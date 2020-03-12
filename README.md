@@ -32,15 +32,15 @@ You can run multiple parallel UI user sessions on a Mac. Setup a user
 for each remote workspace, create a UI session (via VNC for example)
 and run a separate server instance in each session. You need to assign
 a different server ID to each instance (in the server settings). You
-can than easily address each instance from the AudioGridder plugin
+can easily address each instance from the AudioGridder plugin
 via "server[:ID]".
 
 You can also run multiple servers within your network and access
-different servers from your DAW at the same time as needed.
+different servers from your DAW at the same time.
 
 **Server Setup:**
 
-1. Install the PKG (includes server and pluging binaries)
+1. Install the PKG (includes server and plugin binaries)
 2. Run the server (If it crashes, just re-run it until it successfilly
 finishes the startup. Each plugin that does not work will be
 blacklisted.)
@@ -63,7 +63,7 @@ instance).
 
 **Plugin Setup:**
 
-1. Install the PKG (includes server and pluging binaries)
+1. Install the PKG (includes server and plugin binaries)
 2. Run your DAW and insert the AudioGridder plugin
 3. Add your server endpoint(s) by clicking the server icon (this needs
 to be done only once, as the server settings will be shared with new
