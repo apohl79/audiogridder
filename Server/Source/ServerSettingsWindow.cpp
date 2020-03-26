@@ -15,6 +15,8 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
                      LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId),
                      DocumentWindow::closeButton),
       m_app(app) {
+    setUsingNativeTitleBar(true);
+
     auto label = std::make_unique<Label>();
     label->setText("Server ID:", NotificationType::dontSendNotification);
     label->setBounds(15, 40, 150, 30);

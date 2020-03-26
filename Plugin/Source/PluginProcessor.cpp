@@ -23,9 +23,9 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
 #endif
                          .withOutput("Output", AudioChannelSet::stereo(), true)
 #endif
-      )
+                         ),
 #endif
-{
+      m_client(this) {
     signal(SIGPIPE, SIG_IGN);
 
     File cfg(PLUGIN_CONFIG_FILE);
@@ -41,6 +41,9 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
             if (j.find("Last") != j.end()) {
                 m_activeServer = j["Last"].get<int>();
             }
+            if (j.find("NumberOfBuffers") != j.end()) {
+                e47::Client::NUM_OF_BUFFERS = j["NumberOfBuffers"].get<int>();
+            }
         }
     } catch (json::parse_error& e) {
         std::cerr << "parsing config failed: " << e.what() << std::endl;
@@ -50,11 +53,10 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     m_client.setOnConnectCallback([this] {
         int idx = 0;
         for (auto& p : m_loadedPlugins) {
-            std::cout << "loading plugin " << p.name << "... ";
             p.ok = m_client.addPlugin(p.id, p.settings);
-            std::cout << (p.ok ? "ok" : "failed") << std::endl;
+            std::cout << "loading " << p.name << " (" << p.id << ")... " << (p.ok ? "ok" : "failed") << std::endl;
             if (p.ok) {
-                std::cout << "udpating latency samples to " << m_client.getLatencySamples() << std::endl;
+                std::cout << "updating latency samples to " << m_client.getLatencySamples() << std::endl;
                 setLatencySamples(m_client.getLatencySamples());
                 if (p.bypassed) {
                     m_client.bypassPlugin(idx);
@@ -83,7 +85,10 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     }
 }
 
-AudioGridderAudioProcessor::~AudioGridderAudioProcessor() { m_client.close(); }
+AudioGridderAudioProcessor::~AudioGridderAudioProcessor() {
+    m_client.signalThreadShouldExit();
+    m_client.close();
+}
 
 const String AudioGridderAudioProcessor::getName() const { return JucePlugin_Name; }
 
@@ -177,16 +182,11 @@ void AudioGridderAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBu
         }
     } else {
         if (buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) {
-            if (!m_client.send(buffer) || !m_client.read(buffer)) {
-                for (auto i = 0; i < totalNumInputChannels; ++i) {
-                    buffer.clear(i, 0, buffer.getNumSamples());
-                }
-                m_client.close();
-            } else {
-                if (m_client.getLatencySamples() != getLatencySamples()) {
-                    std::cout << "updating latency samples to " << m_client.getLatencySamples() << std::endl;
-                    setLatencySamples(m_client.getLatencySamples());
-                }
+            m_client.send(buffer);
+            m_client.read(buffer);
+            if (m_client.getLatencySamples() != getLatencySamples()) {
+                std::cout << "updating latency samples to " << m_client.getLatencySamples() << std::endl;
+                setLatencySamples(m_client.getLatencySamples());
             }
         }
     }
@@ -207,11 +207,11 @@ void AudioGridderAudioProcessor::processBlock(AudioBuffer<double>& buffer, MidiB
         }
     } else {
         if (buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) {
-            if (!m_client.send(buffer) || !m_client.read(buffer)) {
-                for (auto i = 0; i < totalNumInputChannels; ++i) {
-                    buffer.clear(i, 0, buffer.getNumSamples());
-                }
-                m_client.close();
+            m_client.send(buffer);
+            m_client.read(buffer);
+            if (m_client.getLatencySamples() != getLatencySamples()) {
+                std::cout << "updating latency samples to " << m_client.getLatencySamples() << std::endl;
+                setLatencySamples(m_client.getLatencySamples());
             }
         }
     }
@@ -249,6 +249,7 @@ void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData) {
     json jcfg;
     jcfg["Servers"] = jservers;
     jcfg["Last"] = m_activeServer;
+    jcfg["NumberOfBuffers"] = e47::Client::NUM_OF_BUFFERS;
     File cfg(PLUGIN_CONFIG_FILE);
     cfg.deleteFile();
     FileOutputStream fos(cfg);
@@ -301,8 +302,9 @@ bool AudioGridderAudioProcessor::loadPlugin(const String& id, const String& name
     suspendProcessing(true);
     bool success = m_client.addPlugin(id);
     suspendProcessing(false);
+    std::cout << "loading " << name << " (" << id << ")... " << (success ? "xx" : "error") << std::endl;
     if (success) {
-        std::cout << "udpating latency samples to " << m_client.getLatencySamples() << std::endl;
+        std::cout << "updating latency samples to " << m_client.getLatencySamples() << std::endl;
         setLatencySamples(m_client.getLatencySamples());
         m_loadedPlugins.push_back({id, name, "", false, true});
     }
@@ -313,7 +315,7 @@ void AudioGridderAudioProcessor::unloadPlugin(int idx) {
     suspendProcessing(true);
     m_client.delPlugin(idx);
     suspendProcessing(false);
-    std::cout << "udpating latency samples to " << m_client.getLatencySamples() << std::endl;
+    std::cout << "updating latency samples to " << m_client.getLatencySamples() << std::endl;
     setLatencySamples(m_client.getLatencySamples());
     if (idx == m_activePlugin) {
         hidePlugin();
@@ -366,6 +368,11 @@ void AudioGridderAudioProcessor::exchangePlugins(int idxA, int idxB) {
         m_client.exchangePlugins(idxA, idxB);
         suspendProcessing(false);
         std::swap(m_loadedPlugins[idxA], m_loadedPlugins[idxB]);
+        if (idxA == m_activePlugin) {
+            m_activePlugin = idxB;
+        } else if (idxB == m_activePlugin) {
+            m_activePlugin = idxA;
+        }
     }
 }
 

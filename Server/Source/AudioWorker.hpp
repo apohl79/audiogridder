@@ -52,16 +52,6 @@ class AudioWorker : public Thread {
     std::unique_ptr<ProcessorChain> m_chain;
     RecentsListType m_recents;
     std::function<void()> m_onTerminate;
-
-    template <typename T1, typename T2>
-    void convertBuffer(AudioBuffer<T1>& from, AudioBuffer<T2>& to) {
-        to.setSize(from.getNumChannels(), from.getNumSamples());
-        for (int chan = 0; chan < from.getNumChannels(); ++chan) {
-            for (int sample = 0; sample < from.getNumSamples(); ++sample) {
-                to.setSample(chan, sample, from.getSample(chan, sample));
-            }
-        }
-    }
 };
 
 }  // namespace e47

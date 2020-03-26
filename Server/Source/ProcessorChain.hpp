@@ -42,16 +42,32 @@ class ProcessorChain : public AudioProcessor {
     static std::shared_ptr<AudioPluginInstance> loadPlugin(const String& fileOrIdentifier, double sampleRate,
                                                            int blockSize);
     bool addPluginProcessor(const String& fileOrIdentifier);
-    bool addProcessor(std::shared_ptr<AudioProcessor> processor);
+    bool addProcessor(std::shared_ptr<AudioPluginInstance> processor);
     size_t getSize() const { return m_processors.size(); }
-    std::shared_ptr<AudioProcessor> getProcessor(int index);
+    std::shared_ptr<AudioPluginInstance> getProcessor(int index);
 
     void delProcessor(int idx);
     void exchangeProcessors(int idxA, int idxB);
 
+    void clear() { m_processors.clear(); }
+
+    String toString();
+
   private:
-    std::vector<std::shared_ptr<AudioProcessor>> m_processors;
+    std::vector<std::shared_ptr<AudioPluginInstance>> m_processors;
     std::mutex m_processors_mtx;
+
+    template <typename T>
+    void processBlockReal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
+        int latency = 0;
+        for (auto& p : m_processors) {
+            if (!p->isSuspended()) {
+                p->processBlock(buffer, midiMessages);
+            }
+            latency += p->getLatencySamples();
+        }
+        setLatencySamples(latency);
+    }
 };
 
 }  // namespace e47

@@ -47,7 +47,7 @@ void Server::loadConfig() {
     if (deadmanfile.exists()) {
         StringArray lines;
         deadmanfile.readLines(lines);
-        for (auto& line: lines) {
+        for (auto& line : lines) {
             m_pluginlist.addToBlacklist(line);
         }
         deadmanfile.deleteFile();

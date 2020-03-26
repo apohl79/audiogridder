@@ -18,26 +18,66 @@ namespace e47 {
 /*
  * Core I/O functions
  */
+struct MessageHelper {
+    enum ReadError { E_NONE, E_DATA, E_TIMEOUT, E_STATE, E_SYSCALL };
+    static void seterr(ReadError* e, ReadError c) {
+        if (nullptr != e) {
+            *e = c;
+        }
+    }
+};
+
 static bool send(StreamingSocket* socket, const char* data, int size) {
     if (nullptr != socket && socket->isConnected()) {
-        int to_write = size;
+        int toWrite = size;
         do {
-            int ret = socket->write(data, to_write);
+            int ret = socket->write(static_cast<const char*>(data) + size - toWrite, toWrite);
             data += ret;
-            to_write -= ret;
-        } while (to_write > 0);
+            toWrite -= ret;
+        } while (toWrite > 0);
         return true;
     } else {
         return false;
     }
 }
 
-static bool read(StreamingSocket* socket, void* data, int size) {
+static bool read(StreamingSocket* socket, void* data, int size, int timeoutMilliseconds = 0,
+                 MessageHelper::ReadError* e = nullptr) {
+    MessageHelper::seterr(e, MessageHelper::E_NONE);
     if (nullptr != socket && !socket->isConnected()) {
+        MessageHelper::seterr(e, MessageHelper::E_STATE);
         return false;
     }
-    int len = socket->read(data, size, true);
-    return len == size;
+    auto now = Time::getMillisecondCounterHiRes();
+    auto until = now;
+    if (timeoutMilliseconds > 0) {
+        until += timeoutMilliseconds;
+    }
+    int toRead = size;
+    while (toRead > 0 && now <= until) {
+        int ret = socket->waitUntilReady(true, 100);
+        if (ret < 0) {
+            MessageHelper::seterr(e, MessageHelper::E_SYSCALL);
+            return false;  // error
+        } else if (ret > 0) {
+            int len = socket->read(static_cast<char*>(data) + size - toRead, toRead, timeoutMilliseconds == 0);
+            if (len < 0) {
+                MessageHelper::seterr(e, MessageHelper::E_SYSCALL);
+                return false;
+            } else if (len == 0) {
+                MessageHelper::seterr(e, MessageHelper::E_DATA);
+                return false;
+            }
+            toRead -= len;
+        }
+        now = Time::getMillisecondCounterHiRes();
+    }
+    if (toRead == 0) {
+        return true;
+    } else {
+        MessageHelper::seterr(e, MessageHelper::E_TIMEOUT);
+        return false;
+    }
 }
 
 /*
@@ -110,27 +150,32 @@ class AudioMessage {
     }
 
     template <typename T>
-    bool readFromServer(StreamingSocket* socket, AudioBuffer<T>& buffer) {
+    bool readFromServer(StreamingSocket* socket, AudioBuffer<T>& buffer, MessageHelper::ReadError* e) {
         if (socket->isConnected()) {
-            if (!read(socket, &m_resHeader, sizeof(m_resHeader))) {
+            if (!read(socket, &m_resHeader, sizeof(m_resHeader), 1000, e)) {
                 return false;
             }
             for (int chan = 0; chan < buffer.getNumChannels(); ++chan) {
-                if (!read(socket, buffer.getWritePointer(chan), buffer.getNumSamples() * sizeof(T))) {
+                if (!read(socket, buffer.getWritePointer(chan), buffer.getNumSamples() * sizeof(T), 1000, e)) {
                     return false;
                 }
             }
         } else {
+            *e = MessageHelper::E_STATE;
             return false;
         }
+        *e = MessageHelper::E_NONE;
         return true;
     }
 
     bool readFromClient(StreamingSocket* socket, AudioBuffer<float>& bufferF, AudioBuffer<double>& bufferD) {
         if (socket->isConnected()) {
-            if (!read(socket, &m_reqHeader, sizeof(m_reqHeader))) {
-                return false;
-            }
+            MessageHelper::ReadError e;
+            do {
+                if (!read(socket, &m_reqHeader, sizeof(m_reqHeader), 1000, &e) && e != MessageHelper::E_TIMEOUT) {
+                    return false;
+                }
+            } while (e == MessageHelper::E_TIMEOUT);
             int size;
             if (m_reqHeader.isDouble) {
                 bufferD.setSize(m_reqHeader.channels, m_reqHeader.samples);
@@ -142,9 +187,11 @@ class AudioMessage {
             for (int chan = 0; chan < m_reqHeader.channels; ++chan) {
                 char* data = m_reqHeader.isDouble ? reinterpret_cast<char*>(bufferD.getWritePointer(chan))
                                                   : reinterpret_cast<char*>(bufferF.getWritePointer(chan));
-                if (!read(socket, data, size)) {
-                    return false;
-                }
+                do {
+                    if (!read(socket, data, size, 0, &e) && e != MessageHelper::E_TIMEOUT) {
+                        return false;
+                    }
+                } while (e == MessageHelper::E_TIMEOUT);
             }
         } else {
             return false;
@@ -198,7 +245,7 @@ class DataPayload : public Payload {
   public:
     T* data;
     DataPayload(int type) : Payload(type, sizeof(T)) { realign(); }
-    virtual void realign() { data = reinterpret_cast<T*>(payloadBuffer.data()); }
+    virtual void realign() override { data = reinterpret_cast<T*>(payloadBuffer.data()); }
 };
 
 class NumberPayload : public DataPayload<int> {
@@ -223,7 +270,7 @@ class StringPayload : public Payload {
 
     String getString() const { return String(str, *size); }
 
-    virtual void realign() {
+    virtual void realign() override {
         size = reinterpret_cast<int*>(payloadBuffer.data());
         str = getSize() > sizeof(int) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(int) : nullptr;
     }
@@ -242,7 +289,7 @@ class BinaryPayload : public Payload {
         memcpy(data, src, len);
     }
 
-    virtual void realign() {
+    virtual void realign() override {
         size = reinterpret_cast<int*>(payloadBuffer.data());
         data = getSize() > sizeof(int) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(int) : nullptr;
     }
@@ -283,7 +330,7 @@ class Result : public Payload {
     int getReturnCode() const { return hdr->rc; }
     String getString() const { return String(str, hdr->size); }
 
-    virtual void realign() {
+    virtual void realign() override {
         hdr = reinterpret_cast<hdr_t*>(payloadBuffer.data());
         str = getSize() > sizeof(hdr_t) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(hdr_t) : nullptr;
     }
@@ -348,7 +395,7 @@ class ScreenCapture : public Payload {
         }
     }
 
-    virtual void realign() {
+    virtual void realign() override {
         hdr = reinterpret_cast<hdr_t*>(payloadBuffer.data());
         data = getSize() > sizeof(hdr_t) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(hdr_t) : nullptr;
     }
@@ -416,12 +463,36 @@ class RecentsList : public StringPayload {
     RecentsList() : StringPayload(Type) {}
 };
 
+struct parameter_t {
+    char name[32];
+    int index;
+    int numSteps;
+    bool isDiscrete;
+    bool isBoolean;
+    bool isMetaParameter;
+};
+
+class Parameter : public DataPayload<parameter_t> {
+  public:
+    static constexpr int Type = 16;
+    Parameter() : DataPayload<parameter_t>(Type) {}
+};
+
+struct parametervalue_t {
+    int index;
+    float value;
+};
+
+class ParameterValue : public DataPayload<parametervalue_t> {
+  public:
+    static constexpr int Type = 17;
+    ParameterValue() : DataPayload<parametervalue_t>(Type) {}
+};
+
 template <typename T>
 class Message {
   public:
     static constexpr size_t MAX_SIZE = 200 * 1024;
-
-    enum ReadError { E_DATA, E_TIMEOUT };
 
     struct Header {
         int type;
@@ -430,24 +501,20 @@ class Message {
 
     virtual ~Message() {}
 
-    bool read(StreamingSocket* socket, ReadError* errcode = nullptr) {
+    bool read(StreamingSocket* socket, MessageHelper::ReadError* e = nullptr, int timeoutMilliseconds = 1000) {
         bool success = false;
-        auto seterr = [errcode](ReadError e) {
-            if (nullptr != errcode) {
-                *errcode = e;
-            }
-        };
+        MessageHelper::seterr(e, MessageHelper::E_NONE);
         if (nullptr != socket && socket->isConnected()) {
             Header hdr;
             success = true;
-            int ret = socket->waitUntilReady(true, 1000);
+            int ret = socket->waitUntilReady(true, timeoutMilliseconds);
             if (ret > 0) {
                 if (e47::read(socket, &hdr, sizeof(hdr))) {
                     if (T::Type > 0 && hdr.type != T::Type) {
                         std::cerr << "invalid message type " << hdr.type << " (" << T::Type << " expected)"
                                   << std::endl;
                         success = false;
-                        seterr(E_DATA);
+                        MessageHelper::seterr(e, MessageHelper::E_DATA);
                     } else {
                         payload.setType(hdr.type);
                         if (hdr.size > 0) {
@@ -455,7 +522,7 @@ class Message {
                                 std::cerr << "max size of " << MAX_SIZE << " bytes exceeded (" << hdr.size << " bytes)"
                                           << std::endl;
                                 success = false;
-                                seterr(E_DATA);
+                                MessageHelper::seterr(e, MessageHelper::E_DATA);
                             } else {
                                 if (payload.getSize() != hdr.size) {
                                     payload.setSize(hdr.size);
@@ -463,7 +530,7 @@ class Message {
                                 if (!e47::read(socket, payload.getData(), hdr.size)) {
                                     std::cerr << "failed to read message body" << std::endl;
                                     success = false;
-                                    seterr(E_DATA);
+                                    MessageHelper::seterr(e, MessageHelper::E_DATA);
                                 }
                             }
                         }
@@ -471,16 +538,18 @@ class Message {
                 } else {
                     std::cerr << "failed to read message header" << std::endl;
                     success = false;
-                    seterr(E_DATA);
+                    MessageHelper::seterr(e, MessageHelper::E_DATA);
                 }
             } else if (ret < 0) {
                 std::cerr << "failed to wait for message header" << std::endl;
                 success = false;
-                seterr(E_DATA);
+                MessageHelper::seterr(e, MessageHelper::E_SYSCALL);
             } else {
                 success = false;
-                seterr(E_TIMEOUT);
+                MessageHelper::seterr(e, MessageHelper::E_TIMEOUT);
             }
+        } else {
+            MessageHelper::seterr(e, MessageHelper::E_STATE);
         }
         return success;
     }
@@ -516,8 +585,11 @@ class MessageFactory {
     static std::shared_ptr<Message<Any>> getNextMessage(StreamingSocket* socket) {
         if (nullptr != socket) {
             auto msg = std::make_shared<Message<Any>>();
-            if (msg->read(socket)) {
+            MessageHelper::ReadError e;
+            if (msg->read(socket, &e)) {
                 return msg;
+            } else if (e != MessageHelper::E_TIMEOUT) {
+                socket->close();
             }
         }
         return nullptr;
@@ -526,21 +598,25 @@ class MessageFactory {
     static std::shared_ptr<Result> getResult(StreamingSocket* socket) {
         if (nullptr != socket) {
             auto msg = std::make_shared<Message<Result>>();
-            if (msg->read(socket)) {
-                auto res = std::make_shared<Result>();
-                *res = std::move(msg->payload);
-                return res;
-            }
+            MessageHelper::ReadError e;
+            int retry = 5;
+            do {
+                if (msg->read(socket, &e)) {
+                    auto res = std::make_shared<Result>();
+                    *res = std::move(msg->payload);
+                    return res;
+                }
+            } while (retry-- > 0 && e == MessageHelper::E_TIMEOUT);
         }
         return nullptr;
     }
 
-    static void sendResult(StreamingSocket* socket, int rc) { sendResult(socket, rc, ""); }
+    static bool sendResult(StreamingSocket* socket, int rc) { return sendResult(socket, rc, ""); }
 
-    static void sendResult(StreamingSocket* socket, int rc, const String& str) {
+    static bool sendResult(StreamingSocket* socket, int rc, const String& str) {
         Message<Result> msg;
         msg.payload.setResult(rc, str);
-        msg.send(socket);
+        return msg.send(socket);
     }
 };
 

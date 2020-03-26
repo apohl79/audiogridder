@@ -24,25 +24,23 @@ void ProcessorChain::releaseResources() {
 }
 
 void ProcessorChain::processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMessages) {
-    int latency = 0;
-    for (auto& p : m_processors) {
-        if (!p->isSuspended()) {
-            p->processBlock(buffer, midiMessages);
-        }
-        latency += p->getLatencySamples();
+    auto start_proc = Time::getHighResolutionTicks();
+    processBlockReal(buffer, midiMessages);
+    auto end_proc = Time::getHighResolutionTicks();
+    double time_proc = Time::highResolutionTicksToSeconds(end_proc - start_proc);
+    if (time_proc > 0.02) {
+        dbgln("warning: chain (" << toString() << "): high audio processing time: " << time_proc);
     }
-    setLatencySamples(latency);
 }
 
 void ProcessorChain::processBlock(AudioBuffer<double>& buffer, MidiBuffer& midiMessages) {
-    int latency = 0;
-    for (auto& p : m_processors) {
-        if (!p->isSuspended()) {
-            p->processBlock(buffer, midiMessages);
-        }
-        latency += p->getLatencySamples();
+    auto start_proc = Time::getHighResolutionTicks();
+    processBlockReal(buffer, midiMessages);
+    auto end_proc = Time::getHighResolutionTicks();
+    double time_proc = Time::highResolutionTicksToSeconds(end_proc - start_proc);
+    if (time_proc > 0.02) {
+        dbgln("warning: chain (" << toString() << "): high audio processing time: " << time_proc);
     }
-    setLatencySamples(latency);
 }
 
 double ProcessorChain::getTailLengthSeconds() const {
@@ -81,44 +79,46 @@ void ProcessorChain::setLatency() {
     }
 }
 
-std::shared_ptr<AudioPluginInstance> ProcessorChain::loadPlugin(PluginDescription& plugdesc, double sampleRate,
-                                                                int blockSize) {
-    std::shared_ptr<AudioPluginInstance> inst;
-    std::mutex mtx;
-    std::condition_variable cv;
-    bool done = false;
-    auto fn = [&](std::unique_ptr<AudioPluginInstance> p, const String& err) {
-        std::lock_guard<std::mutex> lock(mtx);
-        if (nullptr == p) {
-            logln("failed loading plugin " << plugdesc.fileOrIdentifier << ": " << err);
-        } else {
-            inst = std::move(p);
-        }
-        done = true;
-        cv.notify_one();
-    };
-
-    AudioPluginFormatManager plugmgr;
-    plugmgr.addDefaultFormats();
-    plugmgr.createPluginInstanceAsync(plugdesc, sampleRate, blockSize, fn);
-
-    std::unique_lock<std::mutex> lock(mtx);
-    cv.wait(lock, [&done] { return done; });
-    return inst;
-}
+// Async version.
+// std::shared_ptr<AudioPluginInstance> ProcessorChain::loadPlugin(PluginDescription& plugdesc, double sampleRate,
+//                                                                int blockSize) {
+//    std::shared_ptr<AudioPluginInstance> inst;
+//    std::mutex mtx;
+//    std::condition_variable cv;
+//    bool done = false;
+//    auto fn = [&](std::unique_ptr<AudioPluginInstance> p, const String& err) {
+//        std::lock_guard<std::mutex> lock(mtx);
+//        if (nullptr == p) {
+//            logln("failed loading plugin " << plugdesc.fileOrIdentifier << ": " << err);
+//        } else {
+//            inst = std::move(p);
+//        }
+//        done = true;
+//        cv.notify_one();
+//    };
+//
+//    AudioPluginFormatManager plugmgr;
+//    plugmgr.addDefaultFormats();
+//    plugmgr.createPluginInstanceAsync(plugdesc, sampleRate, blockSize, fn);
+//
+//    std::unique_lock<std::mutex> lock(mtx);
+//    cv.wait(lock, [&done] { return done; });
+//    return inst;
+//}
 
 // Sync version.
-// std::shared_ptr<AudioPluginInstance> ProcessorChain::loadPlugin(PluginDescription& plugdesc, double sampleRate, int
-// blockSize) {
-//   String err;
-//   AudioPluginFormatManager plugmgr;
-//   plugmgr.addDefaultFormats();
-//   auto inst = std::shared_ptr<AudioPluginInstance>(plugmgr.createPluginInstance(plugdesc, sampleRate, blockSize,
-//   err)); if (nullptr == inst) {
-//       logln("failed loading plugin " << plugdesc.fileOrIdentifier << ": " << err);
-//   }
-//   return inst;
-//}
+std::shared_ptr<AudioPluginInstance> ProcessorChain::loadPlugin(PluginDescription& plugdesc, double sampleRate,
+                                                                int blockSize) {
+    String err;
+    AudioPluginFormatManager plugmgr;
+    plugmgr.addDefaultFormats();
+    auto inst =
+        std::shared_ptr<AudioPluginInstance>(plugmgr.createPluginInstance(plugdesc, sampleRate, blockSize, err));
+    if (nullptr == inst) {
+        logln("failed loading plugin " << plugdesc.fileOrIdentifier << ": " << err);
+    }
+    return inst;
+}
 
 std::shared_ptr<AudioPluginInstance> ProcessorChain::loadPlugin(const String& fileOrIdentifier, double sampleRate,
                                                                 int blockSize) {
@@ -159,7 +159,7 @@ bool ProcessorChain::addPluginProcessor(const String& fileOrIdentifier) {
     return false;
 }
 
-bool ProcessorChain::addProcessor(std::shared_ptr<AudioProcessor> processor) {
+bool ProcessorChain::addProcessor(std::shared_ptr<AudioPluginInstance> processor) {
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     m_processors.push_back(processor);
     setLatency();
@@ -177,7 +177,7 @@ void ProcessorChain::delProcessor(int idx) {
     }
 }
 
-std::shared_ptr<AudioProcessor> ProcessorChain::getProcessor(int index) {
+std::shared_ptr<AudioPluginInstance> ProcessorChain::getProcessor(int index) {
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     if (index > -1 && index < m_processors.size()) {
         return m_processors[index];
@@ -190,6 +190,21 @@ void ProcessorChain::exchangeProcessors(int idxA, int idxB) {
     if (idxA > -1 && idxB < m_processors.size() && idxB > -1 && idxB < m_processors.size()) {
         std::swap(m_processors[idxA], m_processors[idxB]);
     }
+}
+
+String ProcessorChain::toString() {
+    String ret;
+    std::lock_guard<std::mutex> lock(m_processors_mtx);
+    bool first = true;
+    for (auto& p : m_processors) {
+        if (!first) {
+            ret << " > ";
+        } else {
+            first = false;
+        }
+        ret << p->getName();
+    }
+    return ret;
 }
 
 }  // namespace e47

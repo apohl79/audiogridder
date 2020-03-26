@@ -31,6 +31,7 @@ class AudioGridderAudioProcessor : public AudioProcessor {
     bool hasEditor() const override;
 
     const String getName() const override;
+    StringArray getAlternateDisplayNames() const override { return {"AuGrid", "AuGr", "AG"}; }
 
     bool acceptsMidi() const override;
     bool producesMidi() const override;

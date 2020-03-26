@@ -55,9 +55,9 @@ void AudioWorker::run() {
                     if (m_chain->supportsDoublePrecisionProcessing()) {
                         m_chain->processBlock(bufferD, midi);
                     } else {
-                        convertBuffer(bufferD, bufferF);
+                        bufferF.makeCopyOf(bufferD);
                         m_chain->processBlock(bufferF, midi);
-                        convertBuffer(bufferF, bufferD);
+                        bufferD.makeCopyOf(bufferF);
                     }
                 } else if (bufferF.getNumChannels() > 0 && bufferF.getNumSamples() > 0) {
                     m_chain->processBlock(bufferF, midi);
@@ -82,6 +82,8 @@ void AudioWorker::run() {
     }
 
     m_chain->releaseResources();
+    m_chain->clear();
+
     signalThreadShouldExit();
     if (m_onTerminate) {
         m_onTerminate();

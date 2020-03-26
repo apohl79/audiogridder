@@ -149,13 +149,19 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
         MessageFactory::sendResult(m_client.get(), -1);
     } else {
         // send new updated latency samples back
-        MessageFactory::sendResult(m_client.get(), m_audio.getLatencySamples());
-        Message<PluginSettings> msgSettings;
-        if (msgSettings.read(m_client.get()) && *msgSettings.payload.size > 0) {
-            MemoryBlock block;
-            block.append(msgSettings.payload.data, *msgSettings.payload.size);
-            auto proc = m_audio.getProcessor(m_audio.getSize() - 1);
-            proc->setStateInformation(block.getData(), static_cast<int>(block.getSize()));
+        if (!MessageFactory::sendResult(m_client.get(), m_audio.getLatencySamples())) {
+            logln("failed to send result");
+        } else {
+            Message<PluginSettings> msgSettings;
+            if (msgSettings.read(m_client.get()) && *msgSettings.payload.size > 0) {
+                MemoryBlock block;
+                block.append(msgSettings.payload.data, *msgSettings.payload.size);
+                auto proc = m_audio.getProcessor(m_audio.getSize() - 1);
+                proc->setStateInformation(block.getData(), static_cast<int>(block.getSize()));
+            } else {
+                logln("failed to read PluginSettings message");
+                m_client->close();
+            }
         }
     }
 }

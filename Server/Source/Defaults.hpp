@@ -15,4 +15,6 @@ static const String SERVER_CONFIG_FILE = "~/.audiogridderserver";
 static const String PLUGIN_CONFIG_FILE = "~/.audiogridder";
 static const String DEAD_MANS_FILE = "~/.audiogridderserver.crash";
 
+static constexpr int DEFAULT_NUM_OF_BUFFERS = 8;
+
 #endif /* Defaults_hpp */

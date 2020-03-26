@@ -67,12 +67,14 @@ void ScreenWorker::showEditor(std::shared_ptr<AudioProcessor> proc) {
     auto tid = getThreadId();
     MessageManager::callAsync([this, proc, tid] {
         getApp().showEditor(proc, tid, [this](std::shared_ptr<Image> i, int w, int h) {
-            std::lock_guard<std::mutex> lock(m_currentImageLock);
-            m_currentImage = i;
-            m_width = w;
-            m_height = h;
-            m_updated = true;
-            m_currentImageCv.notify_one();
+            if (nullptr != i) {
+                std::lock_guard<std::mutex> lock(m_currentImageLock);
+                m_currentImage = i;
+                m_width = w;
+                m_height = h;
+                m_updated = true;
+                m_currentImageCv.notify_one();
+            }
         });
     });
 }

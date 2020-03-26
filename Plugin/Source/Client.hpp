@@ -13,12 +13,18 @@
 #include "ServerPlugin.hpp"
 #include "Defaults.hpp"
 
+#include <boost/lockfree/spsc_queue.hpp>
+
+class AudioGridderAudioProcessor;
+
 namespace e47 {
 
 class Client : public Thread, public MouseListener, public KeyListener {
   public:
-    Client();
+    Client(AudioGridderAudioProcessor* processor);
     ~Client();
+
+    static int NUM_OF_BUFFERS;
 
     void run();
 
@@ -30,29 +36,31 @@ class Client : public Thread, public MouseListener, public KeyListener {
     int getChannels() const { return m_channels; }
     double getSampleRate() const { return m_rate; }
     int getSamplesPerBlock() const { return m_samplesPerBlock; }
-    int getLatencySamples() const { return m_latency; }
+    int getLatencySamples() const { return m_latency + NUM_OF_BUFFERS * m_samplesPerBlock; }
 
     bool isReady();
     bool isReadyLockFree();
     void init(int channels, double rate, int samplesPerBlock, bool doublePrecission);
     void close();
 
-    template <typename T>
-    bool send(AudioBuffer<T>& buffer) {
-        AudioMessage msg;
+    void send(AudioBuffer<float>& buffer) {
         std::lock_guard<std::mutex> lock(m_clientMtx);
-        return msg.sendToServer(m_audio_socket.get(), buffer);
+        m_audioStreamerF->send(buffer);
     }
 
-    template <typename T>
-    bool read(AudioBuffer<T>& buffer) {
-        AudioMessage msg;
+    void send(AudioBuffer<double>& buffer) {
         std::lock_guard<std::mutex> lock(m_clientMtx);
-        bool success = msg.readFromServer(m_audio_socket.get(), buffer);
-        if (success) {
-            m_latency = msg.getLatencySamples();
-        }
-        return success;
+        m_audioStreamerD->send(buffer);
+    }
+
+    void read(AudioBuffer<float>& buffer) {
+        std::lock_guard<std::mutex> lock(m_clientMtx);
+        m_audioStreamerF->read(buffer);
+    }
+
+    void read(AudioBuffer<double>& buffer) {
+        std::lock_guard<std::mutex> lock(m_clientMtx);
+        m_audioStreamerD->read(buffer);
     }
 
     const auto& getPlugins() const { return m_plugins; }
@@ -81,6 +89,7 @@ class Client : public Thread, public MouseListener, public KeyListener {
     class ScreenReceiver : public Thread {
       public:
         ScreenReceiver(Client* clnt, StreamingSocket* sock) : Thread("ScreenWorker"), m_client(clnt), m_socket(sock) {}
+        ~ScreenReceiver() { stopThread(100); }
         void run();
 
       private:
@@ -104,6 +113,7 @@ class Client : public Thread, public MouseListener, public KeyListener {
     virtual bool keyPressed(const KeyPress& kp, Component* originatingComponent);
 
   private:
+    AudioGridderAudioProcessor* m_processor;
     std::mutex m_srvMtx;
     String m_srvHost = "127.0.0.1";
     int m_srvPort = DEFAULT_SERVER_PORT;
@@ -134,6 +144,133 @@ class Client : public Thread, public MouseListener, public KeyListener {
     void init();
 
     StreamingSocket* accept(StreamingSocket& sock) const;
+
+    String getLoadedPluginsString();
+
+    template <typename T>
+    class AudioStreamer : public Thread {
+      public:
+        Client* client;
+        StreamingSocket* socket;
+        boost::lockfree::spsc_queue<AudioBuffer<T>> writeQ, readQ;
+        std::mutex writeMtx, readMtx;
+        std::condition_variable writeCv, readCv;
+
+        AudioStreamer(Client* clnt, StreamingSocket* sock)
+            : Thread("AudioStreamer"),
+              client(clnt),
+              socket(sock),
+              writeQ(clnt->NUM_OF_BUFFERS * 2),
+              readQ(clnt->NUM_OF_BUFFERS * 2) {
+            for (int i = 0; i < clnt->NUM_OF_BUFFERS; i++) {
+                AudioBuffer<T> buf(clnt->m_channels, clnt->m_samplesPerBlock);
+                buf.clear();
+                readQ.push(std::move(buf));
+            }
+        }
+
+        ~AudioStreamer() {
+            signalThreadShouldExit();
+            notifyWrite();
+            notifyRead();
+            stopThread(100);
+        }
+
+        void notifyWrite() {
+            std::lock_guard<std::mutex> lock(writeMtx);
+            writeCv.notify_one();
+        }
+
+        void waitWrite() {
+            if (writeQ.read_available() == 0) {
+                std::unique_lock<std::mutex> lock(writeMtx);
+                writeCv.wait(lock, [this] { return writeQ.read_available() > 0 || currentThreadShouldExit(); });
+            }
+        }
+
+        void notifyRead() {
+            std::lock_guard<std::mutex> lock(readMtx);
+            readCv.notify_one();
+        }
+
+        void waitRead() {
+            if (readQ.read_available() < (client->NUM_OF_BUFFERS / 2) && readQ.read_available() > 0) {
+                std::cerr << "warning: instance (" << client->getLoadedPluginsString() << "): input buffer below 50% ("
+                          << readQ.read_available() << "/" << client->NUM_OF_BUFFERS << ")" << std::endl;
+            } else if (readQ.read_available() == 0) {
+                std::cerr << "warning: instance (" << client->getLoadedPluginsString()
+                          << "): read queue empty, waiting for data, try increasing the NumberOfBuffers value"
+                          << std::endl;
+                std::unique_lock<std::mutex> lock(readMtx);
+                readCv.wait(lock, [this] { return readQ.read_available() > 0 || currentThreadShouldExit(); });
+            }
+        }
+
+        void run() {
+            while (!currentThreadShouldExit() && socket->isConnected()) {
+                while (writeQ.read_available() > 0) {
+                    AudioBuffer<T> buf;
+                    writeQ.pop(buf);
+                    if (!sendReal(buf)) {
+                        std::cerr << "error: instance (" << client->getLoadedPluginsString() << "): send failed"
+                                  << std::endl;
+                        socket->close();
+                        break;
+                    }
+                    MessageHelper::ReadError err;
+                    if (!readReal(buf, &err)) {
+                        std::cerr << "error: instance (" << client->getLoadedPluginsString()
+                                  << "): read failed, error code " << err << std::endl;
+                        socket->close();
+                        break;
+                    }
+                    readQ.push(std::move(buf));
+                    notifyRead();
+                }
+                waitWrite();
+            }
+        }
+
+        void send(AudioBuffer<T>& buffer) {
+            AudioBuffer<T> cpy;
+            cpy.makeCopyOf(buffer);
+            writeQ.push(std::move(cpy));
+            notifyWrite();
+        }
+
+        void read(AudioBuffer<T>& buffer) {
+            waitRead();
+            AudioBuffer<T> buf;
+            readQ.pop(buf);
+            buffer.makeCopyOf(buf);
+        }
+
+        bool sendReal(AudioBuffer<T>& buffer) {
+            AudioMessage msg;
+            if (nullptr != socket) {
+                return msg.sendToServer(socket, buffer);
+            } else {
+                return nullptr;
+            }
+        }
+
+        bool readReal(AudioBuffer<T>& buffer, MessageHelper::ReadError* e) {
+            AudioMessage msg;
+            bool success = false;
+            if (nullptr != socket) {
+                success = msg.readFromServer(socket, buffer, e);
+            }
+            if (success) {
+                client->m_latency = msg.getLatencySamples();
+            }
+            return success;
+        }
+    };
+    friend AudioStreamer<float>;
+    friend AudioStreamer<double>;
+
+    std::unique_ptr<AudioStreamer<float>> m_audioStreamerF;
+    std::unique_ptr<AudioStreamer<double>> m_audioStreamerD;
 };
 
 }  // namespace e47

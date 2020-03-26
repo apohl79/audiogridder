@@ -6,26 +6,34 @@
  */
 
 #include "Client.hpp"
+#include "PluginProcessor.hpp"
 
 namespace e47 {
 
-Client::Client()
-    : Thread("Client"), m_ready(false), m_cmd_socket(nullptr), m_audio_socket(nullptr), m_screen_socket(nullptr) {
+int Client::NUM_OF_BUFFERS = DEFAULT_NUM_OF_BUFFERS;
+
+Client::Client(AudioGridderAudioProcessor* processor)
+    : Thread("Client"),
+      m_processor(processor),
+      m_ready(false),
+      m_cmd_socket(nullptr),
+      m_audio_socket(nullptr),
+      m_screen_socket(nullptr) {
     startThread();
 }
 
 Client::~Client() {
+    stopThread(1000);
     close();
-    signalThreadShouldExit();
     waitForThreadToExit(-1);
 }
 
 void Client::run() {
     bool lastState = isReady();
     while (!currentThreadShouldExit()) {
-        if (!isReady()) {
+        if (!isReady() && !currentThreadShouldExit()) {
             init();
-        } else if (m_needsReconnect) {
+        } else if (m_needsReconnect && !currentThreadShouldExit()) {
             close();
             init();
         }
@@ -38,7 +46,10 @@ void Client::run() {
                 }
             }
         }
-        Thread::sleep(1000);
+        int sleepfor = 20;
+        while (!currentThreadShouldExit() && sleepfor-- > 0) {
+            Thread::sleep(50);
+        }
     }
 }
 
@@ -52,6 +63,7 @@ void Client::setServer(const String& host, int port) {
             m_id = hostParts[1].getIntValue();
         } else {
             m_srvHost = host;
+            m_id = 0;
         }
         m_srvPort = port;
         m_needsReconnect = true;
@@ -116,16 +128,16 @@ void Client::init() {
     }
     std::cout << "connecting server " << host << ":" << id << std::endl;
     m_cmd_socket = std::make_unique<StreamingSocket>();
-    if (m_cmd_socket->connect(host, port)) {
+    if (m_cmd_socket->connect(host, port, 1000)) {
         StreamingSocket sock;
-        int retry = 200;
+        int retry = 0;
         int clientPort;
         do {
             if (sock.createListener(DEFAULT_CLIENT_PORT - retry)) {
                 clientPort = DEFAULT_CLIENT_PORT - retry;
                 break;
             }
-        } while (0 > retry--);
+        } while (retry++ < 200);
 
         if (!sock.isConnected()) {
             std::cerr << "failed to create listener" << std::endl;
@@ -146,6 +158,13 @@ void Client::init() {
         m_audio_socket = std::unique_ptr<StreamingSocket>(accept(sock));
         if (nullptr != m_audio_socket) {
             std::cout << "audio connection established" << std::endl;
+            if (m_doublePrecission) {
+                m_audioStreamerD.reset(new AudioStreamer<double>(this, m_audio_socket.get()));
+                m_audioStreamerD->startThread(Thread::realtimeAudioPriority);
+            } else {
+                m_audioStreamerF.reset(new AudioStreamer<float>(this, m_audio_socket.get()));
+                m_audioStreamerF->startThread(Thread::realtimeAudioPriority);
+            }
         } else {
             return;
         }
@@ -208,7 +227,7 @@ void Client::close() {
             m_screen_socket->close();
         }
         m_screenWorker->signalThreadShouldExit();
-        m_screenWorker->waitForThreadToExit(-1);
+        m_screenWorker->waitForThreadToExit(100);
         m_screenWorker.reset();
         m_screen_socket.reset();
     }
@@ -221,8 +240,18 @@ void Client::close() {
     }
     if (nullptr != m_audio_socket) {
         m_audio_socket->close();
-        m_audio_socket.reset();
     }
+    if (nullptr != m_audioStreamerD && m_audioStreamerD->isThreadRunning()) {
+        m_audioStreamerD->signalThreadShouldExit();
+        m_audioStreamerD->waitForThreadToExit(100);
+        m_audioStreamerD.reset();
+    }
+    if (nullptr != m_audioStreamerF && m_audioStreamerF->isThreadRunning()) {
+        m_audioStreamerF->signalThreadShouldExit();
+        m_audioStreamerF->waitForThreadToExit(100);
+        m_audioStreamerF.reset();
+    }
+    m_audio_socket.reset();
     if (m_onCloseCallback) {
         m_clientMtx.unlock();
         m_onCloseCallback();
@@ -258,13 +287,13 @@ bool Client::addPlugin(String id, String settings) {
             return false;
         }
         m_latency = result->getReturnCode();
-        Message<PluginSettings> msgSessings;
+        Message<PluginSettings> msgSettings;
         if (settings.isNotEmpty()) {
             MemoryBlock block;
             block.fromBase64Encoding(settings);
-            msgSessings.payload.setData(block.begin(), static_cast<int>(block.getSize()));
+            msgSettings.payload.setData(block.begin(), static_cast<int>(block.getSize()));
         }
-        return msgSessings.send(m_cmd_socket.get());
+        return msgSettings.send(m_cmd_socket.get());
     }
     return false;
 }
@@ -300,12 +329,16 @@ MemoryBlock Client::getPluginSettings(int idx) {
     std::lock_guard<std::mutex> lock(m_clientMtx);
     if (!msg.send(m_cmd_socket.get())) {
         std::cerr << "failed to send GetPluginSettings message" << std::endl;
+        m_cmd_socket->close();
     } else {
         Message<PluginSettings> res;
-        if (!res.read(m_cmd_socket.get())) {
-            std::cerr << "failed to receive PluginSettings message" << std::endl;
-        } else if (*res.payload.size > 0) {
-            block.append(res.payload.data, *res.payload.size);
+        if (res.read(m_cmd_socket.get())) {
+            if (*res.payload.size > 0) {
+                block.append(res.payload.data, *res.payload.size);
+            }
+        } else {
+            std::cerr << "failed to read PluginSettings message" << std::endl;
+            m_cmd_socket->close();
         }
     }
     return block;
@@ -336,14 +369,18 @@ void Client::exchangePlugins(int idxA, int idxB) {
 std::vector<ServerPlugin> Client::getRecents() {
     Message<RecentsList> msg;
     msg.send(m_cmd_socket.get());
-    msg.read(m_cmd_socket.get());
-    String listChunk(msg.payload.str, *msg.payload.size);
-    auto list = StringArray::fromLines(listChunk);
     std::vector<ServerPlugin> recents;
-    for (auto& line : list) {
-        if (!line.isEmpty()) {
-            recents.push_back(ServerPlugin::fromString(line));
+    if (msg.read(m_cmd_socket.get())) {
+        String listChunk(msg.payload.str, *msg.payload.size);
+        auto list = StringArray::fromLines(listChunk);
+        for (auto& line : list) {
+            if (!line.isEmpty()) {
+                recents.push_back(ServerPlugin::fromString(line));
+            }
         }
+    } else {
+        std::cerr << "failed to read RecentsList message" << std::endl;
+        m_cmd_socket->close();
     }
     return recents;
 }
@@ -351,9 +388,9 @@ std::vector<ServerPlugin> Client::getRecents() {
 void Client::ScreenReceiver::run() {
     using MsgType = Message<ScreenCapture>;
     MsgType msg;
-    while (!currentThreadShouldExit()) {
-        MsgType::ReadError errcode;
-        if (msg.read(m_socket, &errcode)) {
+    MessageHelper::ReadError e;
+    do {
+        if (msg.read(m_socket, &e, 200)) {
             if (msg.payload.hdr->size > 0) {
                 m_client->setPluginScreen(
                     std::make_shared<Image>(JPEGImageFormat::loadFrom(msg.payload.data, msg.payload.hdr->size)),
@@ -361,16 +398,10 @@ void Client::ScreenReceiver::run() {
             } else {
                 m_client->setPluginScreen(nullptr, 0, 0);
             }
-        } else {
-            if (errcode != MsgType::E_TIMEOUT) {
-                std::cerr << "screen receiver error, exit" << std::endl;
-                if (nullptr != m_socket) {
-                    m_socket->close();
-                }
-                break;
-            }
         }
-    }
+    } while (!currentThreadShouldExit() && (e == MessageHelper::E_NONE || e == MessageHelper::E_TIMEOUT));
+    signalThreadShouldExit();
+    std::cout << "screen receiver terminated" << std::endl;
 }
 
 void Client::mouseMove(const MouseEvent& event) { sendMouseEvent(MouseEvType::MOVE, event.position); }
@@ -539,6 +570,20 @@ StreamingSocket* Client::accept(StreamingSocket& sock) const {
         }
     } while (--retry > 0);
     return clnt;
+}
+
+String Client::getLoadedPluginsString() {
+    String ret;
+    bool first = true;
+    for (auto& p : m_processor->getLoadedPlugins()) {
+        if (first) {
+            first = false;
+        } else {
+            ret << " > ";
+        }
+        ret << p.name;
+    }
+    return ret;
 }
 
 }  // namespace e47

@@ -145,17 +145,23 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
         auto editFn = [this, idx, active] {
             m_processor.editPlugin(idx);
             m_pluginButtons[idx]->setActive(true);
+            m_pluginButtons[idx]->setColour(PluginButton::textColourOffId, Colours::yellow);
+            auto* p_processor = &m_processor;
             m_processor.getClient().setPluginScreenUpdateCallback(
-                [this, idx](std::shared_ptr<Image> img, int width, int height) {
+                [this, idx, p_processor](std::shared_ptr<Image> img, int width, int height) {
                     if (nullptr != img) {
-                        MessageManager::callAsync([this, img, width, height] {
-                            m_pluginScreen.setSize(width, height);
-                            m_pluginScreen.setImage(*img);
-                            resized();
+                        MessageManager::callAsync([this, p_processor, img, width, height] {
+                            auto p = dynamic_cast<AudioGridderAudioProcessorEditor*>(p_processor->getActiveEditor());
+                            if (this == p) {  // make sure the editor hasn't been closed
+                                m_pluginScreen.setSize(width, height);
+                                m_pluginScreen.setImage(*img);
+                                resized();
+                            }
                         });
                     } else {
-                        MessageManager::callAsync([this, idx] {
-                            if (m_pluginButtons.size() > idx) {
+                        MessageManager::callAsync([this, idx, p_processor] {
+                            auto p = dynamic_cast<AudioGridderAudioProcessorEditor*>(p_processor->getActiveEditor());
+                            if (this == p && m_pluginButtons.size() > idx) {
                                 m_processor.hidePlugin(false);
                                 m_pluginButtons[idx]->setActive(false);
                                 resized();
@@ -165,11 +171,13 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
                 });
             if (active > -1) {
                 m_pluginButtons[active]->setActive(false);
+                m_pluginButtons[active]->setColour(PluginButton::textColourOffId, Colours::white);
             }
         };
         auto hideFn = [this, idx] {
             m_processor.hidePlugin();
             m_pluginButtons[idx]->setActive(false);
+            m_pluginButtons[idx]->setColour(PluginButton::textColourOffId, Colours::white);
             resized();
         };
         if (modifiers.isLeftButtonDown()) {
