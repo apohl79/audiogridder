@@ -41,7 +41,7 @@ different servers from your DAW at the same time.
 **Server Setup:**
 
 1. Install the PKG (includes server and plugin binaries)
-2. Run the server (If it crashes, just re-run it until it successfilly
+2. Run the server (If it crashes, just re-run it until it successfully
 finishes the startup. Each plugin that does not work will be
 blacklisted.)
 3. Manage your plugins (if you do not want to enable all plugins)
@@ -53,7 +53,8 @@ have to assign a different server ID to each instance.
 ## AudioGridder Plugin
 
 The plugin is currently supported as VST3 and AudioUnit on OSX. AAX is
-work in progress.
+likely never coming, as AVID does not seem to support open source
+projects unfortunately. 
 
 You are basically plugging a remote insert stack into your DAW's
 channel insert stacks. From there you can insert any pluging available
