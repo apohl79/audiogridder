@@ -277,7 +277,7 @@ void Client::quit() {
     msg.send(m_cmd_socket.get());
 }
 
-bool Client::addPlugin(String id, String settings) {
+bool Client::addPlugin(String id, StringArray& presets, String settings) {
     Message<AddPlugin> msg;
     msg.payload.setString(id);
     std::lock_guard<std::mutex> lock(m_clientMtx);
@@ -287,6 +287,12 @@ bool Client::addPlugin(String id, String settings) {
             return false;
         }
         m_latency = result->getReturnCode();
+        Message<Presets> msgPresets;
+        if (!msgPresets.read(m_cmd_socket.get())) {
+            return false;
+        }
+        std::cout << "got presets: " << msgPresets.payload.getString() << std::endl;
+        presets = StringArray::fromTokens(msgPresets.payload.getString(), "|", "");
         Message<PluginSettings> msgSettings;
         if (settings.isNotEmpty()) {
             MemoryBlock block;
@@ -383,6 +389,13 @@ std::vector<ServerPlugin> Client::getRecents() {
         m_cmd_socket->close();
     }
     return recents;
+}
+
+void Client::setPreset(int idx, int preset) {
+    Message<Preset> msg;
+    msg.payload.data->idx = idx;
+    msg.payload.data->preset = preset;
+    msg.send(m_cmd_socket.get());
 }
 
 void Client::ScreenReceiver::run() {

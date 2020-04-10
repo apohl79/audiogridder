@@ -41,16 +41,20 @@ void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channels, double 
 }
 
 void AudioWorker::run() {
-    m_chain->prepareToPlay(m_rate, m_samplesPerBlock);
-
     AudioBuffer<float> bufferF;
     AudioBuffer<double> bufferD;
     MidiBuffer midi;
     AudioMessage msg;
+    AudioPlayHead::CurrentPositionInfo posInfo;
+
+    ProcessorChain::PlayHead playHead(&posInfo);
+    m_chain->prepareToPlay(m_rate, m_samplesPerBlock);
+    m_chain->setPlayHead(&playHead);
+
     while (!currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected()) {
         // Read audio chunk
         if (m_socket->waitUntilReady(true, 1000)) {
-            if (msg.readFromClient(m_socket.get(), bufferF, bufferD)) {
+            if (msg.readFromClient(m_socket.get(), bufferF, bufferD, midi, posInfo)) {
                 if (msg.isDouble() && bufferD.getNumChannels() > 0 && bufferD.getNumSamples() > 0) {
                     if (m_chain->supportsDoublePrecisionProcessing()) {
                         m_chain->processBlock(bufferD, midi);
@@ -65,12 +69,12 @@ void AudioWorker::run() {
                     logln("empty audio message from " << m_socket->getHostName());
                 }
                 if (msg.isDouble()) {
-                    if (!msg.sendToClient(m_socket.get(), bufferD, m_chain->getLatencySamples())) {
+                    if (!msg.sendToClient(m_socket.get(), bufferD, midi, m_chain->getLatencySamples())) {
                         logln("failed to send audio data to client");
                         m_socket->close();
                     }
                 } else {
-                    if (!msg.sendToClient(m_socket.get(), bufferF, m_chain->getLatencySamples())) {
+                    if (!msg.sendToClient(m_socket.get(), bufferF, midi, m_chain->getLatencySamples())) {
                         logln("failed to send audio data to client");
                         m_socket->close();
                     }
@@ -94,7 +98,7 @@ void AudioWorker::run() {
 void AudioWorker::shutdown() { signalThreadShouldExit(); }
 
 bool AudioWorker::addPlugin(const String& id) {
-    dbgln("adding plugin " << id);
+    dbgln("adding plugin " << id << "...");
     bool success = m_chain->addPluginProcessor(id);
     if (success) {
         // update recents list
@@ -113,6 +117,7 @@ bool AudioWorker::addPlugin(const String& id) {
     } else {
         dbgln("failed to add plugin");
     }
+    dbgln("..." << (success ? "ok" : "failed"));
     return success;
 }
 

@@ -227,6 +227,14 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
                 }
                 resized();
             });
+            m.addSeparator();
+            PopupMenu presets;
+            int preset = 0;
+            for (auto& p : m_processor.getLoadedPlugin(idx).presets) {
+                presets.addItem(p, [this, idx, preset] { m_processor.getClient().setPreset(idx, preset); });
+                preset++;
+            }
+            m.addSubMenu("Presets", presets);
             m.showAt(button);
         }
     }

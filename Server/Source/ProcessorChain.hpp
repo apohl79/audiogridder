@@ -14,6 +14,18 @@ namespace e47 {
 
 class ProcessorChain : public AudioProcessor {
   public:
+    class PlayHead : public AudioPlayHead {
+      public:
+        PlayHead(AudioPlayHead::CurrentPositionInfo* posInfo) : m_posInfo(posInfo) {}
+        bool getCurrentPosition(CurrentPositionInfo& result) {
+            result = *m_posInfo;
+            return true;
+        }
+
+      private:
+        AudioPlayHead::CurrentPositionInfo* m_posInfo;
+    };
+
     void prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock) override;
     void releaseResources() override;
     void processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMessages) override;
@@ -67,6 +79,18 @@ class ProcessorChain : public AudioProcessor {
             latency += p->getLatencySamples();
         }
         setLatencySamples(latency);
+    }
+
+    template <typename T>
+    void preProcessBlocks(std::shared_ptr<AudioPluginInstance> inst) {
+        MidiBuffer midi;
+        AudioBuffer<T> buf(getMainBusNumInputChannels(), getBlockSize());
+        buf.clear();
+        int samplesProcessed = 0;
+        do {
+            inst->processBlock(buf, midi);
+            samplesProcessed += getBlockSize();
+        } while (samplesProcessed < 8192);
     }
 };
 

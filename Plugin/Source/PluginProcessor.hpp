@@ -57,6 +57,7 @@ class AudioGridderAudioProcessor : public AudioProcessor {
         String id;
         String name;
         String settings;
+        StringArray presets;
         bool bypassed;
         bool ok;
     };

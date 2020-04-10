@@ -53,7 +53,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     m_client.setOnConnectCallback([this] {
         int idx = 0;
         for (auto& p : m_loadedPlugins) {
-            p.ok = m_client.addPlugin(p.id, p.settings);
+            p.ok = m_client.addPlugin(p.id, p.presets, p.settings);
             std::cout << "loading " << p.name << " (" << p.id << ")... " << (p.ok ? "ok" : "failed") << std::endl;
             if (p.ok) {
                 std::cout << "updating latency samples to " << m_client.getLatencySamples() << std::endl;
@@ -120,10 +120,7 @@ double AudioGridderAudioProcessor::getTailLengthSeconds() const { return 0.0; }
 
 bool AudioGridderAudioProcessor::supportsDoublePrecisionProcessing() const { return true; }
 
-int AudioGridderAudioProcessor::getNumPrograms() {
-    return 1;  // NB: some hosts don't cope very well if you tell them there are 0 programs,
-    // so this should be at least 1, even if you're not really implementing programs.
-}
+int AudioGridderAudioProcessor::getNumPrograms() { return 1; }
 
 int AudioGridderAudioProcessor::getCurrentProgram() { return 0; }
 
@@ -172,6 +169,10 @@ void AudioGridderAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBu
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
+    auto* playHead = getPlayHead();
+    AudioPlayHead::CurrentPositionInfo posInfo;
+    playHead->getCurrentPosition(posInfo);
+
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
         buffer.clear(i, 0, buffer.getNumSamples());
     }
@@ -182,8 +183,8 @@ void AudioGridderAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBu
         }
     } else {
         if (buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) {
-            m_client.send(buffer);
-            m_client.read(buffer);
+            m_client.send(buffer, midiMessages, posInfo);
+            m_client.read(buffer, midiMessages);
             if (m_client.getLatencySamples() != getLatencySamples()) {
                 std::cout << "updating latency samples to " << m_client.getLatencySamples() << std::endl;
                 setLatencySamples(m_client.getLatencySamples());
@@ -197,6 +198,10 @@ void AudioGridderAudioProcessor::processBlock(AudioBuffer<double>& buffer, MidiB
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
+    auto* playHead = getPlayHead();
+    AudioPlayHead::CurrentPositionInfo posInfo;
+    playHead->getCurrentPosition(posInfo);
+
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
         buffer.clear(i, 0, buffer.getNumSamples());
     }
@@ -207,8 +212,8 @@ void AudioGridderAudioProcessor::processBlock(AudioBuffer<double>& buffer, MidiB
         }
     } else {
         if (buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) {
-            m_client.send(buffer);
-            m_client.read(buffer);
+            m_client.send(buffer, midiMessages, posInfo);
+            m_client.read(buffer, midiMessages);
             if (m_client.getLatencySamples() != getLatencySamples()) {
                 std::cout << "updating latency samples to " << m_client.getLatencySamples() << std::endl;
                 setLatencySamples(m_client.getLatencySamples());
@@ -227,7 +232,7 @@ void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData) {
     for (auto& srv : m_servers) {
         jservers.push_back(srv.toStdString());
     }
-    j["version"] = 1;
+    j["version"] = 2;
     j["servers"] = jservers;
     j["activeServer"] = m_activeServer;
     auto jplugs = json::array();
@@ -239,7 +244,12 @@ void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData) {
                 plug.settings = settings.toBase64Encoding();
             }
         }
-        jplugs.push_back({plug.id.toStdString(), plug.name.toStdString(), plug.settings.toStdString(), plug.bypassed});
+        auto jpresets = json::array();
+        for (auto& p : plug.presets) {
+            jpresets.push_back(p.toStdString());
+        }
+        jplugs.push_back(
+            {plug.id.toStdString(), plug.name.toStdString(), plug.settings.toStdString(), jpresets, plug.bypassed});
     }
     j["loadedPlugins"] = jplugs;
 
@@ -270,11 +280,20 @@ void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeI
     m_activeServer = j["activeServer"].get<int>();
     for (auto& plug : j["loadedPlugins"]) {
         if (version < 1) {
-            m_loadedPlugins.push_back(
-                {plug[0].get<std::string>(), plug[1].get<std::string>(), plug[2].get<std::string>(), false});
-        } else {
+            StringArray dummy;
             m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
-                                       plug[2].get<std::string>(), plug[3].get<bool>(), false});
+                                       plug[2].get<std::string>(), dummy, false, false});
+        } else if (version == 1) {
+            StringArray dummy;
+            m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
+                                       plug[2].get<std::string>(), dummy, plug[3].get<bool>(), false});
+        } else {
+            StringArray presets;
+            for (auto& p : plug[3]) {
+                presets.add(p.get<std::string>());
+            }
+            m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
+                                       plug[2].get<std::string>(), presets, plug[4].get<bool>(), false});
         }
     }
     m_client.setServer(m_servers[m_activeServer]);
@@ -299,14 +318,15 @@ std::set<String> AudioGridderAudioProcessor::getPluginTypes() const {
 }
 
 bool AudioGridderAudioProcessor::loadPlugin(const String& id, const String& name) {
+    StringArray presets;
     suspendProcessing(true);
-    bool success = m_client.addPlugin(id);
+    bool success = m_client.addPlugin(id, presets);
     suspendProcessing(false);
     std::cout << "loading " << name << " (" << id << ")... " << (success ? "xx" : "error") << std::endl;
     if (success) {
         std::cout << "updating latency samples to " << m_client.getLatencySamples() << std::endl;
         setLatencySamples(m_client.getLatencySamples());
-        m_loadedPlugins.push_back({id, name, "", false, true});
+        m_loadedPlugins.push_back({id, name, "", presets, false, true});
     }
     return success;
 }

@@ -101,10 +101,17 @@ class AudioMessage {
         int channels;
         int samples;
         bool isDouble;
+        int numMidiEvents;
     };
 
     struct ResponseHeader {
         int latencySamples;
+        int numMidiEvents;
+    };
+
+    struct MidiHeader {
+        int sampleNumber;
+        int size;
     };
 
     int getChannels() const { return m_reqHeader.channels; }
@@ -114,10 +121,12 @@ class AudioMessage {
     int getLatencySamples() const { return m_resHeader.latencySamples; }
 
     template <typename T>
-    bool sendToServer(StreamingSocket* socket, AudioBuffer<T>& buffer) {
+    bool sendToServer(StreamingSocket* socket, AudioBuffer<T>& buffer, MidiBuffer& midi,
+                      AudioPlayHead::CurrentPositionInfo& posInfo) {
         m_reqHeader.channels = buffer.getNumChannels();
         m_reqHeader.samples = buffer.getNumSamples();
         m_reqHeader.isDouble = std::is_same<T, double>::value;
+        m_reqHeader.numMidiEvents = midi.getNumEvents();
         if (socket->isConnected()) {
             if (!send(socket, reinterpret_cast<const char*>(&m_reqHeader), sizeof(m_reqHeader))) {
                 return false;
@@ -128,13 +137,28 @@ class AudioMessage {
                     return false;
                 }
             }
+            const uint8* midiData;
+            MidiHeader midiHdr;
+            MidiBuffer::Iterator midiIt(midi);
+            while (midiIt.getNextEvent(midiData, midiHdr.size, midiHdr.sampleNumber)) {
+                if (!send(socket, reinterpret_cast<const char*>(&midiHdr), sizeof(midiHdr))) {
+                    return false;
+                }
+                if (!send(socket, reinterpret_cast<const char*>(midiData), midiHdr.size)) {
+                    return false;
+                }
+            }
+            if (!send(socket, reinterpret_cast<const char*>(&posInfo), sizeof(posInfo))) {
+                return false;
+            }
         }
         return true;
     }
 
     template <typename T>
-    bool sendToClient(StreamingSocket* socket, AudioBuffer<T>& buffer, int latencySamples) {
+    bool sendToClient(StreamingSocket* socket, AudioBuffer<T>& buffer, MidiBuffer& midi, int latencySamples) {
         m_resHeader.latencySamples = latencySamples;
+        m_resHeader.numMidiEvents = midi.getNumEvents();
         if (socket->isConnected()) {
             if (!send(socket, reinterpret_cast<const char*>(&m_resHeader), sizeof(m_resHeader))) {
                 return false;
@@ -145,12 +169,24 @@ class AudioMessage {
                     return false;
                 }
             }
+            const uint8* midiData;
+            MidiHeader midiHdr;
+            MidiBuffer::Iterator midiIt(midi);
+            while (midiIt.getNextEvent(midiData, midiHdr.size, midiHdr.sampleNumber)) {
+                if (!send(socket, reinterpret_cast<const char*>(&midiHdr), sizeof(midiHdr))) {
+                    return false;
+                }
+                if (!send(socket, reinterpret_cast<const char*>(midiData), midiHdr.size)) {
+                    return false;
+                }
+            }
         }
         return true;
     }
 
     template <typename T>
-    bool readFromServer(StreamingSocket* socket, AudioBuffer<T>& buffer, MessageHelper::ReadError* e) {
+    bool readFromServer(StreamingSocket* socket, AudioBuffer<T>& buffer, MidiBuffer& midi,
+                        MessageHelper::ReadError* e) {
         if (socket->isConnected()) {
             if (!read(socket, &m_resHeader, sizeof(m_resHeader), 1000, e)) {
                 return false;
@@ -160,6 +196,21 @@ class AudioMessage {
                     return false;
                 }
             }
+            midi.clear();
+            std::vector<char> midiData;
+            MidiHeader midiHdr;
+            for (int i = 0; i < m_resHeader.numMidiEvents; i++) {
+                if (!read(socket, &midiHdr, sizeof(midiHdr), 1000, e)) {
+                    return false;
+                }
+                if (midiData.size() < midiHdr.size) {
+                    midiData.resize(midiHdr.size);
+                }
+                if (!read(socket, midiData.data(), midiHdr.size, 1000, e)) {
+                    return false;
+                }
+                midi.addEvent(midiData.data(), midiHdr.size, midiHdr.sampleNumber);
+            }
         } else {
             *e = MessageHelper::E_STATE;
             return false;
@@ -168,14 +219,12 @@ class AudioMessage {
         return true;
     }
 
-    bool readFromClient(StreamingSocket* socket, AudioBuffer<float>& bufferF, AudioBuffer<double>& bufferD) {
+    bool readFromClient(StreamingSocket* socket, AudioBuffer<float>& bufferF, AudioBuffer<double>& bufferD,
+                        MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
         if (socket->isConnected()) {
-            MessageHelper::ReadError e;
-            do {
-                if (!read(socket, &m_reqHeader, sizeof(m_reqHeader), 1000, &e) && e != MessageHelper::E_TIMEOUT) {
-                    return false;
-                }
-            } while (e == MessageHelper::E_TIMEOUT);
+            if (!read(socket, &m_reqHeader, sizeof(m_reqHeader))) {
+                return false;
+            }
             int size;
             if (m_reqHeader.isDouble) {
                 bufferD.setSize(m_reqHeader.channels, m_reqHeader.samples);
@@ -187,11 +236,25 @@ class AudioMessage {
             for (int chan = 0; chan < m_reqHeader.channels; ++chan) {
                 char* data = m_reqHeader.isDouble ? reinterpret_cast<char*>(bufferD.getWritePointer(chan))
                                                   : reinterpret_cast<char*>(bufferF.getWritePointer(chan));
-                do {
-                    if (!read(socket, data, size, 0, &e) && e != MessageHelper::E_TIMEOUT) {
-                        return false;
-                    }
-                } while (e == MessageHelper::E_TIMEOUT);
+                if (!read(socket, data, size)) {
+                    return false;
+                }
+            }
+            midi.clear();
+            for (int i = 0; i < m_reqHeader.numMidiEvents; i++) {
+                std::vector<char> midiData;
+                MidiHeader midiHdr;
+                if (!read(socket, &midiHdr, sizeof(midiHdr))) {
+                    return false;
+                }
+                midiData.resize(midiHdr.size);
+                if (!read(socket, midiData.data(), midiHdr.size)) {
+                    return false;
+                }
+                midi.addEvent(midiData.data(), midiHdr.size, midiHdr.sampleNumber);
+            }
+            if (!read(socket, &posInfo, sizeof(posInfo))) {
+                return false;
             }
         } else {
             return false;
@@ -474,7 +537,7 @@ struct parameter_t {
 
 class Parameter : public DataPayload<parameter_t> {
   public:
-    static constexpr int Type = 16;
+    static constexpr int Type = 17;
     Parameter() : DataPayload<parameter_t>(Type) {}
 };
 
@@ -485,8 +548,25 @@ struct parametervalue_t {
 
 class ParameterValue : public DataPayload<parametervalue_t> {
   public:
-    static constexpr int Type = 17;
+    static constexpr int Type = 18;
     ParameterValue() : DataPayload<parametervalue_t>(Type) {}
+};
+
+class Presets : public StringPayload {
+  public:
+    static constexpr int Type = 19;
+    Presets() : StringPayload(Type) {}
+};
+
+struct preset_t {
+    int idx;
+    int preset;
+};
+
+class Preset : public DataPayload<preset_t> {
+  public:
+    static constexpr int Type = 20;
+    Preset() : DataPayload<preset_t>(Type) {}
 };
 
 template <typename T>

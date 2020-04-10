@@ -43,24 +43,24 @@ class Client : public Thread, public MouseListener, public KeyListener {
     void init(int channels, double rate, int samplesPerBlock, bool doublePrecission);
     void close();
 
-    void send(AudioBuffer<float>& buffer) {
+    void send(AudioBuffer<float>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
         std::lock_guard<std::mutex> lock(m_clientMtx);
-        m_audioStreamerF->send(buffer);
+        m_audioStreamerF->send(buffer, midi, posInfo);
     }
 
-    void send(AudioBuffer<double>& buffer) {
+    void send(AudioBuffer<double>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
         std::lock_guard<std::mutex> lock(m_clientMtx);
-        m_audioStreamerD->send(buffer);
+        m_audioStreamerD->send(buffer, midi, posInfo);
     }
 
-    void read(AudioBuffer<float>& buffer) {
+    void read(AudioBuffer<float>& buffer, MidiBuffer& midi) {
         std::lock_guard<std::mutex> lock(m_clientMtx);
-        m_audioStreamerF->read(buffer);
+        m_audioStreamerF->read(buffer, midi);
     }
 
-    void read(AudioBuffer<double>& buffer) {
+    void read(AudioBuffer<double>& buffer, MidiBuffer& midi) {
         std::lock_guard<std::mutex> lock(m_clientMtx);
-        m_audioStreamerD->read(buffer);
+        m_audioStreamerD->read(buffer, midi);
     }
 
     const auto& getPlugins() const { return m_plugins; }
@@ -76,7 +76,7 @@ class Client : public Thread, public MouseListener, public KeyListener {
     using OnCloseCallback = std::function<void()>;
     void setOnCloseCallback(OnCloseCallback fn);
 
-    bool addPlugin(String id, String settings = "");
+    bool addPlugin(String id, StringArray& presets, String settings = "");
     void delPlugin(int idx);
     void editPlugin(int idx);
     void hidePlugin();
@@ -85,6 +85,7 @@ class Client : public Thread, public MouseListener, public KeyListener {
     void unbypassPlugin(int idx);
     void exchangePlugins(int idxA, int idxB);
     std::vector<ServerPlugin> getRecents();
+    void setPreset(int idx, int preset);
 
     class ScreenReceiver : public Thread {
       public:
@@ -150,9 +151,15 @@ class Client : public Thread, public MouseListener, public KeyListener {
     template <typename T>
     class AudioStreamer : public Thread {
       public:
+        struct AudioMidiBuffer {
+            AudioBuffer<T> audio;
+            MidiBuffer midi;
+            AudioPlayHead::CurrentPositionInfo posInfo;
+        };
+
         Client* client;
         StreamingSocket* socket;
-        boost::lockfree::spsc_queue<AudioBuffer<T>> writeQ, readQ;
+        boost::lockfree::spsc_queue<AudioMidiBuffer> writeQ, readQ;
         std::mutex writeMtx, readMtx;
         std::condition_variable writeCv, readCv;
 
@@ -163,8 +170,9 @@ class Client : public Thread, public MouseListener, public KeyListener {
               writeQ(clnt->NUM_OF_BUFFERS * 2),
               readQ(clnt->NUM_OF_BUFFERS * 2) {
             for (int i = 0; i < clnt->NUM_OF_BUFFERS; i++) {
-                AudioBuffer<T> buf(clnt->m_channels, clnt->m_samplesPerBlock);
-                buf.clear();
+                AudioMidiBuffer buf;
+                buf.audio.setSize(clnt->m_channels, clnt->m_samplesPerBlock);
+                buf.audio.clear();
                 readQ.push(std::move(buf));
             }
         }
@@ -209,7 +217,7 @@ class Client : public Thread, public MouseListener, public KeyListener {
         void run() {
             while (!currentThreadShouldExit() && socket->isConnected()) {
                 while (writeQ.read_available() > 0) {
-                    AudioBuffer<T> buf;
+                    AudioMidiBuffer buf;
                     writeQ.pop(buf);
                     if (!sendReal(buf)) {
                         std::cerr << "error: instance (" << client->getLoadedPluginsString() << "): send failed"
@@ -231,34 +239,38 @@ class Client : public Thread, public MouseListener, public KeyListener {
             }
         }
 
-        void send(AudioBuffer<T>& buffer) {
-            AudioBuffer<T> cpy;
-            cpy.makeCopyOf(buffer);
-            writeQ.push(std::move(cpy));
+        void send(AudioBuffer<T>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
+            AudioMidiBuffer buf;
+            buf.audio.makeCopyOf(buffer);
+            buf.midi.addEvents(midi, 0, midi.getNumEvents(), 0);
+            buf.posInfo = posInfo;
+            writeQ.push(std::move(buf));
             notifyWrite();
         }
 
-        void read(AudioBuffer<T>& buffer) {
+        void read(AudioBuffer<T>& buffer, MidiBuffer& midi) {
             waitRead();
-            AudioBuffer<T> buf;
+            AudioMidiBuffer buf;
             readQ.pop(buf);
-            buffer.makeCopyOf(buf);
+            buffer.makeCopyOf(buf.audio);
+            midi.clear();
+            midi.addEvents(buf.midi, 0, buf.midi.getNumEvents(), 0);
         }
 
-        bool sendReal(AudioBuffer<T>& buffer) {
+        bool sendReal(AudioMidiBuffer& buffer) {
             AudioMessage msg;
             if (nullptr != socket) {
-                return msg.sendToServer(socket, buffer);
+                return msg.sendToServer(socket, buffer.audio, buffer.midi, buffer.posInfo);
             } else {
                 return nullptr;
             }
         }
 
-        bool readReal(AudioBuffer<T>& buffer, MessageHelper::ReadError* e) {
+        bool readReal(AudioMidiBuffer& buffer, MessageHelper::ReadError* e) {
             AudioMessage msg;
             bool success = false;
             if (nullptr != socket) {
-                success = msg.readFromServer(socket, buffer, e);
+                success = msg.readFromServer(socket, buffer.audio, buffer.midi, e);
             }
             if (success) {
                 client->m_latency = msg.getLatencySamples();

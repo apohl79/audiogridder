@@ -114,6 +114,9 @@ void Worker::run() {
                     case RecentsList::Type:
                         handleMessage(Message<Any>::convert<RecentsList>(msg));
                         break;
+                    case Preset::Type:
+                        handleMessage(Message<Any>::convert<Preset>(msg));
+                        break;
                     default:
                         logln("unknown message type " << msg->getType());
                 }
@@ -152,15 +155,35 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
         if (!MessageFactory::sendResult(m_client.get(), m_audio.getLatencySamples())) {
             logln("failed to send result");
         } else {
-            Message<PluginSettings> msgSettings;
-            if (msgSettings.read(m_client.get()) && *msgSettings.payload.size > 0) {
-                MemoryBlock block;
-                block.append(msgSettings.payload.data, *msgSettings.payload.size);
-                auto proc = m_audio.getProcessor(m_audio.getSize() - 1);
-                proc->setStateInformation(block.getData(), static_cast<int>(block.getSize()));
-            } else {
-                logln("failed to read PluginSettings message");
+            auto proc = m_audio.getProcessor(m_audio.getSize() - 1);
+            String presets;
+            bool first = true;
+            for (int i = 0; i < proc->getNumPrograms(); i++) {
+                if (first) {
+                    first = false;
+                } else {
+                    presets << "|";
+                }
+                presets << proc->getProgramName(i);
+            }
+            Message<Presets> msgPresets;
+            msgPresets.payload.setString(presets);
+            if (!msgPresets.send(m_client.get())) {
+                logln("failed to send Presets message");
                 m_client->close();
+            } else {
+                Message<PluginSettings> msgSettings;
+                if (msgSettings.read(m_client.get())) {
+                    if (*msgSettings.payload.size > 0) {
+                        MemoryBlock block;
+                        block.append(msgSettings.payload.data, *msgSettings.payload.size);
+                        auto proc = m_audio.getProcessor(m_audio.getSize() - 1);
+                        proc->setStateInformation(block.getData(), static_cast<int>(block.getSize()));
+                    }
+                } else {
+                    logln("failed to read PluginSettings message");
+                    m_client->close();
+                }
             }
         }
     }
@@ -243,6 +266,10 @@ void Worker::handleMessage(std::shared_ptr<Message<RecentsList>> msg) {
     }
     msg->payload.setString(list);
     msg->send(m_client.get());
+}
+
+void Worker::handleMessage(std::shared_ptr<Message<Preset>> msg) {
+    m_audio.getProcessor(msg->payload.data->idx)->setCurrentProgram(msg->payload.data->preset);
 }
 
 }  // namespace e47

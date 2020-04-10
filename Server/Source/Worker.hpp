@@ -39,6 +39,7 @@ class Worker : public Thread {
     void handleMessage(std::shared_ptr<Message<UnbypassPlugin>> msg);
     void handleMessage(std::shared_ptr<Message<ExchangePlugins>> msg);
     void handleMessage(std::shared_ptr<Message<RecentsList>> msg);
+    void handleMessage(std::shared_ptr<Message<Preset>> msg);
 
   private:
     std::unique_ptr<StreamingSocket> m_client;

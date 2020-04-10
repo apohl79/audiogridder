@@ -143,17 +143,21 @@ bool ProcessorChain::addPluginProcessor(const String& fileOrIdentifier) {
             logln("failed to enable busses for plugin: " << fileOrIdentifier);
             return false;
         }
+        AudioProcessor::ProcessingPrecision prec = AudioProcessor::singlePrecision;
         if (isUsingDoublePrecision()) {
             if (inst->supportsDoublePrecisionProcessing()) {
-                inst->setProcessingPrecision(AudioProcessor::doublePrecision);
+                prec = AudioProcessor::doublePrecision;
             } else {
                 logln("host wants double precission but plugin (" << fileOrIdentifier << ") does not support it");
-                inst->setProcessingPrecision(AudioProcessor::singlePrecision);
             }
-        } else {
-            inst->setProcessingPrecision(AudioProcessor::singlePrecision);
         }
+        inst->setProcessingPrecision(prec);
         inst->prepareToPlay(getSampleRate(), getBlockSize());
+        if (prec == AudioProcessor::doublePrecision) {
+            preProcessBlocks<double>(inst);
+        } else {
+            preProcessBlocks<float>(inst);
+        }
         return addProcessor(inst);
     }
     return false;
