@@ -153,6 +153,7 @@ bool ProcessorChain::addPluginProcessor(const String& fileOrIdentifier) {
         }
         inst->setProcessingPrecision(prec);
         inst->prepareToPlay(getSampleRate(), getBlockSize());
+        inst->setPlayHead(getPlayHead());
         if (prec == AudioProcessor::doublePrecision) {
             preProcessBlocks<double>(inst);
         } else {
