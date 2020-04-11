@@ -291,7 +291,6 @@ bool Client::addPlugin(String id, StringArray& presets, String settings) {
         if (!msgPresets.read(m_cmd_socket.get())) {
             return false;
         }
-        std::cout << "got presets: " << msgPresets.payload.getString() << std::endl;
         presets = StringArray::fromTokens(msgPresets.payload.getString(), "|", "");
         Message<PluginSettings> msgSettings;
         if (settings.isNotEmpty()) {

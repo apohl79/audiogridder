@@ -316,7 +316,9 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
     auto& servers = m_processor.getServers();
     for (int i = 0; i < servers.size(); i++) {
         if (i == m_processor.getActiveServer()) {
-            m.addItem(servers[i], true, true, [] {});
+            PopupMenu srvMenu;
+            srvMenu.addItem("Reconnect", [this] { m_processor.getClient().reconnect(); });
+            m.addSubMenu(servers[i], srvMenu, true, nullptr, true, 0);
         } else {
             PopupMenu srvMenu;
             srvMenu.addItem("Connect", [this, i] { m_processor.setActiveServer(i); });

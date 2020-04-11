@@ -41,6 +41,8 @@ class Client : public Thread, public MouseListener, public KeyListener {
     bool isReady();
     bool isReadyLockFree();
     void init(int channels, double rate, int samplesPerBlock, bool doublePrecission);
+
+    void reconnect() { m_needsReconnect = true; }
     void close();
 
     void send(AudioBuffer<float>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
