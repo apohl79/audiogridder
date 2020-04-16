@@ -12,28 +12,41 @@
 #include <type_traits>
 
 #include "KeyAndMouse.hpp"
+#include "json.hpp"
 
 namespace e47 {
+
+using json = nlohmann::json;
 
 /*
  * Core I/O functions
  */
 struct MessageHelper {
-    enum ReadError { E_NONE, E_DATA, E_TIMEOUT, E_STATE, E_SYSCALL };
-    static void seterr(ReadError* e, ReadError c) {
+    enum Error { E_NONE, E_DATA, E_TIMEOUT, E_STATE, E_SYSCALL };
+    static void seterr(Error* e, Error c) {
         if (nullptr != e) {
             *e = c;
         }
     }
 };
 
-static bool send(StreamingSocket* socket, const char* data, int size) {
+static bool send(StreamingSocket* socket, const char* data, int size, MessageHelper::Error* e = nullptr) {
     if (nullptr != socket && socket->isConnected()) {
         int toWrite = size;
         do {
-            int ret = socket->write(static_cast<const char*>(data) + size - toWrite, toWrite);
-            data += ret;
-            toWrite -= ret;
+            int ret = socket->waitUntilReady(false, 100);
+            if (ret < 0) {
+                MessageHelper::seterr(e, MessageHelper::E_SYSCALL);
+                return false;  // error
+            } else if (ret > 0) {
+                int len = socket->write(static_cast<const char*>(data) + size - toWrite, toWrite);
+                if (len < 0) {
+                    MessageHelper::seterr(e, MessageHelper::E_SYSCALL);
+                    return false;
+                }
+                data += len;
+                toWrite -= len;
+            }
         } while (toWrite > 0);
         return true;
     } else {
@@ -42,7 +55,7 @@ static bool send(StreamingSocket* socket, const char* data, int size) {
 }
 
 static bool read(StreamingSocket* socket, void* data, int size, int timeoutMilliseconds = 0,
-                 MessageHelper::ReadError* e = nullptr) {
+                 MessageHelper::Error* e = nullptr) {
     MessageHelper::seterr(e, MessageHelper::E_NONE);
     if (nullptr != socket && !socket->isConnected()) {
         MessageHelper::seterr(e, MessageHelper::E_STATE);
@@ -185,8 +198,7 @@ class AudioMessage {
     }
 
     template <typename T>
-    bool readFromServer(StreamingSocket* socket, AudioBuffer<T>& buffer, MidiBuffer& midi,
-                        MessageHelper::ReadError* e) {
+    bool readFromServer(StreamingSocket* socket, AudioBuffer<T>& buffer, MidiBuffer& midi, MessageHelper::Error* e) {
         if (socket->isConnected()) {
             if (!read(socket, &m_resHeader, sizeof(m_resHeader), 1000, e)) {
                 return false;
@@ -337,6 +349,14 @@ class StringPayload : public Payload {
         size = reinterpret_cast<int*>(payloadBuffer.data());
         str = getSize() > sizeof(int) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(int) : nullptr;
     }
+};
+
+class JsonPayload : public StringPayload {
+  public:
+    JsonPayload(int type) : StringPayload(type) {}
+
+    void setJson(json& j) { setString(j.dump()); }
+    json getJson() { return json::parse(getString().toStdString()); }
 };
 
 class BinaryPayload : public Payload {
@@ -526,23 +546,15 @@ class RecentsList : public StringPayload {
     RecentsList() : StringPayload(Type) {}
 };
 
-struct parameter_t {
-    char name[32];
-    int index;
-    int numSteps;
-    bool isDiscrete;
-    bool isBoolean;
-    bool isMetaParameter;
-};
-
-class Parameter : public DataPayload<parameter_t> {
+class Parameters : public JsonPayload {
   public:
     static constexpr int Type = 17;
-    Parameter() : DataPayload<parameter_t>(Type) {}
+    Parameters() : JsonPayload(Type) {}
 };
 
 struct parametervalue_t {
-    int index;
+    int idx;
+    int paramIdx;
     float value;
 };
 
@@ -552,9 +564,20 @@ class ParameterValue : public DataPayload<parametervalue_t> {
     ParameterValue() : DataPayload<parametervalue_t>(Type) {}
 };
 
-class Presets : public StringPayload {
+struct getparametervalue_t {
+    int idx;
+    int paramIdx;
+};
+
+class GetParameterValue : public DataPayload<getparametervalue_t> {
   public:
     static constexpr int Type = 19;
+    GetParameterValue() : DataPayload<getparametervalue_t>(Type) {}
+};
+
+class Presets : public StringPayload {
+  public:
+    static constexpr int Type = 20;
     Presets() : StringPayload(Type) {}
 };
 
@@ -565,7 +588,7 @@ struct preset_t {
 
 class Preset : public DataPayload<preset_t> {
   public:
-    static constexpr int Type = 20;
+    static constexpr int Type = 21;
     Preset() : DataPayload<preset_t>(Type) {}
 };
 
@@ -581,7 +604,7 @@ class Message {
 
     virtual ~Message() {}
 
-    bool read(StreamingSocket* socket, MessageHelper::ReadError* e = nullptr, int timeoutMilliseconds = 1000) {
+    bool read(StreamingSocket* socket, MessageHelper::Error* e = nullptr, int timeoutMilliseconds = 1000) {
         bool success = false;
         MessageHelper::seterr(e, MessageHelper::E_NONE);
         if (nullptr != socket && socket->isConnected()) {
@@ -660,12 +683,17 @@ class Message {
     T payload;
 };
 
+#define PLD(m) m.payload
+#define pPLD(m) m->payload
+#define DATA(m) PLD(m).data
+#define pDATA(m) pPLD(m).data
+
 class MessageFactory {
   public:
     static std::shared_ptr<Message<Any>> getNextMessage(StreamingSocket* socket) {
         if (nullptr != socket) {
             auto msg = std::make_shared<Message<Any>>();
-            MessageHelper::ReadError e;
+            MessageHelper::Error e;
             if (msg->read(socket, &e)) {
                 return msg;
             } else if (e != MessageHelper::E_TIMEOUT) {
@@ -678,7 +706,7 @@ class MessageFactory {
     static std::shared_ptr<Result> getResult(StreamingSocket* socket) {
         if (nullptr != socket) {
             auto msg = std::make_shared<Message<Result>>();
-            MessageHelper::ReadError e;
+            MessageHelper::Error e;
             int retry = 5;
             do {
                 if (msg->read(socket, &e)) {

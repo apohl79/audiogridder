@@ -235,6 +235,25 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
                 preset++;
             }
             m.addSubMenu("Presets", presets);
+            m.addSeparator();
+            PopupMenu params;
+            for (auto& p : m_processor.getLoadedPlugin(idx).params) {
+                int paramIdx = p.idx;
+                String name = p.name;
+                bool enabled = false;
+                if (p.automationSlot > -1) {
+                    name << " -> [" << p.automationSlot << "]";
+                    enabled = true;
+                }
+                params.addItem(name, true, enabled, [this, idx, paramIdx, enabled] {
+                    if (enabled) {
+                        m_processor.disableParamAutomation(idx, paramIdx);
+                    } else {
+                        m_processor.enableParamAutomation(idx, paramIdx);
+                    }
+                });
+            }
+            m.addSubMenu("Automation", params);
             m.showAt(button);
         }
     }

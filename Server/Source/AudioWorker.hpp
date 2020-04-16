@@ -40,6 +40,8 @@ class AudioWorker : public Thread {
     int getSize() const { return static_cast<int>(m_chain->getSize()); }
     int getLatencySamples() const { return m_chain->getLatencySamples(); }
 
+    float getParameterValue(int idx, int paramIdx) { return m_chain->getParameterValue(idx, paramIdx); }
+
     using RecentsListType = Array<PluginDescription>;
     const RecentsListType& getRecentsList() const { return m_recents; }
 

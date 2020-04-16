@@ -79,33 +79,6 @@ void ProcessorChain::setLatency() {
     }
 }
 
-// Async version.
-// std::shared_ptr<AudioPluginInstance> ProcessorChain::loadPlugin(PluginDescription& plugdesc, double sampleRate,
-//                                                                int blockSize) {
-//    std::shared_ptr<AudioPluginInstance> inst;
-//    std::mutex mtx;
-//    std::condition_variable cv;
-//    bool done = false;
-//    auto fn = [&](std::unique_ptr<AudioPluginInstance> p, const String& err) {
-//        std::lock_guard<std::mutex> lock(mtx);
-//        if (nullptr == p) {
-//            logln("failed loading plugin " << plugdesc.fileOrIdentifier << ": " << err);
-//        } else {
-//            inst = std::move(p);
-//        }
-//        done = true;
-//        cv.notify_one();
-//    };
-//
-//    AudioPluginFormatManager plugmgr;
-//    plugmgr.addDefaultFormats();
-//    plugmgr.createPluginInstanceAsync(plugdesc, sampleRate, blockSize, fn);
-//
-//    std::unique_lock<std::mutex> lock(mtx);
-//    cv.wait(lock, [&done] { return done; });
-//    return inst;
-//}
-
 // Sync version.
 std::shared_ptr<AudioPluginInstance> ProcessorChain::loadPlugin(PluginDescription& plugdesc, double sampleRate,
                                                                 int blockSize) {
@@ -195,6 +168,23 @@ void ProcessorChain::exchangeProcessors(int idxA, int idxB) {
     if (idxA > -1 && idxB < m_processors.size() && idxB > -1 && idxB < m_processors.size()) {
         std::swap(m_processors[idxA], m_processors[idxB]);
     }
+}
+
+float ProcessorChain::getParameterValue(int idx, int paramIdx) {
+    std::lock_guard<std::mutex> lock(m_processors_mtx);
+    if (idx > -1 && idx < m_processors.size()) {
+        for (auto& p : m_processors[idx]->getParameters()) {
+            if (paramIdx == p->getParameterIndex()) {
+                return p->getValue();
+            }
+        }
+    }
+    return 0;
+}
+
+void ProcessorChain::clear() {
+    std::lock_guard<std::mutex> lock(m_processors_mtx);
+    m_processors.clear();
 }
 
 String ProcessorChain::toString() {

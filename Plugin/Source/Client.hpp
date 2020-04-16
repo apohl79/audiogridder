@@ -24,6 +24,54 @@ class Client : public Thread, public MouseListener, public KeyListener {
     Client(AudioGridderAudioProcessor* processor);
     ~Client();
 
+    struct Parameter {
+        int idx = -1;
+        String name;
+        float defaultValue = 0;
+        AudioProcessorParameter::Category category = AudioProcessorParameter::genericParameter;
+        String label;
+        int numSteps = 0x7fffffff;
+        bool isBoolean = false;
+        bool isDiscrete = false;
+        bool isMeta = false;
+        bool isOrientInv = false;
+
+        int automationSlot = -1;
+
+        static Parameter fromJson(const json& j) {
+            Parameter p;
+            p.idx = j["idx"].get<int>();
+            p.name = j["name"].get<std::string>();
+            p.defaultValue = j["defaultValue"].get<float>();
+            p.category = j["category"].get<AudioProcessorParameter::Category>();
+            p.label = j["label"].get<std::string>();
+            p.numSteps = j["numSteps"].get<int>();
+            p.isBoolean = j["isBoolean"].get<bool>();
+            p.isDiscrete = j["isDiscrete"].get<bool>();
+            p.isMeta = j["isMeta"].get<bool>();
+            p.isOrientInv = j["isOrientInv"].get<bool>();
+            if (j.find("automationSlot") != j.end()) {
+                p.automationSlot = j["automationSlot"].get<int>();
+            }
+            return p;
+        }
+
+        json toJson() const {
+            json j = {{"idx", idx},
+                      {"name", name.toStdString()},
+                      {"defaultValue", defaultValue},
+                      {"category", category},
+                      {"label", label.toStdString()},
+                      {"numSteps", numSteps},
+                      {"isBoolean", isBoolean},
+                      {"isDiscrete", isDiscrete},
+                      {"isMeta", isMeta},
+                      {"isOrientInv", isOrientInv},
+                      {"automationSlot", automationSlot}};
+            return j;
+        }
+    };
+
     static int NUM_OF_BUFFERS;
 
     void run();
@@ -78,7 +126,7 @@ class Client : public Thread, public MouseListener, public KeyListener {
     using OnCloseCallback = std::function<void()>;
     void setOnCloseCallback(OnCloseCallback fn);
 
-    bool addPlugin(String id, StringArray& presets, String settings = "");
+    bool addPlugin(String id, StringArray& presets, Array<Parameter>& params, String settings = "");
     void delPlugin(int idx);
     void editPlugin(int idx);
     void hidePlugin();
@@ -88,6 +136,9 @@ class Client : public Thread, public MouseListener, public KeyListener {
     void exchangePlugins(int idxA, int idxB);
     std::vector<ServerPlugin> getRecents();
     void setPreset(int idx, int preset);
+
+    float getParameterValue(int idx, int paramIdx);
+    void setParameterValue(int idx, int paramIdx, float val);
 
     class ScreenReceiver : public Thread {
       public:
@@ -204,13 +255,16 @@ class Client : public Thread, public MouseListener, public KeyListener {
         }
 
         void waitRead() {
-            if (readQ.read_available() < (client->NUM_OF_BUFFERS / 2) && readQ.read_available() > 0) {
+            if (client->NUM_OF_BUFFERS > 1 && readQ.read_available() < (client->NUM_OF_BUFFERS / 2) &&
+                readQ.read_available() > 0) {
                 std::cerr << "warning: instance (" << client->getLoadedPluginsString() << "): input buffer below 50% ("
                           << readQ.read_available() << "/" << client->NUM_OF_BUFFERS << ")" << std::endl;
             } else if (readQ.read_available() == 0) {
-                std::cerr << "warning: instance (" << client->getLoadedPluginsString()
-                          << "): read queue empty, waiting for data, try increasing the NumberOfBuffers value"
-                          << std::endl;
+                if (client->NUM_OF_BUFFERS > 1) {
+                    std::cerr << "warning: instance (" << client->getLoadedPluginsString()
+                              << "): read queue empty, waiting for data, try increasing the NumberOfBuffers value"
+                              << std::endl;
+                }
                 std::unique_lock<std::mutex> lock(readMtx);
                 readCv.wait(lock, [this] { return readQ.read_available() > 0 || currentThreadShouldExit(); });
             }
@@ -227,7 +281,7 @@ class Client : public Thread, public MouseListener, public KeyListener {
                         socket->close();
                         break;
                     }
-                    MessageHelper::ReadError err;
+                    MessageHelper::Error err;
                     if (!readReal(buf, &err)) {
                         std::cerr << "error: instance (" << client->getLoadedPluginsString()
                                   << "): read failed, error code " << err << std::endl;
@@ -241,19 +295,40 @@ class Client : public Thread, public MouseListener, public KeyListener {
             }
         }
 
+        // FIXME: Currently we expect all buffers coming from processBlock to be fully filled with
+        //        client->m_channels and client->m_samplesPerBlock. This can cause issues in DAW's not always
+        //        completely filling the buffers. This happens on logic for example when using parameters.
         void send(AudioBuffer<T>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
             AudioMidiBuffer buf;
             buf.audio.makeCopyOf(buffer);
             buf.midi.addEvents(midi, 0, midi.getNumEvents(), 0);
             buf.posInfo = posInfo;
-            writeQ.push(std::move(buf));
-            notifyWrite();
+            if (client->NUM_OF_BUFFERS > 1) {
+                writeQ.push(std::move(buf));
+                notifyWrite();
+            } else {
+                if (!sendReal(buf)) {
+                    std::cerr << "error: instance (" << client->getLoadedPluginsString() << "): send failed"
+                              << std::endl;
+                    socket->close();
+                }
+            }
         }
 
         void read(AudioBuffer<T>& buffer, MidiBuffer& midi) {
-            waitRead();
             AudioMidiBuffer buf;
-            readQ.pop(buf);
+            if (client->NUM_OF_BUFFERS > 1) {
+                waitRead();
+                readQ.pop(buf);
+            } else {
+                buf.audio.setSize(buffer.getNumChannels(), buffer.getNumSamples());
+                MessageHelper::Error err;
+                if (!readReal(buf, &err)) {
+                    std::cerr << "error: instance (" << client->getLoadedPluginsString()
+                              << "): read failed, error code " << err << std::endl;
+                    socket->close();
+                }
+            }
             buffer.makeCopyOf(buf.audio);
             midi.clear();
             midi.addEvents(buf.midi, 0, buf.midi.getNumEvents(), 0);
@@ -264,11 +339,11 @@ class Client : public Thread, public MouseListener, public KeyListener {
             if (nullptr != socket) {
                 return msg.sendToServer(socket, buffer.audio, buffer.midi, buffer.posInfo);
             } else {
-                return nullptr;
+                return false;
             }
         }
 
-        bool readReal(AudioMidiBuffer& buffer, MessageHelper::ReadError* e) {
+        bool readReal(AudioMidiBuffer& buffer, MessageHelper::Error* e) {
             AudioMessage msg;
             bool success = false;
             if (nullptr != socket) {

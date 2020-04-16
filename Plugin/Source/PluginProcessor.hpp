@@ -24,8 +24,11 @@ class AudioGridderAudioProcessor : public AudioProcessor {
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
 #endif
 
-    void processBlock(AudioBuffer<float>&, MidiBuffer&) override;
-    void processBlock(AudioBuffer<double>&, MidiBuffer&) override;
+    void processBlock(AudioBuffer<float>& buf, MidiBuffer& midi) override { processBlockReal(buf, midi); }
+    void processBlock(AudioBuffer<double>& buf, MidiBuffer& midi) override { processBlockReal(buf, midi); }
+
+    template <typename T>
+    void processBlockReal(AudioBuffer<T>&, MidiBuffer&);
 
     AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override;
@@ -58,12 +61,13 @@ class AudioGridderAudioProcessor : public AudioProcessor {
         String name;
         String settings;
         StringArray presets;
+        Array<e47::Client::Parameter> params;
         bool bypassed;
         bool ok;
     };
 
     auto& getLoadedPlugins() const { return m_loadedPlugins; }
-    const LoadedPlugin& getLoadedPlugin(int idx) const { return m_loadedPlugins[idx]; }
+    const LoadedPlugin& getLoadedPlugin(int idx) const { return idx > -1 ? m_loadedPlugins[idx] : m_unusedDummyPlugin; }
     bool loadPlugin(const String& id, const String& name);
     void unloadPlugin(int idx);
     void editPlugin(int idx);
@@ -73,6 +77,8 @@ class AudioGridderAudioProcessor : public AudioProcessor {
     void bypassPlugin(int idx);
     void unbypassPlugin(int idx);
     void exchangePlugins(int idxA, int idxB);
+    bool enableParamAutomation(int idx, int paramIdx, int slot = -1);
+    void disableParamAutomation(int idx, int paramIdx);
 
     auto& getServers() const { return m_servers; }
     void addServer(const String& s) { m_servers.push_back(s); }
@@ -80,12 +86,50 @@ class AudioGridderAudioProcessor : public AudioProcessor {
     int getActiveServer() const { return m_activeServer; }
     void setActiveServer(int i);
 
+    // It looks like most hosts do not support dynamic parameter creation or changes to existing parameters. Just the
+    // name can be updated. So we create slots at the start.
+    class Parameter : public AudioProcessorParameter {
+      public:
+        Parameter(AudioGridderAudioProcessor& processor, int slot)
+            : m_processor(processor), m_slotId(slot) {}
+        float getValue() const override;
+        void setValue(float newValue) override;
+        float getValueForText(const String& text) const override { return 0; };
+        float getDefaultValue() const override { return getParam().defaultValue; }
+        String getName(int maximumStringLength) const override;
+        String getLabel() const override { return getParam().label; }
+        int getNumSteps() const override { return getParam().numSteps; }
+        bool isDiscrete() const override { return getParam().isDiscrete; }
+        bool isBoolean() const override { return getParam().isBoolean; }
+        bool isOrientationInverted() const override { return getParam().isOrientInv; }
+        bool isMetaParameter() const override { return getParam().isMeta; }
+
+      private:
+        friend AudioGridderAudioProcessor;
+        AudioGridderAudioProcessor& m_processor;
+        int m_idx = -1;
+        int m_paramIdx = 0;
+        int m_slotId = 0;
+
+        const LoadedPlugin& getPlugin() const { return m_processor.getLoadedPlugin(m_idx); }
+        const e47::Client::Parameter& getParam() const { return getPlugin().params.getReference(m_paramIdx); }
+
+        void reset() {
+            m_idx = -1;
+            m_paramIdx = 0;
+        }
+    };
+
   private:
     e47::Client m_client;
     std::vector<LoadedPlugin> m_loadedPlugins;
     int m_activePlugin = -1;
     std::vector<String> m_servers;
     int m_activeServer = 0;
+
+    int m_numberOfAutomationSlots = 16;
+    LoadedPlugin m_unusedDummyPlugin;
+    e47::Client::Parameter m_unusedParam;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioGridderAudioProcessor)
 };

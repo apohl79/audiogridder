@@ -66,7 +66,7 @@ void Worker::run() {
             list += getStringFrom(plugin) + "\n";
         }
         Message<PluginList> msg;
-        msg.payload.setString(list);
+        PLD(msg).setString(list);
         if (!msg.send(m_client.get())) {
             logln("failed to send plugin list");
             m_client->close();
@@ -117,6 +117,12 @@ void Worker::run() {
                     case Preset::Type:
                         handleMessage(Message<Any>::convert<Preset>(msg));
                         break;
+                    case ParameterValue::Type:
+                        handleMessage(Message<Any>::convert<ParameterValue>(msg));
+                        break;
+                    case GetParameterValue::Type:
+                        handleMessage(Message<Any>::convert<GetParameterValue>(msg));
+                        break;
                     default:
                         logln("unknown message type " << msg->getType());
                 }
@@ -147,56 +153,73 @@ void Worker::shutdown() {
 void Worker::handleMessage(std::shared_ptr<Message<Quit>> msg) { shutdown(); }
 
 void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
-    bool success = m_audio.addPlugin(msg->payload.getString());
+    bool success = m_audio.addPlugin(pPLD(msg).getString());
     if (!success) {
         MessageFactory::sendResult(m_client.get(), -1);
-    } else {
-        // send new updated latency samples back
-        if (!MessageFactory::sendResult(m_client.get(), m_audio.getLatencySamples())) {
-            logln("failed to send result");
+        return;
+    }
+    // send new updated latency samples back
+    if (!MessageFactory::sendResult(m_client.get(), m_audio.getLatencySamples())) {
+        logln("failed to send result");
+        m_client->close();
+        return;
+    }
+    auto proc = m_audio.getProcessor(m_audio.getSize() - 1);
+    String presets;
+    bool first = true;
+    for (int i = 0; i < proc->getNumPrograms(); i++) {
+        if (first) {
+            first = false;
         } else {
-            auto proc = m_audio.getProcessor(m_audio.getSize() - 1);
-            String presets;
-            bool first = true;
-            for (int i = 0; i < proc->getNumPrograms(); i++) {
-                if (first) {
-                    first = false;
-                } else {
-                    presets << "|";
-                }
-                presets << proc->getProgramName(i);
-            }
-            Message<Presets> msgPresets;
-            msgPresets.payload.setString(presets);
-            if (!msgPresets.send(m_client.get())) {
-                logln("failed to send Presets message");
-                m_client->close();
-            } else {
-                Message<PluginSettings> msgSettings;
-                if (msgSettings.read(m_client.get())) {
-                    if (*msgSettings.payload.size > 0) {
-                        MemoryBlock block;
-                        block.append(msgSettings.payload.data, *msgSettings.payload.size);
-                        auto proc = m_audio.getProcessor(m_audio.getSize() - 1);
-                        proc->setStateInformation(block.getData(), static_cast<int>(block.getSize()));
-                    }
-                } else {
-                    logln("failed to read PluginSettings message");
-                    m_client->close();
-                }
-            }
+            presets << "|";
         }
+        presets << proc->getProgramName(i);
+    }
+    Message<Presets> msgPresets;
+    msgPresets.payload.setString(presets);
+    if (!msgPresets.send(m_client.get())) {
+        logln("failed to send Presets message");
+        m_client->close();
+        return;
+    }
+    json jparams = json::array();
+    for (auto& param : proc->getParameters()) {
+        json jparam = {{"idx", param->getParameterIndex()},        {"name", param->getName(32).toStdString()},
+                       {"defaultValue", param->getDefaultValue()}, {"category", param->getCategory()},
+                       {"label", param->getLabel().toStdString()}, {"numSteps", param->getNumSteps()},
+                       {"isBoolean", param->isBoolean()},          {"isDiscrete", param->isDiscrete()},
+                       {"isMeta", param->isMetaParameter()},       {"isOrientInv", param->isOrientationInverted()}};
+        jparams.push_back(jparam);
+    }
+    Message<Parameters> msgParams;
+    msgParams.payload.setJson(jparams);
+    if (!msgParams.send(m_client.get())) {
+        logln("failed to send Parameters message");
+        m_client->close();
+        return;
+    }
+    Message<PluginSettings> msgSettings;
+    if (!msgSettings.read(m_client.get())) {
+        logln("failed to read PluginSettings message");
+        m_client->close();
+        return;
+    }
+    if (*msgSettings.payload.size > 0) {
+        MemoryBlock block;
+        block.append(msgSettings.payload.data, *msgSettings.payload.size);
+        auto proc = m_audio.getProcessor(m_audio.getSize() - 1);
+        proc->setStateInformation(block.getData(), static_cast<int>(block.getSize()));
     }
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<DelPlugin>> msg) {
-    m_audio.delPlugin(msg->payload.getNumber());
+    m_audio.delPlugin(pPLD(msg).getNumber());
     // send new updated latency samples back
     MessageFactory::sendResult(m_client.get(), m_audio.getLatencySamples());
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<EditPlugin>> msg) {
-    auto proc = m_audio.getProcessor(msg->payload.getNumber());
+    auto proc = m_audio.getProcessor(pPLD(msg).getNumber());
     if (nullptr != proc) {
         m_screen.showEditor(proc);
         m_shouldHideEditor = true;
@@ -209,7 +232,7 @@ void Worker::handleMessage(std::shared_ptr<Message<HidePlugin>> msg) {
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<Mouse>> msg) {
-    auto ev = *msg->payload.data;
+    auto ev = *pDATA(msg);
     MessageManager::callAsync([ev] {
         auto point = getApp().localPointToGlobal(Point<float>(ev.x, ev.y));
         mouseEvent(ev.type, point.x, point.y);
@@ -218,8 +241,8 @@ void Worker::handleMessage(std::shared_ptr<Message<Mouse>> msg) {
 
 void Worker::handleMessage(std::shared_ptr<Message<Key>> msg) {
     MessageManager::callAsync([msg] {
-        auto* codes = msg->payload.getKeyCodes();
-        auto num = msg->payload.getKeyCount();
+        auto* codes = pPLD(msg).getKeyCodes();
+        auto num = pPLD(msg).getKeyCount();
         for (size_t i = 0; i < num; i++) {
             keyEventDown(codes[i]);
         }
@@ -230,7 +253,7 @@ void Worker::handleMessage(std::shared_ptr<Message<Key>> msg) {
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<GetPluginSettings>> msg) {
-    auto proc = m_audio.getProcessor(msg->payload.getNumber());
+    auto proc = m_audio.getProcessor(pPLD(msg).getNumber());
     if (nullptr != proc) {
         MemoryBlock block;
         proc->getStateInformation(block);
@@ -241,21 +264,21 @@ void Worker::handleMessage(std::shared_ptr<Message<GetPluginSettings>> msg) {
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<BypassPlugin>> msg) {
-    auto proc = m_audio.getProcessor(msg->payload.getNumber());
+    auto proc = m_audio.getProcessor(pPLD(msg).getNumber());
     if (nullptr != proc) {
         proc->suspendProcessing(true);
     }
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<UnbypassPlugin>> msg) {
-    auto proc = m_audio.getProcessor(msg->payload.getNumber());
+    auto proc = m_audio.getProcessor(pPLD(msg).getNumber());
     if (nullptr != proc) {
         proc->suspendProcessing(false);
     }
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<ExchangePlugins>> msg) {
-    m_audio.exchangePlugins(msg->payload.data->idxA, msg->payload.data->idxB);
+    m_audio.exchangePlugins(pDATA(msg)->idxA, pDATA(msg)->idxB);
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<RecentsList>> msg) {
@@ -264,12 +287,29 @@ void Worker::handleMessage(std::shared_ptr<Message<RecentsList>> msg) {
     for (auto& r : recents) {
         list += getStringFrom(r) + "\n";
     }
-    msg->payload.setString(list);
+    pPLD(msg).setString(list);
     msg->send(m_client.get());
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<Preset>> msg) {
-    m_audio.getProcessor(msg->payload.data->idx)->setCurrentProgram(msg->payload.data->preset);
+    m_audio.getProcessor(pDATA(msg)->idx)->setCurrentProgram(pDATA(msg)->preset);
+}
+
+void Worker::handleMessage(std::shared_ptr<Message<ParameterValue>> msg) {
+    for (auto* p : m_audio.getProcessor(pDATA(msg)->idx)->getParameters()) {
+        if (pDATA(msg)->paramIdx == p->getParameterIndex()) {
+            p->setValue(pDATA(msg)->value);
+            return;
+        }
+    }
+}
+
+void Worker::handleMessage(std::shared_ptr<Message<GetParameterValue>> msg) {
+    Message<ParameterValue> ret;
+    DATA(ret)->idx = pDATA(msg)->idx;
+    DATA(ret)->paramIdx = pDATA(msg)->paramIdx;
+    DATA(ret)->value = m_audio.getParameterValue(pDATA(msg)->idx, pDATA(msg)->paramIdx);
+    ret.send(m_client.get());
 }
 
 }  // namespace e47

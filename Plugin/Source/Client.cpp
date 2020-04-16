@@ -185,7 +185,7 @@ void Client::init() {
             std::cerr << "failed reading plugin list" << std::endl;
             return;
         }
-        String listChunk(msg.payload.str, *msg.payload.size);
+        String listChunk(PLD(msg).str, *PLD(msg).size);
         auto list = StringArray::fromLines(listChunk);
         for (auto& line : list) {
             if (!line.isEmpty()) {
@@ -277,9 +277,9 @@ void Client::quit() {
     msg.send(m_cmd_socket.get());
 }
 
-bool Client::addPlugin(String id, StringArray& presets, String settings) {
+bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params, String settings) {
     Message<AddPlugin> msg;
-    msg.payload.setString(id);
+    PLD(msg).setString(id);
     std::lock_guard<std::mutex> lock(m_clientMtx);
     if (msg.send(m_cmd_socket.get())) {
         auto result = MessageFactory::getResult(m_cmd_socket.get());
@@ -292,6 +292,22 @@ bool Client::addPlugin(String id, StringArray& presets, String settings) {
             return false;
         }
         presets = StringArray::fromTokens(msgPresets.payload.getString(), "|", "");
+        Message<Parameters> msgParams;
+        if (!msgParams.read(m_cmd_socket.get())) {
+            return false;
+        }
+        auto jparams = msgParams.payload.getJson();
+        Array<Parameter> paramsBak(std::move(params));
+        for (auto& jparam : jparams) {
+            auto newParam = Parameter::fromJson(jparam);
+            for (auto& oldParam : paramsBak) {
+                if (newParam.idx == oldParam.idx) {
+                    newParam.automationSlot = oldParam.automationSlot;
+                    break;
+                }
+            }
+            params.add(std::move(newParam));
+        }
         Message<PluginSettings> msgSettings;
         if (settings.isNotEmpty()) {
             MemoryBlock block;
@@ -305,7 +321,7 @@ bool Client::addPlugin(String id, StringArray& presets, String settings) {
 
 void Client::delPlugin(int idx) {
     Message<DelPlugin> msg;
-    msg.payload.setNumber(idx);
+    PLD(msg).setNumber(idx);
     std::lock_guard<std::mutex> lock(m_clientMtx);
     msg.send(m_cmd_socket.get());
     auto result = MessageFactory::getResult(m_cmd_socket.get());
@@ -316,7 +332,7 @@ void Client::delPlugin(int idx) {
 
 void Client::editPlugin(int idx) {
     Message<EditPlugin> msg;
-    msg.payload.setNumber(idx);
+    PLD(msg).setNumber(idx);
     std::lock_guard<std::mutex> lock(m_clientMtx);
     msg.send(m_cmd_socket.get());
 }
@@ -330,7 +346,7 @@ void Client::hidePlugin() {
 MemoryBlock Client::getPluginSettings(int idx) {
     MemoryBlock block;
     Message<GetPluginSettings> msg;
-    msg.payload.setNumber(idx);
+    PLD(msg).setNumber(idx);
     std::lock_guard<std::mutex> lock(m_clientMtx);
     if (!msg.send(m_cmd_socket.get())) {
         std::cerr << "failed to send GetPluginSettings message" << std::endl;
@@ -351,22 +367,22 @@ MemoryBlock Client::getPluginSettings(int idx) {
 
 void Client::bypassPlugin(int idx) {
     Message<BypassPlugin> msg;
-    msg.payload.setNumber(idx);
+    PLD(msg).setNumber(idx);
     std::lock_guard<std::mutex> lock(m_clientMtx);
     msg.send(m_cmd_socket.get());
 }
 
 void Client::unbypassPlugin(int idx) {
     Message<UnbypassPlugin> msg;
-    msg.payload.setNumber(idx);
+    PLD(msg).setNumber(idx);
     std::lock_guard<std::mutex> lock(m_clientMtx);
     msg.send(m_cmd_socket.get());
 }
 
 void Client::exchangePlugins(int idxA, int idxB) {
     Message<ExchangePlugins> msg;
-    msg.payload.data->idxA = idxA;
-    msg.payload.data->idxB = idxB;
+    DATA(msg)->idxA = idxA;
+    DATA(msg)->idxB = idxB;
     std::lock_guard<std::mutex> lock(m_clientMtx);
     msg.send(m_cmd_socket.get());
 }
@@ -376,7 +392,7 @@ std::vector<ServerPlugin> Client::getRecents() {
     msg.send(m_cmd_socket.get());
     std::vector<ServerPlugin> recents;
     if (msg.read(m_cmd_socket.get())) {
-        String listChunk(msg.payload.str, *msg.payload.size);
+        String listChunk(PLD(msg).str, *PLD(msg).size);
         auto list = StringArray::fromLines(listChunk);
         for (auto& line : list) {
             if (!line.isEmpty()) {
@@ -392,21 +408,45 @@ std::vector<ServerPlugin> Client::getRecents() {
 
 void Client::setPreset(int idx, int preset) {
     Message<Preset> msg;
-    msg.payload.data->idx = idx;
-    msg.payload.data->preset = preset;
+    DATA(msg)->idx = idx;
+    DATA(msg)->preset = preset;
+    msg.send(m_cmd_socket.get());
+}
+
+float Client::getParameterValue(int idx, int paramIdx) {
+    Message<GetParameterValue> msg;
+    DATA(msg)->idx = idx;
+    DATA(msg)->paramIdx = paramIdx;
+    msg.send(m_cmd_socket.get());
+    Message<ParameterValue> ret;
+    if (ret.read(m_cmd_socket.get())) {
+        if (DATA(msg)->idx == DATA(ret)->idx && DATA(msg)->paramIdx == DATA(ret)->paramIdx) {
+            return DATA(ret)->value;
+        }
+    }
+    std::cerr << getLoadedPluginsString() << ": failed to read parameter value idx=" << idx << " paramIdx=" << paramIdx
+              << std::endl;
+    return 0;
+}
+
+void Client::setParameterValue(int idx, int paramIdx, float val) {
+    Message<ParameterValue> msg;
+    DATA(msg)->idx = idx;
+    DATA(msg)->paramIdx = paramIdx;
+    DATA(msg)->value = val;
     msg.send(m_cmd_socket.get());
 }
 
 void Client::ScreenReceiver::run() {
     using MsgType = Message<ScreenCapture>;
     MsgType msg;
-    MessageHelper::ReadError e;
+    MessageHelper::Error e;
     do {
         if (msg.read(m_socket, &e, 200)) {
-            if (msg.payload.hdr->size > 0) {
+            if (PLD(msg).hdr->size > 0) {
                 m_client->setPluginScreen(
-                    std::make_shared<Image>(JPEGImageFormat::loadFrom(msg.payload.data, msg.payload.hdr->size)),
-                    msg.payload.hdr->width, msg.payload.hdr->height);
+                    std::make_shared<Image>(JPEGImageFormat::loadFrom(DATA(msg), PLD(msg).hdr->size)),
+                    PLD(msg).hdr->width, PLD(msg).hdr->height);
             } else {
                 m_client->setPluginScreen(nullptr, 0, 0);
             }
@@ -466,9 +506,9 @@ void Client::mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wh
 
 void Client::sendMouseEvent(MouseEvType ev, Point<float> p) {
     Message<Mouse> msg;
-    msg.payload.data->type = ev;
-    msg.payload.data->x = p.x;
-    msg.payload.data->y = p.y;
+    DATA(msg)->type = ev;
+    DATA(msg)->x = p.x;
+    DATA(msg)->y = p.y;
     std::lock_guard<std::mutex> lock(m_clientMtx);
     msg.send(m_cmd_socket.get());
 }
@@ -562,8 +602,8 @@ bool Client::keyPressed(const KeyPress& kp, Component* originatingComponent) {
         }
 
         Message<Key> msg;
-        msg.payload.setData(reinterpret_cast<const char*>(keysToPress.data()),
-                            static_cast<int>(keysToPress.size() * sizeof(uint16_t)));
+        PLD(msg).setData(reinterpret_cast<const char*>(keysToPress.data()),
+                         static_cast<int>(keysToPress.size() * sizeof(uint16_t)));
         std::lock_guard<std::mutex> lock(m_clientMtx);
         msg.send(m_cmd_socket.get());
     }

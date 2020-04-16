@@ -61,7 +61,9 @@ class ProcessorChain : public AudioProcessor {
     void delProcessor(int idx);
     void exchangeProcessors(int idxA, int idxB);
 
-    void clear() { m_processors.clear(); }
+    float getParameterValue(int idx, int paramIdx);
+
+    void clear();
 
     String toString();
 
