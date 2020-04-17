@@ -1,10 +1,9 @@
-//
-//  AudioStreamer.hpp
-//  AudioGridder - VST3
-//
-//  Created by Andreas Pohl on 18.04.20.
-//  Copyright © 2020 e47. All rights reserved.
-//
+/*
+ * Copyright (c) 2020 Andreas Pohl
+ * Licensed under MIT (https://github.com/apohl79/audiogridder/blob/master/COPYING)
+ *
+ * Author: Andreas Pohl
+ */
 
 #ifndef AudioStreamer_hpp
 #define AudioStreamer_hpp
