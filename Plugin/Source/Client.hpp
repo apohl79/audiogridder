@@ -216,6 +216,10 @@ class Client : public Thread, public MouseListener, public KeyListener {
         std::mutex writeMtx, readMtx;
         std::condition_variable writeCv, readCv;
 
+        AudioMidiBuffer workingSendBuf, workingReadBuf;
+        int workingSendSamples = 0;
+        int workingReadSamples = 0;
+
         AudioStreamer(Client* clnt, StreamingSocket* sock)
             : Thread("AudioStreamer"),
               client(clnt),
@@ -228,6 +232,7 @@ class Client : public Thread, public MouseListener, public KeyListener {
                 buf.audio.clear();
                 readQ.push(std::move(buf));
             }
+            workingSendBuf.audio.clear();
         }
 
         ~AudioStreamer() {
@@ -295,18 +300,39 @@ class Client : public Thread, public MouseListener, public KeyListener {
             }
         }
 
-        // FIXME: Currently we expect all buffers coming from processBlock to be fully filled with
-        //        client->m_channels and client->m_samplesPerBlock. This can cause issues in DAW's not always
-        //        completely filling the buffers. This happens on logic for example when using parameters.
         void send(AudioBuffer<T>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
-            AudioMidiBuffer buf;
-            buf.audio.makeCopyOf(buffer);
-            buf.midi.addEvents(midi, 0, midi.getNumEvents(), 0);
-            buf.posInfo = posInfo;
             if (client->NUM_OF_BUFFERS > 1) {
-                writeQ.push(std::move(buf));
-                notifyWrite();
+                if (buffer.getNumSamples() == client->m_samplesPerBlock && workingSendSamples == 0) {
+                    AudioMidiBuffer buf;
+                    buf.audio.makeCopyOf(buffer);
+                    buf.midi.addEvents(midi, 0, midi.getNumEvents(), 0);
+                    buf.posInfo = posInfo;
+                    writeQ.push(std::move(buf));
+                    notifyWrite();
+                } else {
+                    copyToWorkingBuffer(workingSendBuf, workingSendSamples, buffer, midi);
+                    if (workingSendSamples >= client->m_samplesPerBlock) {
+                        AudioMidiBuffer buf;
+                        buf.audio.setSize(client->m_channels, client->m_samplesPerBlock);
+                        for (int chan = 0; chan < client->m_channels; chan++) {
+                            buf.audio.copyFrom(chan, 0, workingSendBuf.audio, chan, 0, client->m_samplesPerBlock);
+                        }
+                        buf.midi.addEvents(workingSendBuf.midi, 0, workingSendBuf.midi.getNumEvents(), 0);
+                        buf.posInfo = posInfo;
+                        writeQ.push(std::move(buf));
+                        notifyWrite();
+                        workingSendSamples -= client->m_samplesPerBlock;
+                        if (workingSendSamples > 0) {
+                            shiftSamplesToFront(workingSendBuf.audio, client->m_samplesPerBlock, workingSendSamples);
+                        }
+                        workingSendBuf.midi.clear();
+                    }
+                }
             } else {
+                AudioMidiBuffer buf;
+                buf.audio.makeCopyOf(buffer);
+                buf.midi.addEvents(midi, 0, midi.getNumEvents(), 0);
+                buf.posInfo = posInfo;
                 if (!sendReal(buf)) {
                     std::cerr << "error: instance (" << client->getLoadedPluginsString() << "): send failed"
                               << std::endl;
@@ -318,8 +344,26 @@ class Client : public Thread, public MouseListener, public KeyListener {
         void read(AudioBuffer<T>& buffer, MidiBuffer& midi) {
             AudioMidiBuffer buf;
             if (client->NUM_OF_BUFFERS > 1) {
-                waitRead();
-                readQ.pop(buf);
+                if (buffer.getNumSamples() == client->m_samplesPerBlock && workingReadSamples == 0) {
+                    waitRead();
+                    readQ.pop(buf);
+                    buffer.makeCopyOf(buf.audio);
+                    midi.clear();
+                    midi.addEvents(buf.midi, 0, buf.midi.getNumEvents(), 0);
+                } else {
+                    if (workingReadSamples < buffer.getNumSamples()) {
+                        waitRead();
+                        readQ.pop(buf);
+                        copyToWorkingBuffer(workingReadBuf, workingReadSamples, buf.audio, buf.midi);
+                    }
+                    for (int chan = 0; chan < buffer.getNumChannels(); chan++) {
+                        buffer.copyFrom(chan, 0, workingReadBuf.audio, chan, 0, buffer.getNumSamples());
+                    }
+                    workingReadSamples -= buffer.getNumSamples();
+                    if (workingReadSamples > 0) {
+                        shiftSamplesToFront(workingReadBuf.audio, buffer.getNumSamples(), workingReadSamples);
+                    }
+                }
             } else {
                 buf.audio.setSize(buffer.getNumChannels(), buffer.getNumSamples());
                 MessageHelper::Error err;
@@ -327,11 +371,33 @@ class Client : public Thread, public MouseListener, public KeyListener {
                     std::cerr << "error: instance (" << client->getLoadedPluginsString()
                               << "): read failed, error code " << err << std::endl;
                     socket->close();
+                    return;
+                }
+                buffer.makeCopyOf(buf.audio);
+                midi.clear();
+                midi.addEvents(buf.midi, 0, buf.midi.getNumEvents(), 0);
+            }
+        }
+
+        void copyToWorkingBuffer(AudioMidiBuffer& dst, int& workingSamples, AudioBuffer<T>& src, MidiBuffer& midi) {
+            if ((dst.audio.getNumSamples() - workingSamples) < src.getNumSamples()) {
+                dst.audio.setSize(src.getNumChannels(), workingSamples + src.getNumSamples(), true);
+            }
+            for (int chan = 0; chan < src.getNumChannels(); chan++) {
+                dst.audio.copyFrom(chan, workingSamples, src, chan, 0, src.getNumSamples());
+            }
+            workingSamples += src.getNumSamples();
+            dst.midi.addEvents(midi, 0, midi.getNumEvents(), 0);
+        }
+
+        void shiftSamplesToFront(AudioBuffer<T>& buf, int start, int num) {
+            if (start + num <= buf.getNumSamples()) {
+                for (int chan = 0; chan < buf.getNumChannels(); chan++) {
+                    for (int s = 0; s < num; s++) {
+                        buf.setSample(chan, s, buf.getSample(chan, start + s));
+                    }
                 }
             }
-            buffer.makeCopyOf(buf.audio);
-            midi.clear();
-            midi.addEvents(buf.midi, 0, buf.midi.getNumEvents(), 0);
         }
 
         bool sendReal(AudioMidiBuffer& buffer) {

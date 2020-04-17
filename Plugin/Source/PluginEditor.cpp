@@ -312,10 +312,8 @@ void AudioGridderAudioProcessorEditor::focusOfChildComponentChanged(FocusChangeT
 void AudioGridderAudioProcessorEditor::setConnected(bool connected) {
     m_connected = connected;
     if (connected) {
-        int curLatency =
-            m_processor.getClient().NUM_OF_BUFFERS * m_processor.getBlockSize() * 1000 / m_processor.getSampleRate();
         String srvTxt = m_processor.getClient().getServerHostAndID();
-        srvTxt << " (+" << curLatency << "ms)";
+        srvTxt << " (+" << m_processor.getLatencyMillis() << "ms)";
         m_srvLabel.setText(srvTxt, NotificationType::dontSendNotification);
         auto& plugins = m_processor.getLoadedPlugins();
         for (int i = 0; i < m_pluginButtons.size(); i++) {

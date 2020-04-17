@@ -88,6 +88,8 @@ class AudioGridderAudioProcessor : public AudioProcessor {
     int getActiveServer() const { return m_activeServer; }
     void setActiveServer(int i);
 
+    int getLatencyMillis() const { return m_client.NUM_OF_BUFFERS * getBlockSize() * 1000 / getSampleRate(); }
+
     // It looks like most hosts do not support dynamic parameter creation or changes to existing parameters. Just the
     // name can be updated. So we create slots at the start.
     class Parameter : public AudioProcessorParameter {
