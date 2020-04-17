@@ -4,7 +4,8 @@
               companyName="e47" companyCopyright="2020 Andreas Pohl" companyWebsite="https://www.e47.org"
               companyEmail="audiogridder@e47.org" pluginFormats="buildAU,buildVST3"
               pluginManufacturerCode="XE47" pluginCode="E401" headerPath="../../../Server/Source&#10;/usr/local/include"
-              pluginCharacteristicsValue="pluginProducesMidiOut,pluginWantsMidiIn">
+              pluginCharacteristicsValue="pluginProducesMidiOut,pluginWantsMidiIn"
+              pluginName="AGridder">
   <MAINGROUP id="tTbkq6" name="AudioGridder">
     <GROUP id="{A2A08E54-1037-9844-5B73-F16B657A5259}" name="Source">
       <FILE id="FIyoXr" name="NewServerWindow.cpp" compile="1" resource="0"
