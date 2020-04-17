@@ -10,8 +10,6 @@
 
 namespace e47 {
 
-int Client::NUM_OF_BUFFERS = DEFAULT_NUM_OF_BUFFERS;
-
 Client::Client(AudioGridderAudioProcessor* processor)
     : Thread("Client"),
       m_processor(processor),
@@ -31,6 +29,22 @@ Client::~Client() {
 void Client::run() {
     bool lastState = isReady();
     while (!currentThreadShouldExit()) {
+        File cfg(PLUGIN_CONFIG_FILE);
+        try {
+            if (cfg.exists()) {
+                FileInputStream fis(cfg);
+                json j = json::parse(fis.readEntireStreamAsString().toStdString());
+                if (j.find("NumberOfBuffers") != j.end()) {
+                    int newNum = j["NumberOfBuffers"].get<int>();
+                    if (NUM_OF_BUFFERS != newNum) {
+                        NUM_OF_BUFFERS = newNum;
+                        reconnect();
+                    }
+                }
+            }
+        } catch (json::parse_error& e) {
+            std::cerr << "parsing config failed: " << e.what() << std::endl;
+        }
         if (!isReady() && !currentThreadShouldExit()) {
             init();
         } else if (m_needsReconnect && !currentThreadShouldExit()) {
@@ -389,6 +403,7 @@ void Client::exchangePlugins(int idxA, int idxB) {
 
 std::vector<ServerPlugin> Client::getRecents() {
     Message<RecentsList> msg;
+    std::lock_guard<std::mutex> lock(m_clientMtx);
     msg.send(m_cmd_socket.get());
     std::vector<ServerPlugin> recents;
     if (msg.read(m_cmd_socket.get())) {
@@ -410,6 +425,7 @@ void Client::setPreset(int idx, int preset) {
     Message<Preset> msg;
     DATA(msg)->idx = idx;
     DATA(msg)->preset = preset;
+    std::lock_guard<std::mutex> lock(m_clientMtx);
     msg.send(m_cmd_socket.get());
 }
 
@@ -417,6 +433,7 @@ float Client::getParameterValue(int idx, int paramIdx) {
     Message<GetParameterValue> msg;
     DATA(msg)->idx = idx;
     DATA(msg)->paramIdx = paramIdx;
+    std::lock_guard<std::mutex> lock(m_clientMtx);
     msg.send(m_cmd_socket.get());
     Message<ParameterValue> ret;
     if (ret.read(m_cmd_socket.get())) {
@@ -434,6 +451,7 @@ void Client::setParameterValue(int idx, int paramIdx, float val) {
     DATA(msg)->idx = idx;
     DATA(msg)->paramIdx = paramIdx;
     DATA(msg)->value = val;
+    std::lock_guard<std::mutex> lock(m_clientMtx);
     msg.send(m_cmd_socket.get());
 }
 
@@ -611,7 +629,7 @@ bool Client::keyPressed(const KeyPress& kp, Component* originatingComponent) {
 }
 
 StreamingSocket* Client::accept(StreamingSocket& sock) const {
-    StreamingSocket* clnt;
+    StreamingSocket* clnt = nullptr;
     int retry = 100;
     do {
         if (sock.waitUntilReady(true, 200) > 0) {

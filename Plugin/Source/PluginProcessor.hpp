@@ -51,6 +51,8 @@ class AudioGridderAudioProcessor : public AudioProcessor {
     void getStateInformation(MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
+    void saveConfig(int numOfBuffers = -1);
+
     e47::Client& getClient() { return m_client; }
     std::vector<ServerPlugin> getPlugins(const String& type) const;
     const std::vector<ServerPlugin>& getPlugins() const { return m_client.getPlugins(); }
@@ -90,8 +92,7 @@ class AudioGridderAudioProcessor : public AudioProcessor {
     // name can be updated. So we create slots at the start.
     class Parameter : public AudioProcessorParameter {
       public:
-        Parameter(AudioGridderAudioProcessor& processor, int slot)
-            : m_processor(processor), m_slotId(slot) {}
+        Parameter(AudioGridderAudioProcessor& processor, int slot) : m_processor(processor), m_slotId(slot) {}
         float getValue() const override;
         void setValue(float newValue) override;
         float getValueForText(const String& text) const override { return 0; };

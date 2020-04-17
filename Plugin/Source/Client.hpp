@@ -72,7 +72,7 @@ class Client : public Thread, public MouseListener, public KeyListener {
         }
     };
 
-    static int NUM_OF_BUFFERS;
+    int NUM_OF_BUFFERS = DEFAULT_NUM_OF_BUFFERS;
 
     void run();
 

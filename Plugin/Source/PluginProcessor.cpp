@@ -42,7 +42,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
                 m_activeServer = j["Last"].get<int>();
             }
             if (j.find("NumberOfBuffers") != j.end()) {
-                e47::Client::NUM_OF_BUFFERS = j["NumberOfBuffers"].get<int>();
+                m_client.NUM_OF_BUFFERS = j["NumberOfBuffers"].get<int>();
             }
             if (j.find("NumberOfAutomationSlots") != j.end()) {
                 m_numberOfAutomationSlots = j["NumberOfAutomationSlots"].get<int>();
@@ -254,10 +254,22 @@ void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData) {
     auto dump = j.dump();
     destData.append(dump.data(), dump.length());
 
+    saveConfig();
+}
+
+void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
+    auto jservers = json::array();
+    for (auto& srv : m_servers) {
+        jservers.push_back(srv.toStdString());
+    }
+    if (numOfBuffers < 0) {
+        numOfBuffers = m_client.NUM_OF_BUFFERS;
+    }
     json jcfg;
+    jcfg["_comment_"] = "PLEASE DO NOT CHANGE THIS FILE WHILE YOUR DAW IS RUNNING AND HAS AUDIOGRIDDER PLUGINS LOADED";
     jcfg["Servers"] = jservers;
     jcfg["Last"] = m_activeServer;
-    jcfg["NumberOfBuffers"] = e47::Client::NUM_OF_BUFFERS;
+    jcfg["NumberOfBuffers"] = numOfBuffers;
     jcfg["NumberOfAutomationSlots"] = m_numberOfAutomationSlots;
     File cfg(PLUGIN_CONFIG_FILE);
     cfg.deleteFile();

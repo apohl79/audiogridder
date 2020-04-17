@@ -310,19 +310,21 @@ void AudioGridderAudioProcessorEditor::focusOfChildComponentChanged(FocusChangeT
 }
 
 void AudioGridderAudioProcessorEditor::setConnected(bool connected) {
-    if (connected != m_connected) {
-        m_connected = connected;
-        if (connected) {
-            m_srvLabel.setText(m_processor.getClient().getServerHostAndID(), NotificationType::dontSendNotification);
-            auto& plugins = m_processor.getLoadedPlugins();
-            for (int i = 0; i < m_pluginButtons.size(); i++) {
-                m_pluginButtons[i]->setEnabled(plugins[i].ok);
-            }
-        } else {
-            m_srvLabel.setText("not connected", NotificationType::dontSendNotification);
-            for (auto& but : m_pluginButtons) {
-                but->setEnabled(false);
-            }
+    m_connected = connected;
+    if (connected) {
+        int curLatency =
+            m_processor.getClient().NUM_OF_BUFFERS * m_processor.getBlockSize() * 1000 / m_processor.getSampleRate();
+        String srvTxt = m_processor.getClient().getServerHostAndID();
+        srvTxt << " (+" << curLatency << "ms)";
+        m_srvLabel.setText(srvTxt, NotificationType::dontSendNotification);
+        auto& plugins = m_processor.getLoadedPlugins();
+        for (int i = 0; i < m_pluginButtons.size(); i++) {
+            m_pluginButtons[i]->setEnabled(plugins[i].ok);
+        }
+    } else {
+        m_srvLabel.setText("not connected", NotificationType::dontSendNotification);
+        for (auto& but : m_pluginButtons) {
+            but->setEnabled(false);
         }
     }
 }
@@ -332,6 +334,35 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
         return;
     }
     PopupMenu m;
+    m.addSectionHeader("Buffering");
+    PopupMenu bufMenu;
+    int rate = m_processor.getSampleRate();
+    int iobuf = m_processor.getBlockSize();
+    auto getName = [rate, iobuf](int blocks) -> String {
+        String n;
+        n << blocks << " Blocks (+" << blocks * iobuf * 1000 / rate << "ms)";
+        return n;
+    };
+    bufMenu.addItem("Disabled (+0ms)", true, m_processor.getClient().NUM_OF_BUFFERS == 0,
+                    [this] { m_processor.saveConfig(0); });
+    bufMenu.addItem(getName(4), true, m_processor.getClient().NUM_OF_BUFFERS == 4,
+                    [this] { m_processor.saveConfig(4); });
+    bufMenu.addItem(getName(8), true, m_processor.getClient().NUM_OF_BUFFERS == 8,
+                    [this] { m_processor.saveConfig(8); });
+    bufMenu.addItem(getName(12), true, m_processor.getClient().NUM_OF_BUFFERS == 12,
+                    [this] { m_processor.saveConfig(12); });
+    bufMenu.addItem(getName(16), true, m_processor.getClient().NUM_OF_BUFFERS == 16,
+                    [this] { m_processor.saveConfig(16); });
+    bufMenu.addItem(getName(20), true, m_processor.getClient().NUM_OF_BUFFERS == 20,
+                    [this] { m_processor.saveConfig(20); });
+    bufMenu.addItem(getName(24), true, m_processor.getClient().NUM_OF_BUFFERS == 24,
+                    [this] { m_processor.saveConfig(24); });
+    bufMenu.addItem(getName(28), true, m_processor.getClient().NUM_OF_BUFFERS == 28,
+                    [this] { m_processor.saveConfig(28); });
+    bufMenu.addItem(getName(30), true, m_processor.getClient().NUM_OF_BUFFERS == 30,
+                    [this] { m_processor.saveConfig(30); });
+    m.addSubMenu("Buffer Size", bufMenu);
+    m.addSectionHeader("Servers");
     auto& servers = m_processor.getServers();
     for (int i = 0; i < servers.size(); i++) {
         if (i == m_processor.getActiveServer()) {
