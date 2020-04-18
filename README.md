@@ -12,7 +12,9 @@ UI's will be streamed over the wire. This allows for an experience
 very close to hosting the plugins directly in your DAW but not using
 your local CPU.
 
-![](https://raw.githubusercontent.com/apohl79/audiogridder/master/images/overview.png "AudioGridder Overview")
+<p align="center">
+<img src="https://raw.githubusercontent.com/apohl79/audiogridder/master/images/overview.png" width="600" />
+</p>
 
 This setup proves to be working very well on wired networks. Wireless
 networks work as well given you have a proper connection that provides
