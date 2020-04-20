@@ -27,6 +27,8 @@ class AudioStreamer : public Thread {
     int workingSendSamples = 0;
     int workingReadSamples = 0;
 
+    std::atomic_bool error{false};
+
     AudioStreamer(Client* clnt, StreamingSocket* sock)
         : Thread("AudioStreamer"),
           client(clnt),
@@ -50,13 +52,20 @@ class AudioStreamer : public Thread {
         stopThread(100);
     }
 
+    void setError() {
+        socket->close();
+        error = true;
+        client->m_error = true;
+        notifyRead();
+        notifyWrite();
+    }
     void notifyWrite() {
         std::lock_guard<std::mutex> lock(writeMtx);
         writeCv.notify_one();
     }
 
     void waitWrite() {
-        if (writeQ.read_available() == 0) {
+        if (writeQ.read_available() == 0 && !error) {
             std::unique_lock<std::mutex> lock(writeMtx);
             writeCv.wait(lock, [this] { return writeQ.read_available() > 0 || currentThreadShouldExit(); });
         }
@@ -78,28 +87,30 @@ class AudioStreamer : public Thread {
                           << "): read queue empty, waiting for data, try increasing the NumberOfBuffers value"
                           << std::endl;
             }
-            std::unique_lock<std::mutex> lock(readMtx);
-            readCv.wait(lock, [this] { return readQ.read_available() > 0 || currentThreadShouldExit(); });
+            if (!error) {
+                std::unique_lock<std::mutex> lock(readMtx);
+                readCv.wait(lock, [this] { return readQ.read_available() > 0 || currentThreadShouldExit(); });
+            }
         }
     }
 
     void run() {
-        while (!currentThreadShouldExit() && socket->isConnected()) {
+        while (!currentThreadShouldExit() && !error && socket->isConnected()) {
             while (writeQ.read_available() > 0) {
                 AudioMidiBuffer buf;
                 writeQ.pop(buf);
                 if (!sendReal(buf)) {
                     std::cerr << "error: instance (" << client->getLoadedPluginsString() << "): send failed"
                               << std::endl;
-                    socket->close();
-                    break;
+                    setError();
+                    return;
                 }
                 MessageHelper::Error err;
                 if (!readReal(buf, &err)) {
                     std::cerr << "error: instance (" << client->getLoadedPluginsString()
                               << "): read failed, error code " << err << std::endl;
-                    socket->close();
-                    break;
+                    setError();
+                    return;
                 }
                 readQ.push(std::move(buf));
                 notifyRead();
@@ -109,6 +120,9 @@ class AudioStreamer : public Thread {
     }
 
     void send(AudioBuffer<T>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
+        if (error) {
+            return;
+        }
         if (client->NUM_OF_BUFFERS > 1) {
             if (buffer.getNumSamples() == client->m_samplesPerBlock && workingSendSamples == 0) {
                 AudioMidiBuffer buf;
@@ -143,12 +157,15 @@ class AudioStreamer : public Thread {
             buf.posInfo = posInfo;
             if (!sendReal(buf)) {
                 std::cerr << "error: instance (" << client->getLoadedPluginsString() << "): send failed" << std::endl;
-                socket->close();
+                setError();
             }
         }
     }
 
     void read(AudioBuffer<T>& buffer, MidiBuffer& midi) {
+        if (error) {
+            return;
+        }
         AudioMidiBuffer buf;
         if (client->NUM_OF_BUFFERS > 1) {
             if (buffer.getNumSamples() == client->m_samplesPerBlock && workingReadSamples == 0) {
@@ -180,7 +197,7 @@ class AudioStreamer : public Thread {
             if (!readReal(buf, &err)) {
                 std::cerr << "error: instance (" << client->getLoadedPluginsString() << "): read failed, error code "
                           << err << std::endl;
-                socket->close();
+                setError();
                 return;
             }
             buffer.makeCopyOf(buf.audio);
