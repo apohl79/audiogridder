@@ -235,7 +235,17 @@ void Worker::handleMessage(std::shared_ptr<Message<Mouse>> msg) {
     auto ev = *pDATA(msg);
     MessageManager::callAsync([ev] {
         auto point = getApp().localPointToGlobal(Point<float>(ev.x, ev.y));
-        mouseEvent(ev.type, point.x, point.y);
+        uint64_t flags = 0;
+        if (ev.isShiftDown) {
+            setShiftKey(flags);
+        }
+        if (ev.isCtrlDown) {
+            setControlKey(flags);
+        }
+        if (ev.isAltDown) {
+            setAltKey(flags);
+        }
+        mouseEvent(ev.type, point.x, point.y, flags);
     });
 }
 
@@ -243,12 +253,21 @@ void Worker::handleMessage(std::shared_ptr<Message<Key>> msg) {
     MessageManager::callAsync([msg] {
         auto* codes = pPLD(msg).getKeyCodes();
         auto num = pPLD(msg).getKeyCount();
-        for (size_t i = 0; i < num; i++) {
-            keyEventDown(codes[i]);
+        uint16_t key = 0;
+        uint64_t flags = 0;
+        for (int i = 0; i < num; i++) {
+            if (isShiftKey(codes[i])) {
+                setShiftKey(flags);
+            } else if (isControlKey(codes[i])) {
+                setControlKey(flags);
+            } else if (isAltKey(codes[i])) {
+                setAltKey(flags);
+            } else {
+                key = codes[i];
+            }
         }
-        for (size_t i = num - 1; i > -1; i--) {
-            keyEventUp(codes[i]);
-        }
+        keyEventDown(key, flags);
+        keyEventUp(key, flags);
     });
 }
 

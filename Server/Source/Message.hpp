@@ -488,6 +488,9 @@ struct mouseevent_t {
     MouseEvType type;
     float x;
     float y;
+    bool isShiftDown;
+    bool isCtrlDown;
+    bool isAltDown;
 };
 
 class Mouse : public DataPayload<mouseevent_t> {

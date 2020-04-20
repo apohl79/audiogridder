@@ -15,9 +15,10 @@
 
 namespace e47 {
 
-void mouseEventReal(CGMouseButton button, CGEventType type, CGPoint location) {
+void mouseEventReal(CGMouseButton button, CGEventType type, CGPoint location, CGEventFlags flags) {
     CGEventRef event = CGEventCreateMouseEvent(NULL, type, location, button);
     CGEventSetType(event, type);
+    CGEventSetFlags(event, flags | CGEventGetFlags(event));
     CGEventPost(kCGSessionEventTap, event);
     CFRelease(event);
 }
@@ -70,18 +71,22 @@ std::pair<CGMouseButton, CGEventType> toMouseButtonType(MouseEvType t) {
     return std::make_pair(button, type);
 }
 
-void mouseEvent(MouseEvType t, float x, float y) {
+void mouseEvent(MouseEvType t, float x, float y, uint64_t flags) {
     auto bt = toMouseButtonType(t);
     CGPoint loc = CGPointMake(x, y);
-    mouseEventReal(bt.first, bt.second, loc);
+    mouseEventReal(bt.first, bt.second, loc, flags);
 }
 
 void keyEvent(uint16_t keyCode, uint64_t flags, bool keyDown) {
     CGEventRef ev = CGEventCreateKeyboardEvent(NULL, keyCode, keyDown);
-    CGEventSetFlags(ev, flags);
+    CGEventSetFlags(ev, flags | CGEventGetFlags(ev));
     CGEventPost(kCGSessionEventTap, ev);
     CFRelease(ev);
 }
+
+void setShiftKey(uint64_t& flags) { flags |= kCGEventFlagMaskShift; }
+void setControlKey(uint64_t& flags) { flags |= kCGEventFlagMaskControl; };
+void setAltKey(uint64_t& flags) { flags |= kCGEventFlagMaskAlternate; };
 
 void keyEventDown(uint16_t keyCode, uint64_t flags) { keyEvent(keyCode, flags, true); }
 

@@ -56,7 +56,15 @@ static inline uint16_t getKeyCode(std::string s) {
     return NOKEY;
 }
 
-void mouseEvent(MouseEvType t, float x, float y);
+static inline bool isShiftKey(uint16_t kc) { return kc == 0x38; }
+static inline bool isControlKey(uint16_t kc) { return kc == 0x3B; }
+static inline bool isAltKey(uint16_t kc) { return kc == 0x3A; }
+
+void setShiftKey(uint64_t& flags);
+void setControlKey(uint64_t& flags);
+void setAltKey(uint64_t& flags);
+
+void mouseEvent(MouseEvType t, float x, float y, uint64_t flags = 0);
 void keyEventDown(uint16_t keyCode, uint64_t flags = 0);
 void keyEventUp(uint16_t keyCode, uint64_t flags = 0);
 
