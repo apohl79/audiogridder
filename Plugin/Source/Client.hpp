@@ -74,7 +74,7 @@ class Client : public Thread, public MouseListener, public KeyListener {
 
     int NUM_OF_BUFFERS = DEFAULT_NUM_OF_BUFFERS;
 
-    void run();
+    void run() override;
 
     void setServer(const String& host, int port = DEFAULT_SERVER_PORT);
     String getServerHost();
@@ -140,31 +140,20 @@ class Client : public Thread, public MouseListener, public KeyListener {
     float getParameterValue(int idx, int paramIdx);
     void setParameterValue(int idx, int paramIdx, float val);
 
-    class ScreenReceiver : public Thread {
-      public:
-        ScreenReceiver(Client* clnt, StreamingSocket* sock) : Thread("ScreenWorker"), m_client(clnt), m_socket(sock) {}
-        ~ScreenReceiver() { stopThread(100); }
-        void run();
-
-      private:
-        Client* m_client;
-        StreamingSocket* m_socket;
-    };
-
     // MouseListener
-    virtual void mouseMove(const MouseEvent& event);
-    virtual void mouseEnter(const MouseEvent& event);
-    virtual void mouseExit(const MouseEvent& event) {}
-    virtual void mouseDown(const MouseEvent& event);
-    virtual void mouseDrag(const MouseEvent& event);
-    virtual void mouseUp(const MouseEvent& event);
-    virtual void mouseDoubleClick(const MouseEvent& event);
-    virtual void mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wheel);
+    void mouseMove(const MouseEvent& event) override;
+    void mouseEnter(const MouseEvent& event) override;
+    void mouseExit(const MouseEvent& event) override {}
+    void mouseDown(const MouseEvent& event) override;
+    void mouseDrag(const MouseEvent& event) override;
+    void mouseUp(const MouseEvent& event) override;
+    void mouseDoubleClick(const MouseEvent& event) override;
+    void mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wheel) override;
 
-    void sendMouseEvent(MouseEvType ev, Point<float> p);
+    void sendMouseEvent(MouseEvType ev, Point<float> p, bool isShiftDown, bool isCtrlDown, bool isAltDown);
 
     // KeyListener
-    virtual bool keyPressed(const KeyPress& kp, Component* originatingComponent);
+    bool keyPressed(const KeyPress& kp, Component* originatingComponent) override;
 
   private:
     AudioGridderAudioProcessor* m_processor;
@@ -181,10 +170,24 @@ class Client : public Thread, public MouseListener, public KeyListener {
 
     std::mutex m_clientMtx;
     std::atomic_bool m_ready;
+    std::atomic_bool m_error{false};
     std::unique_ptr<StreamingSocket> m_cmd_socket;
     std::unique_ptr<StreamingSocket> m_audio_socket;
     std::unique_ptr<StreamingSocket> m_screen_socket;
     std::vector<ServerPlugin> m_plugins;
+
+    class ScreenReceiver : public Thread {
+      public:
+        ScreenReceiver(Client* clnt, StreamingSocket* sock) : Thread("ScreenWorker"), m_client(clnt), m_socket(sock) {}
+        ~ScreenReceiver() { stopThread(100); }
+        void run();
+
+      private:
+        Client* m_client;
+        StreamingSocket* m_socket;
+    };
+
+    friend ScreenReceiver;
 
     std::unique_ptr<ScreenReceiver> m_screenWorker;
     std::shared_ptr<Image> m_pluginScreen;

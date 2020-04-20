@@ -208,6 +208,7 @@ void Client::init() {
             }
         }
         m_ready = true;
+        m_error = false;
         m_needsReconnect = false;
 
         if (m_onConnectCallback) {
@@ -221,12 +222,12 @@ void Client::init() {
 
 bool Client::isReady() {
     std::lock_guard<std::mutex> lock(m_clientMtx);
-    m_ready = nullptr != m_cmd_socket && m_cmd_socket->isConnected() && nullptr != m_screen_socket &&
+    m_ready = !m_error && nullptr != m_cmd_socket && m_cmd_socket->isConnected() && nullptr != m_screen_socket &&
               m_screen_socket->isConnected() && nullptr != m_audio_socket && m_audio_socket->isConnected();
     return m_ready;
 }
 
-bool Client::isReadyLockFree() { return m_ready; }
+bool Client::isReadyLockFree() { return !m_error && m_ready; }
 
 void Client::close() {
     m_ready = false;
@@ -292,6 +293,9 @@ void Client::quit() {
 }
 
 bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params, String settings) {
+    if (!isReadyLockFree()) {
+        return false;
+    };
     Message<AddPlugin> msg;
     PLD(msg).setString(id);
     std::lock_guard<std::mutex> lock(m_clientMtx);
@@ -334,6 +338,9 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
 }
 
 void Client::delPlugin(int idx) {
+    if (!isReadyLockFree()) {
+        return;
+    };
     Message<DelPlugin> msg;
     PLD(msg).setNumber(idx);
     std::lock_guard<std::mutex> lock(m_clientMtx);
@@ -345,6 +352,9 @@ void Client::delPlugin(int idx) {
 }
 
 void Client::editPlugin(int idx) {
+    if (!isReadyLockFree()) {
+        return;
+    };
     Message<EditPlugin> msg;
     PLD(msg).setNumber(idx);
     std::lock_guard<std::mutex> lock(m_clientMtx);
@@ -352,6 +362,9 @@ void Client::editPlugin(int idx) {
 }
 
 void Client::hidePlugin() {
+    if (!isReadyLockFree()) {
+        return;
+    };
     Message<HidePlugin> msg;
     std::lock_guard<std::mutex> lock(m_clientMtx);
     msg.send(m_cmd_socket.get());
@@ -359,6 +372,9 @@ void Client::hidePlugin() {
 
 MemoryBlock Client::getPluginSettings(int idx) {
     MemoryBlock block;
+    if (!isReadyLockFree()) {
+        return block;
+    };
     Message<GetPluginSettings> msg;
     PLD(msg).setNumber(idx);
     std::lock_guard<std::mutex> lock(m_clientMtx);
@@ -373,13 +389,16 @@ MemoryBlock Client::getPluginSettings(int idx) {
             }
         } else {
             std::cerr << "failed to read PluginSettings message" << std::endl;
-            m_cmd_socket->close();
+            m_error = true;
         }
     }
     return block;
 }
 
 void Client::bypassPlugin(int idx) {
+    if (!isReadyLockFree()) {
+        return;
+    };
     Message<BypassPlugin> msg;
     PLD(msg).setNumber(idx);
     std::lock_guard<std::mutex> lock(m_clientMtx);
@@ -387,6 +406,9 @@ void Client::bypassPlugin(int idx) {
 }
 
 void Client::unbypassPlugin(int idx) {
+    if (!isReadyLockFree()) {
+        return;
+    };
     Message<UnbypassPlugin> msg;
     PLD(msg).setNumber(idx);
     std::lock_guard<std::mutex> lock(m_clientMtx);
@@ -394,6 +416,9 @@ void Client::unbypassPlugin(int idx) {
 }
 
 void Client::exchangePlugins(int idxA, int idxB) {
+    if (!isReadyLockFree()) {
+        return;
+    };
     Message<ExchangePlugins> msg;
     DATA(msg)->idxA = idxA;
     DATA(msg)->idxB = idxB;
@@ -402,10 +427,13 @@ void Client::exchangePlugins(int idxA, int idxB) {
 }
 
 std::vector<ServerPlugin> Client::getRecents() {
+    std::vector<ServerPlugin> recents;
+    if (!isReadyLockFree()) {
+        return recents;
+    };
     Message<RecentsList> msg;
     std::lock_guard<std::mutex> lock(m_clientMtx);
     msg.send(m_cmd_socket.get());
-    std::vector<ServerPlugin> recents;
     if (msg.read(m_cmd_socket.get())) {
         String listChunk(PLD(msg).str, *PLD(msg).size);
         auto list = StringArray::fromLines(listChunk);
@@ -416,12 +444,15 @@ std::vector<ServerPlugin> Client::getRecents() {
         }
     } else {
         std::cerr << "failed to read RecentsList message" << std::endl;
-        m_cmd_socket->close();
+        m_error = true;
     }
     return recents;
 }
 
 void Client::setPreset(int idx, int preset) {
+    if (!isReadyLockFree()) {
+        return;
+    };
     Message<Preset> msg;
     DATA(msg)->idx = idx;
     DATA(msg)->preset = preset;
@@ -430,6 +461,9 @@ void Client::setPreset(int idx, int preset) {
 }
 
 float Client::getParameterValue(int idx, int paramIdx) {
+    if (!isReadyLockFree()) {
+        return 0;
+    };
     Message<GetParameterValue> msg;
     DATA(msg)->idx = idx;
     DATA(msg)->paramIdx = paramIdx;
@@ -447,6 +481,9 @@ float Client::getParameterValue(int idx, int paramIdx) {
 }
 
 void Client::setParameterValue(int idx, int paramIdx, float val) {
+    if (!isReadyLockFree()) {
+        return;
+    };
     Message<ParameterValue> msg;
     DATA(msg)->idx = idx;
     DATA(msg)->paramIdx = paramIdx;
@@ -471,20 +508,30 @@ void Client::ScreenReceiver::run() {
         }
     } while (!currentThreadShouldExit() && (e == MessageHelper::E_NONE || e == MessageHelper::E_TIMEOUT));
     signalThreadShouldExit();
+    m_client->m_error = true;
     std::cout << "screen receiver terminated" << std::endl;
 }
 
-void Client::mouseMove(const MouseEvent& event) { sendMouseEvent(MouseEvType::MOVE, event.position); }
+void Client::mouseMove(const MouseEvent& event) {
+    sendMouseEvent(MouseEvType::MOVE, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
+                   event.mods.isAltDown());
+}
 
-void Client::mouseEnter(const MouseEvent& event) { sendMouseEvent(MouseEvType::MOVE, event.position); }
+void Client::mouseEnter(const MouseEvent& event) {
+    sendMouseEvent(MouseEvType::MOVE, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
+                   event.mods.isAltDown());
+}
 
 void Client::mouseDown(const MouseEvent& event) {
     if (event.mods.isLeftButtonDown()) {
-        sendMouseEvent(MouseEvType::LEFT_DOWN, event.position);
+        sendMouseEvent(MouseEvType::LEFT_DOWN, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
+                       event.mods.isAltDown());
     } else if (event.mods.isRightButtonDown()) {
-        sendMouseEvent(MouseEvType::RIGHT_DOWN, event.position);
+        sendMouseEvent(MouseEvType::RIGHT_DOWN, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
+                       event.mods.isAltDown());
     } else if (event.mods.isMiddleButtonDown()) {
-        sendMouseEvent(MouseEvType::OTHER_DOWN, event.position);
+        sendMouseEvent(MouseEvType::OTHER_DOWN, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
+                       event.mods.isAltDown());
     } else {
         std::cerr << "unhandled mouseDown event" << std::endl;
     }
@@ -492,11 +539,14 @@ void Client::mouseDown(const MouseEvent& event) {
 
 void Client::mouseDrag(const MouseEvent& event) {
     if (event.mods.isLeftButtonDown()) {
-        sendMouseEvent(MouseEvType::LEFT_DRAG, event.position);
+        sendMouseEvent(MouseEvType::LEFT_DRAG, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
+                       event.mods.isAltDown());
     } else if (event.mods.isRightButtonDown()) {
-        sendMouseEvent(MouseEvType::RIGHT_DRAG, event.position);
+        sendMouseEvent(MouseEvType::RIGHT_DRAG, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
+                       event.mods.isAltDown());
     } else if (event.mods.isMiddleButtonDown()) {
-        sendMouseEvent(MouseEvType::OTHER_DRAG, event.position);
+        sendMouseEvent(MouseEvType::OTHER_DRAG, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
+                       event.mods.isAltDown());
     } else {
         std::cerr << "unhandled mouseDrag event" << std::endl;
     }
@@ -504,11 +554,14 @@ void Client::mouseDrag(const MouseEvent& event) {
 
 void Client::mouseUp(const MouseEvent& event) {
     if (event.mods.isLeftButtonDown()) {
-        sendMouseEvent(MouseEvType::LEFT_UP, event.position);
+        sendMouseEvent(MouseEvType::LEFT_UP, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
+                       event.mods.isAltDown());
     } else if (event.mods.isRightButtonDown()) {
-        sendMouseEvent(MouseEvType::RIGHT_UP, event.position);
+        sendMouseEvent(MouseEvType::RIGHT_UP, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
+                       event.mods.isAltDown());
     } else if (event.mods.isMiddleButtonDown()) {
-        sendMouseEvent(MouseEvType::OTHER_UP, event.position);
+        sendMouseEvent(MouseEvType::OTHER_UP, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
+                       event.mods.isAltDown());
     } else {
         std::cerr << "unhandled mouseUp event" << std::endl;
     }
@@ -522,109 +575,117 @@ void Client::mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wh
     std::cout << "unhanbdled mouseWheelMove " << event.position.x << ":" << event.position.y << std::endl;
 }
 
-void Client::sendMouseEvent(MouseEvType ev, Point<float> p) {
+void Client::sendMouseEvent(MouseEvType ev, Point<float> p, bool isShiftDown, bool isCtrlDown, bool isAltDown) {
+    if (!isReadyLockFree()) {
+        return;
+    };
     Message<Mouse> msg;
     DATA(msg)->type = ev;
     DATA(msg)->x = p.x;
     DATA(msg)->y = p.y;
+    DATA(msg)->isShiftDown = isShiftDown;
+    DATA(msg)->isCtrlDown = isCtrlDown;
+    DATA(msg)->isAltDown = isAltDown;
     std::lock_guard<std::mutex> lock(m_clientMtx);
     msg.send(m_cmd_socket.get());
 }
 
 bool Client::keyPressed(const KeyPress& kp, Component* originatingComponent) {
-    if (kp.isValid()) {
-        auto modkeys = kp.getModifiers();
-        std::vector<uint16_t> keysToPress;
-        if (modkeys.isShiftDown()) {
-            keysToPress.push_back(getKeyCode("Shift"));
-        }
-        if (modkeys.isCtrlDown()) {
-            keysToPress.push_back(getKeyCode("Control"));
-        }
-        if (modkeys.isAltDown()) {
-            keysToPress.push_back(getKeyCode("Option"));
-        }
-        if (kp.isKeyCurrentlyDown(KeyPress::escapeKey)) {
-            keysToPress.push_back(getKeyCode("Escape"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::spaceKey)) {
-            keysToPress.push_back(getKeyCode("Space"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::returnKey)) {
-            keysToPress.push_back(getKeyCode("Return"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::tabKey)) {
-            keysToPress.push_back(getKeyCode("Tab"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::deleteKey)) {
-            keysToPress.push_back(getKeyCode("Delete"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::backspaceKey)) {
-            keysToPress.push_back(getKeyCode("Backspace"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::upKey)) {
-            keysToPress.push_back(getKeyCode("UpArrow"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::downKey)) {
-            keysToPress.push_back(getKeyCode("DownArrow"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::leftKey)) {
-            keysToPress.push_back(getKeyCode("LeftArrow"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::rightKey)) {
-            keysToPress.push_back(getKeyCode("RightArrow"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::pageUpKey)) {
-            keysToPress.push_back(getKeyCode("PageUp"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::pageDownKey)) {
-            keysToPress.push_back(getKeyCode("PageDown"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::homeKey)) {
-            keysToPress.push_back(getKeyCode("Home"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::endKey)) {
-            keysToPress.push_back(getKeyCode("End"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::F1Key)) {
-            keysToPress.push_back(getKeyCode("F1"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::F2Key)) {
-            keysToPress.push_back(getKeyCode("F2"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::F3Key)) {
-            keysToPress.push_back(getKeyCode("F3"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::F4Key)) {
-            keysToPress.push_back(getKeyCode("F4"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::F5Key)) {
-            keysToPress.push_back(getKeyCode("F5"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::F6Key)) {
-            keysToPress.push_back(getKeyCode("F6"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::F7Key)) {
-            keysToPress.push_back(getKeyCode("F7"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::F8Key)) {
-            keysToPress.push_back(getKeyCode("F8"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::F9Key)) {
-            keysToPress.push_back(getKeyCode("F9"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::F10Key)) {
-            keysToPress.push_back(getKeyCode("F10"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::F11Key)) {
-            keysToPress.push_back(getKeyCode("F11"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::F12Key)) {
-            keysToPress.push_back(getKeyCode("F12"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::F13Key)) {
-            keysToPress.push_back(getKeyCode("F13"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::F14Key)) {
-            keysToPress.push_back(getKeyCode("F14"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::F15Key)) {
-            keysToPress.push_back(getKeyCode("F15"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::F16Key)) {
-            keysToPress.push_back(getKeyCode("F16"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::F17Key)) {
-            keysToPress.push_back(getKeyCode("F17"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::F18Key)) {
-            keysToPress.push_back(getKeyCode("F18"));
-        } else if (kp.isKeyCurrentlyDown(KeyPress::F19Key)) {
-            keysToPress.push_back(getKeyCode("F19"));
-        } else {
-            auto c = static_cast<char>(kp.getKeyCode());
-            String key(&c, 1);
-            auto kc = getKeyCode(key.toStdString());
-            if (NOKEY != kc) {
-                keysToPress.push_back(kc);
-            }
-        }
-
-        Message<Key> msg;
-        PLD(msg).setData(reinterpret_cast<const char*>(keysToPress.data()),
-                         static_cast<int>(keysToPress.size() * sizeof(uint16_t)));
-        std::lock_guard<std::mutex> lock(m_clientMtx);
-        msg.send(m_cmd_socket.get());
+    if (!isReadyLockFree()) {
+        return true;
+    };
+    auto modkeys = kp.getModifiers();
+    std::vector<uint16_t> keysToPress;
+    if (modkeys.isShiftDown()) {
+        keysToPress.push_back(getKeyCode("Shift"));
     }
+    if (modkeys.isCtrlDown()) {
+        keysToPress.push_back(getKeyCode("Control"));
+    }
+    if (modkeys.isAltDown()) {
+        keysToPress.push_back(getKeyCode("Option"));
+    }
+    if (kp.isKeyCurrentlyDown(KeyPress::escapeKey)) {
+        keysToPress.push_back(getKeyCode("Escape"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::spaceKey)) {
+        keysToPress.push_back(getKeyCode("Space"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::returnKey)) {
+        keysToPress.push_back(getKeyCode("Return"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::tabKey)) {
+        keysToPress.push_back(getKeyCode("Tab"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::deleteKey)) {
+        keysToPress.push_back(getKeyCode("Delete"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::backspaceKey)) {
+        keysToPress.push_back(getKeyCode("Backspace"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::upKey)) {
+        keysToPress.push_back(getKeyCode("UpArrow"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::downKey)) {
+        keysToPress.push_back(getKeyCode("DownArrow"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::leftKey)) {
+        keysToPress.push_back(getKeyCode("LeftArrow"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::rightKey)) {
+        keysToPress.push_back(getKeyCode("RightArrow"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::pageUpKey)) {
+        keysToPress.push_back(getKeyCode("PageUp"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::pageDownKey)) {
+        keysToPress.push_back(getKeyCode("PageDown"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::homeKey)) {
+        keysToPress.push_back(getKeyCode("Home"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::endKey)) {
+        keysToPress.push_back(getKeyCode("End"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F1Key)) {
+        keysToPress.push_back(getKeyCode("F1"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F2Key)) {
+        keysToPress.push_back(getKeyCode("F2"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F3Key)) {
+        keysToPress.push_back(getKeyCode("F3"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F4Key)) {
+        keysToPress.push_back(getKeyCode("F4"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F5Key)) {
+        keysToPress.push_back(getKeyCode("F5"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F6Key)) {
+        keysToPress.push_back(getKeyCode("F6"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F7Key)) {
+        keysToPress.push_back(getKeyCode("F7"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F8Key)) {
+        keysToPress.push_back(getKeyCode("F8"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F9Key)) {
+        keysToPress.push_back(getKeyCode("F9"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F10Key)) {
+        keysToPress.push_back(getKeyCode("F10"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F11Key)) {
+        keysToPress.push_back(getKeyCode("F11"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F12Key)) {
+        keysToPress.push_back(getKeyCode("F12"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F13Key)) {
+        keysToPress.push_back(getKeyCode("F13"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F14Key)) {
+        keysToPress.push_back(getKeyCode("F14"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F15Key)) {
+        keysToPress.push_back(getKeyCode("F15"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F16Key)) {
+        keysToPress.push_back(getKeyCode("F16"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F17Key)) {
+        keysToPress.push_back(getKeyCode("F17"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F18Key)) {
+        keysToPress.push_back(getKeyCode("F18"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F19Key)) {
+        keysToPress.push_back(getKeyCode("F19"));
+    } else {
+        auto c = static_cast<char>(kp.getKeyCode());
+        String key(&c, 1);
+        auto kc = getKeyCode(key.toStdString());
+        if (NOKEY != kc) {
+            keysToPress.push_back(kc);
+        }
+    }
+
+    Message<Key> msg;
+    PLD(msg).setData(reinterpret_cast<const char*>(keysToPress.data()),
+                     static_cast<int>(keysToPress.size() * sizeof(uint16_t)));
+    std::lock_guard<std::mutex> lock(m_clientMtx);
+    msg.send(m_cmd_socket.get());
+
     return true;
 }
 
