@@ -25,7 +25,7 @@ class AudioGridderPluginListComponent::TableModel : public TableListBoxModel {
     void paintRowBackground(Graphics& g, int /*rowNumber*/, int /*width*/, int /*height*/,
                             bool rowIsSelected) override {
         const auto defaultColour = owner.findColour(ListBox::backgroundColourId);
-        const auto c = rowIsSelected ? defaultColour.interpolatedWith(owner.findColour(ListBox::textColourId), 0.5f)
+        const auto c = rowIsSelected ? defaultColour.interpolatedWith(owner.findColour(ListBox::textColourId), 0.1f)
                                      : defaultColour;
 
         g.fillAll(c);
