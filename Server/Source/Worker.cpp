@@ -153,11 +153,13 @@ void Worker::shutdown() {
 void Worker::handleMessage(std::shared_ptr<Message<Quit>> msg) { shutdown(); }
 
 void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
-    bool success = m_audio.addPlugin(pPLD(msg).getString());
+    auto id = pPLD(msg).getString();
+    bool success = m_audio.addPlugin(id);
     if (!success) {
         MessageFactory::sendResult(m_client.get(), -1);
         return;
     }
+    m_audio.addToRecentsList(id, m_client->getHostName());
     // send new updated latency samples back
     if (!MessageFactory::sendResult(m_client.get(), m_audio.getLatencySamples())) {
         logln("failed to send result");
@@ -301,7 +303,7 @@ void Worker::handleMessage(std::shared_ptr<Message<ExchangePlugins>> msg) {
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<RecentsList>> msg) {
-    auto& recents = m_audio.getRecentsList();
+    auto& recents = m_audio.getRecentsList(m_client->getHostName());
     String list;
     for (auto& r : recents) {
         list += getStringFrom(r) + "\n";

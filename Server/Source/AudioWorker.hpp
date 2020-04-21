@@ -43,7 +43,8 @@ class AudioWorker : public Thread {
     float getParameterValue(int idx, int paramIdx) { return m_chain->getParameterValue(idx, paramIdx); }
 
     using RecentsListType = Array<PluginDescription>;
-    const RecentsListType& getRecentsList() const { return m_recents; }
+    RecentsListType& getRecentsList(String host) const;
+    void addToRecentsList(const String& id, const String& host);
 
   private:
     std::unique_ptr<StreamingSocket> m_socket;
@@ -52,7 +53,8 @@ class AudioWorker : public Thread {
     int m_samplesPerBlock;
     bool m_doublePrecission;
     std::unique_ptr<ProcessorChain> m_chain;
-    RecentsListType m_recents;
+    static HashMap<String, RecentsListType> m_recents;
+    static std::mutex m_recentsMtx;
     std::function<void()> m_onTerminate;
 };
 

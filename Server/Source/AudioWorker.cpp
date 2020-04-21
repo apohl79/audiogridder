@@ -12,6 +12,9 @@
 
 namespace e47 {
 
+HashMap<String, AudioWorker::RecentsListType> AudioWorker::m_recents;
+std::mutex AudioWorker::m_recentsMtx;
+
 AudioWorker::~AudioWorker() {
     if (nullptr != m_socket && m_socket->isConnected()) {
         m_socket->close();
@@ -100,23 +103,6 @@ void AudioWorker::shutdown() { signalThreadShouldExit(); }
 bool AudioWorker::addPlugin(const String& id) {
     dbgln("adding plugin " << id << "...");
     bool success = m_chain->addPluginProcessor(id);
-    if (success) {
-        // update recents list
-        auto& pluginList = getApp().getPluginList();
-        auto plug = pluginList.getTypeForFile(id);
-        m_recents.insert(0, *plug);
-        for (int i = 1; i < m_recents.size(); i++) {
-            if (plug->fileOrIdentifier == m_recents[i].fileOrIdentifier) {
-                m_recents.remove(i);
-                break;
-            }
-        }
-        while (m_recents.size() > 5) {
-            m_recents.removeLast();
-        }
-    } else {
-        dbgln("failed to add plugin");
-    }
     dbgln("..." << (success ? "ok" : "failed"));
     return success;
 }
@@ -129,6 +115,27 @@ void AudioWorker::delPlugin(int idx) {
 void AudioWorker::exchangePlugins(int idxA, int idxB) {
     dbgln("exchanging plugins idxA=" << idxA << " idxB=" << idxB);
     m_chain->exchangeProcessors(idxA, idxB);
+}
+
+AudioWorker::RecentsListType& AudioWorker::getRecentsList(String host) const {
+    std::lock_guard<std::mutex> lock(m_recentsMtx);
+    return m_recents.getReference(host);
+}
+
+void AudioWorker::addToRecentsList(const String& id, const String& host) {
+    auto& pluginList = getApp().getPluginList();
+    auto plug = pluginList.getTypeForFile(id);
+    auto& recents = getRecentsList(host);
+    recents.insert(0, *plug);
+    for (int i = 1; i < m_recents.size(); i++) {
+        if (plug->fileOrIdentifier == recents.getReference(i).fileOrIdentifier) {
+            recents.remove(i);
+            break;
+        }
+    }
+    while (recents.size() > DEFAULT_NUM_RECENTS) {
+        recents.removeLast();
+    }
 }
 
 }  // namespace e47

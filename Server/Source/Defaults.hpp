@@ -16,6 +16,7 @@ static const String PLUGIN_CONFIG_FILE = "~/.audiogridder";
 static const String DEAD_MANS_FILE = "~/.audiogridderserver.crash";
 
 static constexpr int DEFAULT_NUM_OF_BUFFERS = 8;
+static constexpr int DEFAULT_NUM_RECENTS = 10;
 
 static constexpr uint32 DEFAULT_BG_COLOR = 0xff222222;
 static constexpr uint32 DEFAULT_BUTTON_COLOR = 0xff333333;
