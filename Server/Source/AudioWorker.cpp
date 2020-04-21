@@ -127,8 +127,8 @@ void AudioWorker::addToRecentsList(const String& id, const String& host) {
     auto plug = pluginList.getTypeForFile(id);
     auto& recents = getRecentsList(host);
     recents.insert(0, *plug);
-    for (int i = 1; i < m_recents.size(); i++) {
-        if (plug->fileOrIdentifier == recents.getReference(i).fileOrIdentifier) {
+    for (int i = 1; i < recents.size(); i++) {
+        if (!plug->fileOrIdentifier.compare(recents.getReference(i).fileOrIdentifier)) {
             recents.remove(i);
             break;
         }
