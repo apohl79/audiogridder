@@ -16,6 +16,13 @@ namespace e47 {
 class SplashWindow : public TopLevelWindow {
   public:
     SplashWindow() : TopLevelWindow("Splash", true) {
+        auto& lf = getLookAndFeel();
+        lf.setColour(ResizableWindow::backgroundColourId, Colour(DEFAULT_BG_COLOR));
+        lf.setColour(PopupMenu::backgroundColourId, Colour(DEFAULT_BG_COLOR));
+        lf.setColour(TextEditor::backgroundColourId, Colour(DEFAULT_BUTTON_COLOR));
+        lf.setColour(TextButton::buttonColourId, Colour(DEFAULT_BUTTON_COLOR));
+        lf.setColour(ListBox::backgroundColourId, Colour(DEFAULT_BUTTON_COLOR));
+
         centreWithSize(400, 180);
 
         m_logo.setImage(ImageCache::getFromMemory(Images::serverinv_png, Images::serverinv_pngSize));

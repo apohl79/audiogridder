@@ -13,6 +13,12 @@
 
 AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderAudioProcessor& p)
     : AudioProcessorEditor(&p), m_processor(p), m_newPluginButton("", "newPlug") {
+    auto& lf = getLookAndFeel();
+    lf.setColour(ResizableWindow::backgroundColourId, Colour(DEFAULT_BG_COLOR));
+    lf.setColour(PopupMenu::backgroundColourId, Colour(DEFAULT_BG_COLOR));
+    lf.setColour(TextEditor::backgroundColourId, Colour(DEFAULT_BUTTON_COLOR));
+    lf.setColour(TextButton::buttonColourId, Colour(DEFAULT_BUTTON_COLOR));
+
     addAndMakeVisible(m_srvIcon);
     m_srvIcon.setImage(ImageCache::getFromMemory(Images::server_png, Images::server_pngSize));
     m_srvIcon.setAlpha(0.5);
