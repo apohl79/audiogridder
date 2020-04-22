@@ -43,18 +43,19 @@ void Client::run() {
                 }
             }
         } catch (json::parse_error& e) {
-            std::cerr << "parsing config failed: " << e.what() << std::endl;
+            logln("parsing config failed: " << e.what());
         }
-        if (!isReady() && !currentThreadShouldExit()) {
-            init();
-        } else if (m_needsReconnect && !currentThreadShouldExit()) {
+        if ((!isReady() || m_needsReconnect) && !currentThreadShouldExit()) {
             close();
             init();
         }
         if (lastState != isReady()) {
             lastState = isReady();
-            if (!lastState) {
-                // disconnected, the callback might have not been called, so do it from here
+            if (lastState) {
+                if (m_onConnectCallback) {
+                    m_onConnectCallback();
+                }
+            } else {
                 if (m_onCloseCallback) {
                     m_onCloseCallback();
                 }
@@ -104,22 +105,22 @@ int Client::getServerPort() {
 }
 
 void Client::setPluginScreenUpdateCallback(ScreenUpdateCallback fn) {
-    std::lock_guard<std::mutex> lock(m_clientMtx);
+    dbglock(*this, 5);
     m_pluginScreenUpdateCallback = fn;
 }
 
 void Client::setOnConnectCallback(OnConnectCallback fn) {
-    std::lock_guard<std::mutex> lock(m_clientMtx);
+    dbglock(*this, 6);
     m_onConnectCallback = fn;
 }
 
 void Client::setOnCloseCallback(OnCloseCallback fn) {
-    std::lock_guard<std::mutex> lock(m_clientMtx);
+    dbglock(*this, 7);
     m_onCloseCallback = fn;
 }
 
 void Client::init(int channels, double rate, int samplesPerBlock, bool doublePrecission) {
-    std::lock_guard<std::mutex> lock(m_clientMtx);
+    dbglock(*this, 8);
     m_channels = channels;
     m_rate = rate;
     m_samplesPerBlock = samplesPerBlock;
@@ -136,11 +137,12 @@ void Client::init() {
         id = m_id;
         port = m_srvPort + m_id;
     }
-    std::lock_guard<std::mutex> lock(m_clientMtx);
+    dbglock(*this, 9);
+    m_error = true;
     if (!m_channels || !m_rate || !m_samplesPerBlock) {
         return;
     }
-    std::cout << "connecting server " << host << ":" << id << std::endl;
+    logln("connecting server " << host << ":" << id);
     m_cmd_socket = std::make_unique<StreamingSocket>();
     if (m_cmd_socket->connect(host, port, 1000)) {
         StreamingSocket sock;
@@ -154,11 +156,11 @@ void Client::init() {
         } while (retry++ < 200);
 
         if (!sock.isConnected()) {
-            std::cerr << "failed to create listener" << std::endl;
+            logln("failed to create listener");
             return;
         }
 
-        std::cout << "client listener created, PORT=" << clientPort << std::endl;
+        logln("client listener created, PORT=" << clientPort);
 
         // set master socket non-blocking
         fcntl(sock.getRawSocketHandle(), F_SETFL, fcntl(sock.getRawSocketHandle(), F_GETFL, 0) | O_NONBLOCK);
@@ -171,7 +173,7 @@ void Client::init() {
 
         m_audio_socket = std::unique_ptr<StreamingSocket>(accept(sock));
         if (nullptr != m_audio_socket) {
-            std::cout << "audio connection established" << std::endl;
+            logln("audio connection established");
             if (m_doublePrecission) {
                 m_audioStreamerD.reset(new AudioStreamer<double>(this, m_audio_socket.get()));
                 m_audioStreamerD->startThread(Thread::realtimeAudioPriority);
@@ -185,7 +187,7 @@ void Client::init() {
 
         m_screen_socket = std::unique_ptr<StreamingSocket>(accept(sock));
         if (nullptr != m_screen_socket) {
-            std::cout << "screen connection established" << std::endl;
+            logln("screen connection established");
             m_screenWorker = std::make_unique<ScreenReceiver>(this, m_screen_socket.get());
             m_screenWorker->startThread();
         } else {
@@ -196,7 +198,7 @@ void Client::init() {
         m_plugins.clear();
         Message<PluginList> msg;
         if (!msg.read(m_cmd_socket.get())) {
-            std::cerr << "failed reading plugin list" << std::endl;
+            logln("failed reading plugin list");
             return;
         }
         String listChunk(PLD(msg).str, *PLD(msg).size);
@@ -210,37 +212,43 @@ void Client::init() {
         m_ready = true;
         m_error = false;
         m_needsReconnect = false;
-
-        if (m_onConnectCallback) {
-            m_clientMtx.unlock();
-            m_onConnectCallback();
-        }
     } else {
-        std::cerr << "connection to server failed" << std::endl;
+        logln("connection to server failed");
     }
 }
 
 bool Client::isReady() {
-    std::lock_guard<std::mutex> lock(m_clientMtx);
-    m_ready = !m_error && nullptr != m_cmd_socket && m_cmd_socket->isConnected() && nullptr != m_screen_socket &&
-              m_screen_socket->isConnected() && nullptr != m_audio_socket && m_audio_socket->isConnected();
-    return m_ready;
+    int retry = 100;
+    bool locked = false;
+    while (retry-- > 0) {
+        if ((locked = m_clientMtx.try_lock())) {
+            break;
+        } else {
+            sleep(10);
+        }
+    }
+    if (locked) {
+        m_ready = !m_error && nullptr != m_cmd_socket && m_cmd_socket->isConnected() && nullptr != m_screen_socket &&
+                  m_screen_socket->isConnected() && nullptr != m_audio_socket && m_audio_socket->isConnected();
+        m_clientMtx.unlock();
+    } else {
+        logln(getLoadedPluginsString() << ": isReady can't acquire lock, returning stale result");
+        m_error = true;
+    }
+    return !m_error && m_ready;
 }
 
 bool Client::isReadyLockFree() { return !m_error && m_ready; }
 
 void Client::close() {
     m_ready = false;
-    std::lock_guard<std::mutex> lock(m_clientMtx);
+    dbglock(*this, 10);
     m_pluginScreenUpdateCallback = nullptr;
     m_plugins.clear();
     if (nullptr != m_screen_socket) {
         m_screen_socket->close();
     }
     if (nullptr != m_screenWorker && m_screenWorker->isThreadRunning()) {
-        if (nullptr != m_screen_socket) {
-            m_screen_socket->close();
-        }
         m_screenWorker->signalThreadShouldExit();
         m_screenWorker->waitForThreadToExit(100);
         m_screenWorker.reset();
@@ -267,10 +275,6 @@ void Client::close() {
         m_audioStreamerF.reset();
     }
     m_audio_socket.reset();
-    if (m_onCloseCallback) {
-        m_clientMtx.unlock();
-        m_onCloseCallback();
-    }
 }
 
 Image Client::getPluginScreen() {
@@ -298,9 +302,9 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
     };
     Message<AddPlugin> msg;
     PLD(msg).setString(id);
-    std::lock_guard<std::mutex> lock(m_clientMtx);
+    dbglock(*this, 11);
     if (msg.send(m_cmd_socket.get())) {
-        auto result = MessageFactory::getResult(m_cmd_socket.get());
+        auto result = MessageFactory::getResult(m_cmd_socket.get(), 10);
         if (nullptr == result || result->getReturnCode() < 0) {
             return false;
         }
@@ -343,7 +347,7 @@ void Client::delPlugin(int idx) {
     };
     Message<DelPlugin> msg;
     PLD(msg).setNumber(idx);
-    std::lock_guard<std::mutex> lock(m_clientMtx);
+    dbglock(*this, 12);
     msg.send(m_cmd_socket.get());
     auto result = MessageFactory::getResult(m_cmd_socket.get());
     if (nullptr != result && result->getReturnCode() > -1) {
@@ -357,7 +361,7 @@ void Client::editPlugin(int idx) {
     };
     Message<EditPlugin> msg;
     PLD(msg).setNumber(idx);
-    std::lock_guard<std::mutex> lock(m_clientMtx);
+    dbglock(*this, 13);
     msg.send(m_cmd_socket.get());
 }
 
@@ -366,7 +370,7 @@ void Client::hidePlugin() {
         return;
     };
     Message<HidePlugin> msg;
-    std::lock_guard<std::mutex> lock(m_clientMtx);
+    dbglock(*this, 14);
     msg.send(m_cmd_socket.get());
 }
 
@@ -377,10 +381,9 @@ MemoryBlock Client::getPluginSettings(int idx) {
     };
     Message<GetPluginSettings> msg;
     PLD(msg).setNumber(idx);
-    std::lock_guard<std::mutex> lock(m_clientMtx);
+    dbglock(*this, 15);
     if (!msg.send(m_cmd_socket.get())) {
-        std::cerr << "failed to send GetPluginSettings message" << std::endl;
-        m_cmd_socket->close();
+        m_error = true;
     } else {
         Message<PluginSettings> res;
         if (res.read(m_cmd_socket.get())) {
@@ -388,7 +391,7 @@ MemoryBlock Client::getPluginSettings(int idx) {
                 block.append(res.payload.data, *res.payload.size);
             }
         } else {
-            std::cerr << "failed to read PluginSettings message" << std::endl;
+            logln(getLoadedPluginsString() << "failed to read PluginSettings message");
             m_error = true;
         }
     }
@@ -401,7 +404,7 @@ void Client::bypassPlugin(int idx) {
     };
     Message<BypassPlugin> msg;
     PLD(msg).setNumber(idx);
-    std::lock_guard<std::mutex> lock(m_clientMtx);
+    dbglock(*this, 16);
     msg.send(m_cmd_socket.get());
 }
 
@@ -411,7 +414,7 @@ void Client::unbypassPlugin(int idx) {
     };
     Message<UnbypassPlugin> msg;
     PLD(msg).setNumber(idx);
-    std::lock_guard<std::mutex> lock(m_clientMtx);
+    dbglock(*this, 17);
     msg.send(m_cmd_socket.get());
 }
 
@@ -422,7 +425,7 @@ void Client::exchangePlugins(int idxA, int idxB) {
     Message<ExchangePlugins> msg;
     DATA(msg)->idxA = idxA;
     DATA(msg)->idxB = idxB;
-    std::lock_guard<std::mutex> lock(m_clientMtx);
+    dbglock(*this, 18);
     msg.send(m_cmd_socket.get());
 }
 
@@ -432,7 +435,7 @@ std::vector<ServerPlugin> Client::getRecents() {
         return recents;
     };
     Message<RecentsList> msg;
-    std::lock_guard<std::mutex> lock(m_clientMtx);
+    dbglock(*this, 19);
     msg.send(m_cmd_socket.get());
     if (msg.read(m_cmd_socket.get())) {
         String listChunk(PLD(msg).str, *PLD(msg).size);
@@ -443,7 +446,7 @@ std::vector<ServerPlugin> Client::getRecents() {
             }
         }
     } else {
-        std::cerr << "failed to read RecentsList message" << std::endl;
+        logln(getLoadedPluginsString() << "failed to read RecentsList message");
         m_error = true;
     }
     return recents;
@@ -456,7 +459,7 @@ void Client::setPreset(int idx, int preset) {
     Message<Preset> msg;
     DATA(msg)->idx = idx;
     DATA(msg)->preset = preset;
-    std::lock_guard<std::mutex> lock(m_clientMtx);
+    dbglock(*this, 20);
     msg.send(m_cmd_socket.get());
 }
 
@@ -467,7 +470,7 @@ float Client::getParameterValue(int idx, int paramIdx) {
     Message<GetParameterValue> msg;
     DATA(msg)->idx = idx;
     DATA(msg)->paramIdx = paramIdx;
-    std::lock_guard<std::mutex> lock(m_clientMtx);
+    dbglock(*this, 21);
     msg.send(m_cmd_socket.get());
     Message<ParameterValue> ret;
     if (ret.read(m_cmd_socket.get())) {
@@ -475,8 +478,8 @@ float Client::getParameterValue(int idx, int paramIdx) {
             return DATA(ret)->value;
         }
     }
-    std::cerr << getLoadedPluginsString() << ": failed to read parameter value idx=" << idx << " paramIdx=" << paramIdx
-              << std::endl;
+    logln(getLoadedPluginsString() << ": failed to read parameter value idx=" << idx << " paramIdx=" << paramIdx);
+    m_error = true;
     return 0;
 }
 
@@ -488,7 +491,7 @@ void Client::setParameterValue(int idx, int paramIdx, float val) {
     DATA(msg)->idx = idx;
     DATA(msg)->paramIdx = paramIdx;
     DATA(msg)->value = val;
-    std::lock_guard<std::mutex> lock(m_clientMtx);
+    dbglock(*this, 22);
     msg.send(m_cmd_socket.get());
 }
 
@@ -509,7 +512,7 @@ void Client::ScreenReceiver::run() {
     } while (!currentThreadShouldExit() && (e == MessageHelper::E_NONE || e == MessageHelper::E_TIMEOUT));
     signalThreadShouldExit();
     m_client->m_error = true;
-    std::cout << "screen receiver terminated" << std::endl;
+    logln_clnt(m_client, "screen receiver terminated");
 }
 
 void Client::mouseMove(const MouseEvent& event) {
@@ -533,7 +536,7 @@ void Client::mouseDown(const MouseEvent& event) {
         sendMouseEvent(MouseEvType::OTHER_DOWN, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
                        event.mods.isAltDown());
     } else {
-        std::cerr << "unhandled mouseDown event" << std::endl;
+        dbgln("unhandled mouseDown event");
     }
 }
 
@@ -548,7 +551,7 @@ void Client::mouseDrag(const MouseEvent& event) {
         sendMouseEvent(MouseEvType::OTHER_DRAG, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
                        event.mods.isAltDown());
     } else {
-        std::cerr << "unhandled mouseDrag event" << std::endl;
+        dbgln("unhandled mouseDrag event");
     }
 }
 
@@ -563,16 +566,16 @@ void Client::mouseUp(const MouseEvent& event) {
         sendMouseEvent(MouseEvType::OTHER_UP, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
                        event.mods.isAltDown());
     } else {
-        std::cerr << "unhandled mouseUp event" << std::endl;
+        dbgln("unhandled mouseUp event");
     }
 }
 
 void Client::mouseDoubleClick(const MouseEvent& event) {
-    std::cout << "unhandled mouseDoubleClick " << event.position.x << ":" << event.position.y << std::endl;
+    dbgln("unhandled mouseDoubleClick " << event.position.x << ":" << event.position.y);
 }
 
 void Client::mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wheel) {
-    std::cout << "unhanbdled mouseWheelMove " << event.position.x << ":" << event.position.y << std::endl;
+    dbgln("unhanbdled mouseWheelMove " << event.position.x << ":" << event.position.y);
 }
 
 void Client::sendMouseEvent(MouseEvType ev, Point<float> p, bool isShiftDown, bool isCtrlDown, bool isAltDown) {
@@ -586,7 +589,7 @@ void Client::sendMouseEvent(MouseEvType ev, Point<float> p, bool isShiftDown, bo
     DATA(msg)->isShiftDown = isShiftDown;
     DATA(msg)->isCtrlDown = isCtrlDown;
     DATA(msg)->isAltDown = isAltDown;
-    std::lock_guard<std::mutex> lock(m_clientMtx);
+    dbglock(*this, 23);
     msg.send(m_cmd_socket.get());
 }
 
@@ -683,7 +686,7 @@ bool Client::keyPressed(const KeyPress& kp, Component* originatingComponent) {
     Message<Key> msg;
     PLD(msg).setData(reinterpret_cast<const char*>(keysToPress.data()),
                      static_cast<int>(keysToPress.size() * sizeof(uint16_t)));
-    std::lock_guard<std::mutex> lock(m_clientMtx);
+    dbglock(*this, 24);
     msg.send(m_cmd_socket.get());
 
     return true;

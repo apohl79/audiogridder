@@ -65,9 +65,12 @@ class AudioStreamer : public Thread {
     }
 
     void waitWrite() {
-        if (writeQ.read_available() == 0 && !error) {
+        if (writeQ.read_available() == 0 && !error && !currentThreadShouldExit()) {
             std::unique_lock<std::mutex> lock(writeMtx);
-            writeCv.wait(lock, [this] { return writeQ.read_available() > 0 || currentThreadShouldExit(); });
+            try {
+                writeCv.wait(lock, [this] { return writeQ.read_available() > 0 || currentThreadShouldExit(); });
+            } catch (...) {
+            }
         }
     }
 
@@ -76,22 +79,29 @@ class AudioStreamer : public Thread {
         readCv.notify_one();
     }
 
-    void waitRead() {
+    bool waitRead() {
         if (client->NUM_OF_BUFFERS > 1 && readQ.read_available() < (client->NUM_OF_BUFFERS / 2) &&
             readQ.read_available() > 0) {
-            std::cerr << "warning: instance (" << client->getLoadedPluginsString() << "): input buffer below 50% ("
-                      << readQ.read_available() << "/" << client->NUM_OF_BUFFERS << ")" << std::endl;
+            logln_clnt(client, "warning: instance (" << client->getLoadedPluginsString()
+                                                     << "): input buffer below 50% (" << readQ.read_available() << "/"
+                                                     << client->NUM_OF_BUFFERS << ")");
         } else if (readQ.read_available() == 0) {
             if (client->NUM_OF_BUFFERS > 1) {
-                std::cerr << "warning: instance (" << client->getLoadedPluginsString()
-                          << "): read queue empty, waiting for data, try increasing the NumberOfBuffers value"
-                          << std::endl;
+                logln_clnt(client,
+                           "warning: instance ("
+                               << client->getLoadedPluginsString()
+                               << "): read queue empty, waiting for data, try increasing the NumberOfBuffers value");
             }
-            if (!error) {
+            if (!error && !threadShouldExit()) {
                 std::unique_lock<std::mutex> lock(readMtx);
-                readCv.wait(lock, [this] { return readQ.read_available() > 0 || currentThreadShouldExit(); });
+                try {
+                    readCv.wait(lock, [this] { return readQ.read_available() > 0 || threadShouldExit(); });
+                } catch (...) {
+                    return false;
+                }
             }
         }
+        return true;
     }
 
     void run() {
@@ -100,15 +110,14 @@ class AudioStreamer : public Thread {
                 AudioMidiBuffer buf;
                 writeQ.pop(buf);
                 if (!sendReal(buf)) {
-                    std::cerr << "error: instance (" << client->getLoadedPluginsString() << "): send failed"
-                              << std::endl;
+                    logln_clnt(client, "error: instance (" << client->getLoadedPluginsString() << "): send failed");
                     setError();
                     return;
                 }
                 MessageHelper::Error err;
                 if (!readReal(buf, &err)) {
-                    std::cerr << "error: instance (" << client->getLoadedPluginsString()
-                              << "): read failed, error code " << err << std::endl;
+                    logln_clnt(client, "error: instance (" << client->getLoadedPluginsString()
+                                                           << "): read failed, error code " << err);
                     setError();
                     return;
                 }
@@ -156,7 +165,7 @@ class AudioStreamer : public Thread {
             buf.midi.addEvents(midi, 0, midi.getNumEvents(), 0);
             buf.posInfo = posInfo;
             if (!sendReal(buf)) {
-                std::cerr << "error: instance (" << client->getLoadedPluginsString() << "): send failed" << std::endl;
+                logln_clnt(client, "error: instance (" << client->getLoadedPluginsString() << "): send failed");
                 setError();
             }
         }
@@ -169,14 +178,17 @@ class AudioStreamer : public Thread {
         AudioMidiBuffer buf;
         if (client->NUM_OF_BUFFERS > 1) {
             if (buffer.getNumSamples() == client->m_samplesPerBlock && workingReadSamples == 0) {
-                waitRead();
-                readQ.pop(buf);
-                buffer.makeCopyOf(buf.audio);
-                midi.clear();
-                midi.addEvents(buf.midi, 0, buf.midi.getNumEvents(), 0);
+                if (waitRead()) {
+                    readQ.pop(buf);
+                    buffer.makeCopyOf(buf.audio);
+                    midi.clear();
+                    midi.addEvents(buf.midi, 0, buf.midi.getNumEvents(), 0);
+                }
             } else {
                 if (workingReadSamples < buffer.getNumSamples()) {
-                    waitRead();
+                    if (!waitRead()) {
+                        return;
+                    }
                     readQ.pop(buf);
                     copyToWorkingBuffer(workingReadBuf, workingReadSamples, buf.audio, buf.midi);
                 }
@@ -195,8 +207,8 @@ class AudioStreamer : public Thread {
             buf.audio.setSize(buffer.getNumChannels(), buffer.getNumSamples());
             MessageHelper::Error err;
             if (!readReal(buf, &err)) {
-                std::cerr << "error: instance (" << client->getLoadedPluginsString() << "): read failed, error code "
-                          << err << std::endl;
+                logln_clnt(client, "error: instance (" << client->getLoadedPluginsString()
+                                                       << "): read failed, error code " << err);
                 setError();
                 return;
             }

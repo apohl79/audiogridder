@@ -15,6 +15,22 @@
 
 #include <boost/lockfree/spsc_queue.hpp>
 
+#if (JUCE_DEBUG && !JUCE_DISABLE_ASSERTIONS)
+#define dbgln(M)                                                                                \
+    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << (uint64_t)this << "] " << M; \
+                                     std::cout << __str << std::endl;)
+#else
+#define dbgln(M)
+#endif
+
+#define logln(M)                                                                                \
+    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << (uint64_t)this << "] " << M; \
+                                     std::cerr << __str << std::endl;)
+
+#define logln_clnt(C, M)                                                                     \
+    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << (uint64_t)C << "] " << M; \
+                                     std::cerr << __str << std::endl;)
+
 class AudioGridderAudioProcessor;
 
 namespace e47 {
@@ -93,23 +109,36 @@ class Client : public Thread, public MouseListener, public KeyListener {
     void reconnect() { m_needsReconnect = true; }
     void close();
 
+    struct dbglock {
+        Client& client;
+        dbglock(Client& c, int id) : client(c) {
+            client.m_clientMtx.lock();
+            client.m_clientMtxId = id;
+        }
+        ~dbglock() {
+            client.m_clientMtx.unlock();
+            client.m_clientMtxId = 0;
+        }
+    };
+    friend dbglock;
+
     void send(AudioBuffer<float>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
-        std::lock_guard<std::mutex> lock(m_clientMtx);
+        dbglock(*this, 1);
         m_audioStreamerF->send(buffer, midi, posInfo);
     }
 
     void send(AudioBuffer<double>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
-        std::lock_guard<std::mutex> lock(m_clientMtx);
+        dbglock(*this, 2);
         m_audioStreamerD->send(buffer, midi, posInfo);
     }
 
     void read(AudioBuffer<float>& buffer, MidiBuffer& midi) {
-        std::lock_guard<std::mutex> lock(m_clientMtx);
+        dbglock(*this, 3);
         m_audioStreamerF->read(buffer, midi);
     }
 
     void read(AudioBuffer<double>& buffer, MidiBuffer& midi) {
-        std::lock_guard<std::mutex> lock(m_clientMtx);
+        dbglock(*this, 4);
         m_audioStreamerD->read(buffer, midi);
     }
 
@@ -169,6 +198,7 @@ class Client : public Thread, public MouseListener, public KeyListener {
     int m_latency = 0;
 
     std::mutex m_clientMtx;
+    int m_clientMtxId = 0;
     std::atomic_bool m_ready;
     std::atomic_bool m_error{false};
     std::unique_ptr<StreamingSocket> m_cmd_socket;

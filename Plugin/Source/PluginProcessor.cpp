@@ -49,7 +49,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
             }
         }
     } catch (json::parse_error& e) {
-        std::cerr << "parsing config failed: " << e.what() << std::endl;
+        logln_clnt(&m_client, "parsing config failed: " << e.what());
     }
 
     m_unusedParam.name = "(unassigned)";
@@ -67,9 +67,9 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
         int idx = 0;
         for (auto& p : m_loadedPlugins) {
             p.ok = m_client.addPlugin(p.id, p.presets, p.params, p.settings);
-            std::cout << "loading " << p.name << " (" << p.id << ")... " << (p.ok ? "ok" : "failed") << std::endl;
+            logln_clnt(&m_client, "loading " << p.name << " (" << p.id << ")... " << (p.ok ? "ok" : "failed"));
             if (p.ok) {
-                std::cout << "updating latency samples to " << m_client.getLatencySamples() << std::endl;
+                logln_clnt(&m_client, "updating latency samples to " << m_client.getLatencySamples());
                 setLatencySamples(m_client.getLatencySamples());
                 if (p.bypassed) {
                     m_client.bypassPlugin(idx);
@@ -209,7 +209,7 @@ void AudioGridderAudioProcessor::processBlockReal(AudioBuffer<T>& buffer, MidiBu
             m_client.send(buffer, midiMessages, posInfo);
             m_client.read(buffer, midiMessages);
             if (m_client.getLatencySamples() != getLatencySamples()) {
-                std::cout << "updating latency samples to " << m_client.getLatencySamples() << std::endl;
+                logln_clnt(&m_client, "updating latency samples to " << m_client.getLatencySamples());
                 setLatencySamples(m_client.getLatencySamples());
             }
         }
@@ -340,9 +340,9 @@ bool AudioGridderAudioProcessor::loadPlugin(const String& id, const String& name
     suspendProcessing(true);
     bool success = m_client.addPlugin(id, presets, params);
     suspendProcessing(false);
-    std::cout << "loading " << name << " (" << id << ")... " << (success ? "ok" : "error") << std::endl;
+    logln_clnt(&m_client, "loading " << name << " (" << id << ")... " << (success ? "ok" : "error"));
     if (success) {
-        std::cout << "updating latency samples to " << m_client.getLatencySamples() << std::endl;
+        logln_clnt(&m_client, "updating latency samples to " << m_client.getLatencySamples());
         setLatencySamples(m_client.getLatencySamples());
         m_loadedPlugins.push_back({id, name, "", presets, params, false, true});
     }
@@ -353,7 +353,7 @@ void AudioGridderAudioProcessor::unloadPlugin(int idx) {
     suspendProcessing(true);
     m_client.delPlugin(idx);
     suspendProcessing(false);
-    std::cout << "updating latency samples to " << m_client.getLatencySamples() << std::endl;
+    logln_clnt(&m_client, "updating latency samples to " << m_client.getLatencySamples());
     setLatencySamples(m_client.getLatencySamples());
     if (idx == m_activePlugin) {
         hidePlugin();
