@@ -3,17 +3,17 @@
 AudioGridder allows you to offload DSP processing from your local to
 remote computers. This can come in handy when mixing complex projects
 for instance. AudioGridder comes with a plugin and a server that is
-enabling VST3 and AudioUnit plugins to be hosted across a local area
-network. Simply run the server component on a machine in your
-network. Using the AudioGridder AU/VST3 plugin you can add a remote
-insert chain into your DAW's signal paths. The DSP code of the
-inserted plugins will be executed on the remote machine. The plugin
-UI's will be streamed over the wire. This allows for an experience
-very close to hosting the plugins directly in your DAW but not using
-your local CPU.
+enabling VST3 and AudioUnit plugins to be hosted across the
+network. Simply run the server component on a remote machine and
+connect your DAW using the AudioGridder AU/VST3 plugin. You can add
+remote insert chains into your DAW's signal paths that way. The DSP
+code of the inserted plugins will be executed on the remote machine
+and the plugin UI's will be streamed over the wire. This allows for an
+experience very close to hosting the plugins directly in your DAW but
+not using your local CPU.
 
 <p align="center">
-<img src="https://raw.githubusercontent.com/apohl79/audiogridder/master/images/overview.png" width="600" />
+<img src="https://raw.githubusercontent.com/apohl79/audiogridder/master/images/overview.jpg" width="600" />
 </p>
 
 This setup proves to be working very well on wired networks. Wireless
@@ -50,7 +50,9 @@ blacklisted.)
 4. If you want to run multiple servers on a singel machine, you will
 have to assign a different server ID to each instance.
 
-![](https://raw.githubusercontent.com/apohl79/audiogridder/master/images/server.png "AudioGridder Server")
+<p align="center">
+<img src="https://raw.githubusercontent.com/apohl79/audiogridder/master/images/server.jpg" />
+</p>
 
 ## AudioGridder Plugin
 
@@ -73,10 +75,13 @@ to be done only once, as the server settings will be shared with new
 plugin instances)
 4. Add remote plugins
 
-![](https://raw.githubusercontent.com/apohl79/audiogridder/master/images/plugin.png "AudioGridder Plugin")
+<p align="center">
+<img src="https://raw.githubusercontent.com/apohl79/audiogridder/master/images/plugin.jpg" />
+</p>
 
 ## Compatibility
 
-- OSX 64bit
-- Supported plugin formats by the server: AudioUnit and VST3
-- Support plugin formats: AudioUnit, VST3 
+- OSX 64bit (tested on 10.14 and 10.15)
+- The server supports AudioUnit and VST3 plugins
+- The plugin is available as AudioUnit and VST3
+- Tested DAWs: Cubase 10 Pro, Logic Pro X, Reaper
