@@ -71,6 +71,8 @@ class ProcessorChain : public AudioProcessor {
     std::vector<std::shared_ptr<AudioPluginInstance>> m_processors;
     std::mutex m_processors_mtx;
 
+    static std::mutex m_pluginLoaderMtx;
+
     template <typename T>
     void processBlockReal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
         int latency = 0;

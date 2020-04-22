@@ -75,7 +75,8 @@ void Worker::run() {
 
         // enter message loop
         while (!currentThreadShouldExit() && nullptr != m_client && m_client->isConnected()) {
-            auto msg = MessageFactory::getNextMessage(m_client.get());
+            MessageHelper::Error e;
+            auto msg = MessageFactory::getNextMessage(m_client.get(), &e);
             if (nullptr != msg) {
                 switch (msg->getType()) {
                     case Quit::Type:
@@ -126,6 +127,8 @@ void Worker::run() {
                     default:
                         logln("unknown message type " << msg->getType());
                 }
+            } else if (e != MessageHelper::E_TIMEOUT) {
+                break;
             }
         }
     } else {
@@ -140,13 +143,18 @@ void Worker::shutdown() {
         m_screen.hideEditor();
     }
     if (nullptr != m_client) {
+        dbgln("shutdown: closing client socket");
         m_client->close();
         m_client.reset();
     }
+    dbgln("shutdown: terminating audio worker");
     m_audio.shutdown();
+    dbgln("shutdown: terminating screen worker");
     m_screen.shutdown();
-    m_audio.waitForThreadToExit(-1);
-    m_screen.waitForThreadToExit(-1);
+    dbgln("shutdown: waiting for audio worker");
+    m_audio.waitForThreadToExit(2000);
+    dbgln("shutdown: waiting for screen worker");
+    m_screen.waitForThreadToExit(2000);
     signalThreadShouldExit();
 }
 

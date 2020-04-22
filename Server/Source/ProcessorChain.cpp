@@ -10,6 +10,8 @@
 
 namespace e47 {
 
+std::mutex ProcessorChain::m_pluginLoaderMtx;
+
 void ProcessorChain::prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock) {
     setRateAndBufferSizeDetails(sampleRate, maximumExpectedSamplesPerBlock);
     for (auto& p : m_processors) {
@@ -85,6 +87,7 @@ std::shared_ptr<AudioPluginInstance> ProcessorChain::loadPlugin(PluginDescriptio
     String err;
     AudioPluginFormatManager plugmgr;
     plugmgr.addDefaultFormats();
+    std::lock_guard<std::mutex> lock(m_pluginLoaderMtx);  // don't load plugins in parallel
     auto inst =
         std::shared_ptr<AudioPluginInstance>(plugmgr.createPluginInstance(plugdesc, sampleRate, blockSize, err));
     if (nullptr == inst) {

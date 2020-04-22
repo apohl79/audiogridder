@@ -693,24 +693,20 @@ class Message {
 
 class MessageFactory {
   public:
-    static std::shared_ptr<Message<Any>> getNextMessage(StreamingSocket* socket) {
+    static std::shared_ptr<Message<Any>> getNextMessage(StreamingSocket* socket, MessageHelper::Error* e) {
         if (nullptr != socket) {
             auto msg = std::make_shared<Message<Any>>();
-            MessageHelper::Error e;
-            if (msg->read(socket, &e)) {
+            if (msg->read(socket, e)) {
                 return msg;
-            } else if (e != MessageHelper::E_TIMEOUT) {
-                socket->close();
             }
         }
         return nullptr;
     }
 
-    static std::shared_ptr<Result> getResult(StreamingSocket* socket) {
+    static std::shared_ptr<Result> getResult(StreamingSocket* socket, int retry = 5) {
         if (nullptr != socket) {
             auto msg = std::make_shared<Message<Result>>();
             MessageHelper::Error e;
-            int retry = 5;
             do {
                 if (msg->read(socket, &e)) {
                     auto res = std::make_shared<Result>();
