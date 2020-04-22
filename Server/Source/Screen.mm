@@ -9,6 +9,8 @@
 #include <AppKit/AppKit.h>
 #include <CoreGraphics/CoreGraphics.h>
 
+#define logln(M) JUCE_BLOCK_WITH_FORCED_SEMICOLON(juce::String __str; __str << M; juce::Logger::writeToLog(__str);)
+
 namespace e47 {
 
 std::shared_ptr<juce::Image> captureScreen(juce::Rectangle<int> rect) {
@@ -17,16 +19,24 @@ std::shared_ptr<juce::Image> captureScreen(juce::Rectangle<int> rect) {
     if (nullptr != imgref) {
         NSBitmapImageRep* rep = [[NSBitmapImageRep alloc] initWithCGImage:imgref];
         if (nullptr != rep) {
-            NSData* data = [rep representationUsingType:NSJPEGFileType properties:nil];
+            NSDictionary *props = [NSDictionary dictionaryWithObject:[NSNumber numberWithFloat:1.0]
+                                                              forKey:NSImageCompressionFactor];
+            NSData* data = [rep representationUsingType:NSJPEGFileType properties:props];
             std::shared_ptr<juce::Image> ret;
             if (nullptr != data) {
                 ret = std::make_shared<juce::Image>(juce::JPEGImageFormat::loadFrom([data bytes], [data length]));
                 ret->duplicateIfShared();
+            } else {
+                logln("representationUsingType failed");
             }
             [rep release];
             CGImageRelease(imgref);
             return ret;
+        } else {
+            logln("initWithCGImage failed");
         }
+    } else {
+        logln("CGWindowListCreateImage failed");
     }
     return nullptr;
 }

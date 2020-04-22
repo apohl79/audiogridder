@@ -28,22 +28,42 @@ void ScreenWorker::run() {
         m_updated = false;
 
         if (nullptr != m_currentImage) {
-            MemoryOutputStream mos;
-            JPEGImageFormat jpg;
-            jpg.setQuality(qual);
-            jpg.writeImageToStream(*m_currentImage, mos);
-
-            lock.unlock();
-
-            if (mos.getDataSize() > Message<ScreenCapture>::MAX_SIZE) {
-                if (qual > 0.1) {
-                    qual -= 0.1;
-                } else {
-                    logln("plugin screen image data exceeds max message size, Message::MAX_SIZE has to be increased.");
+            // For some reason the plugin window turns white sometimes, this should be investigated..
+            // For now as a hack: Check if the image is mostly white, and reset the plugin window in this case.
+            float brightness = 0;
+            const Image::BitmapData bdata(*m_currentImage, 0, 0, m_width, m_height);
+            for (int x = 0; x < m_width; x++) {
+                for (int y = 0; y < m_height; y++) {
+                    auto col = bdata.getPixelColour(x, y);
+                    brightness += col.getBrightness();
                 }
+            }
+            float mostlyWhite = m_width * m_height * 0.99;
+            if (brightness >= mostlyWhite) {
+                logln("resetting editor window");
+                MessageManager::callAsync([] { getApp().resetEditor(); });
+                // sleep(5000);
+                MessageManager::callAsync([] { getApp().restartEditor(); });
             } else {
-                msg.payload.setImage(m_width, m_height, mos.getData(), mos.getDataSize());
-                msg.send(m_socket.get());
+                MemoryOutputStream mos;
+                JPEGImageFormat jpg;
+                jpg.setQuality(qual);
+                jpg.writeImageToStream(*m_currentImage, mos);
+
+                lock.unlock();
+
+                if (mos.getDataSize() > Message<ScreenCapture>::MAX_SIZE) {
+                    if (qual > 0.1) {
+                        qual -= 0.1;
+                    } else {
+                        logln(
+                            "plugin screen image data exceeds max message size, Message::MAX_SIZE has to be "
+                            "increased.");
+                    }
+                } else {
+                    msg.payload.setImage(m_width, m_height, mos.getData(), mos.getDataSize());
+                    msg.send(m_socket.get());
+                }
             }
         } else {
             // another client took over, notify this one

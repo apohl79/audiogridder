@@ -48,18 +48,31 @@ const KnownPluginList& App::getPluginList() { return m_server->getPluginList(); 
 void App::showEditor(std::shared_ptr<AudioProcessor> proc, Thread::ThreadID tid, WindowCaptureCallback func) {
     if (proc->hasEditor()) {
         std::lock_guard<std::mutex> lock(m_windowMtx);
-        // if (nullptr != m_window && m_windowOwner != tid) {
-        //    m_window->hide();
-        //}
-        m_window = std::make_unique<ProcessorWindow>(proc, func);
         m_windowOwner = tid;
+        m_windowProc = proc;
+        m_windowFunc = func;
+        m_window = std::make_unique<ProcessorWindow>(m_windowProc, m_windowFunc);
     }
 }
 
 void App::hideEditor(Thread::ThreadID tid) {
     if (tid == 0 || tid == m_windowOwner) {
+        std::lock_guard<std::mutex> lock(m_windowMtx);
         m_window.reset();
+        m_windowOwner = 0;
+        m_windowProc.reset();
+        m_windowFunc = nullptr;
     }
+}
+
+void App::resetEditor() {
+    std::lock_guard<std::mutex> lock(m_windowMtx);
+    m_window.reset();
+}
+
+void App::restartEditor() {
+    std::lock_guard<std::mutex> lock(m_windowMtx);
+    m_window = std::make_unique<ProcessorWindow>(m_windowProc, m_windowFunc);
 }
 
 }  // namespace e47

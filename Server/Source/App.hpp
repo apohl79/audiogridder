@@ -43,6 +43,9 @@ class App : public JUCEApplication, public MenuBarModel {
     void showEditor(std::shared_ptr<AudioProcessor> proc, Thread::ThreadID tid, WindowCaptureCallback func);
     void hideEditor(Thread::ThreadID tid = 0);
 
+    void resetEditor();
+    void restartEditor();
+
     Point<float> localPointToGlobal(Point<float> lp) { return m_window->localPointToGlobal(lp); }
 
     class MenuBarWindow : public DocumentWindow {
@@ -95,13 +98,8 @@ class App : public JUCEApplication, public MenuBarModel {
       public:
         ProcessorWindow(std::shared_ptr<AudioProcessor> proc, WindowCaptureCallback func)
             : DocumentWindow(proc->getName(), Colours::lightgrey, 0), m_processor(proc), m_callback(func) {
-            if (proc->hasEditor()) {
-                m_editor = std::unique_ptr<AudioProcessorEditor>(proc->createEditor());
-                addChildAndSetID(m_editor.get(), "edit");
-                setSize(m_editor->getWidth(), m_editor->getHeight());
-                setTitleBarHeight(10);
-                setVisible(true);
-                startTimer(50);
+            if (m_processor->hasEditor()) {
+                createEditor();
             }
         }
 
@@ -115,6 +113,15 @@ class App : public JUCEApplication, public MenuBarModel {
         std::shared_ptr<AudioProcessor> m_processor;
         std::unique_ptr<AudioProcessorEditor> m_editor;
         WindowCaptureCallback m_callback;
+
+        void createEditor() {
+            m_editor = std::unique_ptr<AudioProcessorEditor>(m_processor->createEditor());
+            addChildAndSetID(m_editor.get(), "edit");
+            setSize(m_editor->getWidth(), m_editor->getHeight());
+            setTitleBarHeight(10);
+            setVisible(true);
+            startTimer(50);
+        }
 
         void timerCallback() override { captureWindow(); }
 
@@ -137,6 +144,8 @@ class App : public JUCEApplication, public MenuBarModel {
     std::unique_ptr<ServerSettingsWindow> m_srvSettingsWindow;
     std::unique_ptr<SplashWindow> m_splashWindow;
     Thread::ThreadID m_windowOwner;
+    std::shared_ptr<AudioProcessor> m_windowProc;
+    WindowCaptureCallback m_windowFunc;
     std::mutex m_windowMtx;
     FileLogger* m_logger;
     MenuBarWindow m_menuWindow;
