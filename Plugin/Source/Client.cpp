@@ -676,7 +676,7 @@ bool Client::keyPressed(const KeyPress& kp, Component* originatingComponent) {
         keysToPress.push_back(getKeyCode("F19"));
     } else {
         auto c = static_cast<char>(kp.getKeyCode());
-        String key(&c, 1);
+        String key(CharPointer_UTF8(&c), 1);
         auto kc = getKeyCode(key.toStdString());
         if (NOKEY != kc) {
             keysToPress.push_back(kc);
