@@ -22,24 +22,30 @@ void ScreenWorker::init(std::unique_ptr<StreamingSocket> s) { m_socket = std::mo
 void ScreenWorker::run() {
     Message<ScreenCapture> msg;
     float qual = 0.9;
+    int brightnessCheckNeeded = 20;
     while (!currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected()) {
         std::unique_lock<std::mutex> lock(m_currentImageLock);
         m_currentImageCv.wait(lock, [this] { return m_updated; });
         m_updated = false;
 
         if (nullptr != m_currentImage) {
-            // For some reason the plugin window turns white sometimes, this should be investigated..
+            // For some reason the plugin window turns white or black sometimes, this should be investigated..
             // For now as a hack: Check if the image is mostly white, and reset the plugin window in this case.
-            float brightness = 0;
-            const Image::BitmapData bdata(*m_currentImage, 0, 0, m_width, m_height);
-            for (int x = 0; x < m_width; x++) {
-                for (int y = 0; y < m_height; y++) {
-                    auto col = bdata.getPixelColour(x, y);
-                    brightness += col.getBrightness();
-                }
-            }
             float mostlyWhite = m_width * m_height * 0.99;
-            if (brightness >= mostlyWhite) {
+            float mostlyBlack = 0.1;
+            float brightness = mostlyWhite / 2;
+            if (0 == brightnessCheckNeeded--) {
+                brightness = 0;
+                const Image::BitmapData bdata(*m_currentImage, 0, 0, m_width, m_height);
+                for (int x = 0; x < m_width; x++) {
+                    for (int y = 0; y < m_height; y++) {
+                        auto col = bdata.getPixelColour(x, y);
+                        brightness += col.getBrightness();
+                    }
+                }
+                brightnessCheckNeeded = 20;
+            }
+            if (brightness >= mostlyWhite || brightness <= mostlyBlack) {
                 logln("resetting editor window");
                 MessageManager::callAsync([] { getApp().resetEditor(); });
                 // sleep(5000);
