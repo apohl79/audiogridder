@@ -43,11 +43,14 @@ different servers from your DAW at the same time.
 **Server Setup:**
 
 1. Install the PKG (includes server and plugin binaries)
-2. Run the server (If it crashes, just re-run it until it successfully
+2. Grant AudioGridderServer the Accessibility permission (System
+Preferences -> Security & Privacy -> Privacy Tab) - If you upgrade,
+remove the existing entry and re-add it.
+3. Run the server (If it crashes, just re-run it until it successfully
 finishes the startup. Each plugin that does not work will be
 blacklisted.)
-3. Manage your plugins (if you do not want to enable all plugins)
-4. If you want to run multiple servers on a singel machine, you will
+4. Manage your plugins (if you do not want to enable all plugins)
+5. If you want to run multiple servers on a singel machine, you will
 have to assign a different server ID to each instance.
 
 <p align="center">
