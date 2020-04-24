@@ -86,7 +86,7 @@ bool Server::shouldExclude(const String& name) {
 }
 
 bool Server::shouldExclude(const String& name, const std::vector<String>& include) {
-    if (name.containsIgnoreCase("AGridder")) {
+    if (name.containsIgnoreCase("AGridder") || name.containsIgnoreCase("AudioGridder")) {
         return true;
     }
     if (include.size() > 0) {
