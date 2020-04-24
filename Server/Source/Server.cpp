@@ -77,10 +77,6 @@ void Server::saveConfig() {
 
 Server::~Server() {
     m_masterSocket.close();
-    for (auto& w : m_workers) {
-        w->shutdown();
-        w->waitForThreadToExit(-1);
-    }
     dbgln("server terminated");
 }
 
@@ -90,7 +86,7 @@ bool Server::shouldExclude(const String& name) {
 }
 
 bool Server::shouldExclude(const String& name, const std::vector<String>& include) {
-    if (name.containsIgnoreCase("AudioGridder")) {
+    if (name.containsIgnoreCase("AGridder")) {
         return true;
     }
     if (include.size() > 0) {

@@ -35,6 +35,8 @@ class ProcessorChain : public AudioProcessor {
     bool supportsDoublePrecisionProcessing() const override;
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
 
+    bool updateChannels(int channels);
+
     bool acceptsMidi() const override { return false; };
     bool producesMidi() const override { return false; };
     AudioProcessorEditor* createEditor() override { return nullptr; }
@@ -46,8 +48,6 @@ class ProcessorChain : public AudioProcessor {
     void changeProgramName(int index, const String& newName) override {}
     void getStateInformation(juce::MemoryBlock& destData) override {}
     void setStateInformation(const void* data, int sizeInBytes) override {}
-
-    void setLatency();
 
     static std::shared_ptr<AudioPluginInstance> loadPlugin(PluginDescription& plugdesc, double sampleRate,
                                                            int blockSize);
@@ -73,9 +73,13 @@ class ProcessorChain : public AudioProcessor {
 
     static std::mutex m_pluginLoaderMtx;
 
+    std::atomic_bool m_supportsDoublePrecission{true};
+    std::atomic<double> m_tailSecs{0.0};
+
     template <typename T>
     void processBlockReal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
         int latency = 0;
+        std::lock_guard<std::mutex> lock(m_processors_mtx);
         for (auto& p : m_processors) {
             if (!p->isSuspended()) {
                 p->processBlock(buffer, midiMessages);
@@ -96,6 +100,8 @@ class ProcessorChain : public AudioProcessor {
             samplesProcessed += getBlockSize();
         } while (samplesProcessed < 8192);
     }
+
+    void updateNoLock();
 };
 
 }  // namespace e47

@@ -24,23 +24,15 @@ AudioWorker::~AudioWorker() {
 void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channels, double rate, int samplesPerBlock,
                        bool doublePrecission, std::function<void()> fn) {
     m_socket = std::move(s);
-    m_channels = channels;
     m_rate = rate;
     m_samplesPerBlock = samplesPerBlock;
     m_doublePrecission = doublePrecission;
     m_onTerminate = fn;
-    AudioProcessor::BusesLayout layout;
-    if (channels == 1) {
-        layout.inputBuses.add(AudioChannelSet::mono());
-        layout.outputBuses.add(AudioChannelSet::mono());
-    } else if (channels == 2) {
-        layout.inputBuses.add(AudioChannelSet::stereo());
-        layout.outputBuses.add(AudioChannelSet::stereo());
-    }
-    m_chain->setBusesLayout(layout);
     if (m_doublePrecission && m_chain->supportsDoublePrecisionProcessing()) {
         m_chain->setProcessingPrecision(AudioProcessor::doublePrecision);
     }
+    m_channels = channels;
+    m_chain->updateChannels(channels);
 }
 
 void AudioWorker::run() {
@@ -59,6 +51,17 @@ void AudioWorker::run() {
         if (m_socket->waitUntilReady(true, 1000)) {
             if (msg.readFromClient(m_socket.get(), bufferF, bufferD, midi, posInfo)) {
                 if (msg.isDouble() && bufferD.getNumChannels() > 0 && bufferD.getNumSamples() > 0) {
+                    if (m_channels != bufferD.getNumChannels()) {
+                        dbgln("updating bus layout at processing time due to channel mismatch");
+                        m_chain->releaseResources();
+                        if (!m_chain->updateChannels(bufferD.getNumChannels())) {
+                            logln("failed setting bus layout");
+                            m_socket->close();
+                            break;
+                        }
+                        m_channels = bufferD.getNumChannels();
+                        m_chain->prepareToPlay(m_rate, m_samplesPerBlock);
+                    }
                     if (m_chain->supportsDoublePrecisionProcessing()) {
                         m_chain->processBlock(bufferD, midi);
                     } else {
@@ -67,6 +70,17 @@ void AudioWorker::run() {
                         bufferD.makeCopyOf(bufferF);
                     }
                 } else if (bufferF.getNumChannels() > 0 && bufferF.getNumSamples() > 0) {
+                    if (m_channels > bufferF.getNumChannels()) {
+                        dbgln("updating bus layout at processing time due to channel mismatch");
+                        m_chain->releaseResources();
+                        if (!m_chain->updateChannels(bufferF.getNumChannels())) {
+                            logln("failed setting bus layout");
+                            m_socket->close();
+                            break;
+                        }
+                        m_channels = bufferF.getNumChannels();
+                        m_chain->prepareToPlay(m_rate, m_samplesPerBlock);
+                    }
                     m_chain->processBlock(bufferF, midi);
                 } else {
                     logln("empty audio message from " << m_socket->getHostName());

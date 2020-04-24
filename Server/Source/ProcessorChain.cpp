@@ -14,12 +14,14 @@ std::mutex ProcessorChain::m_pluginLoaderMtx;
 
 void ProcessorChain::prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock) {
     setRateAndBufferSizeDetails(sampleRate, maximumExpectedSamplesPerBlock);
+    std::lock_guard<std::mutex> lock(m_processors_mtx);
     for (auto& p : m_processors) {
         p->prepareToPlay(sampleRate, maximumExpectedSamplesPerBlock);
     }
 }
 
 void ProcessorChain::releaseResources() {
+    std::lock_guard<std::mutex> lock(m_processors_mtx);
     for (auto& p : m_processors) {
         p->releaseResources();
     }
@@ -45,21 +47,9 @@ void ProcessorChain::processBlock(AudioBuffer<double>& buffer, MidiBuffer& midiM
     }
 }
 
-double ProcessorChain::getTailLengthSeconds() const {
-    if (!m_processors.empty()) {
-        return m_processors.back()->getTailLengthSeconds();
-    }
-    return 0;
-}
+double ProcessorChain::getTailLengthSeconds() const { return m_tailSecs; }
 
-bool ProcessorChain::supportsDoublePrecisionProcessing() const {
-    for (auto& p : m_processors) {
-        if (!p->supportsDoublePrecisionProcessing()) {
-            return false;
-        }
-    }
-    return true;
-}
+bool ProcessorChain::supportsDoublePrecisionProcessing() const { return m_supportsDoublePrecission; }
 
 bool ProcessorChain::isBusesLayoutSupported(const BusesLayout& layouts) const {
     if (layouts.getMainOutputChannelSet() != AudioChannelSet::mono() &&
@@ -70,15 +60,25 @@ bool ProcessorChain::isBusesLayoutSupported(const BusesLayout& layouts) const {
     return true;
 }
 
-void ProcessorChain::setLatency() {
-    int latency = 0;
+bool ProcessorChain::updateChannels(int channels) {
+    AudioProcessor::BusesLayout layout;
+    if (channels == 1) {
+        layout.inputBuses.add(AudioChannelSet::mono());
+        layout.outputBuses.add(AudioChannelSet::mono());
+    } else if (channels == 2) {
+        layout.inputBuses.add(AudioChannelSet::stereo());
+        layout.outputBuses.add(AudioChannelSet::stereo());
+    } else {
+        return false;
+    }
+    setBusesLayout(layout);
+    std::lock_guard<std::mutex> lock(m_processors_mtx);
     for (auto& proc : m_processors) {
-        latency += proc->getLatencySamples();
+        if (!proc->setBusesLayout(layout)) {
+            return false;
+        }
     }
-    if (latency != getLatencySamples()) {
-        dbgln("updating latency samples to " << latency);
-        setLatencySamples(latency);
-    }
+    return true;
 }
 
 // Sync version.
@@ -91,7 +91,7 @@ std::shared_ptr<AudioPluginInstance> ProcessorChain::loadPlugin(PluginDescriptio
     auto inst =
         std::shared_ptr<AudioPluginInstance>(plugmgr.createPluginInstance(plugdesc, sampleRate, blockSize, err));
     if (nullptr == inst) {
-        logln("failed loading plugin " << plugdesc.fileOrIdentifier << ": " << err);
+        logln_static("failed loading plugin " << plugdesc.fileOrIdentifier << ": " << err);
     }
     return inst;
 }
@@ -103,7 +103,7 @@ std::shared_ptr<AudioPluginInstance> ProcessorChain::loadPlugin(const String& fi
     if (nullptr != plugdesc) {
         return loadPlugin(*plugdesc, sampleRate, blockSize);
     } else {
-        logln("failed to find plugin descriptor");
+        logln_static("failed to find plugin descriptor");
     }
     return nullptr;
 }
@@ -143,7 +143,7 @@ bool ProcessorChain::addPluginProcessor(const String& fileOrIdentifier) {
 bool ProcessorChain::addProcessor(std::shared_ptr<AudioPluginInstance> processor) {
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     m_processors.push_back(processor);
-    setLatency();
+    updateNoLock();
     return true;
 }
 
@@ -156,6 +156,24 @@ void ProcessorChain::delProcessor(int idx) {
             break;
         }
     }
+    updateNoLock();
+}
+
+void ProcessorChain::updateNoLock() {
+    int latency = 0;
+    bool supportsDouble = true;
+    for (auto& proc : m_processors) {
+        latency += proc->getLatencySamples();
+        if (!proc->supportsDoublePrecisionProcessing()) {
+            supportsDouble = false;
+        }
+    }
+    if (latency != getLatencySamples()) {
+        dbgln("updating latency samples to " << latency);
+        setLatencySamples(latency);
+    }
+    m_supportsDoublePrecission = supportsDouble;
+    m_tailSecs = m_processors.back()->getTailLengthSeconds();
 }
 
 std::shared_ptr<AudioPluginInstance> ProcessorChain::getProcessor(int index) {
