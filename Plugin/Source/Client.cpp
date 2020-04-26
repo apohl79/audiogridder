@@ -46,22 +46,19 @@ void Client::run() {
             logln("parsing config failed: " << e.what());
         }
         if ((!isReady() || m_needsReconnect) && !currentThreadShouldExit()) {
-            bool reconnected = m_needsReconnect;
             close();
             init();
-            bool newState = isReady();
-            if (newState != lastState || (newState && reconnected)) {
-                lastState = newState;
-                if (lastState) {
-                    if (m_onConnectCallback) {
-                        m_onConnectCallback();
-                    }
-                } else {
-                    if (m_onCloseCallback) {
-                        m_onCloseCallback();
-                    }
+            bool newState = m_ready;
+            if (newState) {
+                if (m_onConnectCallback) {
+                    m_onConnectCallback();
+                }
+            } else if (lastState) {
+                if (m_onCloseCallback) {
+                    m_onCloseCallback();
                 }
             }
+            lastState = newState;
         }
         int sleepfor = 20;
         while (!currentThreadShouldExit() && sleepfor-- > 0) {

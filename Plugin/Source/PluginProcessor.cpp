@@ -322,6 +322,7 @@ void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeI
         }
         if (m_activeServer > -1 && m_activeServer < m_servers.size()) {
             m_client.setServer(m_servers[m_activeServer]);
+            m_client.reconnect();
         }
     } catch (json::parse_error& e) {
         logln_clnt(&m_client, "parsing state info failed: " << e.what());
