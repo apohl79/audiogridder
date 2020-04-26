@@ -77,6 +77,7 @@ void Server::saveConfig() {
 
 Server::~Server() {
     m_masterSocket.close();
+    stopThread(2000);
     dbgln("server terminated");
 }
 

@@ -18,6 +18,7 @@ Worker::~Worker() {
     if (nullptr != m_client) {
         m_client->close();
     }
+    stopThread(2000);
 }
 
 String Worker::getStringFrom(const PluginDescription& d) {
