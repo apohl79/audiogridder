@@ -279,41 +279,53 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
 
 void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
     std::string dump(static_cast<const char*>(data), sizeInBytes);
-    json j = json::parse(dump);
-    int version = 0;
-    if (j.find("version") != j.end()) {
-        version = j["version"].get<int>();
-    }
-    m_servers.clear();
-    for (auto& srv : j["servers"]) {
-        m_servers.push_back(srv.get<std::string>());
-    }
-    m_activeServer = j["activeServer"].get<int>();
-    for (auto& plug : j["loadedPlugins"]) {
-        if (version < 1) {
-            StringArray dummy;
-            Array<e47::Client::Parameter> dummy2;
-            m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
-                                       plug[2].get<std::string>(), dummy, dummy2, false, false});
-        } else if (version == 1) {
-            StringArray dummy;
-            Array<e47::Client::Parameter> dummy2;
-            m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
-                                       plug[2].get<std::string>(), dummy, dummy2, plug[3].get<bool>(), false});
-        } else {
-            StringArray presets;
-            for (auto& p : plug[3]) {
-                presets.add(p.get<std::string>());
-            }
-            Array<e47::Client::Parameter> params;
-            for (auto& p : plug[4]) {
-                params.add(e47::Client::Parameter::fromJson(p));
-            }
-            m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
-                                       plug[2].get<std::string>(), presets, params, plug[5].get<bool>(), false});
+    try {
+        json j = json::parse(dump);
+        int version = 0;
+        if (j.find("version") != j.end()) {
+            version = j["version"].get<int>();
         }
+        m_servers.clear();
+        if (j.find("servers") != j.end()) {
+            for (auto& srv : j["servers"]) {
+                m_servers.push_back(srv.get<std::string>());
+            }
+        }
+        if (j.find("activeServer") != j.end()) {
+            m_activeServer = j["activeServer"].get<int>();
+        }
+        if (j.find("loadedPlugins") != j.end()) {
+            for (auto& plug : j["loadedPlugins"]) {
+                if (version < 1) {
+                    StringArray dummy;
+                    Array<e47::Client::Parameter> dummy2;
+                    m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
+                                       plug[2].get<std::string>(), dummy, dummy2, false, false});
+                } else if (version == 1) {
+                    StringArray dummy;
+                    Array<e47::Client::Parameter> dummy2;
+                    m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
+                                       plug[2].get<std::string>(), dummy, dummy2, plug[3].get<bool>(), false});
+                } else {
+                    StringArray presets;
+                    for (auto& p : plug[3]) {
+                        presets.add(p.get<std::string>());
+                    }
+                    Array<e47::Client::Parameter> params;
+                    for (auto& p : plug[4]) {
+                        params.add(e47::Client::Parameter::fromJson(p));
+                    }
+                    m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
+                                       plug[2].get<std::string>(), presets, params, plug[5].get<bool>(), false});
+                }
+            }
+        }
+        if (m_activeServer > -1 && m_activeServer < m_servers.size()) {
+            m_client.setServer(m_servers[m_activeServer]);
+        }
+    } catch (json::parse_error& e) {
+        logln_clnt(&m_client, "parsing state info failed: " << e.what());
     }
-    m_client.setServer(m_servers[m_activeServer]);
 }
 
 std::vector<ServerPlugin> AudioGridderAudioProcessor::getPlugins(const String& type) const {
