@@ -173,7 +173,11 @@ void ProcessorChain::updateNoLock() {
         setLatencySamples(latency);
     }
     m_supportsDoublePrecission = supportsDouble;
-    m_tailSecs = m_processors.back()->getTailLengthSeconds();
+    if (m_processors.size() > 0) {
+        m_tailSecs = m_processors.back()->getTailLengthSeconds();
+    } else {
+        m_tailSecs = 0.0;
+    }
 }
 
 std::shared_ptr<AudioPluginInstance> ProcessorChain::getProcessor(int index) {
