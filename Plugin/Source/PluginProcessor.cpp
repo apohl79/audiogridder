@@ -300,12 +300,12 @@ void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeI
                     StringArray dummy;
                     Array<e47::Client::Parameter> dummy2;
                     m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
-                                       plug[2].get<std::string>(), dummy, dummy2, false, false});
+                                               plug[2].get<std::string>(), dummy, dummy2, false, false});
                 } else if (version == 1) {
                     StringArray dummy;
                     Array<e47::Client::Parameter> dummy2;
                     m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
-                                       plug[2].get<std::string>(), dummy, dummy2, plug[3].get<bool>(), false});
+                                               plug[2].get<std::string>(), dummy, dummy2, plug[3].get<bool>(), false});
                 } else {
                     StringArray presets;
                     for (auto& p : plug[3]) {
@@ -316,7 +316,8 @@ void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeI
                         params.add(e47::Client::Parameter::fromJson(p));
                     }
                     m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
-                                       plug[2].get<std::string>(), presets, params, plug[5].get<bool>(), false});
+                                               plug[2].get<std::string>(), presets, params, plug[5].get<bool>(),
+                                               false});
                 }
             }
         }

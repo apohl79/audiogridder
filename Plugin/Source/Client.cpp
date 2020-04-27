@@ -227,11 +227,13 @@ bool Client::isReady() {
         }
     }
     if (locked) {
-        m_ready = !m_error && nullptr != m_cmd_socket && m_cmd_socket->isConnected() && nullptr != m_screen_socket &&
-                  m_screen_socket->isConnected() && nullptr != m_audio_socket && m_audio_socket->isConnected();
+        m_ready = !m_error && nullptr != m_cmd_socket && m_cmd_socket->isConnected() &&
+                  m_screenWorker->isThreadRunning() && nullptr != m_screen_socket && m_screen_socket->isConnected() &&
+                  nullptr != m_audio_socket && m_audio_socket->isConnected();
         m_clientMtx.unlock();
     } else {
-        logln(getLoadedPluginsString() << ": isReady can't acquire lock, returning stale result");
+        logln(getLoadedPluginsString() << ": isReady can't acquire lock, returning stale result, locked by "
+                                       << m_clientMtxId);
         m_error = true;
     }
     return !m_error && m_ready;
