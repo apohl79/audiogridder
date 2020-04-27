@@ -76,9 +76,21 @@ void Server::saveConfig() {
 }
 
 Server::~Server() {
-    m_masterSocket.close();
-    stopThread(2000);
+    if (m_masterSocket.isConnected()) {
+        m_masterSocket.close();
+    }
+    stopThread(-1);
+    m_pluginlist.clear();
     dbgln("server terminated");
+}
+
+void Server::shutdown() {
+    m_masterSocket.close();
+    for (auto& w : m_workers) {
+        logln("shutting down worker, isRunning=" << (int)w->isThreadRunning());
+        w->shutdown();
+    }
+    signalThreadShouldExit();
 }
 
 bool Server::shouldExclude(const String& name) {
@@ -212,15 +224,16 @@ void Server::run() {
         dbgln("server started: ID=" << m_id << ", PORT=" << m_port + m_id);
         while (!currentThreadShouldExit()) {
             auto* clnt = m_masterSocket.waitForNextConnection();
-            for (auto it = m_workers.begin(); it < m_workers.end(); it++) {
-                if (!(*it)->isThreadRunning()) {
-                    m_workers.erase(it);
-                }
-            }
             if (nullptr != clnt) {
                 dbgln("new client " << clnt->getHostName());
                 m_workers.emplace_back(std::make_unique<Worker>(clnt));
                 m_workers.back()->startThread();
+                // lazy cleanup
+                for (auto it = m_workers.begin(); it < m_workers.end(); it++) {
+                    if (!(*it)->isThreadRunning()) {
+                        m_workers.erase(it);
+                    }
+                }
             }
         }
     } else {

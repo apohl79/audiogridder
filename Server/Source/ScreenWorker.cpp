@@ -15,6 +15,7 @@ ScreenWorker::~ScreenWorker() {
     if (nullptr != m_socket && m_socket->isConnected()) {
         m_socket->close();
     }
+    stopThread(-1);
 }
 
 void ScreenWorker::init(std::unique_ptr<StreamingSocket> s) { m_socket = std::move(s); }

@@ -26,8 +26,9 @@ void App::initialise(const String& commandLineParameters) {
 }
 
 void App::shutdown() {
-    m_server->signalThreadShouldExit();
-    m_server->waitForThreadToExit(1000);
+    m_server->shutdown();
+    m_server->waitForThreadToExit(-1);
+    m_server.reset();
     Logger::setCurrentLogger(nullptr);
     delete m_logger;
 }

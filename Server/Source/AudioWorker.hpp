@@ -24,7 +24,7 @@ class ProcessorChain;
 
 class AudioWorker : public Thread {
   public:
-    AudioWorker() : Thread("AudioWorker") { m_chain = std::make_unique<ProcessorChain>(); }
+    AudioWorker() : Thread("AudioWorker") { m_chain = std::make_shared<ProcessorChain>(); }
     virtual ~AudioWorker();
 
     void init(std::unique_ptr<StreamingSocket> s, int channels, double rate, int samplesPerBlock, bool doublePrecission,
@@ -32,6 +32,7 @@ class AudioWorker : public Thread {
 
     void run() override;
     void shutdown();
+    void clear();
 
     bool addPlugin(const String& id);
     void delPlugin(int idx);
@@ -52,7 +53,7 @@ class AudioWorker : public Thread {
     double m_rate;
     int m_samplesPerBlock;
     bool m_doublePrecission;
-    std::unique_ptr<ProcessorChain> m_chain;
+    std::shared_ptr<ProcessorChain> m_chain;
     static HashMap<String, RecentsListType> m_recents;
     static std::mutex m_recentsMtx;
     std::function<void()> m_onTerminate;

@@ -19,6 +19,8 @@ AudioWorker::~AudioWorker() {
     if (nullptr != m_socket && m_socket->isConnected()) {
         m_socket->close();
     }
+    m_recents.clear();
+    stopThread(-1);
 }
 
 void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channels, double rate, int samplesPerBlock,
@@ -102,8 +104,7 @@ void AudioWorker::run() {
         }
     }
 
-    m_chain->releaseResources();
-    m_chain->clear();
+    clear();
 
     signalThreadShouldExit();
     if (m_onTerminate) {
@@ -112,7 +113,22 @@ void AudioWorker::run() {
     dbgln("audio processor terminated");
 }
 
-void AudioWorker::shutdown() { signalThreadShouldExit(); }
+void AudioWorker::shutdown() {
+    clear();
+    signalThreadShouldExit();
+}
+
+void AudioWorker::clear() {
+    m_chain->releaseResources();
+    if (!MessageManager::getInstance()->isThisTheMessageThread()) {
+        if (m_chain->getSize() > 0) {
+            auto pChain = m_chain;
+            MessageManager::callAsync([pChain] { pChain->clear(); });
+        }
+    } else {
+        m_chain->clear();
+    }
+}
 
 bool AudioWorker::addPlugin(const String& id) {
     dbgln("adding plugin " << id << "...");

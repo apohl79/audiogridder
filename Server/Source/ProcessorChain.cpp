@@ -208,6 +208,7 @@ float ProcessorChain::getParameterValue(int idx, int paramIdx) {
 }
 
 void ProcessorChain::clear() {
+    releaseResources();
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     m_processors.clear();
 }

@@ -22,6 +22,7 @@ class Server : public Thread {
   public:
     Server();
     virtual ~Server();
+    void shutdown();
     void loadConfig();
     void saveConfig();
     int getId() const { return m_id; }
