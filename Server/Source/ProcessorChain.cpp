@@ -74,11 +74,25 @@ bool ProcessorChain::updateChannels(int channels) {
     setBusesLayout(layout);
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     for (auto& proc : m_processors) {
-        if (!proc->setBusesLayout(layout)) {
+        if (!setProcessorBusesLayout(proc)) {
             return false;
         }
     }
     return true;
+}
+
+bool ProcessorChain::setProcessorBusesLayout(std::shared_ptr<AudioPluginInstance> proc) {
+    auto layout = getBusesLayout();
+    if (proc->checkBusesLayoutSupported(layout)) {
+        return proc->setBusesLayout(layout);
+    } else {
+        // try with sidechain input
+        layout.inputBuses.add(AudioChannelSet::mono());
+        if (proc->checkBusesLayoutSupported(layout)) {
+            return proc->setBusesLayout(layout);
+        }
+    }
+    return false;
 }
 
 // Sync version.
@@ -111,12 +125,8 @@ std::shared_ptr<AudioPluginInstance> ProcessorChain::loadPlugin(const String& fi
 bool ProcessorChain::addPluginProcessor(const String& fileOrIdentifier) {
     auto inst = loadPlugin(fileOrIdentifier, getSampleRate(), getBlockSize());
     if (nullptr != inst) {
-        if (!inst->setBusesLayout(getBusesLayout())) {
+        if (!setProcessorBusesLayout(inst)) {
             logln("I/O layout not supported by plugin: " << fileOrIdentifier);
-            return false;
-        }
-        if (!inst->enableAllBuses()) {
-            logln("failed to enable busses for plugin: " << fileOrIdentifier);
             return false;
         }
         AudioProcessor::ProcessingPrecision prec = AudioProcessor::singlePrecision;

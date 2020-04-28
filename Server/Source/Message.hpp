@@ -238,11 +238,15 @@ class AudioMessage {
                 return false;
             }
             int size;
+            // One additional channel for a mono sidechain bus, plugins that don't need it, should ignore the channel
+            int channels = m_reqHeader.channels + 1;
             if (m_reqHeader.isDouble) {
-                bufferD.setSize(m_reqHeader.channels, m_reqHeader.samples);
+                bufferD.setSize(channels, m_reqHeader.samples);
+                bufferD.clear(channels - 1, 0, m_reqHeader.samples);  // no sidechain data yet
                 size = m_reqHeader.samples * sizeof(double);
             } else {
-                bufferF.setSize(m_reqHeader.channels, m_reqHeader.samples);
+                bufferF.setSize(channels, m_reqHeader.samples);
+                bufferF.clear(channels - 1, 0, m_reqHeader.samples);  // no sidechain data yet
                 size = m_reqHeader.samples * sizeof(float);
             }
             for (int chan = 0; chan < m_reqHeader.channels; ++chan) {

@@ -26,6 +26,11 @@ class ProcessorChain : public AudioProcessor {
         AudioPlayHead::CurrentPositionInfo* m_posInfo;
     };
 
+    ProcessorChain()
+        : AudioProcessor(BusesProperties()
+                             .withInput("Input", AudioChannelSet::stereo(), false)
+                             .withOutput("Output", AudioChannelSet::stereo(), false)) {}
+
     void prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock) override;
     void releaseResources() override;
     void processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMessages) override;
@@ -36,6 +41,7 @@ class ProcessorChain : public AudioProcessor {
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
 
     bool updateChannels(int channels);
+    bool setProcessorBusesLayout(std::shared_ptr<AudioPluginInstance> proc);
 
     bool acceptsMidi() const override { return false; };
     bool producesMidi() const override { return false; };
@@ -92,7 +98,8 @@ class ProcessorChain : public AudioProcessor {
     template <typename T>
     void preProcessBlocks(std::shared_ptr<AudioPluginInstance> inst) {
         MidiBuffer midi;
-        AudioBuffer<T> buf(getMainBusNumInputChannels(), getBlockSize());
+        int channels = getMainBusNumInputChannels() + 1;  // +1 mono sidechain input
+        AudioBuffer<T> buf(channels, getBlockSize());
         buf.clear();
         int samplesProcessed = 0;
         do {

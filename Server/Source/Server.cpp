@@ -189,6 +189,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
                 logln("  scanning: " << name);
                 getApp().setSplashInfo(String("Scanning plugin ") + name + "...");
                 if (!scanNextPlugin(scanner, name)) {
+                    logln("    failed: " << name);
                     break;
                 }
             }
@@ -200,7 +201,8 @@ void Server::scanForPlugins(const std::vector<String>& include) {
     }
 
     for (auto& p : m_pluginlist.getTypes()) {
-        if (p.isInstrument || p.numInputChannels != 2 || p.numOutputChannels != 2) {
+        if (p.isInstrument) {
+            logln("  removing instrument plugin: " << p.descriptiveName);
             m_pluginlist.removeType(p);
         }
     }
