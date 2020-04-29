@@ -201,7 +201,7 @@ void AudioGridderAudioProcessor::processBlockReal(AudioBuffer<T>& buffer, MidiBu
     }
 
     if (!m_client.isReadyLockFree()) {
-        for (auto i = 0; i < totalNumInputChannels; ++i) {
+        for (auto i = 0; i < buffer.getNumChannels(); ++i) {
             buffer.clear(i, 0, buffer.getNumSamples());
         }
     } else {
@@ -351,10 +351,11 @@ std::set<String> AudioGridderAudioProcessor::getPluginTypes() const {
 bool AudioGridderAudioProcessor::loadPlugin(const String& id, const String& name) {
     StringArray presets;
     Array<e47::Client::Parameter> params;
+    logln_clnt(&m_client, "loading " << name << " (" << id << ")... ");
     suspendProcessing(true);
     bool success = m_client.addPlugin(id, presets, params);
     suspendProcessing(false);
-    logln_clnt(&m_client, "loading " << name << " (" << id << ")... " << (success ? "ok" : "error"));
+    logln_clnt(&m_client, "..." << (success ? "ok" : "error"));
     if (success) {
         logln_clnt(&m_client, "updating latency samples to " << m_client.getLatencySamples());
         setLatencySamples(m_client.getLatencySamples());

@@ -306,17 +306,24 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
     dbglock(*this, 11);
     if (msg.send(m_cmd_socket.get())) {
         auto result = MessageFactory::getResult(m_cmd_socket.get(), 10);
-        if (nullptr == result || result->getReturnCode() < 0) {
+        if (nullptr == result) {
+            logln("  failed to get result");
+            return false;
+        }
+        if (result->getReturnCode() < 0) {
+            logln("  negative return code");
             return false;
         }
         m_latency = result->getReturnCode();
         Message<Presets> msgPresets;
         if (!msgPresets.read(m_cmd_socket.get())) {
+            logln("  failed to read presets");
             return false;
         }
         presets = StringArray::fromTokens(msgPresets.payload.getString(), "|", "");
         Message<Parameters> msgParams;
         if (!msgParams.read(m_cmd_socket.get())) {
+            logln("  failed to read parameters");
             return false;
         }
         auto jparams = msgParams.payload.getJson();
@@ -337,7 +344,11 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
             block.fromBase64Encoding(settings);
             msgSettings.payload.setData(block.begin(), static_cast<int>(block.getSize()));
         }
-        return msgSettings.send(m_cmd_socket.get());
+        if (!msgSettings.send(m_cmd_socket.get())) {
+            logln("  failed to send settings");
+            return false;
+        }
+        return true;
     }
     return false;
 }

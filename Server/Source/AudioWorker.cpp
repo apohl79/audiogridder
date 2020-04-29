@@ -130,12 +130,7 @@ void AudioWorker::clear() {
     }
 }
 
-bool AudioWorker::addPlugin(const String& id) {
-    dbgln("adding plugin " << id << "...");
-    bool success = m_chain->addPluginProcessor(id);
-    dbgln("..." << (success ? "ok" : "failed"));
-    return success;
-}
+bool AudioWorker::addPlugin(const String& id) { return m_chain->addPluginProcessor(id); }
 
 void AudioWorker::delPlugin(int idx) {
     dbgln("deleting plugin " << idx);

@@ -602,7 +602,7 @@ class Preset : public DataPayload<preset_t> {
 template <typename T>
 class Message {
   public:
-    static constexpr size_t MAX_SIZE = 200 * 1024;
+    static constexpr size_t MAX_SIZE = 1024 * 1024;
 
     struct Header {
         int type;
@@ -666,6 +666,10 @@ class Message {
 
     bool send(StreamingSocket* socket) {
         Header hdr = {payload.getType(), (int)payload.getSize()};
+        if (hdr.size > MAX_SIZE) {
+            std::cerr << "max size of " << MAX_SIZE << " bytes exceeded (" << hdr.size << " bytes)" << std::endl;
+            return false;
+        }
         if (!e47::send(socket, reinterpret_cast<const char*>(&hdr), sizeof(hdr))) {
             return false;
         }

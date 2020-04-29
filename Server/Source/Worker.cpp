@@ -158,7 +158,9 @@ void Worker::handleMessage(std::shared_ptr<Message<Quit>> msg) { shutdown(); }
 
 void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     auto id = pPLD(msg).getString();
+    logln("adding plugin " << id << "...");
     bool success = m_audio.addPlugin(id);
+    logln("..." << (success ? "ok" : "failed"));
     if (!success) {
         MessageFactory::sendResult(m_client.get(), -1);
         return;
@@ -170,6 +172,7 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
         m_client->close();
         return;
     }
+    logln("sending presets...");
     auto proc = m_audio.getProcessor(m_audio.getSize() - 1);
     String presets;
     bool first = true;
@@ -188,6 +191,8 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
         m_client->close();
         return;
     }
+    logln("...ok");
+    logln("sending parameters...");
     json jparams = json::array();
     for (auto& param : proc->getParameters()) {
         json jparam = {{"idx", param->getParameterIndex()},        {"name", param->getName(32).toStdString()},
@@ -204,6 +209,8 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
         m_client->close();
         return;
     }
+    logln("...ok");
+    logln("reading plugin settings...");
     Message<PluginSettings> msgSettings;
     if (!msgSettings.read(m_client.get())) {
         logln("failed to read PluginSettings message");
@@ -216,6 +223,7 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
         auto proc = m_audio.getProcessor(m_audio.getSize() - 1);
         proc->setStateInformation(block.getData(), static_cast<int>(block.getSize()));
     }
+    logln("...ok");
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<DelPlugin>> msg) {
