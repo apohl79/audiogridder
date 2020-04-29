@@ -22,6 +22,10 @@ low latency and enough bandwidth. There is basically no limitation on
 the network side, but your DAW has some latency needs. So a common DSL
 connection through a VPN might be problematic but not impossible.
 
+## Downloads
+
+Please find the latest binaries to download in the [releases](https://github.com/apohl79/audiogridder/releases) section.
+
 ## AudioGridder Server
 
 The server supports VST3 and AudioUnit plugin formats. Installation
@@ -73,9 +77,9 @@ instance).
 
 1. Install the PKG (includes server and plugin binaries)
 2. Run your DAW and insert the AudioGridder plugin
-3. Add your server endpoint(s) by clicking the server icon (this needs
+3. Add your server endpoint(s) (IP or DNS name) by clicking the server icon (this needs
 to be done only once, as the server settings will be shared with new
-plugin instances)
+plugin instances)<br/>**Note:** Server and client have to be able to directly reach each other. This is because the server will have to connect the client at initialization time.
 4. Add remote plugins
 
 <p align="center">
