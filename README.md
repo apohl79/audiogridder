@@ -92,3 +92,12 @@ plugin instances)<br/>**Note:** Server and client have to be able to directly re
 - The server supports AudioUnit and VST3 plugins
 - The plugin is available as AudioUnit and VST3
 - Tested DAWs: Cubase 10 Pro, Logic Pro X, Reaper
+
+## Reporting of Issues
+
+If you report a new issue, please be as precise as possible. I will have to be able to reproduce it or at least get some conclusions from the info you provide.
+
+- Report only one issue at a time, if you have multiple problems, please create multiple issues
+- If you see a crash, please attach the stack trace from apples crash dialog
+- Attach the server latest log file (~/Library/Logs/AudioGridderServer/Main_DATE-TIME.log
+- Minimize the server log (restart the server and just do, what leads to the problem and stop)
