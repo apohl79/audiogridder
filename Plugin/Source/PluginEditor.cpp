@@ -14,6 +14,7 @@
 AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderAudioProcessor& p)
     : AudioProcessorEditor(&p), m_processor(p), m_newPluginButton("", "newPlug") {
     auto& lf = getLookAndFeel();
+    lf.setUsingNativeAlertWindows(true);
     lf.setColour(ResizableWindow::backgroundColourId, Colour(DEFAULT_BG_COLOR));
     lf.setColour(PopupMenu::backgroundColourId, Colour(DEFAULT_BG_COLOR));
     lf.setColour(TextEditor::backgroundColourId, Colour(DEFAULT_BUTTON_COLOR));
@@ -99,15 +100,19 @@ void AudioGridderAudioProcessorEditor::resized() {
 
 void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const ModifierKeys& modifiers) {
     if (!button->getName().compare("newPlug")) {
+        auto addFn = [this](const ServerPlugin& plug) {
+            if (m_processor.loadPlugin(plug.getId(), plug.getName())) {
+                addPluginButton(plug.getId(), plug.getName());
+                resized();
+            } else {
+                AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Error",
+                                                 "Failed to add " + plug.getName() + " plugin!", "OK");
+            }
+        };
         PopupMenu m;
         auto recents = m_processor.getClient().getRecents();
         for (const auto& plug : recents) {
-            m.addItem(plug.getName(), [this, plug] {
-                if (m_processor.loadPlugin(plug.getId(), plug.getName())) {
-                    addPluginButton(plug.getId(), plug.getName());
-                    resized();
-                }
-            });
+            m.addItem(plug.getName(), [addFn, plug] { addFn(plug); });
         }
         if (recents.size() > 0) {
             m.addSeparator();
@@ -119,12 +124,7 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
             std::map<String, PopupMenu> companyMenus;
             for (const auto& plug : m_processor.getPlugins(type)) {
                 auto& menu = companyMenus[plug.getCompany()];
-                menu.addItem(plug.getName(), [this, plug] {
-                    if (m_processor.loadPlugin(plug.getId(), plug.getName())) {
-                        addPluginButton(plug.getId(), plug.getName());
-                        resized();
-                    }
-                });
+                menu.addItem(plug.getName(), [addFn, plug] { addFn(plug); });
             }
             for (auto& company : companyMenus) {
                 sub.addSubMenu(company.first, company.second);
