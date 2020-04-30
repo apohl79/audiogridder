@@ -99,5 +99,5 @@ If you report a new issue, please be as precise as possible. I will have to be a
 
 - Report only one issue at a time, if you have multiple problems, please create multiple issues
 - If you see a crash, please attach the stack trace from apples crash dialog
-- Attach the latest server log file (~/Library/Logs/AudioGridderServer/Main_DATE-TIME.log
+- Attach the latest server log file (~/Library/Logs/AudioGridderServer/Main_DATE-TIME.log)
 - Minimize the server log (restart the server and just do, what leads to the problem and stop)
