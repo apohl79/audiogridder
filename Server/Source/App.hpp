@@ -103,22 +103,36 @@ class App : public JUCEApplication, public MenuBarModel {
             }
         }
 
+        ~ProcessorWindow() {
+            if (m_editor != nullptr) {
+                delete m_editor;
+                m_editor = nullptr;
+            }
+        }
+
+        BorderSize<int> getBorderThickness() override { return {}; }
+
         void hide() {
             if (m_callback) {
                 m_callback(nullptr, 0, 0);
             }
         }
 
+        void forgetEditor() {
+            // Allow a processor to delete his editor, so we should not delete it again
+            m_editor = nullptr;
+            stopTimer();
+        }
+
       private:
         std::shared_ptr<AudioProcessor> m_processor;
-        std::unique_ptr<AudioProcessorEditor> m_editor;
+        AudioProcessorEditor* m_editor = nullptr;
         WindowCaptureCallback m_callback;
 
         void createEditor() {
-            m_editor = std::unique_ptr<AudioProcessorEditor>(m_processor->createEditor());
-            addChildAndSetID(m_editor.get(), "edit");
-            setSize(m_editor->getWidth(), m_editor->getHeight());
-            setTitleBarHeight(10);
+            m_editor = m_processor->createEditor();
+            setContentNonOwned(m_editor, true);
+            setTitleBarHeight(30);
             setVisible(true);
             startTimer(50);
         }
@@ -126,8 +140,8 @@ class App : public JUCEApplication, public MenuBarModel {
         void timerCallback() override { captureWindow(); }
 
         void captureWindow() {
-            if (getWidth() != m_editor->getWidth() || getHeight() != m_editor->getWidth()) {
-                setSize(m_editor->getWidth(), m_editor->getHeight());
+            if (m_editor == nullptr) {
+                return;
             }
             if (m_callback) {
                 m_callback(captureScreen(m_editor->getScreenBounds()), m_editor->getWidth(), m_editor->getHeight());

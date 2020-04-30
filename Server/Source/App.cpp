@@ -6,10 +6,9 @@
  */
 
 #include "App.hpp"
+#include "Server.hpp"
 
 #include <signal.h>
-
-#include "Server.hpp"
 
 namespace e47 {
 
@@ -52,6 +51,9 @@ void App::showEditor(std::shared_ptr<AudioProcessor> proc, Thread::ThreadID tid,
         m_windowOwner = tid;
         m_windowProc = proc;
         m_windowFunc = func;
+        if (proc->getActiveEditor() == nullptr && m_window != nullptr) {
+            m_window->forgetEditor();
+        }
         m_window = std::make_unique<ProcessorWindow>(m_windowProc, m_windowFunc);
     }
 }
