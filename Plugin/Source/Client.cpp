@@ -21,9 +21,8 @@ Client::Client(AudioGridderAudioProcessor* processor)
 }
 
 Client::~Client() {
-    stopThread(1000);
+    stopThread(-1);
     close();
-    waitForThreadToExit(-1);
 }
 
 void Client::run() {
