@@ -48,12 +48,11 @@ const KnownPluginList& App::getPluginList() { return m_server->getPluginList(); 
 void App::showEditor(std::shared_ptr<AudioProcessor> proc, Thread::ThreadID tid, WindowCaptureCallback func) {
     if (proc->hasEditor()) {
         std::lock_guard<std::mutex> lock(m_windowMtx);
+        forgetEditorIfNeeded();
+        m_window.reset();
         m_windowOwner = tid;
         m_windowProc = proc;
         m_windowFunc = func;
-        if (proc->getActiveEditor() == nullptr && m_window != nullptr) {
-            m_window->forgetEditor();
-        }
         m_window = std::make_unique<ProcessorWindow>(m_windowProc, m_windowFunc);
     }
 }
@@ -61,6 +60,7 @@ void App::showEditor(std::shared_ptr<AudioProcessor> proc, Thread::ThreadID tid,
 void App::hideEditor(Thread::ThreadID tid) {
     if (tid == 0 || tid == m_windowOwner) {
         std::lock_guard<std::mutex> lock(m_windowMtx);
+        forgetEditorIfNeeded();
         m_window.reset();
         m_windowOwner = 0;
         m_windowProc.reset();
@@ -70,12 +70,20 @@ void App::hideEditor(Thread::ThreadID tid) {
 
 void App::resetEditor() {
     std::lock_guard<std::mutex> lock(m_windowMtx);
+    forgetEditorIfNeeded();
     m_window.reset();
 }
 
 void App::restartEditor() {
     std::lock_guard<std::mutex> lock(m_windowMtx);
+    forgetEditorIfNeeded();
     m_window = std::make_unique<ProcessorWindow>(m_windowProc, m_windowFunc);
+}
+
+void App::forgetEditorIfNeeded() {
+    if (m_windowProc != nullptr && m_windowProc->getActiveEditor() == nullptr && m_window != nullptr) {
+        m_window->forgetEditor();
+    }
 }
 
 }  // namespace e47

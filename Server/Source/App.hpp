@@ -45,6 +45,7 @@ class App : public JUCEApplication, public MenuBarModel {
 
     void resetEditor();
     void restartEditor();
+    void forgetEditorIfNeeded();
 
     Point<float> localPointToGlobal(Point<float> lp) { return m_window->localPointToGlobal(lp); }
 
@@ -130,7 +131,7 @@ class App : public JUCEApplication, public MenuBarModel {
         WindowCaptureCallback m_callback;
 
         void createEditor() {
-            m_editor = m_processor->createEditor();
+            m_editor = m_processor->createEditorIfNeeded();
             setContentNonOwned(m_editor, true);
             setTitleBarHeight(30);
             setVisible(true);
