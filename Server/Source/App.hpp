@@ -47,7 +47,7 @@ class App : public JUCEApplication, public MenuBarModel {
     void restartEditor();
     void forgetEditorIfNeeded();
 
-    Point<float> localPointToGlobal(Point<float> lp) { return m_window->localPointToGlobal(lp); }
+    Point<float> localPointToGlobal(Point<float> lp);
 
     class MenuBarWindow : public DocumentWindow {
       public:

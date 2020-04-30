@@ -7,6 +7,7 @@
 
 #include "App.hpp"
 #include "Server.hpp"
+#include "Utils.hpp"
 
 #include <signal.h>
 
@@ -84,6 +85,17 @@ void App::forgetEditorIfNeeded() {
     if (m_windowProc != nullptr && m_windowProc->getActiveEditor() == nullptr && m_window != nullptr) {
         m_window->forgetEditor();
     }
+}
+
+Point<float> App::localPointToGlobal(Point<float> lp) {
+    if (m_windowProc != nullptr) {
+        auto* ed = m_windowProc->getActiveEditor();
+        if (ed != nullptr) {
+            return ed->localPointToGlobal(lp);
+        }
+    }
+    logln("failed to resolve local to global point");
+    return lp;
 }
 
 }  // namespace e47
