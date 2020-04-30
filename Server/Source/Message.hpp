@@ -232,21 +232,28 @@ class AudioMessage {
     }
 
     bool readFromClient(StreamingSocket* socket, AudioBuffer<float>& bufferF, AudioBuffer<double>& bufferD,
-                        MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
+                        MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo, int extraChannels = 1) {
         if (socket->isConnected()) {
             if (!read(socket, &m_reqHeader, sizeof(m_reqHeader))) {
                 return false;
             }
             int size;
-            // One additional channel for a mono sidechain bus, plugins that don't need it, should ignore the channel
-            int channels = m_reqHeader.channels + 1;
+            // Arbitarry additional channels to support plugins that have more than one input bus. Plugins that don't
+            // need it, should ignore the channels.
+            int channels = m_reqHeader.channels + extraChannels;
             if (m_reqHeader.isDouble) {
                 bufferD.setSize(channels, m_reqHeader.samples);
-                bufferD.clear(channels - 1, 0, m_reqHeader.samples);  // no sidechain data yet
+                // no data for extra channels
+                for (int chan = m_reqHeader.channels; chan < channels; ++chan) {
+                    bufferD.clear(chan, 0, m_reqHeader.samples);
+                }
                 size = m_reqHeader.samples * sizeof(double);
             } else {
                 bufferF.setSize(channels, m_reqHeader.samples);
-                bufferF.clear(channels - 1, 0, m_reqHeader.samples);  // no sidechain data yet
+                // no data for extra channels
+                for (int chan = m_reqHeader.channels; chan < channels; ++chan) {
+                    bufferF.clear(chan, 0, m_reqHeader.samples);
+                }
                 size = m_reqHeader.samples * sizeof(float);
             }
             for (int chan = 0; chan < m_reqHeader.channels; ++chan) {

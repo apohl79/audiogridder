@@ -51,7 +51,7 @@ void AudioWorker::run() {
     while (!currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected()) {
         // Read audio chunk
         if (m_socket->waitUntilReady(true, 1000)) {
-            if (msg.readFromClient(m_socket.get(), bufferF, bufferD, midi, posInfo)) {
+            if (msg.readFromClient(m_socket.get(), bufferF, bufferD, midi, posInfo, m_chain->getExtraChannels())) {
                 if (msg.isDouble() && bufferD.getNumChannels() > 0 && bufferD.getNumSamples() > 0) {
                     if (m_channels > bufferD.getNumChannels()) {
                         dbgln("updating bus layout at processing time due to channel mismatch");

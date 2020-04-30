@@ -73,6 +73,7 @@ bool ProcessorChain::updateChannels(int channels) {
     }
     setBusesLayout(layout);
     std::lock_guard<std::mutex> lock(m_processors_mtx);
+    m_extraChannels = 0;
     for (auto& proc : m_processors) {
         if (!setProcessorBusesLayout(proc)) {
             return false;
@@ -86,13 +87,32 @@ bool ProcessorChain::setProcessorBusesLayout(std::shared_ptr<AudioPluginInstance
     if (proc->checkBusesLayoutSupported(layout)) {
         return proc->setBusesLayout(layout);
     } else {
-        // try with sidechain input
-        layout.inputBuses.add(AudioChannelSet::mono());
-        if (proc->checkBusesLayoutSupported(layout)) {
-            return proc->setBusesLayout(layout);
+        // try with extra channels
+        auto procLayout = proc->getBusesLayout();
+        int extraInChannels = 0;
+        for (int busIdx = 1; busIdx < procLayout.inputBuses.size(); busIdx++) {
+            auto bus = procLayout.inputBuses[busIdx];
+            extraInChannels += bus.size();
+            layout.inputBuses.add(bus);
+        }
+        int extraOutChannels = 0;
+        for (int busIdx = 1; busIdx < procLayout.outputBuses.size(); busIdx++) {
+            auto bus = procLayout.outputBuses[busIdx];
+            extraOutChannels += bus.size();
+            layout.outputBuses.add(bus);
+        }
+        if (proc->checkBusesLayoutSupported(layout) && proc->setBusesLayout(layout)) {
+            m_extraChannels = jmax(m_extraChannels, extraInChannels, extraOutChannels);
+            logln(extraInChannels << " extra input(s), " << extraOutChannels << " extra output(s)");
+            return true;
         }
     }
     return false;
+}
+
+int ProcessorChain::getExtraChannels() {
+    std::lock_guard<std::mutex> lock(m_processors_mtx);
+    return m_extraChannels;
 }
 
 // Sync version.
@@ -130,7 +150,7 @@ bool ProcessorChain::addPluginProcessor(const String& fileOrIdentifier) {
             return false;
         }
         AudioProcessor::ProcessingPrecision prec = AudioProcessor::singlePrecision;
-        if (isUsingDoublePrecision()) {
+        if (isUsingDoublePrecision() && supportsDoublePrecisionProcessing()) {
             if (inst->supportsDoublePrecisionProcessing()) {
                 prec = AudioProcessor::doublePrecision;
             } else {
@@ -172,11 +192,15 @@ void ProcessorChain::delProcessor(int idx) {
 void ProcessorChain::updateNoLock() {
     int latency = 0;
     bool supportsDouble = true;
+    m_extraChannels = 0;
     for (auto& proc : m_processors) {
         latency += proc->getLatencySamples();
         if (!proc->supportsDoublePrecisionProcessing()) {
             supportsDouble = false;
         }
+        int extraInChannels = proc->getTotalNumInputChannels() - proc->getMainBusNumInputChannels();
+        int extraOutChannels = proc->getTotalNumOutputChannels() - proc->getMainBusNumOutputChannels();
+        m_extraChannels = jmax(m_extraChannels, extraInChannels, extraOutChannels);
     }
     if (latency != getLatencySamples()) {
         dbgln("updating latency samples to " << latency);

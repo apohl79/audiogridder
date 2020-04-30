@@ -42,6 +42,7 @@ class ProcessorChain : public AudioProcessor {
 
     bool updateChannels(int channels);
     bool setProcessorBusesLayout(std::shared_ptr<AudioPluginInstance> proc);
+    int getExtraChannels();
 
     bool acceptsMidi() const override { return false; };
     bool producesMidi() const override { return false; };
@@ -82,6 +83,8 @@ class ProcessorChain : public AudioProcessor {
     std::atomic_bool m_supportsDoublePrecission{true};
     std::atomic<double> m_tailSecs{0.0};
 
+    int m_extraChannels = 0;
+
     template <typename T>
     void processBlockReal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
         int latency = 0;
@@ -98,7 +101,7 @@ class ProcessorChain : public AudioProcessor {
     template <typename T>
     void preProcessBlocks(std::shared_ptr<AudioPluginInstance> inst) {
         MidiBuffer midi;
-        int channels = getMainBusNumInputChannels() + 1;  // +1 mono sidechain input
+        int channels = getMainBusNumInputChannels() + m_extraChannels;
         AudioBuffer<T> buf(channels, getBlockSize());
         buf.clear();
         int samplesProcessed = 0;
