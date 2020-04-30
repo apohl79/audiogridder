@@ -372,6 +372,8 @@ void AudioGridderAudioProcessor::unloadPlugin(int idx) {
     setLatencySamples(m_client.getLatencySamples());
     if (idx == m_activePlugin) {
         hidePlugin();
+    } else if (idx < m_activePlugin) {
+        m_activePlugin--;
     }
     int i = 0;
     for (auto it = m_loadedPlugins.begin(); it < m_loadedPlugins.end(); it++) {

@@ -175,7 +175,7 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
                         });
                     }
                 });
-            if (active > -1) {
+            if (active > -1 && active < m_pluginButtons.size()) {
                 m_pluginButtons[active]->setActive(false);
                 m_pluginButtons[active]->setColour(PluginButton::textColourOffId, Colours::white);
             }
