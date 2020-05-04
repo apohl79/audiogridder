@@ -13,6 +13,7 @@ static constexpr int DEFAULT_SERVER_PORT = 55056;
 
 static const String SERVER_CONFIG_FILE = "~/.audiogridderserver";
 static const String PLUGIN_CONFIG_FILE = "~/.audiogridder";
+static const String KNOWN_PLUGINS_FILE = "~/.audiogridderserver.cache";
 static const String DEAD_MANS_FILE = "~/.audiogridderserver.crash";
 
 static constexpr int DEFAULT_NUM_OF_BUFFERS = 8;

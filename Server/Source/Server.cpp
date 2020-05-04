@@ -17,6 +17,7 @@ using json = nlohmann::json;
 Server::Server() : Thread("Server") { loadConfig(); }
 
 void Server::loadConfig() {
+    loadKnownPluginList();
     File cfg(SERVER_CONFIG_FILE);
     if (cfg.exists()) {
         FileInputStream fis(cfg);
@@ -32,14 +33,12 @@ void Server::loadConfig() {
             m_enableVST = j["VST"].get<bool>();
             logln("VST3 support " << (m_enableVST ? "enabled" : "disabled"));
         }
+        if (j.find("ScreenQuality") != j.end()) {
+            m_screenQuality = j["ScreenQuality"].get<float>();
+        }
         if (j.find("ExcludePlugins") != j.end()) {
             for (auto& s : j["ExcludePlugins"]) {
                 m_pluginexclude.insert(s.get<std::string>());
-            }
-        }
-        if (j.find("BlacklistedPlugins") != j.end()) {
-            for (auto& s : j["BlacklistedPlugins"]) {
-                m_pluginlist.addToBlacklist(s.get<std::string>());
             }
         }
     }
@@ -60,19 +59,30 @@ void Server::saveConfig() {
     j["ID"] = m_id;
     j["AU"] = m_enableAU;
     j["VST"] = m_enableVST;
+    j["ScreenQuality"] = m_screenQuality;
     j["ExcludePlugins"] = json::array();
     for (auto& p : m_pluginexclude) {
         j["ExcludePlugins"].push_back(p.toStdString());
-    }
-    j["BlacklistedPlugins"] = json::array();
-    for (auto& p : m_pluginlist.getBlacklistedFiles()) {
-        j["BlacklistedPlugins"].push_back(p.toStdString());
     }
 
     File cfg(SERVER_CONFIG_FILE);
     cfg.deleteFile();
     FileOutputStream fos(cfg);
     fos.writeText(j.dump(4), false, false, "\n");
+}
+
+void Server::loadKnownPluginList() {
+    File file(KNOWN_PLUGINS_FILE);
+    if (file.exists()) {
+        auto xml = XmlDocument::parse(file);
+        m_pluginlist.recreateFromXml(*xml);
+    }
+}
+
+void Server::saveKnownPluginList() {
+    File file(KNOWN_PLUGINS_FILE);
+    auto xml = m_pluginlist.createXml();
+    xml->writeTo(file);
 }
 
 Server::~Server() {
@@ -124,6 +134,7 @@ void Server::addPlugins(const std::vector<String>& names, std::function<void(boo
         logln("scanning for plugins...");
         scanForPlugins(names);
         saveConfig();
+        saveKnownPluginList();
         if (fn) {
             for (auto& name : names) {
                 bool found = false;
@@ -146,17 +157,17 @@ void Server::addPlugins(const std::vector<String>& names, std::function<void(boo
 bool Server::scanNextPlugin(PluginDirectoryScanner& scanner, String& name) {
     std::mutex mtx;
     std::condition_variable cv;
-    bool success = false;
+    bool hasNext = false;
     bool done = false;
-    MessageManager::callAsync([this, &mtx, &cv, &scanner, &name, &success, &done] {
+    MessageManager::callAsync([this, &mtx, &cv, &scanner, &name, &hasNext, &done] {
         std::lock_guard<std::mutex> lock(mtx);
-        success = scanner.scanNextFile(true, name);
+        hasNext = scanner.scanNextFile(true, name);
         done = true;
         cv.notify_one();
     });
     std::unique_lock<std::mutex> lock(mtx);
     cv.wait(lock, [&done] { return done; });
-    return success;
+    return hasNext;
 }
 
 void Server::scanForPlugins() {
@@ -178,20 +189,17 @@ void Server::scanForPlugins(const std::vector<String>& include) {
     for (auto& fmt : fmts) {
         PluginDirectoryScanner scanner(m_pluginlist, *fmt, fmt->getDefaultLocationsToSearch(), true,
                                        File(DEAD_MANS_FILE));
-        while (true) {
+        bool hasNext = true;
+        while (hasNext) {
             auto name = scanner.getNextPluginFileThatWillBeScanned();
             if (shouldExclude(name, include)) {
                 dbgln("  (skipping: " << name << ")");
-                if (!scanner.skipNextFile()) {
-                    break;
-                }
+                hasNext = scanner.skipNextFile();
             } else {
                 logln("  scanning: " << name);
                 getApp().setSplashInfo(String("Scanning plugin ") + name + "...");
-                if (!scanNextPlugin(scanner, name)) {
-                    logln("    failed: " << name);
-                    break;
-                }
+                hasNext = scanNextPlugin(scanner, name);
+                saveKnownPluginList();
             }
             neverSeenList.erase(name);
         }
@@ -200,12 +208,24 @@ void Server::scanForPlugins(const std::vector<String>& include) {
         }
     }
 
+    StringArray instPlugs;
     for (auto& p : m_pluginlist.getTypes()) {
         if (p.isInstrument) {
-            logln("  removing instrument plugin: " << p.descriptiveName);
+            instPlugs.add(p.descriptiveName);
             m_pluginlist.removeType(p);
+            if (!p.pluginFormatName.compare("AudioUnit")) {
+                m_pluginexclude.insert(p.descriptiveName);
+            } else {
+                m_pluginexclude.insert(p.fileOrIdentifier);
+            }
         }
     }
+    if (!instPlugs.isEmpty()) {
+        String info = "The following instrument plugins have been deactivated:\n\n";
+        info << instPlugs.joinIntoString(", ");
+        AlertWindow::showMessageBoxAsync(AlertWindow::InfoIcon, "Info", info, "OK");
+    }
+
     m_pluginlist.sort(KnownPluginList::sortAlphabetically, true);
 
     for (auto& name : neverSeenList) {

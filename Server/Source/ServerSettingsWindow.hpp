@@ -24,7 +24,7 @@ class ServerSettingsWindow : public DocumentWindow {
   private:
     App* m_app;
     std::vector<std::unique_ptr<Component>> m_components;
-    TextEditor m_idText;
+    TextEditor m_idText, m_screenQuality;
     ToggleButton m_auSupport, m_vstSupport;
     TextButton m_saveButton;
 

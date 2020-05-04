@@ -50,6 +50,7 @@ class AudioGridderPluginListComponent : public Component, public FileDragAndDrop
     void removeMissingPlugins();
     void removePluginItem(int index);
     void addPluginItem(int index);
+    void rescanPluginItem(int index);
 
     void resized() override;
     bool isInterestedInFileDrag(const StringArray&) override;

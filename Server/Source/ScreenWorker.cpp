@@ -22,7 +22,7 @@ void ScreenWorker::init(std::unique_ptr<StreamingSocket> s) { m_socket = std::mo
 
 void ScreenWorker::run() {
     Message<ScreenCapture> msg;
-    float qual = 0.9;
+    float qual = getApp().getServer().getScreenQuality();
     int brightnessCheckNeeded = 20;
     while (!currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected()) {
         std::unique_lock<std::mutex> lock(m_currentImageLock);

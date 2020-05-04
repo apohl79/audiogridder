@@ -266,6 +266,15 @@ void AudioGridderPluginListComponent::addPluginItem(int index) {
     }
 }
 
+void AudioGridderPluginListComponent::rescanPluginItem(int index) {
+    if (index >= list.getNumTypes() && index < (list.getNumTypes() + list.getBlacklistedFiles().size())) {
+        index -= list.getNumTypes();
+        auto id = list.getBlacklistedFiles()[index];
+        list.removeFromBlacklist(id);
+        getApp().getServer().saveKnownPluginList();
+    }
+}
+
 PopupMenu AudioGridderPluginListComponent::createMenuForRow(int rowNumber) {
     PopupMenu menu;
 
@@ -276,6 +285,11 @@ PopupMenu AudioGridderPluginListComponent::createMenuForRow(int rowNumber) {
             menu.addItem(PopupMenu::Item("Deactivate").setAction([this, rowNumber] { removePluginItem(rowNumber); }));
         } else if (excluded) {
             menu.addItem(PopupMenu::Item("Activate").setAction([this, rowNumber] { addPluginItem(rowNumber); }));
+        } else {
+            menu.addItem(
+                PopupMenu::Item("Remove from blacklist (Force rescan at next start)").setAction([this, rowNumber] {
+                    rescanPluginItem(rowNumber);
+                }));
         }
     }
 

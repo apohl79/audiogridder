@@ -38,8 +38,10 @@ void App::restartServer() {
     hidePluginList();
     hideServerSettings();
 
-    m_server->signalThreadShouldExit();
-    m_server->waitForThreadToExit(1000);
+    m_server->shutdown();
+    m_server->waitForThreadToExit(-1);
+    showSplashWindow();
+    setSplashInfo("Starting server...");
     m_server = std::make_unique<Server>();
     m_server->startThread();
 }

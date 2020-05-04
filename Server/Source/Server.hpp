@@ -31,6 +31,8 @@ class Server : public Thread {
     void setEnableAU(bool b) { m_enableAU = b; }
     bool getEnableVST() const { return m_enableVST; }
     void setEnableVST(bool b) { m_enableVST = b; }
+    float getScreenQuality() const { return m_screenQuality; }
+    void setScreenQuality(float q) { m_screenQuality = q; }
     void run();
     const KnownPluginList& getPluginList() const { return m_pluginlist; }
     KnownPluginList& getPluginList() { return m_pluginlist; }
@@ -38,6 +40,7 @@ class Server : public Thread {
     bool shouldExclude(const String& name, const std::vector<String>& include);
     auto& getExcludeList() { return m_pluginexclude; }
     void addPlugins(const std::vector<String>& names, std::function<void(bool)> fn);
+    void saveKnownPluginList();
 
   private:
     String m_host;
@@ -49,10 +52,12 @@ class Server : public Thread {
     std::set<String> m_pluginexclude;
     bool m_enableAU = true;
     bool m_enableVST = true;
+    float m_screenQuality = 0.9;
 
     bool scanNextPlugin(PluginDirectoryScanner& scanner, String& name);
     void scanForPlugins();
     void scanForPlugins(const std::vector<String>& include);
+    void loadKnownPluginList();
 };
 
 }  // namespace e47

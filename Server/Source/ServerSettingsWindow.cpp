@@ -49,12 +49,31 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_vstSupport.setToggleState(m_app->getServer().getEnableVST(), NotificationType::dontSendNotification);
     addChildAndSetID(&m_vstSupport, "vst");
 
+    label = std::make_unique<Label>();
+    label->setText("Screen Capture Quality:", NotificationType::dontSendNotification);
+    label->setBounds(15, 160, 150, 30);
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
+
+    String q;
+    q << m_app->getServer().getScreenQuality();
+    m_screenQuality.setText(q);
+    m_screenQuality.setBounds(180, 163, 50, 25);
+    addChildAndSetID(&m_screenQuality, "qual");
+
     m_saveButton.setButtonText("Save");
-    m_saveButton.setBounds(63, 170, 125, 30);
+    m_saveButton.setBounds(63, 210, 125, 30);
     m_saveButton.onClick = [this] {
         m_app->getServer().setId(m_idText.getTextValue().toString().getIntValue());
         m_app->getServer().setEnableAU(m_auSupport.getToggleState());
         m_app->getServer().setEnableVST(m_vstSupport.getToggleState());
+        float q = m_screenQuality.getTextValue().toString().getFloatValue();
+        if (q < 0.1) {
+            q = 0.1;
+        } else if (q > 1) {
+            q = 1;
+        }
+        m_app->getServer().setScreenQuality(q);
         m_app->getServer().saveConfig();
         m_app->hideServerSettings();
         m_app->restartServer();
@@ -62,7 +81,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     addChildAndSetID(&m_saveButton, "save");
 
     setResizable(false, false);
-    centreWithSize(250, 220);
+    centreWithSize(250, 260);
     setVisible(true);
 }
 

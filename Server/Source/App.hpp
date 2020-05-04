@@ -72,7 +72,15 @@ class App : public JUCEApplication, public MenuBarModel {
                 m_pluginListWindow =
                     std::make_unique<PluginListWindow>(this, m_server->getPluginList(), DEAD_MANS_FILE);
             });
-            menu.addItem("Server", [this] { m_srvSettingsWindow = std::make_unique<ServerSettingsWindow>(this); });
+            menu.addItem("Server Settings",
+                         [this] { m_srvSettingsWindow = std::make_unique<ServerSettingsWindow>(this); });
+            menu.addSeparator();
+            menu.addItem("Force full Rescan", [this] {
+                m_server->getPluginList().clear();
+                m_server->saveKnownPluginList();
+                restartServer();
+            });
+            menu.addItem("Restart Server", [this] { restartServer(); });
         }
         return menu;
     }
