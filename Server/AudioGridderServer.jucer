@@ -43,7 +43,6 @@
             file="Source/ServerSettingsWindow.cpp"/>
       <FILE id="ySzlOj" name="ServerSettingsWindow.hpp" compile="0" resource="0"
             file="Source/ServerSettingsWindow.hpp"/>
-      <FILE id="csptRH" name="Settings.hpp" compile="0" resource="0" file="Source/Settings.hpp"/>
       <FILE id="DxDUnd" name="SplashWindow.hpp" compile="0" resource="0"
             file="Source/SplashWindow.hpp"/>
       <FILE id="nwBJ5F" name="Utils.hpp" compile="0" resource="0" file="Source/Utils.hpp"/>
