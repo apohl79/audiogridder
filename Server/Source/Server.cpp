@@ -237,6 +237,7 @@ void Server::run() {
     logln("scanning for plugins...");
     scanForPlugins();
     saveConfig();
+    saveKnownPluginList();
 
     getApp().hideSplashWindow();
 
