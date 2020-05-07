@@ -8,6 +8,7 @@
 #include "ScreenWorker.hpp"
 #include "Message.hpp"
 #include "Utils.hpp"
+#include "ImageDiff.hpp"
 
 namespace e47 {
 
@@ -23,53 +24,67 @@ void ScreenWorker::init(std::unique_ptr<StreamingSocket> s) { m_socket = std::mo
 void ScreenWorker::run() {
     Message<ScreenCapture> msg;
     float qual = getApp().getServer().getScreenQuality();
-    int brightnessCheckNeeded = 20;
+    PNGImageFormat png;
+    JPEGImageFormat jpg;
+    bool diffDetect = getApp().getServer().getScreenDiffDetection();
+    uint32_t captureCount = 0;
     while (!currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected()) {
         std::unique_lock<std::mutex> lock(m_currentImageLock);
         m_currentImageCv.wait(lock, [this] { return m_updated; });
         m_updated = false;
 
         if (nullptr != m_currentImage) {
+            std::shared_ptr<Image> imgToSend = m_currentImage;
+            bool needsBrightnessCheckOrRefresh = (captureCount++ % 20) == 0;
+            bool forceFullImg = !diffDetect || needsBrightnessCheckOrRefresh;  // send a full image once per second
+
             // For some reason the plugin window turns white or black sometimes, this should be investigated..
             // For now as a hack: Check if the image is mostly white, and reset the plugin window in this case.
             float mostlyWhite = m_width * m_height * 0.99;
             float mostlyBlack = 0.1;
             float brightness = mostlyWhite / 2;
-            if (0 == brightnessCheckNeeded--) {
+
+            // Calculate the difference between the current and the last image
+            uint64_t diffPxCount = m_width * m_height;
+            if (!forceFullImg && m_lastImage != nullptr && m_currentImage->getBounds() == m_lastImage->getBounds() &&
+                m_diffImage != nullptr) {
                 brightness = 0;
-                const Image::BitmapData bdata(*m_currentImage, 0, 0, m_width, m_height);
-                for (int x = 0; x < m_width; x++) {
-                    for (int y = 0; y < m_height; y++) {
-                        auto col = bdata.getPixelColour(x, y);
-                        brightness += col.getBrightness();
-                    }
-                }
-                brightnessCheckNeeded = 20;
+                diffPxCount = ImageDiff::getDelta(
+                    *m_lastImage, *m_currentImage, *m_diffImage,
+                    [&brightness](const PixelARGB& px) { brightness += ImageDiff::getBrightness(px); });
+                imgToSend = m_diffImage;
+            } else if (needsBrightnessCheckOrRefresh && !diffDetect) {
+                brightness = ImageDiff::getBrightness(*imgToSend);
             }
+
             if (brightness >= mostlyWhite || brightness <= mostlyBlack) {
                 logln("resetting editor window");
                 MessageManager::callAsync([] { getApp().resetEditor(); });
-                // sleep(5000);
                 MessageManager::callAsync([] { getApp().restartEditor(); });
             } else {
-                MemoryOutputStream mos;
-                JPEGImageFormat jpg;
-                jpg.setQuality(qual);
-                jpg.writeImageToStream(*m_currentImage, mos);
-
-                lock.unlock();
-
-                if (mos.getDataSize() > Message<ScreenCapture>::MAX_SIZE) {
-                    if (qual > 0.1) {
-                        qual -= 0.1;
+                if (diffPxCount > 0) {
+                    MemoryOutputStream mos;
+                    if (diffDetect) {
+                        png.writeImageToStream(*imgToSend, mos);
                     } else {
-                        logln(
-                            "plugin screen image data exceeds max message size, Message::MAX_SIZE has to be "
-                            "increased.");
+                        jpg.setQuality(qual);
+                        jpg.writeImageToStream(*imgToSend, mos);
                     }
-                } else {
-                    msg.payload.setImage(m_width, m_height, mos.getData(), mos.getDataSize());
-                    msg.send(m_socket.get());
+
+                    lock.unlock();
+
+                    if (mos.getDataSize() > Message<ScreenCapture>::MAX_SIZE) {
+                        if (!diffDetect && qual > 0.1) {
+                            qual -= 0.1;
+                        } else {
+                            logln(
+                                "plugin screen image data exceeds max message size, Message::MAX_SIZE has to be "
+                                "increased.");
+                        }
+                    } else {
+                        msg.payload.setImage(m_width, m_height, mos.getData(), mos.getDataSize());
+                        msg.send(m_socket.get());
+                    }
                 }
             }
         } else {
@@ -79,7 +94,7 @@ void ScreenWorker::run() {
         }
     }
     hideEditor();
-    dbgln("screen processor terminated");
+    logln("screen processor terminated");
 }
 
 void ScreenWorker::shutdown() {
@@ -93,10 +108,20 @@ void ScreenWorker::shutdown() {
 void ScreenWorker::showEditor(std::shared_ptr<AudioProcessor> proc) {
     auto tid = getThreadId();
     MessageManager::callAsync([this, proc, tid] {
+        m_currentImageLock.lock();
+        m_currentImage.reset();
+        m_lastImage.reset();
+        m_currentImageLock.unlock();
+
         getApp().showEditor(proc, tid, [this](std::shared_ptr<Image> i, int w, int h) {
             if (nullptr != i) {
                 std::lock_guard<std::mutex> lock(m_currentImageLock);
+                m_lastImage = m_currentImage;
                 m_currentImage = i;
+                if (m_lastImage == nullptr || m_lastImage->getBounds() != m_currentImage->getBounds() ||
+                    m_diffImage == nullptr) {
+                    m_diffImage = std::make_shared<Image>(Image::ARGB, w, h, false);
+                }
                 m_width = w;
                 m_height = h;
                 m_updated = true;
@@ -108,7 +133,13 @@ void ScreenWorker::showEditor(std::shared_ptr<AudioProcessor> proc) {
 
 void ScreenWorker::hideEditor() {
     auto tid = getThreadId();
-    MessageManager::callAsync([tid] { getApp().hideEditor(tid); });
+    MessageManager::callAsync([this, tid] {
+        getApp().hideEditor(tid);
+
+        std::lock_guard<std::mutex> lock(m_currentImageLock);
+        m_currentImage.reset();
+        m_lastImage.reset();
+    });
 }
 
 }  // namespace e47

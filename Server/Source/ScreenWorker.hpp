@@ -28,7 +28,7 @@ class ScreenWorker : public Thread {
 
   private:
     std::unique_ptr<StreamingSocket> m_socket;
-    std::shared_ptr<Image> m_currentImage;
+    std::shared_ptr<Image> m_currentImage, m_lastImage, m_diffImage;
     int m_width;
     int m_height;
     bool m_updated = false;

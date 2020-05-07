@@ -140,16 +140,16 @@ void Worker::run() {
 }
 
 void Worker::shutdown() {
+    if (m_shutdown) {
+        return;
+    }
+    m_shutdown = true;
     if (m_shouldHideEditor) {
         m_screen.hideEditor();
     }
-    dbgln("shutdown: terminating audio worker");
     m_audio.shutdown();
-    dbgln("shutdown: terminating screen worker");
     m_screen.shutdown();
-    dbgln("shutdown: waiting for audio worker");
     m_audio.waitForThreadToExit(-1);
-    dbgln("shutdown: waiting for screen worker");
     m_screen.waitForThreadToExit(-1);
     signalThreadShouldExit();
 }

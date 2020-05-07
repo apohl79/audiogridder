@@ -24,9 +24,10 @@ class ServerSettingsWindow : public DocumentWindow {
   private:
     App* m_app;
     std::vector<std::unique_ptr<Component>> m_components;
-    TextEditor m_idText, m_screenQuality;
-    ToggleButton m_auSupport, m_vstSupport;
+    TextEditor m_idText, m_screenJpgQuality;
+    ToggleButton m_auSupport, m_vstSupport, m_screenDiffDetection;
     TextButton m_saveButton;
+    Label m_screenJpgQualityLbl;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ServerSettingsWindow)
 };

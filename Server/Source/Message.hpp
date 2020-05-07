@@ -609,7 +609,7 @@ class Preset : public DataPayload<preset_t> {
 template <typename T>
 class Message {
   public:
-    static constexpr size_t MAX_SIZE = 1024 * 1024;
+    static constexpr size_t MAX_SIZE = 1024 * 1024 * 20;  // 20 MB
 
     struct Header {
         int type;

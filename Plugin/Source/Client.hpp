@@ -215,6 +215,7 @@ class Client : public Thread, public MouseListener, public KeyListener {
       private:
         Client* m_client;
         StreamingSocket* m_socket;
+        std::shared_ptr<Image> m_image;
     };
 
     friend ScreenReceiver;

@@ -160,7 +160,7 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
                             auto p = dynamic_cast<AudioGridderAudioProcessorEditor*>(p_processor->getActiveEditor());
                             if (this == p) {  // make sure the editor hasn't been closed
                                 m_pluginScreen.setSize(width, height);
-                                m_pluginScreen.setImage(*img);
+                                m_pluginScreen.setImage(img->createCopy());
                                 resized();
                             }
                         });

@@ -31,8 +31,10 @@ class Server : public Thread {
     void setEnableAU(bool b) { m_enableAU = b; }
     bool getEnableVST() const { return m_enableVST; }
     void setEnableVST(bool b) { m_enableVST = b; }
-    float getScreenQuality() const { return m_screenQuality; }
-    void setScreenQuality(float q) { m_screenQuality = q; }
+    float getScreenQuality() const { return m_screenJpgQuality; }
+    void setScreenQuality(float q) { m_screenJpgQuality = q; }
+    bool getScreenDiffDetection() const { return m_screenDiffDetection; }
+    void setScreenDiffDetection(bool b) { m_screenDiffDetection = b; }
     void run();
     const KnownPluginList& getPluginList() const { return m_pluginlist; }
     KnownPluginList& getPluginList() { return m_pluginlist; }
@@ -52,7 +54,8 @@ class Server : public Thread {
     std::set<String> m_pluginexclude;
     bool m_enableAU = true;
     bool m_enableVST = true;
-    float m_screenQuality = 0.9;
+    float m_screenJpgQuality = 0.9;
+    bool m_screenDiffDetection = true;
 
     bool scanNextPlugin(PluginDirectoryScanner& scanner, String& name);
     void scanForPlugins();

@@ -17,6 +17,7 @@ using json = nlohmann::json;
 Server::Server() : Thread("Server") { loadConfig(); }
 
 void Server::loadConfig() {
+    logln("starting server...");
     loadKnownPluginList();
     File cfg(SERVER_CONFIG_FILE);
     if (cfg.exists()) {
@@ -34,7 +35,11 @@ void Server::loadConfig() {
             logln("VST3 support " << (m_enableVST ? "enabled" : "disabled"));
         }
         if (j.find("ScreenQuality") != j.end()) {
-            m_screenQuality = j["ScreenQuality"].get<float>();
+            m_screenJpgQuality = j["ScreenQuality"].get<float>();
+        }
+        if (j.find("ScreenDiffDetection") != j.end()) {
+            m_screenDiffDetection = j["ScreenDiffDetection"].get<bool>();
+            logln("Screen capture difference detection " << (m_screenDiffDetection ? "enabled" : "disabled"));
         }
         if (j.find("ExcludePlugins") != j.end()) {
             for (auto& s : j["ExcludePlugins"]) {
@@ -59,7 +64,8 @@ void Server::saveConfig() {
     j["ID"] = m_id;
     j["AU"] = m_enableAU;
     j["VST"] = m_enableVST;
-    j["ScreenQuality"] = m_screenQuality;
+    j["ScreenQuality"] = m_screenJpgQuality;
+    j["ScreenDiffDetection"] = m_screenDiffDetection;
     j["ExcludePlugins"] = json::array();
     for (auto& p : m_pluginexclude) {
         j["ExcludePlugins"].push_back(p.toStdString());
@@ -91,7 +97,7 @@ Server::~Server() {
     }
     stopThread(-1);
     m_pluginlist.clear();
-    dbgln("server terminated");
+    logln("server terminated");
 }
 
 void Server::shutdown() {
@@ -99,6 +105,7 @@ void Server::shutdown() {
     for (auto& w : m_workers) {
         logln("shutting down worker, isRunning=" << (int)w->isThreadRunning());
         w->shutdown();
+        w->waitForThreadToExit(-1);
     }
     signalThreadShouldExit();
 }

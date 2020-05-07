@@ -48,6 +48,7 @@ class Worker : public Thread {
     AudioWorker m_audio;
     ScreenWorker m_screen;
     bool m_shouldHideEditor = false;
+    std::atomic_bool m_shutdown{false};
 
     String getStringFrom(const PluginDescription& d);
 };
