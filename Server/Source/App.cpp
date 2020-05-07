@@ -38,12 +38,17 @@ void App::restartServer() {
     hidePluginList();
     hideServerSettings();
 
-    m_server->shutdown();
-    m_server->waitForThreadToExit(-1);
     showSplashWindow();
-    setSplashInfo("Starting server...");
-    m_server = std::make_unique<Server>();
-    m_server->startThread();
+    setSplashInfo("Restarting server...");
+
+    std::thread([this] {
+        // leave message thread context
+        m_server->shutdown();
+        m_server->waitForThreadToExit(-1);
+        m_server.reset();
+        m_server = std::make_unique<Server>();
+        m_server->startThread();
+    }).detach();
 }
 
 const KnownPluginList& App::getPluginList() { return m_server->getPluginList(); }
