@@ -46,6 +46,15 @@ class SplashWindow : public TopLevelWindow {
         m_title2.setBounds(300, 50, 100, 40);
         addChildAndSetID(&m_title2, "title2");
 
+        m_version.setText(ProjectInfo::versionString, NotificationType::dontSendNotification);
+        font.setHeight(15);
+        font.setStyleFlags(Font::bold);
+        m_version.setFont(font);
+        m_version.setJustificationType(Justification::right);
+        m_version.setAlpha(0.2);
+        m_version.setBounds(200, 75, 172, 40);
+        addChildAndSetID(&m_version, "version");
+
         m_info.setBounds(10, 140, 380, 25);
         m_info.setAlpha(0.5);
         addChildAndSetID(&m_info, "info");
@@ -64,6 +73,7 @@ class SplashWindow : public TopLevelWindow {
     Label m_title;
     Label m_title2;
     Label m_info;
+    Label m_version;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SplashWindow)
 };

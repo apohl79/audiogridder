@@ -5,7 +5,7 @@
               companyEmail="audiogridder@e47.org" pluginFormats="buildAU,buildVST3"
               pluginManufacturerCode="XE47" pluginCode="E401" headerPath="../../../Server/Source&#10;/usr/local/include"
               pluginCharacteristicsValue="pluginProducesMidiOut,pluginWantsMidiIn"
-              pluginName="AGridder" pluginVST3Category="Network">
+              pluginName="AGridder" pluginVST3Category="Network" version="dev-build">
   <MAINGROUP id="tTbkq6" name="AudioGridder">
     <GROUP id="{A2A08E54-1037-9844-5B73-F16B657A5259}" name="Source">
       <FILE id="AdvFM2" name="AudioStreamer.hpp" compile="0" resource="0"

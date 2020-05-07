@@ -32,7 +32,7 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor, public Plu
     PluginButton m_newPluginButton;
     ImageComponent m_pluginScreen;
     ImageComponent m_srvIcon;
-    Label m_srvLabel;
+    Label m_srvLabel, m_versionLabel;
     bool m_connected = false;
 
     Button* addPluginButton(const String& id, const String& name);

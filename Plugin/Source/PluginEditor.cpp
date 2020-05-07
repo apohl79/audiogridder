@@ -36,6 +36,14 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
     font.setHeight(font.getHeight() - 2);
     m_srvLabel.setFont(font);
 
+    addAndMakeVisible(m_versionLabel);
+    String v = "Version ";
+    v << ProjectInfo::versionString;
+    m_versionLabel.setText(v, NotificationType::dontSendNotification);
+    m_versionLabel.setBounds(0, 89, 190, 10);
+    m_versionLabel.setFont(Font(10, Font::plain));
+    m_versionLabel.setAlpha(0.4);
+
     addAndMakeVisible(m_newPluginButton);
     m_newPluginButton.setButtonText("+");
     m_newPluginButton.setOnClickWithModListener(this);
@@ -86,7 +94,7 @@ void AudioGridderAudioProcessorEditor::resized() {
         num++;
     }
     m_newPluginButton.setBounds(1, top, buttonWidth, buttonHeight);
-    top += buttonHeight + 2;
+    top += buttonHeight + 13;
     int windowHeight = jmax(100, top);
     int windowWidth = 200;
     if (m_processor.getActivePlugin() != -1) {
@@ -96,6 +104,7 @@ void AudioGridderAudioProcessorEditor::resized() {
     if (getWidth() != windowWidth || getHeight() != windowHeight) {
         setSize(windowWidth, windowHeight);
     }
+    m_versionLabel.setBounds(0, windowHeight - 11, m_versionLabel.getWidth(), m_versionLabel.getHeight());
 }
 
 void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const ModifierKeys& modifiers) {
