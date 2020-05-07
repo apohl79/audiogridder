@@ -19,6 +19,7 @@
       <FILE id="tC3soa" name="KeyAndMouse.cpp" compile="1" resource="0" file="Source/KeyAndMouse.cpp"/>
       <FILE id="qptnsE" name="KeyAndMouse.hpp" compile="0" resource="0" file="Source/KeyAndMouse.hpp"/>
       <FILE id="YPI7wt" name="Message.hpp" compile="0" resource="0" file="Source/Message.hpp"/>
+      <FILE id="q2LAET" name="ImageDiff.hpp" compile="0" resource="0" file="Source/ImageDiff.hpp"/>
       <FILE id="lwoFf2" name="PluginListComponent.cpp" compile="1" resource="0"
             file="Source/PluginListComponent.cpp"/>
       <FILE id="uS9tXT" name="PluginListComponent.hpp" compile="0" resource="0"
@@ -53,8 +54,8 @@
   <EXPORTFORMATS>
     <XCODE_MAC targetFolder="Builds/MacOSX" smallIcon="TxAv0c" bigIcon="TxAv0c">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug"/>
-        <CONFIGURATION isDebug="0" name="Release"/>
+        <CONFIGURATION isDebug="1" name="Debug" osxCompatibility="10.7 SDK" optimisation="3"/>
+        <CONFIGURATION isDebug="0" name="Release" osxCompatibility="10.7 SDK"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../audio/JUCE/modules"/>
