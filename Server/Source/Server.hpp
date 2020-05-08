@@ -49,7 +49,8 @@ class Server : public Thread {
     int m_port = DEFAULT_SERVER_PORT;
     int m_id = 0;
     StreamingSocket m_masterSocket;
-    std::vector<std::unique_ptr<Worker>> m_workers;
+    using WorkerList = std::vector<std::unique_ptr<Worker>>;
+    WorkerList m_workers;
     KnownPluginList m_pluginlist;
     std::set<String> m_pluginexclude;
     bool m_enableAU = true;

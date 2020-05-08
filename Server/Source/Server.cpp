@@ -259,11 +259,14 @@ void Server::run() {
                 m_workers.emplace_back(std::make_unique<Worker>(clnt));
                 m_workers.back()->startThread();
                 // lazy cleanup
+                std::shared_ptr<WorkerList> deadWorkers = std::make_shared<WorkerList>();
                 for (auto it = m_workers.begin(); it < m_workers.end(); it++) {
                     if (!(*it)->isThreadRunning()) {
+                        deadWorkers->push_back(std::move(*it));
                         m_workers.erase(it);
                     }
                 }
+                MessageManager::callAsync([deadWorkers] { deadWorkers->clear(); });
             }
         }
     } else {
