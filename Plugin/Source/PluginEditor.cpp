@@ -187,19 +187,23 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
             if (active > -1 && active < m_pluginButtons.size()) {
                 m_pluginButtons[active]->setActive(false);
                 m_pluginButtons[active]->setColour(PluginButton::textColourOffId, Colours::white);
+                resized();
             }
         };
-        auto hideFn = [this, idx] {
+        auto hideFn = [this, idx](int i = -1) {
             m_processor.hidePlugin();
-            m_pluginButtons[idx]->setActive(false);
-            m_pluginButtons[idx]->setColour(PluginButton::textColourOffId, Colours::white);
+            int index = i > -1 ? i : idx;
+            m_pluginButtons[index]->setActive(false);
+            m_pluginButtons[index]->setColour(PluginButton::textColourOffId, Colours::white);
             resized();
         };
         if (modifiers.isLeftButtonDown()) {
-            if (idx != active) {
+            bool edit = idx != active;
+            if (active > -1) {
+                hideFn(active);
+            }
+            if (edit) {
                 editFn();
-            } else {
-                hideFn();
             }
         } else {
             PopupMenu m;
