@@ -26,9 +26,13 @@ class AudioGridderAudioProcessor : public AudioProcessor {
 
     void processBlock(AudioBuffer<float>& buf, MidiBuffer& midi) override { processBlockReal(buf, midi); }
     void processBlock(AudioBuffer<double>& buf, MidiBuffer& midi) override { processBlockReal(buf, midi); }
+    void processBlockBypassed(AudioBuffer<float>& buf, MidiBuffer& midi) override;
+    void processBlockBypassed(AudioBuffer<double>& buf, MidiBuffer& midi) override;
 
     template <typename T>
     void processBlockReal(AudioBuffer<T>&, MidiBuffer&);
+
+    void updateLatency(int samples);
 
     AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override;
@@ -133,6 +137,10 @@ class AudioGridderAudioProcessor : public AudioProcessor {
     int m_numberOfAutomationSlots = 16;
     LoadedPlugin m_unusedDummyPlugin;
     e47::Client::Parameter m_unusedParam;
+
+    Array<Array<float>> m_bypassBufferF;
+    Array<Array<double>> m_bypassBufferD;
+    std::mutex m_bypassBufferMtx;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioGridderAudioProcessor)
 };

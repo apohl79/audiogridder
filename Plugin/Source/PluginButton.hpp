@@ -12,7 +12,7 @@
 
 class PluginButton : public TextButton {
   public:
-    PluginButton(const String& id, const String& name) : TextButton(name), m_id(id) {}
+    PluginButton(const String& id, const String& name, bool extraButtons = true);
     virtual ~PluginButton() {}
 
     class Listener {
@@ -26,14 +26,24 @@ class PluginButton : public TextButton {
 
     const String& getPluginId() const { return m_id; }
 
+    void mouseUp(const MouseEvent& event) override;
+
+    enum AreaType { MAIN, BYPASS, MOVE_DOWN, MOVE_UP, DELETE };
+
+    AreaType getAreaType() const;
+
   protected:
     void paintButton(Graphics& g, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override;
-    virtual void clicked(const ModifierKeys& modifiers) override;
+    void clicked(const ModifierKeys& modifiers) override;
+    void drawText(Graphics& g, int left, int right);
 
   private:
     Listener* m_listener = nullptr;
     bool m_active = false;
     String m_id;
+    bool m_withExtraButtons = true;
+    Rectangle<int> m_bypassArea, m_moveUpArea, m_moveDownArea, m_deleteArea;
+    Point<int> m_lastMousePosition;
 };
 
 #endif /* PluginButton_hpp */

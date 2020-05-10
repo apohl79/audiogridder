@@ -12,7 +12,7 @@
 #include "PluginProcessor.hpp"
 
 AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderAudioProcessor& p)
-    : AudioProcessorEditor(&p), m_processor(p), m_newPluginButton("", "newPlug") {
+    : AudioProcessorEditor(&p), m_processor(p), m_newPluginButton("", "newPlug", false) {
     auto& lf = getLookAndFeel();
     lf.setUsingNativeAlertWindows(true);
     lf.setColour(ResizableWindow::backgroundColourId, Colour(DEFAULT_BG_COLOR));
@@ -157,7 +157,11 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
     } else {
         int idx = getPluginIndex(button->getName());
         int active = m_processor.getActivePlugin();
+        PluginButton::AreaType area = m_pluginButtons[idx]->getAreaType();
         auto editFn = [this, idx, active] {
+            if (m_processor.isBypassed(idx)) {
+                return;
+            }
             m_processor.editPlugin(idx);
             m_pluginButtons[idx]->setActive(true);
             m_pluginButtons[idx]->setColour(PluginButton::textColourOffId, Colours::yellow);
@@ -197,55 +201,70 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
             m_pluginButtons[index]->setColour(PluginButton::textColourOffId, Colours::white);
             resized();
         };
-        if (modifiers.isLeftButtonDown()) {
-            bool edit = idx != active;
-            if (active > -1) {
-                hideFn(active);
+        auto bypassFn = [this, idx, button] {
+            m_processor.bypassPlugin(idx);
+            button->setButtonText("( " + m_processor.getLoadedPlugin(idx).name + " )");
+            button->setColour(PluginButton::textColourOffId, Colours::grey);
+        };
+        auto unBypassFn = [this, idx, button] {
+            m_processor.unbypassPlugin(idx);
+            button->setButtonText(m_processor.getLoadedPlugin(idx).name);
+            button->setColour(PluginButton::textColourOffId, Colours::white);
+        };
+        auto moveUpFn = [this, idx] {
+            if (idx > 0) {
+                m_processor.exchangePlugins(idx, idx - 1);
+                std::swap(m_pluginButtons[idx], m_pluginButtons[idx - 1]);
+                resized();
             }
-            if (edit) {
-                editFn();
+        };
+        auto moveDownFn = [this, idx] {
+            if (idx < m_pluginButtons.size() - 1) {
+                m_processor.exchangePlugins(idx, idx + 1);
+                std::swap(m_pluginButtons[idx], m_pluginButtons[idx + 1]);
+                resized();
+            }
+        };
+        auto deleteFn = [this, idx] {
+            m_processor.unloadPlugin(idx);
+            int i = 0;
+            for (auto it = m_pluginButtons.begin(); it < m_pluginButtons.end(); it++) {
+                if (i++ == idx) {
+                    m_pluginButtons.erase(it);
+                    break;
+                }
+            }
+            resized();
+        };
+        if (modifiers.isLeftButtonDown()) {
+            switch (area) {
+                case PluginButton::MAIN: {
+                    bool edit = idx != active;
+                    if (active > -1) {
+                        hideFn(active);
+                    }
+                    if (edit) {
+                        editFn();
+                    }
+                    break;
+                }
+                default:
+                    break;
             }
         } else {
             PopupMenu m;
-            bool bypassed = m_processor.isBypassed(idx);
-            if (bypassed) {
-                m.addItem("Unbypass", [this, idx, button] {
-                    m_processor.unbypassPlugin(idx);
-                    button->setButtonText(m_processor.getLoadedPlugin(idx).name);
-                    button->setColour(PluginButton::textColourOffId, Colours::white);
-                });
+            if (m_processor.isBypassed(idx)) {
+                m.addItem("Unbypass", unBypassFn);
             } else {
-                m.addItem("Bypass", [this, idx, button] {
-                    m_processor.bypassPlugin(idx);
-                    button->setButtonText("( " + m_processor.getLoadedPlugin(idx).name + " )");
-                    button->setColour(PluginButton::textColourOffId, Colours::grey);
-                });
+                m.addItem("Bypass", bypassFn);
             }
             m.addItem("Edit", editFn);
             m.addItem("Hide", idx == m_processor.getActivePlugin(), false, hideFn);
             m.addSeparator();
-            m.addItem("Move Up", idx > 0, false, [this, idx] {
-                m_processor.exchangePlugins(idx, idx - 1);
-                std::swap(m_pluginButtons[idx], m_pluginButtons[idx - 1]);
-                resized();
-            });
-            m.addItem("Move Down", idx < m_pluginButtons.size() - 1, false, [this, idx] {
-                m_processor.exchangePlugins(idx, idx + 1);
-                std::swap(m_pluginButtons[idx], m_pluginButtons[idx + 1]);
-                resized();
-            });
+            m.addItem("Move Up", idx > 0, false, moveUpFn);
+            m.addItem("Move Down", idx < m_pluginButtons.size() - 1, false, moveDownFn);
             m.addSeparator();
-            m.addItem("Delete", [this, idx] {
-                m_processor.unloadPlugin(idx);
-                int i = 0;
-                for (auto it = m_pluginButtons.begin(); it < m_pluginButtons.end(); it++) {
-                    if (i++ == idx) {
-                        m_pluginButtons.erase(it);
-                        break;
-                    }
-                }
-                resized();
-            });
+            m.addItem("Delete", deleteFn);
             m.addSeparator();
             PopupMenu presets;
             int preset = 0;

@@ -70,7 +70,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
             logln_clnt(&m_client, "loading " << p.name << " (" << p.id << ")... " << (p.ok ? "ok" : "failed"));
             if (p.ok) {
                 logln_clnt(&m_client, "updating latency samples to " << m_client.getLatencySamples());
-                setLatencySamples(m_client.getLatencySamples());
+                updateLatency(m_client.getLatencySamples());
                 if (p.bypassed) {
                     m_client.bypassPlugin(idx);
                 }
@@ -210,8 +210,82 @@ void AudioGridderAudioProcessor::processBlockReal(AudioBuffer<T>& buffer, MidiBu
             m_client.read(buffer, midiMessages);
             if (m_client.getLatencySamples() != getLatencySamples()) {
                 logln_clnt(&m_client, "updating latency samples to " << m_client.getLatencySamples());
-                setLatencySamples(m_client.getLatencySamples());
+                updateLatency(m_client.getLatencySamples());
             }
+        }
+    }
+}
+
+void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<float>& buffer, MidiBuffer& midiMessages) {
+    ScopedNoDenormals noDenormals;
+    auto totalNumInputChannels = getTotalNumInputChannels();
+    auto totalNumOutputChannels = getTotalNumOutputChannels();
+
+    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
+        buffer.clear(i, 0, buffer.getNumSamples());
+    }
+
+    for (auto c = 0; c < totalNumOutputChannels; ++c) {
+        auto& buf = m_bypassBufferF.getReference(c);
+        for (auto s = 0; s < buffer.getNumSamples(); ++s) {
+            buf.add(buffer.getSample(c, s));
+            buffer.setSample(c, s, buf.getFirst());
+            buf.remove(0);
+        }
+    }
+}
+
+void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<double>& buffer, MidiBuffer& midiMessages) {
+    ScopedNoDenormals noDenormals;
+    auto totalNumInputChannels = getTotalNumInputChannels();
+    auto totalNumOutputChannels = getTotalNumOutputChannels();
+
+    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
+        buffer.clear(i, 0, buffer.getNumSamples());
+    }
+
+    for (auto c = 0; c < totalNumOutputChannels; ++c) {
+        auto& buf = m_bypassBufferD.getReference(c);
+        for (auto s = 0; s < buffer.getNumSamples(); ++s) {
+            buf.add(buffer.getSample(c, s));
+            buffer.setSample(c, s, buf.getFirst());
+            buf.remove(0);
+        }
+    }
+}
+
+void AudioGridderAudioProcessor::updateLatency(int samples) {
+    setLatencySamples(samples);
+    int channels = getTotalNumOutputChannels();
+    std::lock_guard<std::mutex> lock(m_bypassBufferMtx);
+    while (m_bypassBufferF.size() < channels) {
+        Array<float> buf;
+        for (int i = 0; i < samples; i++) {
+            buf.add(0);
+        }
+        m_bypassBufferF.add(std::move(buf));
+    }
+    while (m_bypassBufferD.size() < channels) {
+        Array<double> buf;
+        for (int i = 0; i < samples; i++) {
+            buf.add(0);
+        }
+        m_bypassBufferD.add(std::move(buf));
+    }
+    for (int c = 0; c < channels; c++) {
+        auto& bufF = m_bypassBufferF.getReference(c);
+        while (bufF.size() > samples) {
+            bufF.remove(0);
+        }
+        while (bufF.size() < samples) {
+            bufF.add(0);
+        }
+        auto& bufD = m_bypassBufferD.getReference(c);
+        while (bufD.size() > samples) {
+            bufD.remove(0);
+        }
+        while (bufD.size() < samples) {
+            bufD.add(0);
         }
     }
 }
@@ -358,7 +432,7 @@ bool AudioGridderAudioProcessor::loadPlugin(const String& id, const String& name
     logln_clnt(&m_client, "..." << (success ? "ok" : "error"));
     if (success) {
         logln_clnt(&m_client, "updating latency samples to " << m_client.getLatencySamples());
-        setLatencySamples(m_client.getLatencySamples());
+        updateLatency(m_client.getLatencySamples());
         m_loadedPlugins.push_back({id, name, "", presets, params, false, true});
     }
     return success;
@@ -369,7 +443,7 @@ void AudioGridderAudioProcessor::unloadPlugin(int idx) {
     m_client.delPlugin(idx);
     suspendProcessing(false);
     logln_clnt(&m_client, "updating latency samples to " << m_client.getLatencySamples());
-    setLatencySamples(m_client.getLatencySamples());
+    updateLatency(m_client.getLatencySamples());
     if (idx == m_activePlugin) {
         hidePlugin();
     } else if (idx < m_activePlugin) {
