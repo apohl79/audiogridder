@@ -18,10 +18,10 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor, public Plu
 
     void paint(Graphics&) override;
     void resized() override;
-    virtual void buttonClicked(Button* button, const ModifierKeys& modifiers) override;
-    virtual void focusOfChildComponentChanged(FocusChangeType cause) override;
+    void buttonClicked(Button* button, const ModifierKeys& modifiers) override;
+    void focusOfChildComponentChanged(FocusChangeType cause) override;
 
-    virtual void mouseUp(const MouseEvent& event) override;  // server icon
+    void mouseUp(const MouseEvent& event) override;  // server icon
 
     void setConnected(bool connected);
 
