@@ -248,6 +248,22 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
                     }
                     break;
                 }
+                case PluginButton::BYPASS:
+                    if (m_processor.isBypassed(idx)) {
+                        unBypassFn();
+                    } else {
+                        bypassFn();
+                    }
+                    break;
+                case PluginButton::MOVE_DOWN:
+                    moveDownFn();
+                    break;
+                case PluginButton::MOVE_UP:
+                    moveUpFn();
+                    break;
+                case PluginButton::DELETE:
+                    deleteFn();
+                    break;
                 default:
                     break;
             }

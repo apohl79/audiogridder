@@ -35,6 +35,51 @@ void PluginButton::paintButton(Graphics& g, bool shouldDrawButtonAsHighlighted, 
     int textIndentLeft = 0;
     int textIndentRight = 0;
 
+    if (m_withExtraButtons) {
+        // bypass button
+        int indent = 5;
+        int width = getHeight() - indent * 2;
+        textIndentLeft = indent * 2 + width;
+
+        m_bypassArea = Rectangle<int>(indent, indent, width, width);
+
+        int space = 4;
+        int indent_right = 6;
+        width = getHeight() - indent_right * 2;
+        textIndentRight = indent + (space + width) * 3;
+        m_moveDownArea = Rectangle<int>(getWidth() - (width + space) * 3, indent_right, width, width);
+        m_moveUpArea = Rectangle<int>(getWidth() - (width + space) * 2, indent_right, width, width);
+        m_deleteArea = Rectangle<int>(getWidth() - width - space, indent_right, width, width);
+
+        // bypass
+        g.setColour(fgColor);
+        g.drawEllipse(m_bypassArea.toFloat(), 0.7);
+        g.setColour(baseColour);
+        g.fillRect(m_bypassArea.getCentreX() - 2, m_bypassArea.getY() - 2, 4, 4);
+        g.setColour(fgColor);
+        g.drawLine(m_bypassArea.getCentreX(), m_bypassArea.getY() - 1, m_bypassArea.getCentreX(),
+                   m_bypassArea.getY() + 5, 0.7);
+
+        // down
+        Path down;
+        PathStrokeType stroke(0.7);
+        auto rect = m_moveDownArea.toFloat();
+        down.addTriangle(rect.getX(), rect.getY(), rect.getRight(), rect.getY(), rect.getCentreX(), rect.getBottom());
+        g.strokePath(down, stroke);
+
+        // up
+        Path up;
+        rect = m_moveUpArea.toFloat();
+        up.addTriangle(rect.getCentreX(), rect.getY(), rect.getX(), rect.getBottom(), rect.getRight(),
+                       rect.getBottom());
+        g.strokePath(up, stroke);
+
+        // delete
+        rect = m_deleteArea.toFloat();
+        g.drawLine(rect.getX(), rect.getY(), rect.getRight(), rect.getBottom(), 0.7);
+        g.drawLine(rect.getX(), rect.getBottom(), rect.getRight(), rect.getY(), 0.7);
+    }
+
     drawText(g, textIndentLeft, textIndentRight);
 }
 
@@ -72,6 +117,15 @@ void PluginButton::mouseUp(const MouseEvent& event) {
 PluginButton::AreaType PluginButton::getAreaType() const {
     if (!m_withExtraButtons) {
         return PluginButton::MAIN;
+    }
+    if (m_bypassArea.contains(m_lastMousePosition)) {
+        return PluginButton::BYPASS;
+    } else if (m_moveUpArea.contains(m_lastMousePosition)) {
+        return PluginButton::MOVE_UP;
+    } else if (m_moveDownArea.contains(m_lastMousePosition)) {
+        return PluginButton::MOVE_DOWN;
+    } else if (m_deleteArea.contains(m_lastMousePosition)) {
+        return PluginButton::DELETE;
     }
     return PluginButton::MAIN;
 }
