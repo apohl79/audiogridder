@@ -46,12 +46,16 @@ void AudioWorker::run() {
 
     ProcessorChain::PlayHead playHead(&posInfo);
     m_chain->prepareToPlay(m_rate, m_samplesPerBlock);
-    m_chain->setPlayHead(&playHead);
+    bool hasToSetPlayHead = true;
 
     while (!currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected()) {
         // Read audio chunk
         if (m_socket->waitUntilReady(true, 1000)) {
             if (msg.readFromClient(m_socket.get(), bufferF, bufferD, midi, posInfo, m_chain->getExtraChannels())) {
+                if (hasToSetPlayHead) {  // do not set the playhead before it's initialized
+                    m_chain->setPlayHead(&playHead);
+                    hasToSetPlayHead = false;
+                }
                 if (msg.isDouble() && bufferD.getNumChannels() > 0 && bufferD.getNumSamples() > 0) {
                     if (m_channels > bufferD.getNumChannels()) {
                         dbgln("updating bus layout at processing time due to channel mismatch");
