@@ -5,8 +5,10 @@
  * Author: Andreas Pohl
  */
 
+#ifdef JUCE_MAC
 #include <ApplicationServices/ApplicationServices.h>
 #include <CoreFoundation/CoreFoundation.h>
+#endif
 
 #include <iostream>
 #include <utility>
@@ -14,6 +16,8 @@
 #include "KeyAndMouse.hpp"
 
 namespace e47 {
+
+#ifdef JUCE_MAC
 
 void mouseEventReal(CGMouseButton button, CGEventType type, CGPoint location, CGEventFlags flags) {
     CGEventRef event = CGEventCreateMouseEvent(NULL, type, location, button);
@@ -91,5 +95,7 @@ void setAltKey(uint64_t& flags) { flags |= kCGEventFlagMaskAlternate; };
 void keyEventDown(uint16_t keyCode, uint64_t flags) { keyEvent(keyCode, flags, true); }
 
 void keyEventUp(uint16_t keyCode, uint64_t flags) { keyEvent(keyCode, flags, false); }
+
+#endif
 
 }  // namespace e47

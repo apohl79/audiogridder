@@ -8,8 +8,6 @@
 #ifndef App_hpp
 #define App_hpp
 
-#include <CoreFoundation/CoreFoundation.h>
-
 #include "../JuceLibraryCode/JuceHeader.h"
 #include "Defaults.hpp"
 #include "Server.hpp"
@@ -49,13 +47,42 @@ class App : public JUCEApplication, public MenuBarModel {
 
     Point<float> localPointToGlobal(Point<float> lp);
 
-    class MenuBarWindow : public DocumentWindow {
+    class MenuBarWindow : public DocumentWindow, public SystemTrayIconComponent {
       public:
         MenuBarWindow(App* app)
-            : DocumentWindow(ProjectInfo::projectName, Colours::lightgrey, DocumentWindow::allButtons) {
-            setMacMainMenu(app);
+            : DocumentWindow(ProjectInfo::projectName, Colours::lightgrey, DocumentWindow::closeButton), m_app(app) {
+            PopupMenu m;
+            m.addItem("About AudioGridder", [app] {
+                app->showSplashWindow([app] { app->hideSplashWindow(); });
+                String info = "Copyright (c) 2020 by Andreas Pohl, MIT license";
+                app->setSplashInfo(info);
+            });
+            setIconImage(ImageCache::getFromMemory(Images::servertraywin_png, Images::servertraywin_pngSize),
+                         ImageCache::getFromMemory(Images::servertraymac_png, Images::servertraymac_pngSize));
+#ifdef JUCE_MAC
+            setMacMainMenu(app, &m);
+#endif
         }
-        ~MenuBarWindow() { setMacMainMenu(nullptr); }
+
+        ~MenuBarWindow() {
+#ifdef JUCE_MAC
+            setMacMainMenu(nullptr);
+#endif
+        }
+
+        void mouseUp(const MouseEvent& event) override {
+#ifdef JUCE_MAC
+            showDropdownMenu(m_app->getMenuForIndex(0, "Tray"));
+#else
+            auto menu = m_app->getMenuForIndex(0, "Tray");
+            menu.addSeparator();
+            menu.addItem("Quit", [this] { m_app->systemRequestedQuit(); });
+            menu.show();
+#endif
+        }
+
+      private:
+        App* m_app;
     };
 
     // MenuBarModel
@@ -90,7 +117,12 @@ class App : public JUCEApplication, public MenuBarModel {
     void hidePluginList() { m_pluginListWindow.reset(); }
     void hideServerSettings() { m_srvSettingsWindow.reset(); }
 
-    void showSplashWindow() { m_splashWindow = std::make_unique<SplashWindow>(); }
+    void showSplashWindow(std::function<void()> onClick = nullptr) {
+        m_splashWindow = std::make_unique<SplashWindow>();
+        if (onClick) {
+            m_splashWindow->onClick = onClick;
+        }
+    }
     // called from the server thread
     void hideSplashWindow() {
         MessageManager::callAsync([this] { m_splashWindow.reset(); });

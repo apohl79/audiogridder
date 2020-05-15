@@ -27,6 +27,8 @@ enum MouseEvType : uint8_t {
     OTHER_DRAG
 };
 
+#ifdef JUCE_MAC
+
 const std::unordered_map<std::string, uint16_t> VKeyMap = {
     {"A", 0x00},         {"S", 0x01},         {"D", 0x02},      {"F", 0x03},         {"H", 0x04},
     {"G", 0x05},         {"Z", 0x06},         {"X", 0x07},      {"C", 0x08},         {"V", 0x09},
@@ -67,6 +69,8 @@ void setAltKey(uint64_t& flags);
 void mouseEvent(MouseEvType t, float x, float y, uint64_t flags = 0);
 void keyEventDown(uint16_t keyCode, uint64_t flags = 0);
 void keyEventUp(uint16_t keyCode, uint64_t flags = 0);
+
+#endif
 
 }  // namespace e47
 

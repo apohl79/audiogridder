@@ -8,13 +8,26 @@
 #ifndef Defaults_hpp
 #define Defaults_hpp
 
+#include "../JuceLibraryCode/JuceHeader.h"
+
 static constexpr int DEFAULT_CLIENT_PORT = 55055;
 static constexpr int DEFAULT_SERVER_PORT = 55056;
 
+#ifdef JUCE_MAC
 static const String SERVER_CONFIG_FILE = "~/.audiogridderserver";
 static const String PLUGIN_CONFIG_FILE = "~/.audiogridder";
 static const String KNOWN_PLUGINS_FILE = "~/.audiogridderserver.cache";
 static const String DEAD_MANS_FILE = "~/.audiogridderserver.crash";
+#else
+static const String SERVER_CONFIG_FILE =
+    File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + "\\.audiogridderserver";
+static const String PLUGIN_CONFIG_FILE =
+    File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + "\\.audiogridder";
+static const String KNOWN_PLUGINS_FILE =
+    File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + "\\.audiogridderserver.cache";
+static const String DEAD_MANS_FILE =
+    File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + "\\.audiogridderserver.crash";
+#endif
 
 static constexpr int DEFAULT_NUM_OF_BUFFERS = 8;
 static constexpr int DEFAULT_NUM_RECENTS = 10;

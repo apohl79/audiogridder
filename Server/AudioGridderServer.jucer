@@ -14,13 +14,13 @@
       <FILE id="YxNmm4" name="AudioWorker.cpp" compile="1" resource="0" file="Source/AudioWorker.cpp"/>
       <FILE id="SVahV1" name="AudioWorker.hpp" compile="0" resource="0" file="Source/AudioWorker.hpp"/>
       <FILE id="C2S389" name="Defaults.hpp" compile="0" resource="0" file="Source/Defaults.hpp"/>
+      <FILE id="q2LAET" name="ImageDiff.hpp" compile="0" resource="0" file="Source/ImageDiff.hpp"/>
       <FILE id="a2CnKT" name="Images.cpp" compile="1" resource="0" file="Source/Images.cpp"/>
       <FILE id="AfCHJU" name="Images.hpp" compile="0" resource="0" file="Source/Images.hpp"/>
       <FILE id="JtAYTR" name="json.hpp" compile="0" resource="0" file="Source/json.hpp"/>
       <FILE id="tC3soa" name="KeyAndMouse.cpp" compile="1" resource="0" file="Source/KeyAndMouse.cpp"/>
       <FILE id="qptnsE" name="KeyAndMouse.hpp" compile="0" resource="0" file="Source/KeyAndMouse.hpp"/>
       <FILE id="YPI7wt" name="Message.hpp" compile="0" resource="0" file="Source/Message.hpp"/>
-      <FILE id="q2LAET" name="ImageDiff.hpp" compile="0" resource="0" file="Source/ImageDiff.hpp"/>
       <FILE id="lwoFf2" name="PluginListComponent.cpp" compile="1" resource="0"
             file="Source/PluginListComponent.cpp"/>
       <FILE id="uS9tXT" name="PluginListComponent.hpp" compile="0" resource="0"
@@ -33,8 +33,9 @@
             file="Source/ProcessorChain.cpp"/>
       <FILE id="MZnIYD" name="ProcessorChain.hpp" compile="0" resource="0"
             file="Source/ProcessorChain.hpp"/>
-      <FILE id="cCYAYL" name="Screen.h" compile="0" resource="0" file="Source/Screen.h"/>
+      <FILE id="ksFBj4" name="Screen.cpp" compile="1" resource="0" file="Source/Screen.cpp"/>
       <FILE id="HmVpM7" name="Screen.mm" compile="1" resource="0" file="Source/Screen.mm"/>
+      <FILE id="cCYAYL" name="Screen.h" compile="0" resource="0" file="Source/Screen.h"/>
       <FILE id="Ahq5XH" name="ScreenWorker.cpp" compile="1" resource="0"
             file="Source/ScreenWorker.cpp"/>
       <FILE id="SWP3JK" name="ScreenWorker.hpp" compile="0" resource="0"
@@ -55,8 +56,10 @@
   <EXPORTFORMATS>
     <XCODE_MAC targetFolder="Builds/MacOSX" smallIcon="TxAv0c" bigIcon="TxAv0c">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" osxCompatibility="10.7 SDK" optimisation="3"/>
-        <CONFIGURATION isDebug="0" name="Release" osxCompatibility="10.7 SDK"/>
+        <CONFIGURATION isDebug="1" name="Debug" osxCompatibility="10.7 SDK" optimisation="3"
+                       defines="JUCE_MAC" recommendedWarnings="LLVM"/>
+        <CONFIGURATION isDebug="0" name="Release" osxCompatibility="10.7 SDK" defines="JUCE_MAC"
+                       recommendedWarnings="LLVM"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../audio/JUCE/modules"/>
@@ -73,6 +76,26 @@
         <MODULEPATH id="juce_opengl" path="../audio/JUCE/modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
+    <VS2019 targetFolder="Builds/VisualStudio2019">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" defines="JUCE_WINDOWS"/>
+        <CONFIGURATION isDebug="0" name="Release" defines="JUCE_WINDOWS"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_opengl"/>
+        <MODULEPATH id="juce_gui_extra"/>
+        <MODULEPATH id="juce_gui_basics"/>
+        <MODULEPATH id="juce_graphics"/>
+        <MODULEPATH id="juce_events"/>
+        <MODULEPATH id="juce_data_structures"/>
+        <MODULEPATH id="juce_cryptography"/>
+        <MODULEPATH id="juce_core"/>
+        <MODULEPATH id="juce_audio_processors"/>
+        <MODULEPATH id="juce_audio_formats"/>
+        <MODULEPATH id="juce_audio_devices"/>
+        <MODULEPATH id="juce_audio_basics"/>
+      </MODULEPATHS>
+    </VS2019>
   </EXPORTFORMATS>
   <MODULES>
     <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
@@ -90,6 +113,7 @@
   </MODULES>
   <LIVE_SETTINGS>
     <OSX/>
+    <WINDOWS/>
   </LIVE_SETTINGS>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_PLUGINHOST_VST3="1" JUCE_PLUGINHOST_AU="1"/>
 </JUCERPROJECT>

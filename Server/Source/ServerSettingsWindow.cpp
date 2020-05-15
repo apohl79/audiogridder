@@ -32,11 +32,19 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     label = std::make_unique<Label>();
     label->setText("AudioUnit Support:", NotificationType::dontSendNotification);
     label->setBounds(15, 80, 250, 30);
+#ifdef JUCE_WINDOWS
+    label->setAlpha(0.5);
+#endif
     addChildAndSetID(label.get(), "lbl");
     m_components.push_back(std::move(label));
 
     m_auSupport.setBounds(307, 83, 25, 25);
     m_auSupport.setToggleState(m_app->getServer().getEnableAU(), NotificationType::dontSendNotification);
+#ifdef JUCE_WINDOWS
+    m_auSupport.setToggleState(false, NotificationType::dontSendNotification);
+    m_auSupport.setAlpha(0.5);
+    m_auSupport.setEnabled(false);
+#endif
     addChildAndSetID(&m_auSupport, "au");
 
     label = std::make_unique<Label>();
@@ -84,21 +92,22 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 
     m_saveButton.setButtonText("Save");
     m_saveButton.setBounds(112, 250, 125, 30);
-    m_saveButton.onClick = [this] {
-        m_app->getServer().setId(m_idText.getTextValue().toString().getIntValue());
-        m_app->getServer().setEnableAU(m_auSupport.getToggleState());
-        m_app->getServer().setEnableVST(m_vstSupport.getToggleState());
-        m_app->getServer().setScreenDiffDetection(m_screenDiffDetection.getToggleState());
-        float q = m_screenJpgQuality.getTextValue().toString().getFloatValue();
-        if (q < 0.1) {
-            q = 0.1;
-        } else if (q > 1) {
-            q = 1;
+    m_saveButton.onClick = [this, app] {
+        auto appCpy = app;
+        appCpy->getServer().setId(m_idText.getTextValue().toString().getIntValue());
+        appCpy->getServer().setEnableAU(m_auSupport.getToggleState());
+        appCpy->getServer().setEnableVST(m_vstSupport.getToggleState());
+        appCpy->getServer().setScreenDiffDetection(m_screenDiffDetection.getToggleState());
+        float qual = m_screenJpgQuality.getTextValue().toString().getFloatValue();
+        if (qual < 0.1) {
+            qual = 0.1f;
+        } else if (qual > 1) {
+            qual = 1.0f;
         }
-        m_app->getServer().setScreenQuality(q);
-        m_app->getServer().saveConfig();
-        m_app->hideServerSettings();
-        m_app->restartServer();
+        appCpy->getServer().setScreenQuality(qual);
+        appCpy->getServer().saveConfig();
+        appCpy->hideServerSettings();
+        appCpy->restartServer();
     };
     addChildAndSetID(&m_saveButton, "save");
 

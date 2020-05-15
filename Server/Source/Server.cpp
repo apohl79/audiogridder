@@ -5,7 +5,10 @@
  * Author: Andreas Pohl
  */
 
+#ifdef JUCE_MAC
 #include <sys/socket.h>
+#endif
+
 #include "Server.hpp"
 #include "Utils.hpp"
 #include "json.hpp"
@@ -184,9 +187,11 @@ void Server::scanForPlugins() {
 
 void Server::scanForPlugins(const std::vector<String>& include) {
     std::vector<std::unique_ptr<AudioPluginFormat>> fmts;
+#ifdef JUCE_MAC
     if (m_enableAU) {
         fmts.push_back(std::make_unique<AudioUnitPluginFormat>());
     }
+#endif
     if (m_enableVST) {
         fmts.push_back(std::make_unique<VST3PluginFormat>());
     }
@@ -248,7 +253,9 @@ void Server::run() {
 
     getApp().hideSplashWindow();
 
+#ifdef JUCE_MAC
     setsockopt(m_masterSocket.getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
+#endif
 
     if (m_masterSocket.createListener(m_port + m_id, m_host)) {
         dbgln("server started: ID=" << m_id << ", PORT=" << m_port + m_id);
@@ -260,10 +267,12 @@ void Server::run() {
                 m_workers.back()->startThread();
                 // lazy cleanup
                 std::shared_ptr<WorkerList> deadWorkers = std::make_shared<WorkerList>();
-                for (auto it = m_workers.begin(); it < m_workers.end(); it++) {
+                for (auto it = m_workers.begin(); it < m_workers.end();) {
                     if (!(*it)->isThreadRunning()) {
                         deadWorkers->push_back(std::move(*it));
                         m_workers.erase(it);
+                    } else {
+                        it++;
                     }
                 }
                 MessageManager::callAsync([deadWorkers] { deadWorkers->clear(); });

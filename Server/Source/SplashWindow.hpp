@@ -42,8 +42,9 @@ class SplashWindow : public TopLevelWindow {
         font.setHeight(25);
         font.setStyleFlags(Font::plain);
         m_title2.setFont(font);
+        m_title2.setJustificationType(Justification::right);
         m_title2.setAlpha(0.4);
-        m_title2.setBounds(300, 50, 100, 40);
+        m_title2.setBounds(200, 50, 172, 40);
         addChildAndSetID(&m_title2, "title2");
 
         m_version.setText(ProjectInfo::versionString, NotificationType::dontSendNotification);
@@ -67,6 +68,14 @@ class SplashWindow : public TopLevelWindow {
     }
 
     void setInfo(const String& txt) { m_info.setText(txt, NotificationType::dontSendNotification); }
+
+    std::function<void()> onClick = nullptr;
+
+    void mouseUp(const MouseEvent& event) override {
+        if (onClick) {
+            onClick();
+        }
+    }
 
   private:
     ImageComponent m_logo;

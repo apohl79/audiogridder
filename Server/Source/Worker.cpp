@@ -10,7 +10,9 @@
 #include "Utils.hpp"
 #include "Defaults.hpp"
 
+#ifdef JUCE_MAC
 #include <sys/socket.h>
+#endif
 
 namespace e47 {
 
@@ -41,7 +43,9 @@ void Worker::run() {
 
         // start audio processing
         sock = std::make_unique<StreamingSocket>();
+#ifdef JUCE_MAC
         setsockopt(sock->getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
+#endif
         if (sock->connect(m_client->getHostName(), cfg.clientPort)) {
             m_audio.init(std::move(sock), cfg.channels, cfg.rate, cfg.samplesPerBlock, cfg.doublePrecission,
                          [this] { /*m_client->close();*/ });
@@ -52,7 +56,9 @@ void Worker::run() {
 
         // start screen capturing
         sock = std::make_unique<StreamingSocket>();
+#ifdef JUCE_MAC
         setsockopt(sock->getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
+#endif
         if (sock->connect(m_client->getHostName(), cfg.clientPort)) {
             m_screen.init(std::move(sock));
             m_screen.startThread();
@@ -246,6 +252,7 @@ void Worker::handleMessage(std::shared_ptr<Message<HidePlugin>> msg) {
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<Mouse>> msg) {
+#ifdef JUCE_MAC
     auto ev = *pDATA(msg);
     MessageManager::callAsync([ev] {
         auto point = getApp().localPointToGlobal(Point<float>(ev.x, ev.y));
@@ -261,9 +268,11 @@ void Worker::handleMessage(std::shared_ptr<Message<Mouse>> msg) {
         }
         mouseEvent(ev.type, point.x, point.y, flags);
     });
+#endif
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<Key>> msg) {
+#ifdef JUCE_MAC
     MessageManager::callAsync([msg] {
         auto* codes = pPLD(msg).getKeyCodes();
         auto num = pPLD(msg).getKeyCount();
@@ -283,6 +292,7 @@ void Worker::handleMessage(std::shared_ptr<Message<Key>> msg) {
         keyEventDown(key, flags);
         keyEventUp(key, flags);
     });
+#endif
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<GetPluginSettings>> msg) {

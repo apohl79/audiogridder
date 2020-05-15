@@ -9,7 +9,9 @@
 #include "Server.hpp"
 #include "Utils.hpp"
 
+#ifdef JUCE_MAC
 #include <signal.h>
+#endif
 
 namespace e47 {
 
@@ -18,7 +20,9 @@ App::App() : m_menuWindow(this) {}
 void App::initialise(const String& commandLineParameters) {
     m_logger = FileLogger::createDateStampedLogger(getApplicationName(), "Main_", ".log", "");
     Logger::setCurrentLogger(m_logger);
+#ifdef JUCE_MAC
     signal(SIGPIPE, SIG_IGN);
+#endif
     showSplashWindow();
     setSplashInfo("Starting server...");
     m_server = std::make_unique<Server>();

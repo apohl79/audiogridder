@@ -8,9 +8,6 @@
 #ifndef Message_hpp
 #define Message_hpp
 
-#include <sys/socket.h>
-#include <type_traits>
-
 #include "KeyAndMouse.hpp"
 #include "json.hpp"
 
