@@ -235,28 +235,32 @@ void keyEvent(uint16_t keyCode, uint64_t flags, bool keyDown) {
     }
 
     // modifiers down
-    if ((flags & VK_SHIFT) == VK_SHIFT) {
-        sendKey(VK_SHIFT, true);
-    }
-    if ((flags & VK_CONTROL) == VK_CONTROL) {
-        sendKey(VK_CONTROL, true);
-    }
-    if ((flags & VK_MENU) == VK_MENU) {
-        sendKey(VK_MENU, true);
+    if (keyDown) {
+        if ((flags & VK_SHIFT) == VK_SHIFT) {
+            sendKey(VK_SHIFT, true);
+        }
+        if ((flags & VK_CONTROL) == VK_CONTROL) {
+            sendKey(VK_CONTROL, true);
+        }
+        if ((flags & VK_MENU) == VK_MENU) {
+            sendKey(VK_MENU, true);
+        }
     }
 
     // send key
     sendKey(vk, keyDown);
 
     // modifiers up
-    if ((flags & VK_SHIFT) == VK_SHIFT) {
-        sendKey(VK_SHIFT, false);
-    }
-    if ((flags & VK_CONTROL) == VK_CONTROL) {
-        sendKey(VK_CONTROL, false);
-    }
-    if ((flags & VK_MENU) == VK_MENU) {
-        sendKey(VK_MENU, false);
+    if (!keyDown) {
+        if ((flags & VK_SHIFT) == VK_SHIFT) {
+            sendKey(VK_SHIFT, false);
+        }
+        if ((flags & VK_CONTROL) == VK_CONTROL) {
+            sendKey(VK_CONTROL, false);
+        }
+        if ((flags & VK_MENU) == VK_MENU) {
+            sendKey(VK_MENU, false);
+        }
     }
 #endif
 }
