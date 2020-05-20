@@ -61,7 +61,10 @@ void App::showEditor(std::shared_ptr<AudioProcessor> proc, Thread::ThreadID tid,
     if (proc->hasEditor()) {
         std::lock_guard<std::mutex> lock(m_windowMtx);
         forgetEditorIfNeeded();
-        m_window.reset();
+        if (m_window != nullptr) {
+            m_window->setVisible(false);
+            m_window.reset();
+        }
         m_windowOwner = tid;
         m_windowProc = proc;
         m_windowFunc = func;
@@ -73,7 +76,10 @@ void App::hideEditor(Thread::ThreadID tid) {
     if (tid == 0 || tid == m_windowOwner) {
         std::lock_guard<std::mutex> lock(m_windowMtx);
         forgetEditorIfNeeded();
-        m_window.reset();
+        if (m_window != nullptr) {
+            m_window->setVisible(false);
+            m_window.reset();
+        }
         m_windowOwner = 0;
         m_windowProc.reset();
         m_windowFunc = nullptr;
@@ -83,7 +89,10 @@ void App::hideEditor(Thread::ThreadID tid) {
 void App::resetEditor() {
     std::lock_guard<std::mutex> lock(m_windowMtx);
     forgetEditorIfNeeded();
-    m_window.reset();
+    if (m_window != nullptr) {
+        m_window->setVisible(false);
+        m_window.reset();
+    }
 }
 
 void App::restartEditor() {

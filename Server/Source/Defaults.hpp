@@ -8,8 +8,6 @@
 #ifndef Defaults_hpp
 #define Defaults_hpp
 
-#include "../JuceLibraryCode/JuceHeader.h"
-
 static constexpr int DEFAULT_CLIENT_PORT = 55055;
 static constexpr int DEFAULT_SERVER_PORT = 55056;
 

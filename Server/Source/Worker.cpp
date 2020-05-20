@@ -252,7 +252,6 @@ void Worker::handleMessage(std::shared_ptr<Message<HidePlugin>> msg) {
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<Mouse>> msg) {
-#ifdef JUCE_MAC
     auto ev = *pDATA(msg);
     MessageManager::callAsync([ev] {
         auto point = getApp().localPointToGlobal(Point<float>(ev.x, ev.y));
@@ -268,11 +267,9 @@ void Worker::handleMessage(std::shared_ptr<Message<Mouse>> msg) {
         }
         mouseEvent(ev.type, point.x, point.y, flags);
     });
-#endif
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<Key>> msg) {
-#ifdef JUCE_MAC
     MessageManager::callAsync([msg] {
         auto* codes = pPLD(msg).getKeyCodes();
         auto num = pPLD(msg).getKeyCount();
@@ -292,7 +289,6 @@ void Worker::handleMessage(std::shared_ptr<Message<Key>> msg) {
         keyEventDown(key, flags);
         keyEventUp(key, flags);
     });
-#endif
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<GetPluginSettings>> msg) {

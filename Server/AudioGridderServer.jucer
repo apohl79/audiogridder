@@ -78,8 +78,8 @@
     </XCODE_MAC>
     <VS2019 targetFolder="Builds/VisualStudio2019">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" defines="JUCE_WINDOWS"/>
-        <CONFIGURATION isDebug="0" name="Release" defines="JUCE_WINDOWS"/>
+        <CONFIGURATION isDebug="1" name="Debug" defines="JUCE_WINDOWS&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"/>
+        <CONFIGURATION isDebug="0" name="Release" defines="JUCE_WINDOWS&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_opengl"/>
