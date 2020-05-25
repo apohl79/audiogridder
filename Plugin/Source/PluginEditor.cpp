@@ -10,6 +10,7 @@
 #include "Images.hpp"
 #include "NewServerWindow.hpp"
 #include "PluginProcessor.hpp"
+#include "Version.hpp"
 
 AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderAudioProcessor& p)
     : AudioProcessorEditor(&p), m_processor(p), m_newPluginButton("", "newPlug", false) {
@@ -38,7 +39,7 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
 
     addAndMakeVisible(m_versionLabel);
     String v = "Version ";
-    v << ProjectInfo::versionString;
+    v << AUDIOGRIDDER_VERSION;
     m_versionLabel.setText(v, NotificationType::dontSendNotification);
     m_versionLabel.setBounds(0, 89, 190, 10);
     m_versionLabel.setFont(Font(10, Font::plain));

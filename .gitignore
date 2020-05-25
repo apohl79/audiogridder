@@ -3,3 +3,7 @@
 .DS_Store
 JuceLibraryCode
 Builds
+package/build/*
+package/AudioGridder.iss
+package/VERSION
+

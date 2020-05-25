@@ -10,6 +10,7 @@
 
 #include "../JuceLibraryCode/JuceHeader.h"
 #include "Images.hpp"
+#include "Version.hpp"
 
 namespace e47 {
 
@@ -47,7 +48,7 @@ class SplashWindow : public TopLevelWindow {
         m_title2.setBounds(200, 50, 172, 40);
         addChildAndSetID(&m_title2, "title2");
 
-        m_version.setText(ProjectInfo::versionString, NotificationType::dontSendNotification);
+        m_version.setText(AUDIOGRIDDER_VERSION, NotificationType::dontSendNotification);
         font.setHeight(15);
         font.setStyleFlags(Font::bold);
         m_version.setFont(font);
