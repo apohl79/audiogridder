@@ -3,7 +3,7 @@ AppName=AudioGridder
 AppVersion=#STR_VER#
 DefaultDirName={commonpf}\AudioGridderServer
 DefaultGroupName=AudioGridder
-OutputBaseFilename=AudioGridder-#STR_VER#
+OutputBaseFilename=AudioGridder_#STR_VER#
 
 [Files]
 Source: "..\Server\Builds\VisualStudio2019\x64\Debug\App\AudioGridderServer.exe"; DestDir: "{app}"
