@@ -423,15 +423,25 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
             m.addSubMenu(servers[i], srvMenu, true, nullptr, true, 0);
         } else {
             PopupMenu srvMenu;
-            srvMenu.addItem("Connect", [this, i] { m_processor.setActiveServer(i); });
-            srvMenu.addItem("Remove", [this, i] { m_processor.delServer(i); });
+            srvMenu.addItem("Connect", [this, i] {
+                m_processor.setActiveServer(i);
+                m_processor.saveConfig();
+            });
+            srvMenu.addItem("Remove", [this, i] {
+                m_processor.delServer(i);
+                m_processor.saveConfig();
+            });
             m.addSubMenu(servers[i], srvMenu);
         }
     }
     m.addSeparator();
     m.addItem("Add", [this] {
         auto w = new NewServerWindow(getScreenX() + 2, getScreenY() + 30);
-        w->onOk([this](String server) { m_processor.addServer(server); });
+        w->onOk([this](String server) {
+            m_processor.addServer(server);
+            m_processor.setActiveServer(m_processor.getServers().size() - 1);
+            m_processor.saveConfig();
+        });
         w->setAlwaysOnTop(true);
         w->runModalLoop();
     });
