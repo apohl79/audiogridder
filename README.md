@@ -46,7 +46,7 @@ different servers from your DAW at the same time.
 
 **Server Setup:**
 
-1. Install the PKG (includes server and plugin binaries)
+1. Install the PKG on OSX or the Setup EXE on Windows (includes server and plugin binaries)
 2. Grant AudioGridderServer the Accessibility permission (System
 Preferences -> Security & Privacy -> Privacy Tab) - If you upgrade,
 remove the existing entry and re-add it.
@@ -75,7 +75,7 @@ instance).
 
 **Plugin Setup:**
 
-1. Install the PKG (includes server and plugin binaries)
+1. Install the PKG on OSX or the Setup EXE on Windows (includes server and plugin binaries)
 2. Run your DAW and insert the AudioGridder plugin
 3. Add your server endpoint(s) (IP or DNS name) by clicking the server icon (this needs
 to be done only once, as the server settings will be shared with new
@@ -88,10 +88,11 @@ plugin instances)<br/>**Note:** Server and client have to be able to directly re
 
 ## Compatibility
 
-- OSX 64bit (tested on 10.14 and 10.15)
-- The server supports AudioUnit and VST3 plugins
-- The plugin is available as AudioUnit and VST3
-- Tested DAWs: Cubase 10 Pro, Logic Pro X, Reaper
+- Server: OSX 64bit 10.7+, Windows 10
+- Plugin: OSX 64bit 10.11+, Windows 10
+- The server supports AudioUnit (Mac only) and VST3 plugins
+- The plugin is available as AudioUnit (Mac only) and VST3
+- Tested DAWs: Cubase 10 Pro, Logic Pro X, Reaper, Ableton Live
 
 ## Reporting of Issues
 
