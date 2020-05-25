@@ -8,8 +8,7 @@
 #include "Screen.h"
 
 #ifdef JUCE_WINDOWS
-
-#include <Windows.h>
+#include <windows.h>
 
 namespace e47 {
 

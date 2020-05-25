@@ -11,7 +11,7 @@
 static constexpr int DEFAULT_CLIENT_PORT = 55055;
 static constexpr int DEFAULT_SERVER_PORT = 55056;
 
-#ifdef JUCE_MAC
+#ifndef JUCE_WINDOWS
 static const String SERVER_CONFIG_FILE = "~/.audiogridderserver";
 static const String PLUGIN_CONFIG_FILE = "~/.audiogridder";
 static const String KNOWN_PLUGINS_FILE = "~/.audiogridderserver.cache";

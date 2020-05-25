@@ -57,8 +57,9 @@
     <XCODE_MAC targetFolder="Builds/MacOSX" smallIcon="TxAv0c" bigIcon="TxAv0c">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" osxCompatibility="10.7 SDK" optimisation="3"
-                       defines="JUCE_MAC" recommendedWarnings="LLVM"/>
-        <CONFIGURATION isDebug="0" name="Release" osxCompatibility="10.7 SDK" defines="JUCE_MAC"
+                       defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
+                       recommendedWarnings="LLVM"/>
+        <CONFIGURATION isDebug="0" name="Release" osxCompatibility="10.7 SDK" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
                        recommendedWarnings="LLVM"/>
       </CONFIGURATIONS>
       <MODULEPATHS>

@@ -9,7 +9,7 @@
 #include <ApplicationServices/ApplicationServices.h>
 #include <CoreFoundation/CoreFoundation.h>
 #elif JUCE_WINDOWS
-#include <Windows.h>
+#include <windows.h>
 #endif
 
 #include <iostream>

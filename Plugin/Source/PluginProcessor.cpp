@@ -26,7 +26,10 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
                          ),
 #endif
       m_client(this) {
+
+#ifdef JUCE_MAC
     signal(SIGPIPE, SIG_IGN);
+#endif
 
     File cfg(PLUGIN_CONFIG_FILE);
     try {

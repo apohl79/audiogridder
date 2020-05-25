@@ -9,6 +9,10 @@
 #include "PluginProcessor.hpp"
 #include "ImageDiff.hpp"
 
+#ifdef JUCE_WINDOWS
+#include "windows.h"
+#endif
+
 namespace e47 {
 
 Client::Client(AudioGridderAudioProcessor* processor)
@@ -161,8 +165,28 @@ void Client::init() {
 
         logln("client listener created, PORT=" << clientPort);
 
+        auto setSocketBlockingState = [](int handle, bool shouldBlock) noexcept -> bool {
+#ifdef JUCE_WINDOWS
+            DWORD nonBlocking = shouldBlock ? 0 : 1;
+            return ioctlsocket(handle, FIONBIO, &nonBlocking) == 0;
+#else
+            int socketFlags = fcntl(handle, F_GETFL, 0);
+            if (socketFlags == -1) {
+                return false;
+            }
+            if (shouldBlock) {
+                socketFlags &= ~O_NONBLOCK;
+            } else {
+                socketFlags |= O_NONBLOCK;
+            }
+            return fcntl(handle, F_SETFL, socketFlags) == 0;
+#endif
+        };
+
         // set master socket non-blocking
-        fcntl(sock.getRawSocketHandle(), F_SETFL, fcntl(sock.getRawSocketHandle(), F_GETFL, 0) | O_NONBLOCK);
+        if (!setSocketBlockingState(sock.getRawSocketHandle(), false)) {
+            logln("failed to set master socket non-blocking");
+        }
 
         Handshake cfg = {1, clientPort, m_channels, m_rate, m_samplesPerBlock, m_doublePrecission};
         if (!e47::send(m_cmd_socket.get(), reinterpret_cast<const char*>(&cfg), sizeof(cfg))) {
