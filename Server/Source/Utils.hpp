@@ -27,7 +27,7 @@
 
 namespace e47 {
 
-static App& getApp() { return *dynamic_cast<App*>(JUCEApplication::getInstance()); }
+static inline App& getApp() { return *dynamic_cast<App*>(JUCEApplication::getInstance()); }
 
 }  // namespace e47
 

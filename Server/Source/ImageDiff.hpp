@@ -8,6 +8,8 @@
 #ifndef ImageDiff_hpp
 #define ImageDiff_hpp
 
+#include "NumberConversion.hpp"
+
 namespace e47 {
 
 namespace ImageDiff {
@@ -26,7 +28,7 @@ uint64_t getDelta(const uint8_t* imgFrom, const uint8_t* imgTo, uint8_t* imgDelt
     auto* pxDelta = reinterpret_cast<PixelARGB*>(imgDelta);
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
-            std::size_t p = y * width + x;
+            auto p = as<size_t>(y * width + x);
             if (pxFrom[p] != pxTo[p]) {
                 count++;
                 pxDelta[p].set(pxTo[p]);
@@ -60,7 +62,7 @@ uint64_t applyDelta(uint8_t* imgDst, const uint8_t* imgDelta, int width, int hei
     auto* pxDelta = reinterpret_cast<const PixelARGB*>(imgDelta);
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
-            std::size_t p = y * width + x;
+            auto p = as<size_t>(y * width + x);
             if (pxDelta[p].getAlpha() == 255) {
                 pxDst[p].set(pxDelta[p]);
                 count++;
@@ -91,7 +93,7 @@ float getBrightness(const uint8_t* img, int width, int height) {
     float brightness = 0;
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
-            std::size_t p = y * width + x;
+            auto p = as<size_t>(y * width + x);
             brightness += getBrightness(px[p]);
         }
     }

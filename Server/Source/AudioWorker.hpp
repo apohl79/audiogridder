@@ -25,7 +25,7 @@ class ProcessorChain;
 class AudioWorker : public Thread {
   public:
     AudioWorker() : Thread("AudioWorker") { m_chain = std::make_shared<ProcessorChain>(); }
-    virtual ~AudioWorker();
+    virtual ~AudioWorker() override;
 
     void init(std::unique_ptr<StreamingSocket> s, int channels, double rate, int samplesPerBlock, bool doublePrecission,
               std::function<void()> fn);

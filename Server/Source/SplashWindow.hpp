@@ -29,13 +29,13 @@ class SplashWindow : public TopLevelWindow {
 
         m_logo.setImage(ImageCache::getFromMemory(Images::serverinv_png, Images::serverinv_pngSize));
         m_logo.setBounds(10, 10, 100, 100);
-        m_logo.setAlpha(0.6);
+        m_logo.setAlpha(0.6f);
         addChildAndSetID(&m_logo, "logo");
 
         m_title.setText("AudioGridder", NotificationType::dontSendNotification);
         Font font(40, Font::bold);
         m_title.setFont(font);
-        m_title.setAlpha(0.9);
+        m_title.setAlpha(0.9f);
         m_title.setBounds(130, 10, 260, 60);
         addChildAndSetID(&m_title, "title");
 
@@ -44,7 +44,7 @@ class SplashWindow : public TopLevelWindow {
         font.setStyleFlags(Font::plain);
         m_title2.setFont(font);
         m_title2.setJustificationType(Justification::right);
-        m_title2.setAlpha(0.4);
+        m_title2.setAlpha(0.4f);
         m_title2.setBounds(200, 50, 172, 40);
         addChildAndSetID(&m_title2, "title2");
 
@@ -53,7 +53,7 @@ class SplashWindow : public TopLevelWindow {
         font.setStyleFlags(Font::bold);
         m_version.setFont(font);
         m_version.setJustificationType(Justification::right);
-        m_version.setAlpha(0.2);
+        m_version.setAlpha(0.2f);
         m_version.setBounds(200, 75, 172, 40);
         addChildAndSetID(&m_version, "version");
 
@@ -72,7 +72,7 @@ class SplashWindow : public TopLevelWindow {
 
     std::function<void()> onClick = nullptr;
 
-    void mouseUp(const MouseEvent& event) override {
+    void mouseUp(const MouseEvent& /* event */) override {
         if (onClick) {
             onClick();
         }

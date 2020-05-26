@@ -14,7 +14,7 @@
 class AudioGridderAudioProcessorEditor : public AudioProcessorEditor, public PluginButton::Listener {
   public:
     AudioGridderAudioProcessorEditor(AudioGridderAudioProcessor&);
-    ~AudioGridderAudioProcessorEditor();
+    ~AudioGridderAudioProcessorEditor() override;
 
     void paint(Graphics&) override;
     void resized() override;

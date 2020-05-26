@@ -44,17 +44,17 @@ class ProcessorChain : public AudioProcessor {
     bool setProcessorBusesLayout(std::shared_ptr<AudioPluginInstance> proc);
     int getExtraChannels();
 
-    bool acceptsMidi() const override { return false; };
-    bool producesMidi() const override { return false; };
+    bool acceptsMidi() const override { return false; }
+    bool producesMidi() const override { return false; }
     AudioProcessorEditor* createEditor() override { return nullptr; }
     bool hasEditor() const override { return false; }
     int getNumPrograms() override { return 0; }
     int getCurrentProgram() override { return 0; }
-    void setCurrentProgram(int index) override {}
-    const String getProgramName(int index) override { return ""; }
-    void changeProgramName(int index, const String& newName) override {}
-    void getStateInformation(juce::MemoryBlock& destData) override {}
-    void setStateInformation(const void* data, int sizeInBytes) override {}
+    void setCurrentProgram(int /* index */) override {}
+    const String getProgramName(int /* index */) override { return ""; }
+    void changeProgramName(int /* index */, const String& /* newName */) override {}
+    void getStateInformation(juce::MemoryBlock& /* destData */) override {}
+    void setStateInformation(const void* /* data */, int /* sizeInBytes */) override {}
 
     static std::shared_ptr<AudioPluginInstance> loadPlugin(PluginDescription& plugdesc, double sampleRate,
                                                            int blockSize);

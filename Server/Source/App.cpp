@@ -17,7 +17,7 @@ namespace e47 {
 
 App::App() : m_menuWindow(this) {}
 
-void App::initialise(const String& commandLineParameters) {
+void App::initialise(const String& /* commandLineParameters */) {
     m_logger = FileLogger::createDateStampedLogger(getApplicationName(), "Main_", ".log", "");
     Logger::setCurrentLogger(m_logger);
 #ifdef JUCE_MAC
@@ -73,14 +73,14 @@ void App::showEditor(std::shared_ptr<AudioProcessor> proc, Thread::ThreadID tid,
 }
 
 void App::hideEditor(Thread::ThreadID tid) {
-    if (tid == 0 || tid == m_windowOwner) {
+    if (tid == nullptr || tid == m_windowOwner) {
         std::lock_guard<std::mutex> lock(m_windowMtx);
         forgetEditorIfNeeded();
         if (m_window != nullptr) {
             m_window->setVisible(false);
             m_window.reset();
         }
-        m_windowOwner = 0;
+        m_windowOwner = nullptr;
         m_windowProc.reset();
         m_windowFunc = nullptr;
     }

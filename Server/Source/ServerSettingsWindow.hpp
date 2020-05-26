@@ -17,7 +17,7 @@ class App;
 class ServerSettingsWindow : public DocumentWindow {
   public:
     ServerSettingsWindow(App* app);
-    ~ServerSettingsWindow() { clearContentComponent(); }
+    ~ServerSettingsWindow() override { clearContentComponent(); }
 
     void closeButtonPressed() override;
 

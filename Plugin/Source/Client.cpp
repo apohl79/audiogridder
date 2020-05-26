@@ -8,6 +8,7 @@
 #include "Client.hpp"
 #include "PluginProcessor.hpp"
 #include "ImageDiff.hpp"
+#include "NumberConversion.hpp"
 
 #ifdef JUCE_WINDOWS
 #include "windows.h"
@@ -142,7 +143,7 @@ void Client::init() {
     }
     dbglock(*this, 9);
     m_error = true;
-    if (!m_channels || !m_rate || !m_samplesPerBlock) {
+    if (m_channels == 0 || m_rate == 0.0 || m_samplesPerBlock == 0) {
         return;
     }
     logln("connecting server " << host << ":" << id);
@@ -150,7 +151,7 @@ void Client::init() {
     if (m_cmd_socket->connect(host, port, 1000)) {
         StreamingSocket sock;
         int retry = 0;
-        int clientPort;
+        int clientPort = DEFAULT_CLIENT_PORT;
         do {
             if (sock.createListener(DEFAULT_CLIENT_PORT - retry)) {
                 clientPort = DEFAULT_CLIENT_PORT - retry;
@@ -224,7 +225,7 @@ void Client::init() {
             logln("failed reading plugin list");
             return;
         }
-        String listChunk(PLD(msg).str, *PLD(msg).size);
+        String listChunk(PLD(msg).str, as<size_t>(*PLD(msg).size));
         auto list = StringArray::fromLines(listChunk);
         for (auto& line : list) {
             if (!line.isEmpty()) {
@@ -244,7 +245,7 @@ bool Client::isReady() {
     int retry = 100;
     bool locked = false;
     while (retry-- > 0) {
-        if ((locked = m_clientMtx.try_lock())) {
+        if ((locked = m_clientMtx.try_lock()) == true) {
             break;
         } else {
             sleep(10);
@@ -424,7 +425,7 @@ MemoryBlock Client::getPluginSettings(int idx) {
         Message<PluginSettings> res;
         if (res.read(m_cmd_socket.get())) {
             if (*res.payload.size > 0) {
-                block.append(res.payload.data, *res.payload.size);
+                block.append(res.payload.data, as<size_t>(*res.payload.size));
             }
         } else {
             logln(getLoadedPluginsString() << "failed to read PluginSettings message");
@@ -474,7 +475,7 @@ std::vector<ServerPlugin> Client::getRecents() {
     dbglock(*this, 19);
     msg.send(m_cmd_socket.get());
     if (msg.read(m_cmd_socket.get())) {
-        String listChunk(PLD(msg).str, *PLD(msg).size);
+        String listChunk(PLD(msg).str, as<size_t>(*PLD(msg).size));
         auto list = StringArray::fromLines(listChunk);
         for (auto& line : list) {
             if (!line.isEmpty()) {
@@ -618,7 +619,7 @@ void Client::mouseDoubleClick(const MouseEvent& event) {
     dbgln("unhandled mouseDoubleClick " << event.position.x << ":" << event.position.y);
 }
 
-void Client::mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wheel) {
+void Client::mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& /* wheel */) {
     dbgln("unhanbdled mouseWheelMove " << event.position.x << ":" << event.position.y);
 }
 
@@ -637,7 +638,7 @@ void Client::sendMouseEvent(MouseEvType ev, Point<float> p, bool isShiftDown, bo
     msg.send(m_cmd_socket.get());
 }
 
-bool Client::keyPressed(const KeyPress& kp, Component* originatingComponent) {
+bool Client::keyPressed(const KeyPress& kp, Component* /* originatingComponent */) {
     if (!isReadyLockFree()) {
         return true;
     };

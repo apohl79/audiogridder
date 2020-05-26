@@ -33,8 +33,8 @@ class AudioStreamer : public Thread {
         : Thread("AudioStreamer"),
           client(clnt),
           socket(sock),
-          writeQ(clnt->NUM_OF_BUFFERS * 2),
-          readQ(clnt->NUM_OF_BUFFERS * 2) {
+          writeQ(as<size_t>(clnt->NUM_OF_BUFFERS * 2)),
+          readQ(as<size_t>(clnt->NUM_OF_BUFFERS * 2)) {
         for (int i = 0; i < clnt->NUM_OF_BUFFERS; i++) {
             AudioMidiBuffer buf;
             buf.audio.setSize(clnt->m_channels, clnt->m_samplesPerBlock);
@@ -80,7 +80,7 @@ class AudioStreamer : public Thread {
     }
 
     bool waitRead() {
-        if (client->NUM_OF_BUFFERS > 1 && readQ.read_available() < (client->NUM_OF_BUFFERS / 2) &&
+        if (client->NUM_OF_BUFFERS > 1 && readQ.read_available() < as<size_t>(client->NUM_OF_BUFFERS / 2) &&
             readQ.read_available() > 0) {
             logln_clnt(client, "warning: instance (" << client->getLoadedPluginsString()
                                                      << "): input buffer below 50% (" << readQ.read_available() << "/"

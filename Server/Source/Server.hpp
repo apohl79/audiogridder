@@ -55,7 +55,7 @@ class Server : public Thread {
     std::set<String> m_pluginexclude;
     bool m_enableAU = true;
     bool m_enableVST = true;
-    float m_screenJpgQuality = 0.9;
+    float m_screenJpgQuality = 0.9f;
     bool m_screenDiffDetection = true;
 
     bool scanNextPlugin(PluginDirectoryScanner& scanner, String& name);

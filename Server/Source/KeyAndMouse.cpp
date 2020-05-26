@@ -21,7 +21,7 @@ namespace e47 {
 
 #if defined(JUCE_MAC)
 void mouseEventReal(CGMouseButton button, CGEventType type, CGPoint location, CGEventFlags flags) {
-    CGEventRef event = CGEventCreateMouseEvent(NULL, type, location, button);
+    CGEventRef event = CGEventCreateMouseEvent(nullptr, type, location, button);
     CGEventSetType(event, type);
     CGEventSetFlags(event, flags | CGEventGetFlags(event));
     CGEventPost(kCGSessionEventTap, event);
@@ -163,7 +163,7 @@ void keyEvent(uint16_t keyCode, uint64_t flags, bool keyDown) {
     CGEventSetFlags(ev, flags | CGEventGetFlags(ev));
     CGEventPost(kCGSessionEventTap, ev);
     CFRelease(ev);
-#elif JUCE_WINDOWS
+#elif defined(JUCE_WINDOWS)
     auto ch = getKeyName(keyCode);
     WORD vk = 0;
     if (ch.length() == 1) {

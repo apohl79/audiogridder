@@ -20,6 +20,8 @@
       <FILE id="tC3soa" name="KeyAndMouse.cpp" compile="1" resource="0" file="Source/KeyAndMouse.cpp"/>
       <FILE id="qptnsE" name="KeyAndMouse.hpp" compile="0" resource="0" file="Source/KeyAndMouse.hpp"/>
       <FILE id="YPI7wt" name="Message.hpp" compile="0" resource="0" file="Source/Message.hpp"/>
+      <FILE id="nK9xoD" name="NumberConversion.hpp" compile="0" resource="0"
+            file="Source/NumberConversion.hpp"/>
       <FILE id="lwoFf2" name="PluginListComponent.cpp" compile="1" resource="0"
             file="Source/PluginListComponent.cpp"/>
       <FILE id="uS9tXT" name="PluginListComponent.hpp" compile="0" resource="0"

@@ -40,12 +40,12 @@ void ScreenWorker::run() {
 
             // For some reason the plugin window turns white or black sometimes, this should be investigated..
             // For now as a hack: Check if the image is mostly white, and reset the plugin window in this case.
-            float mostlyWhite = m_width * m_height * 0.99;
-            float mostlyBlack = 0.1;
+            float mostlyWhite = m_width * m_height * 0.99f;
+            float mostlyBlack = 0.1f;
             float brightness = mostlyWhite / 2;
 
             // Calculate the difference between the current and the last image
-            uint64_t diffPxCount = m_width * m_height;
+            auto diffPxCount = as<uint64_t>(m_width * m_height);
             if (!forceFullImg && m_lastImage != nullptr && m_currentImage->getBounds() == m_lastImage->getBounds() &&
                 m_diffImage != nullptr) {
                 brightness = 0;
@@ -75,7 +75,7 @@ void ScreenWorker::run() {
 
                     if (mos.getDataSize() > Message<ScreenCapture>::MAX_SIZE) {
                         if (!diffDetect && qual > 0.1) {
-                            qual -= 0.1;
+                            qual -= 0.1f;
                         } else {
                             logln(
                                 "plugin screen image data exceeds max message size, Message::MAX_SIZE has to be "

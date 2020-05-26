@@ -7,6 +7,7 @@
 
 #include "ProcessorChain.hpp"
 #include "Utils.hpp"
+#include "NumberConversion.hpp"
 
 namespace e47 {
 
@@ -216,23 +217,23 @@ void ProcessorChain::updateNoLock() {
 
 std::shared_ptr<AudioPluginInstance> ProcessorChain::getProcessor(int index) {
     std::lock_guard<std::mutex> lock(m_processors_mtx);
-    if (index > -1 && index < m_processors.size()) {
-        return m_processors[index];
+    if (index > -1 && as<size_t>(index) < m_processors.size()) {
+        return m_processors[as<size_t>(index)];
     }
     return nullptr;
 }
 
 void ProcessorChain::exchangeProcessors(int idxA, int idxB) {
     std::lock_guard<std::mutex> lock(m_processors_mtx);
-    if (idxA > -1 && idxB < m_processors.size() && idxB > -1 && idxB < m_processors.size()) {
-        std::swap(m_processors[idxA], m_processors[idxB]);
+    if (idxA > -1 && as<size_t>(idxA) < m_processors.size() && idxB > -1 && as<size_t>(idxB) < m_processors.size()) {
+        std::swap(m_processors[as<size_t>(idxA)], m_processors[as<size_t>(idxB)]);
     }
 }
 
 float ProcessorChain::getParameterValue(int idx, int paramIdx) {
     std::lock_guard<std::mutex> lock(m_processors_mtx);
-    if (idx > -1 && idx < m_processors.size()) {
-        for (auto& p : m_processors[idx]->getParameters()) {
+    if (idx > -1 && as<size_t>(idx) < m_processors.size()) {
+        for (auto& p : m_processors[as<size_t>(idx)]->getParameters()) {
             if (paramIdx == p->getParameterIndex()) {
                 return p->getValue();
             }

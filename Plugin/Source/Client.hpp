@@ -38,7 +38,7 @@ namespace e47 {
 class Client : public Thread, public MouseListener, public KeyListener {
   public:
     Client(AudioGridderAudioProcessor* processor);
-    ~Client();
+    ~Client() override;
 
     struct Parameter {
         int idx = -1;
@@ -172,7 +172,7 @@ class Client : public Thread, public MouseListener, public KeyListener {
     // MouseListener
     void mouseMove(const MouseEvent& event) override;
     void mouseEnter(const MouseEvent& event) override;
-    void mouseExit(const MouseEvent& event) override {}
+    void mouseExit(const MouseEvent& /* event */) override {}
     void mouseDown(const MouseEvent& event) override;
     void mouseDrag(const MouseEvent& event) override;
     void mouseUp(const MouseEvent& event) override;

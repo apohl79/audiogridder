@@ -6,6 +6,9 @@
  */
 
 #include "PluginButton.hpp"
+#include "NumberConversion.hpp"
+
+using namespace e47;
 
 PluginButton::PluginButton(const String& id, const String& name, bool extraButtons)
     : TextButton(name), m_id(id), m_withExtraButtons(extraButtons) {}
@@ -26,10 +29,11 @@ void PluginButton::paintButton(Graphics& g, bool shouldDrawButtonAsHighlighted, 
     }
 
     if (m_active) {
-        g.setColour(findColour(ComboBox::outlineColourId).withMultipliedAlpha(0.9));
+        g.setColour(findColour(ComboBox::outlineColourId).withMultipliedAlpha(0.9f));
         float dashs[] = {4.0, 2.0};
-        g.drawDashedLine(Line<float>(0, 0, getWidth(), 0), dashs, 2);
-        g.drawDashedLine(Line<float>(0, getHeight(), getWidth(), getHeight()), dashs, 2);
+        g.drawDashedLine(Line<float>(0.0f, 0.0f, as<float>(getWidth()), 0.0f), dashs, 2);
+        g.drawDashedLine(Line<float>(0.0f, as<float>(getHeight()), as<float>(getWidth()), as<float>(getHeight())),
+                         dashs, 2);
     }
 
     int textIndentLeft = 0;
@@ -53,16 +57,16 @@ void PluginButton::paintButton(Graphics& g, bool shouldDrawButtonAsHighlighted, 
 
         // bypass
         g.setColour(fgColor);
-        g.drawEllipse(m_bypassArea.toFloat(), 0.7);
+        g.drawEllipse(m_bypassArea.toFloat(), 0.7f);
         g.setColour(baseColour);
         g.fillRect(m_bypassArea.getCentreX() - 2, m_bypassArea.getY() - 2, 4, 4);
         g.setColour(fgColor);
-        g.drawLine(m_bypassArea.getCentreX(), m_bypassArea.getY() - 1, m_bypassArea.getCentreX(),
-                   m_bypassArea.getY() + 5, 0.7);
+        g.drawLine(as<float>(m_bypassArea.getCentreX()), as<float>(m_bypassArea.getY() - 1),
+                   as<float>(m_bypassArea.getCentreX()), as<float>(m_bypassArea.getY() + 5), 0.7f);
 
         // down
         Path down;
-        PathStrokeType stroke(0.7);
+        PathStrokeType stroke(0.7f);
         auto rect = m_moveDownArea.toFloat();
         down.addTriangle(rect.getX(), rect.getY(), rect.getRight(), rect.getY(), rect.getCentreX(), rect.getBottom());
         g.strokePath(down, stroke);
@@ -76,8 +80,8 @@ void PluginButton::paintButton(Graphics& g, bool shouldDrawButtonAsHighlighted, 
 
         // delete
         rect = m_deleteArea.toFloat();
-        g.drawLine(rect.getX(), rect.getY(), rect.getRight(), rect.getBottom(), 0.7);
-        g.drawLine(rect.getX(), rect.getBottom(), rect.getRight(), rect.getY(), 0.7);
+        g.drawLine(rect.getX(), rect.getY(), rect.getRight(), rect.getBottom(), 0.7f);
+        g.drawLine(rect.getX(), rect.getBottom(), rect.getRight(), rect.getY(), 0.7f);
     }
 
     drawText(g, textIndentLeft, textIndentRight);

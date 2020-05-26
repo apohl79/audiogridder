@@ -9,13 +9,14 @@
 
 #include "../JuceLibraryCode/JuceHeader.h"
 #include "Client.hpp"
+#include "NumberConversion.hpp"
 
 #include <set>
 
 class AudioGridderAudioProcessor : public AudioProcessor {
   public:
     AudioGridderAudioProcessor();
-    ~AudioGridderAudioProcessor();
+    ~AudioGridderAudioProcessor() override;
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
@@ -73,7 +74,9 @@ class AudioGridderAudioProcessor : public AudioProcessor {
     };
 
     auto& getLoadedPlugins() const { return m_loadedPlugins; }
-    const LoadedPlugin& getLoadedPlugin(int idx) const { return idx > -1 ? m_loadedPlugins[idx] : m_unusedDummyPlugin; }
+    const LoadedPlugin& getLoadedPlugin(int idx) const {
+        return idx > -1 ? m_loadedPlugins[e47::as<size_t>(idx)] : m_unusedDummyPlugin;
+    }
     bool loadPlugin(const String& id, const String& name);
     void unloadPlugin(int idx);
     void editPlugin(int idx);
@@ -92,7 +95,9 @@ class AudioGridderAudioProcessor : public AudioProcessor {
     int getActiveServer() const { return m_activeServer; }
     void setActiveServer(int i);
 
-    int getLatencyMillis() const { return m_client.NUM_OF_BUFFERS * getBlockSize() * 1000 / getSampleRate(); }
+    int getLatencyMillis() const {
+        return e47::as<int>(lround(m_client.NUM_OF_BUFFERS * getBlockSize() * 1000 / getSampleRate()));
+    }
 
     // It looks like most hosts do not support dynamic parameter creation or changes to existing parameters. Just the
     // name can be updated. So we create slots at the start.
@@ -101,7 +106,7 @@ class AudioGridderAudioProcessor : public AudioProcessor {
         Parameter(AudioGridderAudioProcessor& processor, int slot) : m_processor(processor), m_slotId(slot) {}
         float getValue() const override;
         void setValue(float newValue) override;
-        float getValueForText(const String& text) const override { return 0; };
+        float getValueForText(const String& /* text */) const override { return 0; }
         float getDefaultValue() const override { return getParam().defaultValue; }
         String getName(int maximumStringLength) const override;
         String getLabel() const override { return getParam().label; }

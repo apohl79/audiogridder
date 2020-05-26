@@ -9,6 +9,7 @@
 #include "KeyAndMouse.hpp"
 #include "Utils.hpp"
 #include "Defaults.hpp"
+#include "NumberConversion.hpp"
 
 #ifdef JUCE_MAC
 #include <sys/socket.h>
@@ -48,7 +49,7 @@ void Worker::run() {
 #endif
         if (sock->connect(m_client->getHostName(), cfg.clientPort)) {
             m_audio.init(std::move(sock), cfg.channels, cfg.rate, cfg.samplesPerBlock, cfg.doublePrecission,
-                         [this] { /*m_client->close();*/ });
+                         [/*this*/] { /*m_client->close();*/ });
             m_audio.startThread(Thread::realtimeAudioPriority);
         } else {
             logln("failed to establish audio connection to " << m_client->getHostName() << ":" << cfg.clientPort);
@@ -72,9 +73,9 @@ void Worker::run() {
         for (auto& plugin : pluginList.getTypes()) {
             list += getStringFrom(plugin) + "\n";
         }
-        Message<PluginList> msg;
-        PLD(msg).setString(list);
-        if (!msg.send(m_client.get())) {
+        Message<PluginList> msgPL;
+        PLD(msgPL).setString(list);
+        if (!msgPL.send(m_client.get())) {
             logln("failed to send plugin list");
             m_client->close();
             signalThreadShouldExit();
@@ -160,7 +161,7 @@ void Worker::shutdown() {
     signalThreadShouldExit();
 }
 
-void Worker::handleMessage(std::shared_ptr<Message<Quit>> msg) { shutdown(); }
+void Worker::handleMessage(std::shared_ptr<Message<Quit>> /* msg */) { shutdown(); }
 
 void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     auto id = pPLD(msg).getString();
@@ -225,8 +226,7 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     }
     if (*msgSettings.payload.size > 0) {
         MemoryBlock block;
-        block.append(msgSettings.payload.data, *msgSettings.payload.size);
-        auto proc = m_audio.getProcessor(m_audio.getSize() - 1);
+        block.append(msgSettings.payload.data, as<size_t>(*msgSettings.payload.size));
         proc->setStateInformation(block.getData(), static_cast<int>(block.getSize()));
     }
     logln("...ok");
@@ -246,7 +246,7 @@ void Worker::handleMessage(std::shared_ptr<Message<EditPlugin>> msg) {
     }
 }
 
-void Worker::handleMessage(std::shared_ptr<Message<HidePlugin>> msg) {
+void Worker::handleMessage(std::shared_ptr<Message<HidePlugin>> /* msg */) {
     m_screen.hideEditor();
     m_shouldHideEditor = false;
 }

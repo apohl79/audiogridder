@@ -22,8 +22,8 @@ class Server;
 class Worker : public Thread {
   public:
     Worker(StreamingSocket* clnt) : Thread("Worker"), m_client(clnt) {}
-    virtual ~Worker();
-    virtual void run() override;
+    ~Worker() override;
+    void run() override;
 
     void shutdown();
 

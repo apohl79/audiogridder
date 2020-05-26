@@ -8,6 +8,8 @@
 #ifndef KeyAndMouse_hpp
 #define KeyAndMouse_hpp
 
+#include "NumberConversion.hpp"
+
 #include <stdint.h>
 #include <string>
 #include <unordered_map>
@@ -27,7 +29,7 @@ enum MouseEvType : uint8_t {
     OTHER_DRAG
 };
 
-const std::unordered_map<std::string, uint16_t> VKeyMap = {
+const std::unordered_map<std::string, int> VKeyMap = {
     {"A", 0x00},         {"S", 0x01},         {"D", 0x02},      {"F", 0x03},         {"H", 0x04},
     {"G", 0x05},         {"Z", 0x06},         {"X", 0x07},      {"C", 0x08},         {"V", 0x09},
     {"B", 0x0B},         {"Q", 0x0C},         {"W", 0x0D},      {"E", 0x0E},         {"R", 0x0F},
@@ -51,7 +53,7 @@ const uint16_t NOKEY = 0xFF;
 static inline uint16_t getKeyCode(std::string s) {
     auto it = VKeyMap.find(s);
     if (it != VKeyMap.end()) {
-        return it->second;
+        return as<uint16_t>(it->second);
     }
     return NOKEY;
 }

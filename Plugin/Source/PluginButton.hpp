@@ -13,7 +13,7 @@
 class PluginButton : public TextButton {
   public:
     PluginButton(const String& id, const String& name, bool extraButtons = true);
-    virtual ~PluginButton() {}
+    virtual ~PluginButton() override {}
 
     class Listener {
       public:

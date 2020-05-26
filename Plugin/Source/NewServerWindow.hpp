@@ -12,7 +12,7 @@
 class NewServerWindow : public TopLevelWindow, public TextButton::Listener {
   public:
     NewServerWindow(float x, float y);
-    ~NewServerWindow();
+    ~NewServerWindow() override;
 
     void paint(Graphics&) override;
 

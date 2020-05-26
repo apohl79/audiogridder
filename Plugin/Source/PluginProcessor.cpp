@@ -6,13 +6,14 @@
  */
 
 #include "PluginProcessor.hpp"
-
-#include <signal.h>
-
 #include "PluginEditor.hpp"
 #include "json.hpp"
 
+#include <signal.h>
+
 using json = nlohmann::json;
+
+using namespace e47;
 
 AudioGridderAudioProcessor::AudioGridderAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -77,12 +78,12 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
                 if (p.bypassed) {
                     m_client.bypassPlugin(idx);
                 }
-                for (auto& p : p.params) {
-                    if (p.automationSlot > -1) {
-                        if (p.automationSlot < m_numberOfAutomationSlots) {
-                            enableParamAutomation(idx, p.idx, p.automationSlot);
+                for (auto& param : p.params) {
+                    if (param.automationSlot > -1) {
+                        if (param.automationSlot < m_numberOfAutomationSlots) {
+                            enableParamAutomation(idx, param.idx, param.automationSlot);
                         } else {
-                            p.automationSlot = -1;
+                            param.automationSlot = -1;
                         }
                     }
                 }
@@ -105,8 +106,8 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
             }
         });
     });
-    if (m_activeServer > -1 && m_activeServer < m_servers.size()) {
-        m_client.setServer(m_servers[m_activeServer]);
+    if (m_activeServer > -1 && as<size_t>(m_activeServer) < m_servers.size()) {
+        m_client.setServer(m_servers[as<size_t>(m_activeServer)]);
     }
 }
 
@@ -149,11 +150,11 @@ int AudioGridderAudioProcessor::getNumPrograms() { return 1; }
 
 int AudioGridderAudioProcessor::getCurrentProgram() { return 0; }
 
-void AudioGridderAudioProcessor::setCurrentProgram(int index) {}
+void AudioGridderAudioProcessor::setCurrentProgram(int /* index */) {}
 
-const String AudioGridderAudioProcessor::getProgramName(int index) { return {}; }
+const String AudioGridderAudioProcessor::getProgramName(int /* index */) { return {}; }
 
-void AudioGridderAudioProcessor::changeProgramName(int index, const String& newName) {}
+void AudioGridderAudioProcessor::changeProgramName(int /* index */, const String& /* newName */) {}
 
 void AudioGridderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
     m_client.init(getTotalNumInputChannels(), sampleRate, samplesPerBlock, isUsingDoublePrecision());
@@ -195,9 +196,9 @@ void AudioGridderAudioProcessor::processBlockReal(AudioBuffer<T>& buffer, MidiBu
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    auto* playHead = getPlayHead();
+    auto* phead = getPlayHead();
     AudioPlayHead::CurrentPositionInfo posInfo;
-    playHead->getCurrentPosition(posInfo);
+    phead->getCurrentPosition(posInfo);
 
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
         buffer.clear(i, 0, buffer.getNumSamples());
@@ -219,7 +220,7 @@ void AudioGridderAudioProcessor::processBlockReal(AudioBuffer<T>& buffer, MidiBu
     }
 }
 
-void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<float>& buffer, MidiBuffer& midiMessages) {
+void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<float>& buffer, MidiBuffer& /* midiMessages */) {
     ScopedNoDenormals noDenormals;
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
@@ -238,7 +239,7 @@ void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<float>& buffer
     }
 }
 
-void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<double>& buffer, MidiBuffer& midiMessages) {
+void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<double>& buffer, MidiBuffer& /* midiMessages */) {
     ScopedNoDenormals noDenormals;
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
@@ -307,7 +308,7 @@ void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData) {
     j["servers"] = jservers;
     j["activeServer"] = m_activeServer;
     auto jplugs = json::array();
-    for (int i = 0; i < m_loadedPlugins.size(); i++) {
+    for (size_t i = 0; i < m_loadedPlugins.size(); i++) {
         auto& plug = m_loadedPlugins[i];
         if (m_client.isReadyLockFree()) {
             auto settings = m_client.getPluginSettings(static_cast<int>(i));
@@ -355,7 +356,7 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
 }
 
 void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
-    std::string dump(static_cast<const char*>(data), sizeInBytes);
+    std::string dump(static_cast<const char*>(data), as<size_t>(sizeInBytes));
     try {
         json j = json::parse(dump);
         int version = 0;
@@ -375,12 +376,12 @@ void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeI
             for (auto& plug : j["loadedPlugins"]) {
                 if (version < 1) {
                     StringArray dummy;
-                    Array<e47::Client::Parameter> dummy2;
+                    Array<Client::Parameter> dummy2;
                     m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
                                                plug[2].get<std::string>(), dummy, dummy2, false, false});
                 } else if (version == 1) {
                     StringArray dummy;
-                    Array<e47::Client::Parameter> dummy2;
+                    Array<Client::Parameter> dummy2;
                     m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
                                                plug[2].get<std::string>(), dummy, dummy2, plug[3].get<bool>(), false});
                 } else {
@@ -398,8 +399,8 @@ void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeI
                 }
             }
         }
-        if (m_activeServer > -1 && m_activeServer < m_servers.size()) {
-            m_client.setServer(m_servers[m_activeServer]);
+        if (m_activeServer > -1 && as<size_t>(m_activeServer) < m_servers.size()) {
+            m_client.setServer(m_servers[as<size_t>(m_activeServer)]);
             m_client.reconnect();
         }
     } catch (json::parse_error& e) {
@@ -474,32 +475,33 @@ void AudioGridderAudioProcessor::hidePlugin(bool updateServer) {
 }
 
 bool AudioGridderAudioProcessor::isBypassed(int idx) {
-    if (idx > -1 && idx < m_loadedPlugins.size()) {
-        return m_loadedPlugins[idx].bypassed;
+    if (idx > -1 && as<size_t>(idx) < m_loadedPlugins.size()) {
+        return m_loadedPlugins[as<size_t>(idx)].bypassed;
     }
     return false;
 }
 
 void AudioGridderAudioProcessor::bypassPlugin(int idx) {
-    if (idx > -1 && idx < m_loadedPlugins.size()) {
+    if (idx > -1 && as<size_t>(idx) < m_loadedPlugins.size()) {
         m_client.bypassPlugin(idx);
-        m_loadedPlugins[idx].bypassed = true;
+        m_loadedPlugins[as<size_t>(idx)].bypassed = true;
     }
 }
 
 void AudioGridderAudioProcessor::unbypassPlugin(int idx) {
-    if (idx > -1 && idx < m_loadedPlugins.size()) {
+    if (idx > -1 && as<size_t>(idx) < m_loadedPlugins.size()) {
         m_client.unbypassPlugin(idx);
-        m_loadedPlugins[idx].bypassed = false;
+        m_loadedPlugins[as<size_t>(idx)].bypassed = false;
     }
 }
 
 void AudioGridderAudioProcessor::exchangePlugins(int idxA, int idxB) {
-    if (idxA > -1 && idxA < m_loadedPlugins.size() && idxB > -1 && idxB < m_loadedPlugins.size()) {
+    if (idxA > -1 && as<size_t>(idxA) < m_loadedPlugins.size() && idxB > -1 &&
+        as<size_t>(idxB) < m_loadedPlugins.size()) {
         suspendProcessing(true);
         m_client.exchangePlugins(idxA, idxB);
         suspendProcessing(false);
-        std::swap(m_loadedPlugins[idxA], m_loadedPlugins[idxB]);
+        std::swap(m_loadedPlugins[as<size_t>(idxA)], m_loadedPlugins[as<size_t>(idxB)]);
         if (idxA == m_activePlugin) {
             m_activePlugin = idxB;
         } else if (idxB == m_activePlugin) {
@@ -517,7 +519,7 @@ void AudioGridderAudioProcessor::exchangePlugins(int idxA, int idxB) {
 }
 
 bool AudioGridderAudioProcessor::enableParamAutomation(int idx, int paramIdx, int slot) {
-    auto& param = m_loadedPlugins[idx].params.getReference(paramIdx);
+    auto& param = m_loadedPlugins[as<size_t>(idx)].params.getReference(paramIdx);
     Parameter* pparam = nullptr;
     if (slot == -1) {
         for (slot = 0; slot < m_numberOfAutomationSlots; slot++) {
@@ -540,7 +542,7 @@ bool AudioGridderAudioProcessor::enableParamAutomation(int idx, int paramIdx, in
 }
 
 void AudioGridderAudioProcessor::disableParamAutomation(int idx, int paramIdx) {
-    auto& param = m_loadedPlugins[idx].params.getReference(paramIdx);
+    auto& param = m_loadedPlugins[as<size_t>(idx)].params.getReference(paramIdx);
     auto* pparam = dynamic_cast<Parameter*>(getParameters()[param.automationSlot]);
     pparam->reset();
     updateHostDisplay();
@@ -557,10 +559,10 @@ void AudioGridderAudioProcessor::delServer(int idx) {
     }
 }
 
-void AudioGridderAudioProcessor::setActiveServer(int i) {
-    if (i > -1 && i < m_servers.size()) {
-        m_activeServer = i;
-        m_client.setServer(m_servers[i]);
+void AudioGridderAudioProcessor::setActiveServer(int idx) {
+    if (idx > -1 && as<size_t>(idx) < m_servers.size()) {
+        m_activeServer = idx;
+        m_client.setServer(m_servers[as<size_t>(idx)]);
     }
 }
 

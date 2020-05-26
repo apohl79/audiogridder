@@ -39,7 +39,7 @@ class App : public JUCEApplication, public MenuBarModel {
     void restartServer();
 
     void showEditor(std::shared_ptr<AudioProcessor> proc, Thread::ThreadID tid, WindowCaptureCallback func);
-    void hideEditor(Thread::ThreadID tid = 0);
+    void hideEditor(Thread::ThreadID tid = nullptr);
 
     void resetEditor();
     void restartEditor();
@@ -64,13 +64,13 @@ class App : public JUCEApplication, public MenuBarModel {
 #endif
         }
 
-        ~MenuBarWindow() {
+        ~MenuBarWindow() override {
 #ifdef JUCE_MAC
             setMacMainMenu(nullptr);
 #endif
         }
 
-        void mouseUp(const MouseEvent& event) override {
+        void mouseUp(const MouseEvent& /* event */) override {
 #ifdef JUCE_MAC
             showDropdownMenu(m_app->getMenuForIndex(0, "Tray"));
 #else
@@ -92,7 +92,7 @@ class App : public JUCEApplication, public MenuBarModel {
         return names;
     }
 
-    PopupMenu getMenuForIndex(int topLevelMenuIndex, const String& menuName) override {
+    PopupMenu getMenuForIndex(int topLevelMenuIndex, const String& /* menuName */) override {
         PopupMenu menu;
         if (topLevelMenuIndex == 0) {  // Settings
             menu.addItem("Plugins", [this] {
@@ -112,7 +112,7 @@ class App : public JUCEApplication, public MenuBarModel {
         return menu;
     }
 
-    void menuItemSelected(int menuItemID, int topLevelMenuIndex) override {}
+    void menuItemSelected(int /* menuItemID */, int /* topLevelMenuIndex */) override {}
 
     void hidePluginList() { m_pluginListWindow.reset(); }
     void hideServerSettings() { m_srvSettingsWindow.reset(); }
@@ -144,7 +144,7 @@ class App : public JUCEApplication, public MenuBarModel {
             }
         }
 
-        ~ProcessorWindow() {
+        ~ProcessorWindow() override {
             if (m_editor != nullptr) {
                 delete m_editor;
                 m_editor = nullptr;

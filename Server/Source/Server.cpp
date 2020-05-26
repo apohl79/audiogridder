@@ -169,7 +169,7 @@ bool Server::scanNextPlugin(PluginDirectoryScanner& scanner, String& name) {
     std::condition_variable cv;
     bool hasNext = false;
     bool done = false;
-    MessageManager::callAsync([this, &mtx, &cv, &scanner, &name, &hasNext, &done] {
+    MessageManager::callAsync([&mtx, &cv, &scanner, &name, &hasNext, &done] {
         std::lock_guard<std::mutex> lock(mtx);
         hasNext = scanner.scanNextFile(true, name);
         done = true;

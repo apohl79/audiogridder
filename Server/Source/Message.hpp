@@ -9,6 +9,7 @@
 #define Message_hpp
 
 #include "KeyAndMouse.hpp"
+#include "NumberConversion.hpp"
 #include "json.hpp"
 
 namespace e47 {
@@ -143,7 +144,7 @@ class AudioMessage {
             }
             for (int chan = 0; chan < m_reqHeader.channels; ++chan) {
                 if (!send(socket, reinterpret_cast<const char*>(buffer.getReadPointer(chan)),
-                          m_reqHeader.samples * sizeof(T))) {
+                          m_reqHeader.samples * as<int>(sizeof(T)))) {
                     return false;
                 }
             }
@@ -175,7 +176,7 @@ class AudioMessage {
             }
             for (int chan = 0; chan < m_reqHeader.channels; ++chan) {
                 if (!send(socket, reinterpret_cast<const char*>(buffer.getReadPointer(chan)),
-                          m_reqHeader.samples * sizeof(T))) {
+                          m_reqHeader.samples * as<int>(sizeof(T)))) {
                     return false;
                 }
             }
@@ -201,7 +202,7 @@ class AudioMessage {
                 return false;
             }
             for (int chan = 0; chan < buffer.getNumChannels(); ++chan) {
-                if (!read(socket, buffer.getWritePointer(chan), buffer.getNumSamples() * sizeof(T), 1000, e)) {
+                if (!read(socket, buffer.getWritePointer(chan), buffer.getNumSamples() * as<int>(sizeof(T)), 1000, e)) {
                     return false;
                 }
             }
@@ -212,8 +213,9 @@ class AudioMessage {
                 if (!read(socket, &midiHdr, sizeof(midiHdr), 1000, e)) {
                     return false;
                 }
-                if (midiData.size() < midiHdr.size) {
-                    midiData.resize(midiHdr.size);
+                auto size = as<size_t>(midiHdr.size);
+                if (midiData.size() < size) {
+                    midiData.resize(size);
                 }
                 if (!read(socket, midiData.data(), midiHdr.size, 1000, e)) {
                     return false;
@@ -244,14 +246,14 @@ class AudioMessage {
                 for (int chan = m_reqHeader.channels; chan < channels; ++chan) {
                     bufferD.clear(chan, 0, m_reqHeader.samples);
                 }
-                size = m_reqHeader.samples * sizeof(double);
+                size = m_reqHeader.samples * as<int>(sizeof(double));
             } else {
                 bufferF.setSize(channels, m_reqHeader.samples);
                 // no data for extra channels
                 for (int chan = m_reqHeader.channels; chan < channels; ++chan) {
                     bufferF.clear(chan, 0, m_reqHeader.samples);
                 }
-                size = m_reqHeader.samples * sizeof(float);
+                size = m_reqHeader.samples * as<int>(sizeof(float));
             }
             for (int chan = 0; chan < m_reqHeader.channels; ++chan) {
                 char* data = m_reqHeader.isDouble ? reinterpret_cast<char*>(bufferD.getWritePointer(chan))
@@ -267,7 +269,7 @@ class AudioMessage {
                 if (!read(socket, &midiHdr, sizeof(midiHdr))) {
                     return false;
                 }
-                midiData.resize(midiHdr.size);
+                midiData.resize(static_cast<size_t>(midiHdr.size));
                 if (!read(socket, midiData.data(), midiHdr.size)) {
                     return false;
                 }
@@ -309,9 +311,9 @@ class Payload {
 
     int getType() const { return payloadType; }
     void setType(int t) { payloadType = t; }
-    size_t getSize() const { return payloadBuffer.size(); }
-    void setSize(size_t size) {
-        payloadBuffer.resize(size);
+    int getSize() const { return as<int>(payloadBuffer.size()); }
+    void setSize(int size) {
+        payloadBuffer.resize(as<size_t>(size));
         realign();
     }
     char* getData() { return reinterpret_cast<char*>(payloadBuffer.data()); }
@@ -346,16 +348,17 @@ class StringPayload : public Payload {
     StringPayload(int type) : Payload(type, sizeof(int)) { realign(); }
 
     void setString(const String& s) {
-        setSize(sizeof(int) + s.length());
+        setSize(as<int>(sizeof(int)) + s.length());
         *size = s.length();
-        memcpy(str, s.getCharPointer(), s.length());
+        memcpy(str, s.getCharPointer(), as<size_t>(s.length()));
     }
 
-    String getString() const { return String(str, *size); }
+    String getString() const { return String(str, static_cast<size_t>(*size)); }
 
     virtual void realign() override {
         size = reinterpret_cast<int*>(payloadBuffer.data());
-        str = getSize() > sizeof(int) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(int) : nullptr;
+        str =
+            as<size_t>(getSize()) > sizeof(int) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(int) : nullptr;
     }
 };
 
@@ -375,14 +378,15 @@ class BinaryPayload : public Payload {
     BinaryPayload(int type) : Payload(type, sizeof(int)) { realign(); }
 
     void setData(const char* src, int len) {
-        setSize(sizeof(int) + len);
+        setSize(as<int>(sizeof(int)) + len);
         *size = len;
-        memcpy(data, src, len);
+        memcpy(data, src, static_cast<size_t>(len));
     }
 
     virtual void realign() override {
         size = reinterpret_cast<int*>(payloadBuffer.data());
-        data = getSize() > sizeof(int) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(int) : nullptr;
+        data =
+            as<size_t>(getSize()) > sizeof(int) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(int) : nullptr;
     }
 };
 
@@ -412,18 +416,19 @@ class Result : public Payload {
     Result() : Payload(Type) { realign(); }
 
     void setResult(int rc, const String& s) {
-        setSize(sizeof(hdr_t) + s.length());
+        setSize(static_cast<int>(sizeof(hdr_t)) + s.length());
         hdr->rc = rc;
         hdr->size = s.length();
-        memcpy(str, s.getCharPointer(), s.length());
+        memcpy(str, s.getCharPointer(), as<size_t>(s.length()));
     }
 
     int getReturnCode() const { return hdr->rc; }
-    String getString() const { return String(str, hdr->size); }
+    String getString() const { return String(str, as<size_t>(hdr->size)); }
 
     virtual void realign() override {
         hdr = reinterpret_cast<hdr_t*>(payloadBuffer.data());
-        str = getSize() > sizeof(hdr_t) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(hdr_t) : nullptr;
+        str = as<size_t>(getSize()) > sizeof(hdr_t) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(hdr_t)
+                                                    : nullptr;
     }
 };
 
@@ -477,7 +482,7 @@ class ScreenCapture : public Payload {
     ScreenCapture() : Payload(Type) { realign(); }
 
     void setImage(int width, int height, const void* p, size_t size) {
-        setSize(sizeof(hdr_t) + size);
+        setSize(as<int>(sizeof(hdr_t) + size));
         hdr->width = width;
         hdr->height = height;
         hdr->size = size;
@@ -488,7 +493,8 @@ class ScreenCapture : public Payload {
 
     virtual void realign() override {
         hdr = reinterpret_cast<hdr_t*>(payloadBuffer.data());
-        data = getSize() > sizeof(hdr_t) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(hdr_t) : nullptr;
+        data = as<size_t>(getSize()) > sizeof(hdr_t) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(hdr_t)
+                                                     : nullptr;
     }
 };
 
@@ -525,7 +531,7 @@ class Key : public BinaryPayload {
     Key() : BinaryPayload(Type) {}
 
     const uint16_t* getKeyCodes() const { return reinterpret_cast<const uint16_t*>(data); }
-    size_t getKeyCount() const { return *size / sizeof(uint16_t); }
+    int getKeyCount() const { return *size / as<int>(sizeof(uint16_t)); }
 };
 
 class BypassPlugin : public NumberPayload {
@@ -606,7 +612,7 @@ class Preset : public DataPayload<preset_t> {
 template <typename T>
 class Message {
   public:
-    static constexpr size_t MAX_SIZE = 1024 * 1024 * 20;  // 20 MB
+    static constexpr int MAX_SIZE = 1024 * 1024 * 20;  // 20 MB
 
     struct Header {
         int type;
@@ -624,9 +630,9 @@ class Message {
             int ret = socket->waitUntilReady(true, timeoutMilliseconds);
             if (ret > 0) {
                 if (e47::read(socket, &hdr, sizeof(hdr))) {
-                    if (T::Type > 0 && hdr.type != T::Type) {
-                        std::cerr << "invalid message type " << hdr.type << " (" << T::Type << " expected)"
-                                  << std::endl;
+                    auto t = T::Type;
+                    if (t > 0 && hdr.type != t) {
+                        std::cerr << "invalid message type " << hdr.type << " (" << t << " expected)" << std::endl;
                         success = false;
                         MessageHelper::seterr(e, MessageHelper::E_DATA);
                     } else {
@@ -670,7 +676,7 @@ class Message {
 
     bool send(StreamingSocket* socket) {
         Header hdr = {payload.getType(), (int)payload.getSize()};
-        if (hdr.size > MAX_SIZE) {
+        if (static_cast<size_t>(hdr.size) > MAX_SIZE) {
             std::cerr << "max size of " << MAX_SIZE << " bytes exceeded (" << hdr.size << " bytes)" << std::endl;
             return false;
         }

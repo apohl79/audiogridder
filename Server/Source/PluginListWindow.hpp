@@ -18,7 +18,7 @@ class App;
 class PluginListWindow : public DocumentWindow {
   public:
     PluginListWindow(App* app, KnownPluginList& list, const String& deadMansPedalFile);
-    ~PluginListWindow() { clearContentComponent(); }
+    ~PluginListWindow() override { clearContentComponent(); }
 
     void closeButtonPressed() override;
 
