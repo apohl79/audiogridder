@@ -47,7 +47,7 @@ different servers from your DAW at the same time.
 **Server Setup:**
 
 1. Install the PKG on OSX or the Setup EXE on Windows (includes server and plugin binaries)
-2. Grant AudioGridderServer the Accessibility permission (System
+2. On OSX: Grant AudioGridderServer the Accessibility permission (System
 Preferences -> Security & Privacy -> Privacy Tab) - If you upgrade,
 remove the existing entry and re-add it.
 3. Run the server (If it crashes, just re-run it until it successfully
