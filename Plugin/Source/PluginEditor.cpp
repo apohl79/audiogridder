@@ -66,7 +66,7 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
             b->setButtonText("( " + m_processor.getLoadedPlugin(idx).name + " )");
             b->setColour(PluginButton::textColourOffId, Colours::grey);
         }
-#ifdef JucePlugin_IsSynth
+#if JucePlugin_IsSynth
         m_newPluginButton.setEnabled(false);
 #endif
         idx++;
@@ -118,7 +118,7 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
         auto addFn = [this](const ServerPlugin& plug) {
             if (m_processor.loadPlugin(plug.getId(), plug.getName())) {
                 addPluginButton(plug.getId(), plug.getName());
-#ifdef JucePlugin_IsSynth
+#if JucePlugin_IsSynth
                 m_newPluginButton.setEnabled(false);
 #endif
                 resized();
@@ -247,7 +247,7 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
                     break;
                 }
             }
-#ifdef JucePlugin_IsSynth
+#if JucePlugin_IsSynth
             m_newPluginButton.setEnabled(true);
 #endif
             resized();
