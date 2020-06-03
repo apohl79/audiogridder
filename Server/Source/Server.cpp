@@ -37,6 +37,10 @@ void Server::loadConfig() {
             m_enableVST = j["VST"].get<bool>();
             logln("VST3 support " << (m_enableVST ? "enabled" : "disabled"));
         }
+        if (j.find("VST2") != j.end()) {
+            m_enableVST2 = j["VST2"].get<bool>();
+            logln("VST2 support " << (m_enableVST2 ? "enabled" : "disabled"));
+        }
         if (j.find("ScreenQuality") != j.end()) {
             m_screenJpgQuality = j["ScreenQuality"].get<float>();
         }
@@ -67,6 +71,7 @@ void Server::saveConfig() {
     j["ID"] = m_id;
     j["AU"] = m_enableAU;
     j["VST"] = m_enableVST;
+    j["VST2"] = m_enableVST2;
     j["ScreenQuality"] = m_screenJpgQuality;
     j["ScreenDiffDetection"] = m_screenDiffDetection;
     j["ExcludePlugins"] = json::array();
@@ -194,6 +199,9 @@ void Server::scanForPlugins(const std::vector<String>& include) {
 #endif
     if (m_enableVST) {
         fmts.push_back(std::make_unique<VST3PluginFormat>());
+    }
+    if (m_enableVST2) {
+        fmts.push_back(std::make_unique<VSTPluginFormat>());
     }
 
     std::set<String> neverSeenList = m_pluginexclude;

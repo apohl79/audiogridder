@@ -58,12 +58,22 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     addChildAndSetID(&m_vstSupport, "vst");
 
     label = std::make_unique<Label>();
-    label->setText("Screen Capture Diff Detection:", NotificationType::dontSendNotification);
+    label->setText("VST2 Support:", NotificationType::dontSendNotification);
     label->setBounds(15, 160, 250, 30);
     addChildAndSetID(label.get(), "lbl");
     m_components.push_back(std::move(label));
 
-    m_screenDiffDetection.setBounds(307, 163, 25, 25);
+    m_vst2Support.setBounds(307, 163, 25, 25);
+    m_vst2Support.setToggleState(m_app->getServer().getEnableVST2(), NotificationType::dontSendNotification);
+    addChildAndSetID(&m_vst2Support, "vst2");
+
+    label = std::make_unique<Label>();
+    label->setText("Screen Capture Diff Detection:", NotificationType::dontSendNotification);
+    label->setBounds(15, 200, 250, 30);
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
+
+    m_screenDiffDetection.setBounds(307, 203, 25, 25);
     m_screenDiffDetection.setToggleState(m_app->getServer().getScreenDiffDetection(),
                                          NotificationType::dontSendNotification);
     m_screenDiffDetection.onClick = [this] {
@@ -81,22 +91,23 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     addChildAndSetID(&m_screenDiffDetection, "diff");
 
     m_screenJpgQualityLbl.setText("Screen Capture Quality (0.1-1.0):", NotificationType::dontSendNotification);
-    m_screenJpgQualityLbl.setBounds(15, 200, 250, 30);
+    m_screenJpgQualityLbl.setBounds(15, 240, 250, 30);
     addChildAndSetID(&m_screenJpgQualityLbl, "lbl");
 
     String q;
     q << m_app->getServer().getScreenQuality();
     m_screenJpgQuality.setText(q);
-    m_screenJpgQuality.setBounds(280, 203, 50, 25);
+    m_screenJpgQuality.setBounds(280, 243, 50, 25);
     addChildAndSetID(&m_screenJpgQuality, "qual");
 
     m_saveButton.setButtonText("Save");
-    m_saveButton.setBounds(112, 250, 125, 30);
+    m_saveButton.setBounds(112, 310, 125, 30);
     m_saveButton.onClick = [this, app] {
         auto appCpy = app;
         appCpy->getServer().setId(m_idText.getTextValue().toString().getIntValue());
         appCpy->getServer().setEnableAU(m_auSupport.getToggleState());
         appCpy->getServer().setEnableVST(m_vstSupport.getToggleState());
+        appCpy->getServer().setEnableVST2(m_vst2Support.getToggleState());
         appCpy->getServer().setScreenDiffDetection(m_screenDiffDetection.getToggleState());
         float qual = m_screenJpgQuality.getTextValue().toString().getFloatValue();
         if (qual < 0.1) {
@@ -112,7 +123,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     addChildAndSetID(&m_saveButton, "save");
 
     setResizable(false, false);
-    centreWithSize(350, 300);
+    centreWithSize(350, 360);
     setVisible(true);
 }
 

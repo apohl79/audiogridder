@@ -31,6 +31,8 @@ class Server : public Thread {
     void setEnableAU(bool b) { m_enableAU = b; }
     bool getEnableVST() const { return m_enableVST; }
     void setEnableVST(bool b) { m_enableVST = b; }
+    bool getEnableVST2() const { return m_enableVST2; }
+    void setEnableVST2(bool b) { m_enableVST2 = b; }
     float getScreenQuality() const { return m_screenJpgQuality; }
     void setScreenQuality(float q) { m_screenJpgQuality = q; }
     bool getScreenDiffDetection() const { return m_screenDiffDetection; }
@@ -55,6 +57,7 @@ class Server : public Thread {
     std::set<String> m_pluginexclude;
     bool m_enableAU = true;
     bool m_enableVST = true;
+    bool m_enableVST2 = true;
     float m_screenJpgQuality = 0.9f;
     bool m_screenDiffDetection = true;
 

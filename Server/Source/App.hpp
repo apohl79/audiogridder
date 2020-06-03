@@ -76,6 +76,11 @@ class App : public JUCEApplication, public MenuBarModel {
 #else
             auto menu = m_app->getMenuForIndex(0, "Tray");
             menu.addSeparator();
+            menu.addItem("About AudioGridder", [this] {
+                m_app->showSplashWindow([this] { m_app->hideSplashWindow(); });
+                String info = "Copyright (c) 2020 by Andreas Pohl, MIT license";
+                m_app->setSplashInfo(info);
+            });
             menu.addItem("Quit", [this] { m_app->systemRequestedQuit(); });
             menu.show();
 #endif

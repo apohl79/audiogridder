@@ -59,9 +59,9 @@
     <XCODE_MAC targetFolder="Builds/MacOSX" smallIcon="TxAv0c" bigIcon="TxAv0c">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" osxCompatibility="10.7 SDK" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
-                       recommendedWarnings="LLVM"/>
+                       recommendedWarnings="LLVM" headerPath="$(HOME)/audio/vstsdk2.4"/>
         <CONFIGURATION isDebug="1" name="Release" osxCompatibility="10.7 SDK" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
-                       recommendedWarnings="LLVM"/>
+                       recommendedWarnings="LLVM" headerPath="$(HOME)/audio/vstsdk2.4"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../audio/JUCE/modules"/>
@@ -78,10 +78,12 @@
         <MODULEPATH id="juce_opengl" path="../audio/JUCE/modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
-    <VS2019 targetFolder="Builds/VisualStudio2019">
+    <VS2019 targetFolder="Builds/VisualStudio2019" smallIcon="TxAv0c" bigIcon="TxAv0c">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" defines="JUCE_WINDOWS&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"/>
-        <CONFIGURATION isDebug="0" name="Release" defines="JUCE_WINDOWS&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"/>
+        <CONFIGURATION isDebug="1" name="Debug" defines="JUCE_WINDOWS&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
+                       headerPath="Z:\vstsdk2.4"/>
+        <CONFIGURATION isDebug="0" name="Release" defines="JUCE_WINDOWS&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
+                       headerPath="Z:\vstsdk2.4"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_opengl"/>
@@ -117,5 +119,6 @@
     <OSX/>
     <WINDOWS/>
   </LIVE_SETTINGS>
-  <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_PLUGINHOST_VST3="1" JUCE_PLUGINHOST_AU="1"/>
+  <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_PLUGINHOST_VST3="1" JUCE_PLUGINHOST_AU="1"
+               JUCE_PLUGINHOST_VST="1"/>
 </JUCERPROJECT>
