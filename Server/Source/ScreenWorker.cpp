@@ -22,6 +22,8 @@ ScreenWorker::~ScreenWorker() {
 void ScreenWorker::init(std::unique_ptr<StreamingSocket> s) { m_socket = std::move(s); }
 
 void ScreenWorker::run() {
+    dbgln("screen processor started");
+
     Message<ScreenCapture> msg;
     float qual = getApp().getServer().getScreenQuality();
     PNGImageFormat png;
@@ -94,7 +96,8 @@ void ScreenWorker::run() {
         }
     }
     hideEditor();
-    logln("screen processor terminated");
+
+    dbgln("screen processor terminated");
 }
 
 void ScreenWorker::shutdown() {

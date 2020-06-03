@@ -21,9 +21,7 @@ class AudioGridderAudioProcessor : public AudioProcessor {
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
 
-#ifndef JucePlugin_PreferredChannelConfigurations
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
-#endif
 
     void processBlock(AudioBuffer<float>& buf, MidiBuffer& midi) override { processBlockReal(buf, midi); }
     void processBlock(AudioBuffer<double>& buf, MidiBuffer& midi) override { processBlockReal(buf, midi); }
@@ -43,7 +41,7 @@ class AudioGridderAudioProcessor : public AudioProcessor {
 
     bool acceptsMidi() const override;
     bool producesMidi() const override;
-    bool isMidiEffect() const override;
+    bool isMidiEffect() const override { return false; }
     double getTailLengthSeconds() const override;
     bool supportsDoublePrecisionProcessing() const override;
 

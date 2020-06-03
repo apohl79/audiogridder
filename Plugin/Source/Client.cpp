@@ -123,12 +123,16 @@ void Client::setOnCloseCallback(OnCloseCallback fn) {
     m_onCloseCallback = fn;
 }
 
-void Client::init(int channels, double rate, int samplesPerBlock, bool doublePrecission) {
+void Client::init(int channelsIn, int channelsOut, double rate, int samplesPerBlock, bool doublePrecission) {
     dbglock(*this, 8);
-    m_channels = channels;
+    m_channelsIn = channelsIn;
+    m_channelsOut = channelsOut;
     m_rate = rate;
     m_samplesPerBlock = samplesPerBlock;
     m_doublePrecission = doublePrecission;
+    if (m_ready) {
+        m_needsReconnect = true;
+    }
 }
 
 void Client::init() {
@@ -143,7 +147,7 @@ void Client::init() {
     }
     dbglock(*this, 9);
     m_error = true;
-    if (m_channels == 0 || m_rate == 0.0 || m_samplesPerBlock == 0) {
+    if (m_channelsOut == 0 || m_rate == 0.0 || m_samplesPerBlock == 0) {
         return;
     }
     logln("connecting server " << host << ":" << id);
@@ -189,7 +193,7 @@ void Client::init() {
             logln("failed to set master socket non-blocking");
         }
 
-        Handshake cfg = {1, clientPort, m_channels, m_rate, m_samplesPerBlock, m_doublePrecission};
+        Handshake cfg = {1, clientPort, m_channelsIn, m_channelsOut, m_rate, m_samplesPerBlock, m_doublePrecission};
         if (!e47::send(m_cmd_socket.get(), reinterpret_cast<const char*>(&cfg), sizeof(cfg))) {
             m_cmd_socket->close();
             return;
@@ -554,7 +558,7 @@ void Client::ScreenReceiver::run() {
                 m_client->setPluginScreen(nullptr, 0, 0);
             }
         }
-    } while (!currentThreadShouldExit() && (e == MessageHelper::E_NONE || e == MessageHelper::E_TIMEOUT));
+    } while (!currentThreadShouldExit() && (e.code == MessageHelper::E_NONE || e.code == MessageHelper::E_TIMEOUT));
     signalThreadShouldExit();
     m_client->m_error = true;
     logln_clnt(m_client, "screen receiver terminated");

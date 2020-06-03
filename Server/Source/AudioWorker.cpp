@@ -23,21 +23,24 @@ AudioWorker::~AudioWorker() {
     stopThread(-1);
 }
 
-void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channels, double rate, int samplesPerBlock,
-                       bool doublePrecission, std::function<void()> fn) {
+void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channelsIn, int channelsOut, double rate,
+                       int samplesPerBlock, bool doublePrecission) {
     m_socket = std::move(s);
     m_rate = rate;
     m_samplesPerBlock = samplesPerBlock;
     m_doublePrecission = doublePrecission;
-    m_onTerminate = fn;
+    m_channelsIn = channelsIn;
+    m_channelsOut = channelsOut;
+    m_chain = std::make_shared<ProcessorChain>(ProcessorChain::createBussesProperties(channelsIn == 0));
     if (m_doublePrecission && m_chain->supportsDoublePrecisionProcessing()) {
         m_chain->setProcessingPrecision(AudioProcessor::doublePrecision);
     }
-    m_channels = channels;
-    m_chain->updateChannels(channels);
+    m_chain->updateChannels(channelsIn, channelsOut);
 }
 
 void AudioWorker::run() {
+    dbgln("audio processor started");
+
     AudioBuffer<float> bufferF;
     AudioBuffer<double> bufferD;
     MidiBuffer midi;
@@ -48,26 +51,24 @@ void AudioWorker::run() {
     m_chain->prepareToPlay(m_rate, m_samplesPerBlock);
     bool hasToSetPlayHead = true;
 
+    MessageHelper::Error e;
     while (!currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected()) {
         // Read audio chunk
         if (m_socket->waitUntilReady(true, 1000)) {
-            if (msg.readFromClient(m_socket.get(), bufferF, bufferD, midi, posInfo, m_chain->getExtraChannels())) {
+            if (msg.readFromClient(m_socket.get(), bufferF, bufferD, midi, posInfo, m_chain->getExtraChannels(), &e)) {
                 if (hasToSetPlayHead) {  // do not set the playhead before it's initialized
                     m_chain->setPlayHead(&playHead);
                     hasToSetPlayHead = false;
                 }
-                if (msg.isDouble() && bufferD.getNumChannels() > 0 && bufferD.getNumSamples() > 0) {
-                    if (m_channels > bufferD.getNumChannels()) {
-                        dbgln("updating bus layout at processing time due to channel mismatch");
-                        m_chain->releaseResources();
-                        if (!m_chain->updateChannels(bufferD.getNumChannels())) {
-                            logln("failed setting bus layout");
-                            m_socket->close();
-                            break;
-                        }
-                        m_channels = bufferD.getNumChannels();
-                        m_chain->prepareToPlay(m_rate, m_samplesPerBlock);
-                    }
+                int bufferChannels = msg.isDouble() ? bufferD.getNumChannels() : bufferF.getNumChannels();
+                if (m_channelsOut > bufferChannels) {
+                    logln("error: channel mismatch");
+                    m_chain->releaseResources();
+                    m_socket->close();
+                    break;
+                }
+                bool sendOk;
+                if (msg.isDouble()) {
                     if (m_chain->supportsDoublePrecisionProcessing()) {
                         m_chain->processBlock(bufferD, midi);
                     } else {
@@ -75,45 +76,28 @@ void AudioWorker::run() {
                         m_chain->processBlock(bufferF, midi);
                         bufferD.makeCopyOf(bufferF);
                     }
-                } else if (bufferF.getNumChannels() > 0 && bufferF.getNumSamples() > 0) {
-                    if (m_channels > bufferF.getNumChannels()) {
-                        dbgln("updating bus layout at processing time due to channel mismatch");
-                        m_chain->releaseResources();
-                        if (!m_chain->updateChannels(bufferF.getNumChannels())) {
-                            logln("failed setting bus layout");
-                            m_socket->close();
-                            break;
-                        }
-                        m_channels = bufferF.getNumChannels();
-                        m_chain->prepareToPlay(m_rate, m_samplesPerBlock);
-                    }
+                    sendOk =
+                        msg.sendToClient(m_socket.get(), bufferD, midi, m_chain->getLatencySamples(), m_channelsOut);
+                } else {
                     m_chain->processBlock(bufferF, midi);
-                } else {
-                    logln("empty audio message from " << m_socket->getHostName());
+                    sendOk =
+                        msg.sendToClient(m_socket.get(), bufferF, midi, m_chain->getLatencySamples(), m_channelsOut);
                 }
-                if (msg.isDouble()) {
-                    if (!msg.sendToClient(m_socket.get(), bufferD, midi, m_chain->getLatencySamples())) {
-                        logln("failed to send audio data to client");
-                        m_socket->close();
-                    }
-                } else {
-                    if (!msg.sendToClient(m_socket.get(), bufferF, midi, m_chain->getLatencySamples())) {
-                        logln("failed to send audio data to client");
-                        m_socket->close();
-                    }
+                if (!sendOk) {
+                    logln("error: failed to send audio data to client");
+                    m_socket->close();
                 }
             } else {
+                logln("error: failed to read audio message: " << e.toString());
                 m_socket->close();
             }
         }
     }
 
-    clear();
+    m_chain->setPlayHead(nullptr);
 
+    clear();
     signalThreadShouldExit();
-    if (m_onTerminate) {
-        m_onTerminate();
-    }
     dbgln("audio processor terminated");
 }
 

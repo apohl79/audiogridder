@@ -37,7 +37,8 @@ void Worker::run() {
     if (len > 0) {
         dbgln("  version          = " << cfg.version);
         dbgln("  clientPort       = " << cfg.clientPort);
-        dbgln("  channels         = " << cfg.channels);
+        dbgln("  channelsIn       = " << cfg.channelsIn);
+        dbgln("  channelsOut      = " << cfg.channelsOut);
         dbgln("  rate             = " << cfg.rate);
         dbgln("  samplesPerBlock  = " << cfg.samplesPerBlock);
         dbgln("  doublePrecission = " << static_cast<int>(cfg.doublePrecission));
@@ -48,8 +49,8 @@ void Worker::run() {
         setsockopt(sock->getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
 #endif
         if (sock->connect(m_client->getHostName(), cfg.clientPort)) {
-            m_audio.init(std::move(sock), cfg.channels, cfg.rate, cfg.samplesPerBlock, cfg.doublePrecission,
-                         [/*this*/] { /*m_client->close();*/ });
+            m_audio.init(std::move(sock), cfg.channelsIn, cfg.channelsOut, cfg.rate, cfg.samplesPerBlock,
+                         cfg.doublePrecission);
             m_audio.startThread(Thread::realtimeAudioPriority);
         } else {
             logln("failed to establish audio connection to " << m_client->getHostName() << ":" << cfg.clientPort);
@@ -71,7 +72,10 @@ void Worker::run() {
         auto& pluginList = getApp().getPluginList();
         String list;
         for (auto& plugin : pluginList.getTypes()) {
-            list += getStringFrom(plugin) + "\n";
+            if ((plugin.numInputChannels > 0 && cfg.channelsIn > 0) ||
+                (plugin.numInputChannels == 0 && cfg.channelsIn == 0)) {
+                list += getStringFrom(plugin) + "\n";
+            }
         }
         Message<PluginList> msgPL;
         PLD(msgPL).setString(list);
@@ -82,6 +86,7 @@ void Worker::run() {
         }
 
         // enter message loop
+        dbgln("command processor started");
         while (!currentThreadShouldExit() && nullptr != m_client && m_client->isConnected()) {
             MessageHelper::Error e;
             auto msg = MessageFactory::getNextMessage(m_client.get(), &e);
@@ -135,7 +140,7 @@ void Worker::run() {
                     default:
                         logln("unknown message type " << msg->getType());
                 }
-            } else if (e != MessageHelper::E_TIMEOUT) {
+            } else if (e.code != MessageHelper::E_TIMEOUT) {
                 break;
             }
         }

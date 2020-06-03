@@ -220,24 +220,6 @@ void Server::scanForPlugins(const std::vector<String>& include) {
         }
     }
 
-    StringArray instPlugs;
-    for (auto& p : m_pluginlist.getTypes()) {
-        if (p.isInstrument) {
-            instPlugs.add(p.descriptiveName);
-            m_pluginlist.removeType(p);
-            if (!p.pluginFormatName.compare("AudioUnit")) {
-                m_pluginexclude.insert(p.descriptiveName);
-            } else {
-                m_pluginexclude.insert(p.fileOrIdentifier);
-            }
-        }
-    }
-    if (!instPlugs.isEmpty()) {
-        String info = "The following instrument plugins have been deactivated:\n\n";
-        info << instPlugs.joinIntoString(", ");
-        AlertWindow::showMessageBoxAsync(AlertWindow::InfoIcon, "Info", info, "OK");
-    }
-
     m_pluginlist.sort(KnownPluginList::sortAlphabetically, true);
 
     for (auto& name : neverSeenList) {

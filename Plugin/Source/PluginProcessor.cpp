@@ -16,16 +16,11 @@ using json = nlohmann::json;
 using namespace e47;
 
 AudioGridderAudioProcessor::AudioGridderAudioProcessor()
-#ifndef JucePlugin_PreferredChannelConfigurations
     : AudioProcessor(BusesProperties()
-#if !JucePlugin_IsMidiEffect
 #if !JucePlugin_IsSynth
                          .withInput("Input", AudioChannelSet::stereo(), true)
 #endif
-                         .withOutput("Output", AudioChannelSet::stereo(), true)
-#endif
-                         ),
-#endif
+                         .withOutput("Output", AudioChannelSet::stereo(), true)),
       m_client(this) {
 
 #ifdef JUCE_MAC
@@ -134,14 +129,6 @@ bool AudioGridderAudioProcessor::producesMidi() const {
 #endif
 }
 
-bool AudioGridderAudioProcessor::isMidiEffect() const {
-#if JucePlugin_IsMidiEffect
-    return true;
-#else
-    return false;
-#endif
-}
-
 double AudioGridderAudioProcessor::getTailLengthSeconds() const { return 0.0; }
 
 bool AudioGridderAudioProcessor::supportsDoublePrecisionProcessing() const { return true; }
@@ -157,7 +144,9 @@ const String AudioGridderAudioProcessor::getProgramName(int /* index */) { retur
 void AudioGridderAudioProcessor::changeProgramName(int /* index */, const String& /* newName */) {}
 
 void AudioGridderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
-    m_client.init(getTotalNumInputChannels(), sampleRate, samplesPerBlock, isUsingDoublePrecision());
+    logln_clnt(&m_client, "prepareToPlay: sampleRate = " << sampleRate << ", samplesPerBlock=" << samplesPerBlock);
+    m_client.init(getTotalNumInputChannels(), getTotalNumOutputChannels(), sampleRate, samplesPerBlock,
+                  isUsingDoublePrecision());
 }
 
 void AudioGridderAudioProcessor::releaseResources() {
@@ -165,30 +154,18 @@ void AudioGridderAudioProcessor::releaseResources() {
     // spare memory, etc.
 }
 
-#ifndef JucePlugin_PreferredChannelConfigurations
 bool AudioGridderAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
-#if JucePlugin_IsMidiEffect
-    ignoreUnused(layouts);
-    return true;
-#else
-    // This is the place where you check if the layout is supported.
-    // In this template code we only support mono or stereo.
     if (layouts.getMainOutputChannelSet() != AudioChannelSet::mono() &&
         layouts.getMainOutputChannelSet() != AudioChannelSet::stereo()) {
         return false;
     }
-
-    // This checks if the input layout matches the output layout
 #if !JucePlugin_IsSynth
     if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet()) {
         return false;
     }
 #endif
-
     return true;
-#endif
 }
-#endif
 
 template <typename T>
 void AudioGridderAudioProcessor::processBlockReal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
@@ -209,7 +186,7 @@ void AudioGridderAudioProcessor::processBlockReal(AudioBuffer<T>& buffer, MidiBu
             buffer.clear(i, 0, buffer.getNumSamples());
         }
     } else {
-        if (buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) {
+        if ((buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) || midiMessages.getNumEvents() > 0) {
             m_client.send(buffer, midiMessages, posInfo);
             m_client.read(buffer, midiMessages);
             if (m_client.getLatencySamples() != getLatencySamples()) {

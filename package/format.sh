@@ -1,6 +1,9 @@
 #!/bin/bash
 
-DIR=..
+DIR=.
+if [ ! -d $DIR/Plugin ]; then
+    DIR=..
+fi
 if [ -n "$1" ]; then
     DIR=$1
 fi

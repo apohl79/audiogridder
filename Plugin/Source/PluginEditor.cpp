@@ -66,6 +66,9 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
             b->setButtonText("( " + m_processor.getLoadedPlugin(idx).name + " )");
             b->setColour(PluginButton::textColourOffId, Colours::grey);
         }
+#ifdef JucePlugin_IsSynth
+        m_newPluginButton.setEnabled(false);
+#endif
         idx++;
     }
 
@@ -115,6 +118,9 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
         auto addFn = [this](const ServerPlugin& plug) {
             if (m_processor.loadPlugin(plug.getId(), plug.getName())) {
                 addPluginButton(plug.getId(), plug.getName());
+#ifdef JucePlugin_IsSynth
+                m_newPluginButton.setEnabled(false);
+#endif
                 resized();
             } else {
                 AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Error",
@@ -241,6 +247,9 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
                     break;
                 }
             }
+#ifdef JucePlugin_IsSynth
+            m_newPluginButton.setEnabled(true);
+#endif
             resized();
         };
         if (modifiers.isLeftButtonDown()) {
@@ -404,6 +413,8 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
     };
     bufMenu.addItem("Disabled (+0ms)", true, m_processor.getClient().NUM_OF_BUFFERS == 0,
                     [this] { m_processor.saveConfig(0); });
+    bufMenu.addItem(getName(2), true, m_processor.getClient().NUM_OF_BUFFERS == 2,
+                    [this] { m_processor.saveConfig(2); });
     bufMenu.addItem(getName(4), true, m_processor.getClient().NUM_OF_BUFFERS == 4,
                     [this] { m_processor.saveConfig(4); });
     bufMenu.addItem(getName(8), true, m_processor.getClient().NUM_OF_BUFFERS == 8,

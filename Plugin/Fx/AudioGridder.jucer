@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<JUCERPROJECT id="JM1hGs" name="AudioGridder" projectType="audioplug" jucerVersion="5.4.7"
+              companyName="e47" companyCopyright="2020 Andreas Pohl" companyWebsite="https://www.e47.org"
+              companyEmail="audiogridder@e47.org" pluginFormats="buildAU,buildVST3"
+              pluginManufacturerCode="XE47" pluginCode="E401" headerPath="../../../../Server/Source&#10;"
+              pluginName="AGridder" pluginVST3Category="Network" version="1.0.0"
+              pluginAUMainType="'aufx'">
+  <MAINGROUP id="tTbkq6" name="AudioGridder">
+    <GROUP id="{A2A08E54-1037-9844-5B73-F16B657A5259}" name="Source">
+      <FILE id="FaxY5N" name="AudioStreamer.hpp" compile="0" resource="0"
+            file="../Source/AudioStreamer.hpp"/>
+      <FILE id="OYKLkH" name="Client.cpp" compile="1" resource="0" file="../Source/Client.cpp"/>
+      <FILE id="iWAQgS" name="Client.hpp" compile="0" resource="0" file="../Source/Client.hpp"/>
+      <FILE id="KFE1km" name="Images.cpp" compile="1" resource="0" file="../Source/Images.cpp"/>
+      <FILE id="bNKB6z" name="Images.hpp" compile="0" resource="0" file="../Source/Images.hpp"/>
+      <FILE id="TtcZns" name="NewServerWindow.cpp" compile="1" resource="0"
+            file="../Source/NewServerWindow.cpp"/>
+      <FILE id="IE18nC" name="NewServerWindow.hpp" compile="0" resource="0"
+            file="../Source/NewServerWindow.hpp"/>
+      <FILE id="xtRSyq" name="PluginButton.cpp" compile="1" resource="0"
+            file="../Source/PluginButton.cpp"/>
+      <FILE id="eriSMf" name="PluginButton.hpp" compile="0" resource="0"
+            file="../Source/PluginButton.hpp"/>
+      <FILE id="KoiWSL" name="PluginEditor.cpp" compile="1" resource="0"
+            file="../Source/PluginEditor.cpp"/>
+      <FILE id="lkGBSv" name="PluginEditor.hpp" compile="0" resource="0"
+            file="../Source/PluginEditor.hpp"/>
+      <FILE id="I1MuaF" name="PluginProcessor.cpp" compile="1" resource="0"
+            file="../Source/PluginProcessor.cpp"/>
+      <FILE id="sfJS6b" name="PluginProcessor.hpp" compile="0" resource="0"
+            file="../Source/PluginProcessor.hpp"/>
+      <FILE id="jBgUv5" name="ServerPlugin.hpp" compile="0" resource="0"
+            file="../Source/ServerPlugin.hpp"/>
+    </GROUP>
+  </MAINGROUP>
+  <EXPORTFORMATS>
+    <XCODE_MAC targetFolder="Builds/MacOSX" aaxFolder="../../AAX_SDK_2p3p2">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" optimisation="3" headerPath="/usr/local/include"
+                       recommendedWarnings="LLVM"/>
+        <CONFIGURATION isDebug="1" name="Release" headerPath="/usr/local/include" recommendedWarnings="LLVM"
+                       enablePluginBinaryCopyStep="0"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_audio_basics" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_devices" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_formats" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_plugin_client" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_utils" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_core" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_cryptography" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_data_structures" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_events" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_graphics" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_basics" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_extra" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_opengl" path="../../JUCE/modules"/>
+      </MODULEPATHS>
+    </XCODE_MAC>
+    <VS2019 targetFolder="Builds/VisualStudio2019">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" headerPath="C:\local\boost_1_73_0"/>
+        <CONFIGURATION isDebug="0" name="Release" headerPath="C:\local\boost_1_73_0"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_opengl"/>
+        <MODULEPATH id="juce_gui_extra"/>
+        <MODULEPATH id="juce_gui_basics"/>
+        <MODULEPATH id="juce_graphics"/>
+        <MODULEPATH id="juce_events"/>
+        <MODULEPATH id="juce_data_structures"/>
+        <MODULEPATH id="juce_cryptography"/>
+        <MODULEPATH id="juce_core"/>
+        <MODULEPATH id="juce_audio_utils"/>
+        <MODULEPATH id="juce_audio_processors"/>
+        <MODULEPATH id="juce_audio_plugin_client"/>
+        <MODULEPATH id="juce_audio_formats"/>
+        <MODULEPATH id="juce_audio_devices"/>
+        <MODULEPATH id="juce_audio_basics"/>
+      </MODULEPATHS>
+    </VS2019>
+  </EXPORTFORMATS>
+  <MODULES>
+    <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_formats" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_plugin_client" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="1"/>
+    <MODULE id="juce_audio_processors" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_cryptography" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_events" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_graphics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+  </MODULES>
+  <LIVE_SETTINGS>
+    <OSX buildEnabled="0" continuousRebuildEnabled="1"/>
+    <WINDOWS/>
+  </LIVE_SETTINGS>
+  <JUCEOPTIONS JUCE_VST3_CAN_REPLACE_VST2="0" JUCE_STRICT_REFCOUNTEDPOINTER="1"/>
+</JUCERPROJECT>

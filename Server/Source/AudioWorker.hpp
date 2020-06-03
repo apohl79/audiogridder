@@ -10,6 +10,8 @@
 
 #include "../JuceLibraryCode/JuceHeader.h"
 #include "ProcessorChain.hpp"
+#include "Message.hpp"
+
 #include <thread>
 
 namespace e47 {
@@ -24,11 +26,11 @@ class ProcessorChain;
 
 class AudioWorker : public Thread {
   public:
-    AudioWorker() : Thread("AudioWorker") { m_chain = std::make_shared<ProcessorChain>(); }
+    AudioWorker() : Thread("AudioWorker") {}
     virtual ~AudioWorker() override;
 
-    void init(std::unique_ptr<StreamingSocket> s, int channels, double rate, int samplesPerBlock, bool doublePrecission,
-              std::function<void()> fn);
+    void init(std::unique_ptr<StreamingSocket> s, int channelsIn, int channelsOut, double rate, int samplesPerBlock,
+              bool doublePrecission);
 
     void run() override;
     void shutdown();
@@ -49,14 +51,14 @@ class AudioWorker : public Thread {
 
   private:
     std::unique_ptr<StreamingSocket> m_socket;
-    int m_channels;
+    int m_channelsIn;
+    int m_channelsOut;
     double m_rate;
     int m_samplesPerBlock;
     bool m_doublePrecission;
     std::shared_ptr<ProcessorChain> m_chain;
     static HashMap<String, RecentsListType> m_recents;
     static std::mutex m_recentsMtx;
-    std::function<void()> m_onTerminate;
 };
 
 }  // namespace e47

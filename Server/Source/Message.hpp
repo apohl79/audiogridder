@@ -20,10 +20,29 @@ using json = nlohmann::json;
  * Core I/O functions
  */
 struct MessageHelper {
-    enum Error { E_NONE, E_DATA, E_TIMEOUT, E_STATE, E_SYSCALL };
-    static void seterr(Error* e, Error c) {
+    enum ErrorCode { E_NONE, E_DATA, E_TIMEOUT, E_STATE, E_SYSCALL, E_SIZE };
+
+    struct Error {
+        ErrorCode code = E_NONE;
+        String str = "";
+        String toString() const {
+            String ret = "EC=";
+            ret << code;
+            ret << " STR=" << str;
+            return ret;
+        }
+    };
+
+    static void seterr(Error* e, ErrorCode c, String s = "") {
         if (nullptr != e) {
-            *e = c;
+            e->code = c;
+            e->str = s;
+        }
+    }
+
+    static void seterrstr(Error* e, String s) {
+        if (nullptr != e) {
+            e->str = s;
         }
     }
 };
@@ -97,7 +116,8 @@ static bool read(StreamingSocket* socket, void* data, int size, int timeoutMilli
 struct Handshake {
     int version;
     int clientPort;
-    int channels;
+    int channelsIn;
+    int channelsOut;
     double rate;
     int samplesPerBlock;
     bool doublePrecission;
@@ -111,13 +131,17 @@ class AudioMessage {
     struct RequestHeader {
         int channels;
         int samples;
-        bool isDouble;
+        int channelsRequested;  // If only midi data is sent, let the server know about the expected audio buffer size
+        int samplesRequested;   // If only midi data is sent, let the server know about the expected audio buffer size
         int numMidiEvents;
+        bool isDouble;
     };
 
     struct ResponseHeader {
-        int latencySamples;
+        int channels;
+        int samples;
         int numMidiEvents;
+        int latencySamples;
     };
 
     struct MidiHeader {
@@ -126,16 +150,21 @@ class AudioMessage {
     };
 
     int getChannels() const { return m_reqHeader.channels; }
+    int getChannelsRequested() const { return m_reqHeader.channelsRequested; }
     int getSamples() const { return m_reqHeader.samples; }
+    int getSamplesRequested() const { return m_reqHeader.samplesRequested; }
     bool isDouble() const { return m_reqHeader.isDouble; }
 
     int getLatencySamples() const { return m_resHeader.latencySamples; }
 
     template <typename T>
     bool sendToServer(StreamingSocket* socket, AudioBuffer<T>& buffer, MidiBuffer& midi,
-                      AudioPlayHead::CurrentPositionInfo& posInfo) {
+                      AudioPlayHead::CurrentPositionInfo& posInfo, int channelsRequested = -1,
+                      int samplesRequested = -1) {
         m_reqHeader.channels = buffer.getNumChannels();
         m_reqHeader.samples = buffer.getNumSamples();
+        m_reqHeader.channelsRequested = channelsRequested > -1 ? channelsRequested : buffer.getNumChannels();
+        m_reqHeader.samplesRequested = samplesRequested > -1 ? samplesRequested : buffer.getNumSamples();
         m_reqHeader.isDouble = std::is_same<T, double>::value;
         m_reqHeader.numMidiEvents = midi.getNumEvents();
         if (socket->isConnected()) {
@@ -167,16 +196,19 @@ class AudioMessage {
     }
 
     template <typename T>
-    bool sendToClient(StreamingSocket* socket, AudioBuffer<T>& buffer, MidiBuffer& midi, int latencySamples) {
+    bool sendToClient(StreamingSocket* socket, AudioBuffer<T>& buffer, MidiBuffer& midi, int latencySamples,
+                      int channelsToSend) {
+        m_resHeader.channels = channelsToSend;
+        m_resHeader.samples = buffer.getNumSamples();
         m_resHeader.latencySamples = latencySamples;
         m_resHeader.numMidiEvents = midi.getNumEvents();
         if (socket->isConnected()) {
             if (!send(socket, reinterpret_cast<const char*>(&m_resHeader), sizeof(m_resHeader))) {
                 return false;
             }
-            for (int chan = 0; chan < m_reqHeader.channels; ++chan) {
+            for (int chan = 0; chan < m_resHeader.channels; ++chan) {
                 if (!send(socket, reinterpret_cast<const char*>(buffer.getReadPointer(chan)),
-                          m_reqHeader.samples * as<int>(sizeof(T)))) {
+                          m_resHeader.samples * as<int>(sizeof(T)))) {
                     return false;
                 }
             }
@@ -199,10 +231,20 @@ class AudioMessage {
     bool readFromServer(StreamingSocket* socket, AudioBuffer<T>& buffer, MidiBuffer& midi, MessageHelper::Error* e) {
         if (socket->isConnected()) {
             if (!read(socket, &m_resHeader, sizeof(m_resHeader), 1000, e)) {
+                MessageHelper::seterrstr(e, "response header");
+                return false;
+            }
+            if (buffer.getNumChannels() < m_resHeader.channels) {
+                MessageHelper::seterr(e, MessageHelper::E_SIZE, "buffer has not enough channels");
+                return false;
+            }
+            if (buffer.getNumSamples() < m_resHeader.samples) {
+                MessageHelper::seterr(e, MessageHelper::E_SIZE, "buffer has not enough samples");
                 return false;
             }
             for (int chan = 0; chan < buffer.getNumChannels(); ++chan) {
                 if (!read(socket, buffer.getWritePointer(chan), buffer.getNumSamples() * as<int>(sizeof(T)), 1000, e)) {
+                    MessageHelper::seterrstr(e, "audio data");
                     return false;
                 }
             }
@@ -211,6 +253,7 @@ class AudioMessage {
             MidiHeader midiHdr;
             for (int i = 0; i < m_resHeader.numMidiEvents; i++) {
                 if (!read(socket, &midiHdr, sizeof(midiHdr), 1000, e)) {
+                    MessageHelper::seterrstr(e, "midi header");
                     return false;
                 }
                 auto size = as<size_t>(midiHdr.size);
@@ -218,47 +261,54 @@ class AudioMessage {
                     midiData.resize(size);
                 }
                 if (!read(socket, midiData.data(), midiHdr.size, 1000, e)) {
+                    MessageHelper::seterrstr(e, "midi data");
                     return false;
                 }
                 midi.addEvent(midiData.data(), midiHdr.size, midiHdr.sampleNumber);
             }
         } else {
-            *e = MessageHelper::E_STATE;
+            MessageHelper::seterr(e, MessageHelper::E_STATE, "not connected");
             return false;
         }
-        *e = MessageHelper::E_NONE;
+        MessageHelper::seterr(e, MessageHelper::E_NONE);
         return true;
     }
 
+    template <typename T>
+    int prepareBufferForRead(AudioBuffer<T>& buffer, int totalChannels, int totalSamples) {
+        buffer.setSize(totalChannels, totalSamples);
+        // no data for extra channels
+        for (int chan = m_reqHeader.channels; chan < totalChannels; ++chan) {
+            buffer.clear(chan, 0, totalSamples);
+        }
+        // bytes to read
+        return m_reqHeader.samples * as<int>(sizeof(T));
+    }
+
     bool readFromClient(StreamingSocket* socket, AudioBuffer<float>& bufferF, AudioBuffer<double>& bufferD,
-                        MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo, int extraChannels = 1) {
+                        MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo, int extraChannels,
+                        MessageHelper::Error* e) {
         if (socket->isConnected()) {
-            if (!read(socket, &m_reqHeader, sizeof(m_reqHeader))) {
+            if (!read(socket, &m_reqHeader, sizeof(m_reqHeader), 0, e)) {
+                MessageHelper::seterrstr(e, "request header");
                 return false;
             }
-            int size;
             // Arbitarry additional channels to support plugins that have more than one input bus. Plugins that don't
             // need it, should ignore the channels.
-            int channels = m_reqHeader.channels + extraChannels;
+            int totalChannels = jmax(m_reqHeader.channels, m_reqHeader.channelsRequested) + extraChannels;
+            int totalSamples = jmax(m_reqHeader.samples, m_reqHeader.samplesRequested);
+            int size;
             if (m_reqHeader.isDouble) {
-                bufferD.setSize(channels, m_reqHeader.samples);
-                // no data for extra channels
-                for (int chan = m_reqHeader.channels; chan < channels; ++chan) {
-                    bufferD.clear(chan, 0, m_reqHeader.samples);
-                }
-                size = m_reqHeader.samples * as<int>(sizeof(double));
+                size = prepareBufferForRead<double>(bufferD, totalChannels, totalSamples);
             } else {
-                bufferF.setSize(channels, m_reqHeader.samples);
-                // no data for extra channels
-                for (int chan = m_reqHeader.channels; chan < channels; ++chan) {
-                    bufferF.clear(chan, 0, m_reqHeader.samples);
-                }
-                size = m_reqHeader.samples * as<int>(sizeof(float));
+                size = prepareBufferForRead<float>(bufferF, totalChannels, totalSamples);
             }
+            // Read the channel data from the client, if any
             for (int chan = 0; chan < m_reqHeader.channels; ++chan) {
                 char* data = m_reqHeader.isDouble ? reinterpret_cast<char*>(bufferD.getWritePointer(chan))
                                                   : reinterpret_cast<char*>(bufferF.getWritePointer(chan));
-                if (!read(socket, data, size)) {
+                if (!read(socket, data, size, 0, e)) {
+                    MessageHelper::seterrstr(e, "audio data");
                     return false;
                 }
             }
@@ -266,21 +316,26 @@ class AudioMessage {
             for (int i = 0; i < m_reqHeader.numMidiEvents; i++) {
                 std::vector<char> midiData;
                 MidiHeader midiHdr;
-                if (!read(socket, &midiHdr, sizeof(midiHdr))) {
+                if (!read(socket, &midiHdr, sizeof(midiHdr), 0, e)) {
+                    MessageHelper::seterrstr(e, "midi header");
                     return false;
                 }
                 midiData.resize(static_cast<size_t>(midiHdr.size));
                 if (!read(socket, midiData.data(), midiHdr.size)) {
+                    MessageHelper::seterrstr(e, "midi data");
                     return false;
                 }
                 midi.addEvent(midiData.data(), midiHdr.size, midiHdr.sampleNumber);
             }
             if (!read(socket, &posInfo, sizeof(posInfo))) {
+                MessageHelper::seterrstr(e, "pos info");
                 return false;
             }
         } else {
+            MessageHelper::seterr(e, MessageHelper::E_STATE, "not connected");
             return false;
         }
+        MessageHelper::seterr(e, MessageHelper::E_NONE);
         return true;
     }
 
@@ -731,7 +786,7 @@ class MessageFactory {
                     *res = std::move(msg->payload);
                     return res;
                 }
-            } while (retry-- > 0 && e == MessageHelper::E_TIMEOUT);
+            } while (retry-- > 0 && e.code == MessageHelper::E_TIMEOUT);
         }
         return nullptr;
     }
@@ -744,6 +799,30 @@ class MessageFactory {
         return msg.send(socket);
     }
 };
+
+/*
+static inline String toString(MidiMessage& mm, int samplePos) {
+    String ret = "Midi message: ";
+    ret << "sample=" << samplePos << " ts=" << mm.getTimeStamp()
+        << " ch=" << mm.getChannel() << " v=" << mm.getVelocity() << " n=" << mm.getNoteNumber()
+        << " desc=" << mm.getDescription();
+    return ret;
+}
+
+static inline String toString(MidiBuffer& midi) {
+    if (midi.getNumEvents() > 0) {
+        MidiBuffer::Iterator midiIt(midi);
+        MidiMessage mm;
+        int samplePos;
+        String ret = "Midi buffer:\n";
+        while (midiIt.getNextEvent(mm, samplePos)) {
+            ret << "  " << toString(mm, samplePos) << "\n";
+        }
+        return ret;
+    }
+    return "";
+}
+*/
 
 }  // namespace e47
 

@@ -50,7 +50,11 @@ void PluginButton::paintButton(Graphics& g, bool shouldDrawButtonAsHighlighted, 
         int space = 4;
         int indent_right = 6;
         width = getHeight() - indent_right * 2;
-        textIndentRight = indent + (space + width) * 3;
+        int rightButtonCount = 3;
+#if JucePlugin_IsSynth
+        rightButtonCount = 1;
+#endif
+        textIndentRight = indent + (space + width) * rightButtonCount;
         m_moveDownArea = Rectangle<int>(getWidth() - (width + space) * 3, indent_right, width, width);
         m_moveUpArea = Rectangle<int>(getWidth() - (width + space) * 2, indent_right, width, width);
         m_deleteArea = Rectangle<int>(getWidth() - width - space, indent_right, width, width);
@@ -64,10 +68,12 @@ void PluginButton::paintButton(Graphics& g, bool shouldDrawButtonAsHighlighted, 
         g.drawLine(as<float>(m_bypassArea.getCentreX()), as<float>(m_bypassArea.getY() - 1),
                    as<float>(m_bypassArea.getCentreX()), as<float>(m_bypassArea.getY() + 5), 0.7f);
 
+        Rectangle<float> rect;
+#if !JucePlugin_IsSynth
         // down
         Path down;
         PathStrokeType stroke(0.7f);
-        auto rect = m_moveDownArea.toFloat();
+        rect = m_moveDownArea.toFloat();
         down.addTriangle(rect.getX(), rect.getY(), rect.getRight(), rect.getY(), rect.getCentreX(), rect.getBottom());
         g.strokePath(down, stroke);
 
@@ -77,6 +83,7 @@ void PluginButton::paintButton(Graphics& g, bool shouldDrawButtonAsHighlighted, 
         up.addTriangle(rect.getCentreX(), rect.getY(), rect.getX(), rect.getBottom(), rect.getRight(),
                        rect.getBottom());
         g.strokePath(up, stroke);
+#endif
 
         // delete
         rect = m_deleteArea.toFloat();
@@ -124,10 +131,12 @@ PluginButton::AreaType PluginButton::getAreaType() const {
     }
     if (m_bypassArea.contains(m_lastMousePosition)) {
         return PluginButton::BYPASS;
+#if !JucePlugin_IsSynth
     } else if (m_moveUpArea.contains(m_lastMousePosition)) {
         return PluginButton::MOVE_UP;
     } else if (m_moveDownArea.contains(m_lastMousePosition)) {
         return PluginButton::MOVE_DOWN;
+#endif
     } else if (m_deleteArea.contains(m_lastMousePosition)) {
         return PluginButton::DELETE;
     }

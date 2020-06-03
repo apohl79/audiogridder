@@ -61,16 +61,17 @@ bool ProcessorChain::isBusesLayoutSupported(const BusesLayout& layouts) const {
     return true;
 }
 
-bool ProcessorChain::updateChannels(int channels) {
+bool ProcessorChain::updateChannels(int channelsIn, int channelsOut) {
     AudioProcessor::BusesLayout layout;
-    if (channels == 1) {
+    if (channelsIn == 1) {
         layout.inputBuses.add(AudioChannelSet::mono());
-        layout.outputBuses.add(AudioChannelSet::mono());
-    } else if (channels == 2) {
+    } else if (channelsIn == 2) {
         layout.inputBuses.add(AudioChannelSet::stereo());
+    }
+    if (channelsOut == 1) {
+        layout.outputBuses.add(AudioChannelSet::mono());
+    } else if (channelsOut == 2) {
         layout.outputBuses.add(AudioChannelSet::stereo());
-    } else {
-        return false;
     }
     setBusesLayout(layout);
     std::lock_guard<std::mutex> lock(m_processors_mtx);

@@ -26,10 +26,17 @@ class ProcessorChain : public AudioProcessor {
         AudioPlayHead::CurrentPositionInfo* m_posInfo;
     };
 
-    ProcessorChain()
-        : AudioProcessor(BusesProperties()
-                             .withInput("Input", AudioChannelSet::stereo(), false)
-                             .withOutput("Output", AudioChannelSet::stereo(), false)) {}
+    ProcessorChain(const BusesProperties& props) : AudioProcessor(props) {}
+
+    static BusesProperties createBussesProperties(bool instrument) {
+        if (instrument) {
+            return BusesProperties().withOutput("Output", AudioChannelSet::stereo(), false);
+        } else {
+            return BusesProperties()
+                .withInput("Input", AudioChannelSet::stereo(), false)
+                .withOutput("Output", AudioChannelSet::stereo(), false);
+        }
+    }
 
     void prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock) override;
     void releaseResources() override;
@@ -40,7 +47,7 @@ class ProcessorChain : public AudioProcessor {
     bool supportsDoublePrecisionProcessing() const override;
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
 
-    bool updateChannels(int channels);
+    bool updateChannels(int channelsIn, int channelsOut);
     bool setProcessorBusesLayout(std::shared_ptr<AudioPluginInstance> proc);
     int getExtraChannels();
 
@@ -101,7 +108,7 @@ class ProcessorChain : public AudioProcessor {
     template <typename T>
     void preProcessBlocks(std::shared_ptr<AudioPluginInstance> inst) {
         MidiBuffer midi;
-        int channels = getMainBusNumInputChannels() + m_extraChannels;
+        int channels = jmax(getMainBusNumInputChannels(), getMainBusNumOutputChannels()) + m_extraChannels;
         AudioBuffer<T> buf(channels, getBlockSize());
         buf.clear();
         int samplesProcessed = 0;

@@ -97,14 +97,15 @@ class Client : public Thread, public MouseListener, public KeyListener {
     String getServerHostAndID();
     int getServerPort();
     int getId() const { return m_id; }
-    int getChannels() const { return m_channels; }
+    int getChannelsIn() const { return m_channelsIn; }
+    int getChannelsOut() const { return m_channelsOut; }
     double getSampleRate() const { return m_rate; }
     int getSamplesPerBlock() const { return m_samplesPerBlock; }
     int getLatencySamples() const { return m_latency + NUM_OF_BUFFERS * m_samplesPerBlock; }
 
     bool isReady();
     bool isReadyLockFree();
-    void init(int channels, double rate, int samplesPerBlock, bool doublePrecission);
+    void init(int channelsIn, int channelsOut, double rate, int samplesPerBlock, bool doublePrecission);
 
     void reconnect() { m_needsReconnect = true; }
     void close();
@@ -191,7 +192,8 @@ class Client : public Thread, public MouseListener, public KeyListener {
     int m_srvPort = DEFAULT_SERVER_PORT;
     int m_id = 0;
     bool m_needsReconnect = false;
-    int m_channels = 0;
+    int m_channelsIn = 0;
+    int m_channelsOut = 0;
     double m_rate = 0;
     int m_samplesPerBlock = 0;
     bool m_doublePrecission = false;

@@ -6,8 +6,9 @@ DefaultGroupName=AudioGridder
 OutputBaseFilename=AudioGridder_#STR_VER#
 
 [Files]
-Source: "..\Server\Builds\VisualStudio2019\x64\Debug\App\AudioGridderServer.exe"; DestDir: "{app}"
-Source: "..\Plugin\Builds\VisualStudio2019\x64\Debug\VST3\AudioGridder.vst3"; DestDir: "{commoncf}\Steinberg\VST3"
+Source: "..\Server\Builds\VisualStudio2019\x64\Release\App\AudioGridderServer.exe"; DestDir: "{app}"
+Source: "..\Plugin\Fx\Builds\VisualStudio2019\x64\Release\VST3\AudioGridder.vst3"; DestDir: "{commoncf}\Steinberg\VST3"
+Source: "..\Plugin\Inst\Builds\VisualStudio2019\x64\Release\VST3\AudioGridderInst.vst3"; DestDir: "{commoncf}\Steinberg\VST3"
 
 [Icons]
 Name: "{autoprograms}\AudioGridderServer"; Filename: "{app}\AudioGridderServer.exe"
