@@ -1,16 +1,17 @@
 # AudioGridder
 
-AudioGridder allows you to offload DSP processing from your local to
-remote computers. This can come in handy when mixing complex projects
-for instance. AudioGridder comes with a plugin and a server that is
-enabling VST3 and AudioUnit plugins to be hosted across the
-network. Simply run the server component on a remote machine and
-connect your DAW using the AudioGridder AU/VST3 plugin. You can add
-remote insert chains into your DAW's signal paths that way. The DSP
-code of the inserted plugins will be executed on the remote machine
-and the plugin UI's will be streamed over the wire. This allows for an
-experience very close to hosting the plugins directly in your DAW but
-not using your local CPU.
+AudioGridder is a plugin host, that allows you to offload DSP
+processing to remote computers running OS X or Windows. This can come
+in handy when mixing complex projects for instance. AudioGridder comes
+with a plugin in AU/VST3 format and a server that supports VST2/VST3
+and AudioUnit plugins to be hosted across the network. Simply run the
+server component on a remote machine and connect your DAW using the
+AudioGridder AU/VST3 plugin. This allows you to add remote insert
+chains or instruments into your DAW's signal paths. The DSP code of
+the loaded remote plugins will be executed on the remote machine and
+the remote plugin UI's will be streamed over the wire. With
+AudioGridder you get an experience very close to hosting the plugins
+directly in your DAW but not using your local CPU.
 
 <p align="center">
 <img src="https://raw.githubusercontent.com/apohl79/audiogridder/master/images/overview.jpg" width="600" />
@@ -28,7 +29,7 @@ Please find the latest binaries to download in the [releases](https://github.com
 
 ## AudioGridder Server
 
-The server supports VST3 and AudioUnit plugin formats. Installation
+The server supports VST2, VST3 and AudioUnit plugin formats. Installation
 and setup is straight forward. There is multiple possibilities for
 your setup. It's suggested, that you dedicate each server to a single
 remote DAW workspace. That is because each server can only stream a
@@ -90,9 +91,10 @@ plugin instances)<br/>**Note:** Server and client have to be able to directly re
 
 - Server: OSX 64bit 10.7+, Windows 10
 - Plugin: OSX 64bit 10.11+, Windows 10
-- The server supports AudioUnit (Mac only) and VST3 plugins
+- The server supports AudioUnit (Mac only) and VST2/VST3 plugins
 - The plugin is available as AudioUnit (Mac only) and VST3
 - Tested DAWs: Cubase 10 Pro, Logic Pro X, Reaper, Ableton Live
+- ProTools is supposed to be working via Blue Cat's PatchWork
 
 ## Reporting of Issues
 
