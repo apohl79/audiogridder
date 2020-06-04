@@ -125,12 +125,13 @@ void Client::setOnCloseCallback(OnCloseCallback fn) {
 
 void Client::init(int channelsIn, int channelsOut, double rate, int samplesPerBlock, bool doublePrecission) {
     dbglock(*this, 8);
-    m_channelsIn = channelsIn;
-    m_channelsOut = channelsOut;
-    m_rate = rate;
-    m_samplesPerBlock = samplesPerBlock;
-    m_doublePrecission = doublePrecission;
-    if (m_ready) {
+    if (!m_ready || m_channelsIn != channelsIn || m_channelsOut != channelsOut || m_rate != rate ||
+        m_samplesPerBlock != samplesPerBlock || m_doublePrecission != doublePrecission) {
+        m_channelsIn = channelsIn;
+        m_channelsOut = channelsOut;
+        m_rate = rate;
+        m_samplesPerBlock = samplesPerBlock;
+        m_doublePrecission = doublePrecission;
         m_needsReconnect = true;
     }
 }

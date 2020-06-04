@@ -27,6 +27,8 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     signal(SIGPIPE, SIG_IGN);
 #endif
 
+    updateLatency(0);
+
     File cfg(PLUGIN_CONFIG_FILE);
     try {
         if (cfg.exists()) {
@@ -207,11 +209,16 @@ void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<float>& buffer
     }
 
     for (auto c = 0; c < totalNumOutputChannels; ++c) {
-        auto& buf = m_bypassBufferF.getReference(c);
-        for (auto s = 0; s < buffer.getNumSamples(); ++s) {
-            buf.add(buffer.getSample(c, s));
-            buffer.setSample(c, s, buf.getFirst());
-            buf.remove(0);
+        std::lock_guard<std::mutex> lock(m_bypassBufferMtx);
+        if (c < totalNumOutputChannels) {
+            auto& buf = m_bypassBufferF.getReference(c);
+            for (auto s = 0; s < buffer.getNumSamples(); ++s) {
+                buf.add(buffer.getSample(c, s));
+                buffer.setSample(c, s, buf.getFirst());
+                buf.remove(0);
+            }
+        } else {
+            logln_clnt(&m_client, "processBlockBypassed: error: m_bypassBufferF has less channels than buffer");
         }
     }
 }
@@ -226,11 +233,16 @@ void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<double>& buffe
     }
 
     for (auto c = 0; c < totalNumOutputChannels; ++c) {
-        auto& buf = m_bypassBufferD.getReference(c);
-        for (auto s = 0; s < buffer.getNumSamples(); ++s) {
-            buf.add(buffer.getSample(c, s));
-            buffer.setSample(c, s, buf.getFirst());
-            buf.remove(0);
+        std::lock_guard<std::mutex> lock(m_bypassBufferMtx);
+        if (c < totalNumOutputChannels) {
+            auto& buf = m_bypassBufferD.getReference(c);
+            for (auto s = 0; s < buffer.getNumSamples(); ++s) {
+                buf.add(buffer.getSample(c, s));
+                buffer.setSample(c, s, buf.getFirst());
+                buf.remove(0);
+            }
+        } else {
+            logln_clnt(&m_client, "processBlockBypassed: error: m_bypassBufferD has less channels than buffer");
         }
     }
 }
