@@ -56,7 +56,7 @@ control the remote UI otherwise**.
 finishes the startup. Each plugin that does not work will be
 blacklisted.)
 4. **On Windows**: If you get errors about missing DLLs (MSVCP140.dll and VCRUNTIME140_1.dll)
-when you start the server, you have to install the "Microsoft Visual C++ Redistributable für
+when you start the server, you have to install the "Microsoft Visual C++ Redistributable for
 Visual Studio 2019". You can download it from
 [Microsoft](https://visualstudio.microsoft.com/downloads/), under "Other Tools and
 Frameworks". Here is the [direct link](https://aka.ms/vs/16/release/VC_redist.x64.exe) as well.
