@@ -83,7 +83,7 @@
         <CONFIGURATION isDebug="1" name="Debug" defines="JUCE_WINDOWS&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
                        headerPath="Z:\vstsdk2.4"/>
         <CONFIGURATION isDebug="0" name="Release" defines="JUCE_WINDOWS&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
-                       headerPath="Z:\vstsdk2.4"/>
+                       headerPath="Z:\vstsdk2.4" useRuntimeLibDLL="0"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_opengl"/>
