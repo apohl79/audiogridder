@@ -46,6 +46,8 @@ class Server : public Thread {
     void addPlugins(const std::vector<String>& names, std::function<void(bool)> fn);
     void saveKnownPluginList();
 
+    static bool scanPlugin(const String& id, const String& format);
+
   private:
     String m_host;
     int m_port = DEFAULT_SERVER_PORT;
@@ -61,10 +63,13 @@ class Server : public Thread {
     float m_screenJpgQuality = 0.9f;
     bool m_screenDiffDetection = true;
 
-    bool scanNextPlugin(PluginDirectoryScanner& scanner, String& name);
+    void scanNextPlugin(const String& id, const String& fmt);
     void scanForPlugins();
     void scanForPlugins(const std::vector<String>& include);
+
     void loadKnownPluginList();
+    static void loadKnownPluginList(KnownPluginList& plist);
+    static void saveKnownPluginList(KnownPluginList& plist);
 };
 
 }  // namespace e47

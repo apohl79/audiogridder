@@ -21,7 +21,6 @@ Server::Server() : Thread("Server") { loadConfig(); }
 
 void Server::loadConfig() {
     logln("starting server...");
-    loadKnownPluginList();
     File cfg(SERVER_CONFIG_FILE);
     if (cfg.exists()) {
         FileInputStream fis(cfg);
@@ -46,7 +45,7 @@ void Server::loadConfig() {
         }
         if (j.find("ScreenDiffDetection") != j.end()) {
             m_screenDiffDetection = j["ScreenDiffDetection"].get<bool>();
-            logln("Screen capture difference detection " << (m_screenDiffDetection ? "enabled" : "disabled"));
+            logln("screen capture difference detection " << (m_screenDiffDetection ? "enabled" : "disabled"));
         }
         if (j.find("ExcludePlugins") != j.end()) {
             for (auto& s : j["ExcludePlugins"]) {
@@ -85,17 +84,21 @@ void Server::saveConfig() {
     fos.writeText(j.dump(4), false, false, "\n");
 }
 
-void Server::loadKnownPluginList() {
+void Server::loadKnownPluginList() { loadKnownPluginList(m_pluginlist); }
+
+void Server::loadKnownPluginList(KnownPluginList& plist) {
     File file(KNOWN_PLUGINS_FILE);
     if (file.exists()) {
         auto xml = XmlDocument::parse(file);
-        m_pluginlist.recreateFromXml(*xml);
+        plist.recreateFromXml(*xml);
     }
 }
 
-void Server::saveKnownPluginList() {
+void Server::saveKnownPluginList() { saveKnownPluginList(m_pluginlist); }
+
+void Server::saveKnownPluginList(KnownPluginList& plist) {
     File file(KNOWN_PLUGINS_FILE);
-    auto xml = m_pluginlist.createXml();
+    auto xml = plist.createXml();
     xml->writeTo(file);
 }
 
@@ -146,7 +149,6 @@ bool Server::shouldExclude(const String& name, const std::vector<String>& includ
 
 void Server::addPlugins(const std::vector<String>& names, std::function<void(bool)> fn) {
     std::thread([this, names, fn] {
-        logln("scanning for plugins...");
         scanForPlugins(names);
         saveConfig();
         saveKnownPluginList();
@@ -169,20 +171,57 @@ void Server::addPlugins(const std::vector<String>& names, std::function<void(boo
     }).detach();
 }
 
-bool Server::scanNextPlugin(PluginDirectoryScanner& scanner, String& name) {
-    std::mutex mtx;
-    std::condition_variable cv;
-    bool hasNext = false;
-    bool done = false;
-    MessageManager::callAsync([&mtx, &cv, &scanner, &name, &hasNext, &done] {
-        std::lock_guard<std::mutex> lock(mtx);
-        hasNext = scanner.scanNextFile(true, name);
-        done = true;
-        cv.notify_one();
-    });
-    std::unique_lock<std::mutex> lock(mtx);
-    cv.wait(lock, [&done] { return done; });
-    return hasNext;
+bool Server::scanPlugin(const String& id, const String& format) {
+    std::unique_ptr<AudioPluginFormat> fmt;
+    if (!format.compare("VST")) {
+        fmt = std::make_unique<VSTPluginFormat>();
+    } else if (!format.compare("VST3")) {
+        fmt = std::make_unique<VST3PluginFormat>();
+#ifdef JUCE_MAC
+    } else if (!format.compare("AudioUnit")) {
+        fmt = std::make_unique<AudioUnitPluginFormat>();
+#endif
+    } else {
+        return false;
+    }
+    KnownPluginList plist;
+    loadKnownPluginList(plist);
+    logln_static("scanning id=" << id << " fmt=" << format);
+    bool success = true;
+    PluginDirectoryScanner scanner(plist, *fmt, {}, true, File(DEAD_MANS_FILE));
+    scanner.setFilesOrIdentifiersToScan({id});
+    String name;
+    scanner.scanNextFile(true, name);
+    for (auto& f : scanner.getFailedFiles()) {
+        plist.addToBlacklist(f);
+        success = false;
+    }
+    saveKnownPluginList(plist);
+    return success;
+}
+
+void Server::scanNextPlugin(const String& id, const String& fmt) {
+    String fileFmt = id;
+    fileFmt << "|" << fmt;
+    ChildProcess proc;
+    StringArray args;
+    args.add(File::getSpecialLocation(File::currentExecutableFile).getFullPathName());
+    args.add("-scan");
+    args.add(fileFmt);
+    if (proc.start(args)) {
+        proc.waitForProcessToFinish(30000);
+        if (proc.isRunning()) {
+            logln("error: scan timeout, killing scan process");
+            proc.kill();
+        } else {
+            auto ec = proc.getExitCode();
+            if (ec != 0) {
+                logln("error: scan failed with exit code " << as<int>(ec));
+            }
+        }
+    } else {
+        logln("error: failed to start scan process");
+    }
 }
 
 void Server::scanForPlugins() {
@@ -191,6 +230,7 @@ void Server::scanForPlugins() {
 }
 
 void Server::scanForPlugins(const std::vector<String>& include) {
+    logln("scanning for plugins...");
     std::vector<std::unique_ptr<AudioPluginFormat>> fmts;
 #ifdef JUCE_MAC
     if (m_enableAU) {
@@ -206,37 +246,35 @@ void Server::scanForPlugins(const std::vector<String>& include) {
 
     std::set<String> neverSeenList = m_pluginexclude;
 
+    loadKnownPluginList();
+
     for (auto& fmt : fmts) {
-        PluginDirectoryScanner scanner(m_pluginlist, *fmt, fmt->getDefaultLocationsToSearch(), true,
-                                       File(DEAD_MANS_FILE));
-        bool hasNext = true;
-        while (hasNext) {
-            auto name = scanner.getNextPluginFileThatWillBeScanned();
-            if (shouldExclude(name, include)) {
-                dbgln("  (skipping: " << name << ")");
-                hasNext = scanner.skipNextFile();
-            } else {
+        auto fileOrIds = fmt->searchPathsForPlugins(fmt->getDefaultLocationsToSearch(), true);
+        for (auto& fileOrId : fileOrIds) {
+            auto name = fmt->getNameOfPluginFromIdentifier(fileOrId);
+            auto plugindesc = m_pluginlist.getTypeForFile(fileOrId);
+            if ((nullptr == plugindesc || fmt->pluginNeedsRescanning(*plugindesc)) &&
+                !m_pluginlist.getBlacklistedFiles().contains(fileOrId) && !shouldExclude(name, include)) {
                 logln("  scanning: " << name);
                 getApp().setSplashInfo(String("Scanning plugin ") + name + "...");
-                hasNext = scanNextPlugin(scanner, name);
-                saveKnownPluginList();
+                scanNextPlugin(fileOrId, fmt->getName());
+            } else {
+                dbgln("  (skipping: " << name << ")");
             }
             neverSeenList.erase(name);
         }
-        for (auto& f : scanner.getFailedFiles()) {
-            m_pluginlist.addToBlacklist(f);
-        }
     }
 
+    loadKnownPluginList();
     m_pluginlist.sort(KnownPluginList::sortAlphabetically, true);
 
     for (auto& name : neverSeenList) {
         m_pluginexclude.erase(name);
     }
+    logln("scan for plugins finished.");
 }
 
 void Server::run() {
-    logln("scanning for plugins...");
     scanForPlugins();
     saveConfig();
     saveKnownPluginList();
@@ -247,6 +285,7 @@ void Server::run() {
     setsockopt(m_masterSocket.getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
 #endif
 
+    logln("creating listener " << (m_host.length() == 0? "*": m_host) << ":" << (m_port + m_id));
     if (m_masterSocket.createListener(m_port + m_id, m_host)) {
         dbgln("server started: ID=" << m_id << ", PORT=" << m_port + m_id);
         while (!currentThreadShouldExit()) {

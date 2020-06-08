@@ -17,22 +17,47 @@ namespace e47 {
 
 App::App() : m_menuWindow(this) {}
 
-void App::initialise(const String& /* commandLineParameters */) {
-    m_logger = FileLogger::createDateStampedLogger(getApplicationName(), "Main_", ".log", "");
+void App::initialise(const String& commandLineParameters) {
+    m_logger = FileLogger::createDateStampedLogger(getApplicationName(), "AudioGridderServer_", ".log", "");
     Logger::setCurrentLogger(m_logger);
 #ifdef JUCE_MAC
     signal(SIGPIPE, SIG_IGN);
 #endif
-    showSplashWindow();
-    setSplashInfo("Starting server...");
-    m_server = std::make_unique<Server>();
-    m_server->startThread();
+    logln("Commandline: " << commandLineParameters);
+    auto args = getCommandLineParameterArray();
+    String fileToScan = "";
+    for (int i = 0; i < args.size(); i++) {
+        if (!args[i].compare("-scan") && args.size() >= i + 2) {
+            fileToScan = args[i + 1];
+            break;
+        }
+    }
+    if (fileToScan.length() > 0) {
+        auto parts = StringArray::fromTokens(fileToScan, "|", "");
+        String id = parts[0];
+        String format = "VST";
+        if (parts.size() > 1) {
+            format = parts[1];
+        }
+        logln("Scan mode: format=" << format << " id=" << id);
+        bool success = Server::scanPlugin(id, format);
+        logln("..." << (success ? "success" : "failed"));
+        setApplicationReturnValue(success ? 0 : 1);
+        quit();
+    } else {
+        showSplashWindow();
+        setSplashInfo("Starting server...");
+        m_server = std::make_unique<Server>();
+        m_server->startThread();
+    }
 }
 
 void App::shutdown() {
-    m_server->shutdown();
-    m_server->waitForThreadToExit(-1);
-    m_server.reset();
+    if (m_server != nullptr) {
+        m_server->shutdown();
+        m_server->waitForThreadToExit(-1);
+        m_server.reset();
+    }
     Logger::setCurrentLogger(nullptr);
     delete m_logger;
 }
