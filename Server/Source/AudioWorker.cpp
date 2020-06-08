@@ -39,7 +39,7 @@ void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channelsIn, int c
 }
 
 void AudioWorker::run() {
-    dbgln("audio processor started");
+    logln("audio processor started");
 
     AudioBuffer<float> bufferF;
     AudioBuffer<double> bufferD;
@@ -98,7 +98,7 @@ void AudioWorker::run() {
 
     clear();
     signalThreadShouldExit();
-    dbgln("audio processor terminated");
+    logln("audio processor terminated");
 }
 
 void AudioWorker::shutdown() {
@@ -121,12 +121,12 @@ void AudioWorker::clear() {
 bool AudioWorker::addPlugin(const String& id) { return m_chain->addPluginProcessor(id); }
 
 void AudioWorker::delPlugin(int idx) {
-    dbgln("deleting plugin " << idx);
+    logln("deleting plugin " << idx);
     m_chain->delProcessor(idx);
 }
 
 void AudioWorker::exchangePlugins(int idxA, int idxB) {
-    dbgln("exchanging plugins idxA=" << idxA << " idxB=" << idxB);
+    logln("exchanging plugins idxA=" << idxA << " idxB=" << idxB);
     m_chain->exchangeProcessors(idxA, idxB);
 }
 

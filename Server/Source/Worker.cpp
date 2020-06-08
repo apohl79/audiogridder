@@ -35,13 +35,13 @@ void Worker::run() {
     int len;
     len = m_client->read(&cfg, sizeof(cfg), true);
     if (len > 0) {
-        dbgln("  version          = " << cfg.version);
-        dbgln("  clientPort       = " << cfg.clientPort);
-        dbgln("  channelsIn       = " << cfg.channelsIn);
-        dbgln("  channelsOut      = " << cfg.channelsOut);
-        dbgln("  rate             = " << cfg.rate);
-        dbgln("  samplesPerBlock  = " << cfg.samplesPerBlock);
-        dbgln("  doublePrecission = " << static_cast<int>(cfg.doublePrecission));
+        logln("  version          = " << cfg.version);
+        logln("  clientPort       = " << cfg.clientPort);
+        logln("  channelsIn       = " << cfg.channelsIn);
+        logln("  channelsOut      = " << cfg.channelsOut);
+        logln("  rate             = " << cfg.rate);
+        logln("  samplesPerBlock  = " << cfg.samplesPerBlock);
+        logln("  doublePrecission = " << static_cast<int>(cfg.doublePrecission));
 
         // start audio processing
         sock = std::make_unique<StreamingSocket>();
@@ -86,7 +86,7 @@ void Worker::run() {
         }
 
         // enter message loop
-        dbgln("command processor started");
+        logln("command processor started");
         while (!currentThreadShouldExit() && nullptr != m_client && m_client->isConnected()) {
             MessageHelper::Error e;
             auto msg = MessageFactory::getNextMessage(m_client.get(), &e);
@@ -148,7 +148,7 @@ void Worker::run() {
         logln("handshake error with client " << m_client->getHostName());
     }
     shutdown();
-    dbgln("command processor terminated");
+    logln("command processor terminated");
 }
 
 void Worker::shutdown() {

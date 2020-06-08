@@ -259,7 +259,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
                 getApp().setSplashInfo(String("Scanning plugin ") + name + "...");
                 scanNextPlugin(fileOrId, fmt->getName());
             } else {
-                dbgln("  (skipping: " << name << ")");
+                logln("  (skipping: " << name << ")");
             }
             neverSeenList.erase(name);
         }
@@ -287,11 +287,11 @@ void Server::run() {
 
     logln("creating listener " << (m_host.length() == 0? "*": m_host) << ":" << (m_port + m_id));
     if (m_masterSocket.createListener(m_port + m_id, m_host)) {
-        dbgln("server started: ID=" << m_id << ", PORT=" << m_port + m_id);
+        logln("server started: ID=" << m_id << ", PORT=" << m_port + m_id);
         while (!currentThreadShouldExit()) {
             auto* clnt = m_masterSocket.waitForNextConnection();
             if (nullptr != clnt) {
-                dbgln("new client " << clnt->getHostName());
+                logln("new client " << clnt->getHostName());
                 m_workers.emplace_back(std::make_unique<Worker>(clnt));
                 m_workers.back()->startThread();
                 // lazy cleanup

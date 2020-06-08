@@ -34,7 +34,7 @@ void ProcessorChain::processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMe
     auto end_proc = Time::getHighResolutionTicks();
     double time_proc = Time::highResolutionTicksToSeconds(end_proc - start_proc);
     if (time_proc > 0.02) {
-        dbgln("warning: chain (" << toString() << "): high audio processing time: " << time_proc);
+        logln("warning: chain (" << toString() << "): high audio processing time: " << time_proc);
     }
 }
 
@@ -44,7 +44,7 @@ void ProcessorChain::processBlock(AudioBuffer<double>& buffer, MidiBuffer& midiM
     auto end_proc = Time::getHighResolutionTicks();
     double time_proc = Time::highResolutionTicksToSeconds(end_proc - start_proc);
     if (time_proc > 0.02) {
-        dbgln("warning: chain (" << toString() << "): high audio processing time: " << time_proc);
+        logln("warning: chain (" << toString() << "): high audio processing time: " << time_proc);
     }
 }
 
@@ -205,7 +205,7 @@ void ProcessorChain::updateNoLock() {
         m_extraChannels = jmax(m_extraChannels, extraInChannels, extraOutChannels);
     }
     if (latency != getLatencySamples()) {
-        dbgln("updating latency samples to " << latency);
+        logln("updating latency samples to " << latency);
         setLatencySamples(latency);
     }
     m_supportsDoublePrecission = supportsDouble;
