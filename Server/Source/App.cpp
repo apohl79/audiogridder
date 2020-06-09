@@ -123,7 +123,9 @@ void App::resetEditor() {
 void App::restartEditor() {
     std::lock_guard<std::mutex> lock(m_windowMtx);
     forgetEditorIfNeeded();
-    m_window = std::make_unique<ProcessorWindow>(m_windowProc, m_windowFunc);
+    if (m_windowProc != nullptr) {
+        m_window = std::make_unique<ProcessorWindow>(m_windowProc, m_windowFunc);
+    }
 }
 
 void App::forgetEditorIfNeeded() {
