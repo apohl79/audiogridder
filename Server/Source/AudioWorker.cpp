@@ -137,17 +137,19 @@ AudioWorker::RecentsListType& AudioWorker::getRecentsList(String host) const {
 
 void AudioWorker::addToRecentsList(const String& id, const String& host) {
     auto& pluginList = getApp().getPluginList();
-    auto plug = pluginList.getTypeForFile(id);
-    auto& recents = getRecentsList(host);
-    recents.insert(0, *plug);
-    for (int i = 1; i < recents.size(); i++) {
-        if (!plug->fileOrIdentifier.compare(recents.getReference(i).fileOrIdentifier)) {
-            recents.remove(i);
-            break;
+    auto plug = pluginList.getTypeForIdentifierString(id);
+    if (plug != nullptr) {
+        auto& recents = getRecentsList(host);
+        recents.insert(0, *plug);
+        for (int i = 1; i < recents.size(); i++) {
+            if (!plug->createIdentifierString().compare(recents.getReference(i).createIdentifierString())) {
+                recents.remove(i);
+                break;
+            }
         }
-    }
-    while (recents.size() > DEFAULT_NUM_RECENTS) {
-        recents.removeLast();
+        while (recents.size() > DEFAULT_NUM_RECENTS) {
+            recents.removeLast();
+        }
     }
 }
 

@@ -132,10 +132,13 @@ std::shared_ptr<AudioPluginInstance> ProcessorChain::loadPlugin(PluginDescriptio
     return inst;
 }
 
-std::shared_ptr<AudioPluginInstance> ProcessorChain::loadPlugin(const String& fileOrIdentifier, double sampleRate,
-                                                                int blockSize) {
+std::shared_ptr<AudioPluginInstance> ProcessorChain::loadPlugin(const String& id, double sampleRate, int blockSize) {
     auto& pluglist = getApp().getPluginList();
-    auto plugdesc = pluglist.getTypeForFile(fileOrIdentifier);
+    auto plugdesc = pluglist.getTypeForIdentifierString(id);
+    // try fallback
+    if (nullptr == plugdesc) {
+        plugdesc = pluglist.getTypeForFile(id);
+    }
     if (nullptr != plugdesc) {
         return loadPlugin(*plugdesc, sampleRate, blockSize);
     } else {
@@ -144,11 +147,13 @@ std::shared_ptr<AudioPluginInstance> ProcessorChain::loadPlugin(const String& fi
     return nullptr;
 }
 
-bool ProcessorChain::addPluginProcessor(const String& fileOrIdentifier) {
-    auto inst = loadPlugin(fileOrIdentifier, getSampleRate(), getBlockSize());
+bool ProcessorChain::addPluginProcessor(const String& id) {
+    auto inst = loadPlugin(id, getSampleRate(), getBlockSize());
     if (nullptr != inst) {
         if (!setProcessorBusesLayout(inst)) {
-            logln("I/O layout not supported by plugin: " << fileOrIdentifier);
+            logln("I/O layout (" << getMainBusNumInputChannels() << "," << getMainBusNumOutputChannels() << " +"
+                                 << m_extraChannels << ") not supported by plugin: " << inst->getName() << " (" << id
+                                 << ")");
             return false;
         }
         AudioProcessor::ProcessingPrecision prec = AudioProcessor::singlePrecision;
@@ -156,7 +161,8 @@ bool ProcessorChain::addPluginProcessor(const String& fileOrIdentifier) {
             if (inst->supportsDoublePrecisionProcessing()) {
                 prec = AudioProcessor::doublePrecision;
             } else {
-                logln("host wants double precission but plugin (" << fileOrIdentifier << ") does not support it");
+                logln("host wants double precission but plugin '" << inst->getName() << "' (" << id
+                                                                  << ") does not support it");
             }
         }
         inst->setProcessingPrecision(prec);

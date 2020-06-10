@@ -16,10 +16,10 @@ std::shared_ptr<juce::Image> captureScreen(juce::Rectangle<int> rect) {
     HDC hDC = GetDC(0);
     float dpi = (GetDeviceCaps(hDC, LOGPIXELSX) + GetDeviceCaps(hDC, LOGPIXELSY)) / 2.0f;
     float scaleFactor = dpi / 96;
-    int x = GetSystemMetricsForDpi(SM_XVIRTUALSCREEN, (UINT) roundl(dpi)) + rect.getX();
-    int y = GetSystemMetricsForDpi(SM_YVIRTUALSCREEN, (UINT) roundl(dpi)) + rect.getY();
-    int w = (int) roundl(rect.getWidth() * scaleFactor);
-    int h = (int) roundl(rect.getHeight() * scaleFactor);
+    int x = GetSystemMetricsForDpi(SM_XVIRTUALSCREEN, (UINT)roundl(dpi)) + rect.getX();
+    int y = GetSystemMetricsForDpi(SM_YVIRTUALSCREEN, (UINT)roundl(dpi)) + rect.getY();
+    int w = (int)roundl(rect.getWidth() * scaleFactor);
+    int h = (int)roundl(rect.getHeight() * scaleFactor);
     HDC cDC = CreateCompatibleDC(hDC);
     HBITMAP bmap = CreateCompatibleBitmap(hDC, w, h);
     HGDIOBJ oldObj = SelectObject(cDC, bmap);

@@ -25,7 +25,7 @@ Worker::~Worker() {
 }
 
 String Worker::getStringFrom(const PluginDescription& d) {
-    String s = d.name + "|" + d.manufacturerName + "|" + d.fileOrIdentifier + "|" + d.pluginFormatName + "\n";
+    String s = d.name + "|" + d.manufacturerName + "|" + d.createIdentifierString() + "|" + d.pluginFormatName + "\n";
     return s;
 }
 

@@ -67,7 +67,7 @@ class ProcessorChain : public AudioProcessor {
                                                            int blockSize);
     static std::shared_ptr<AudioPluginInstance> loadPlugin(const String& fileOrIdentifier, double sampleRate,
                                                            int blockSize);
-    bool addPluginProcessor(const String& fileOrIdentifier);
+    bool addPluginProcessor(const String& id);
     bool addProcessor(std::shared_ptr<AudioPluginInstance> processor);
     size_t getSize() const { return m_processors.size(); }
     std::shared_ptr<AudioPluginInstance> getProcessor(int index);
