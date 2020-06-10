@@ -52,16 +52,9 @@ different servers from your DAW at the same time.
 Preferences -> Security & Privacy -> Privacy Tab) - If you upgrade,
 remove the existing entry and re-add it. **You will not be able to
 control the remote UI otherwise**.
-3. Run the server (If it crashes, just re-run it until it successfully
-finishes the startup. Each plugin that does not work will be
-blacklisted.)
-4. **On Windows**: If you get errors about missing DLLs (MSVCP140.dll and VCRUNTIME140_1.dll)
-when you start the server, you have to install the "Microsoft Visual C++ Redistributable for
-Visual Studio 2019". You can download it from
-[Microsoft](https://visualstudio.microsoft.com/downloads/), under "Other Tools and
-Frameworks". Here is the [direct link](https://aka.ms/vs/16/release/VC_redist.x64.exe) as well.
-5. Manage your plugins (if you do not want to enable all plugins).
-6. If you want to run multiple servers on a singel machine, you will
+3. Run the server
+4. Manage your plugins (if you do not want to enable all plugins).
+5. If you want to run multiple servers on a singel machine, you will
 have to assign a different server ID to each instance.
 
 <p align="center">
