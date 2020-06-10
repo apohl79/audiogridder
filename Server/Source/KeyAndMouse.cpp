@@ -98,8 +98,14 @@ void mouseEvent(MouseEvType t, float x, float y, uint64_t flags) {
     CGPoint loc = CGPointMake(x, y);
     mouseEventReal(bt.first, bt.second, loc, flags);
 #elif defined(JUCE_WINDOWS)
-    long lx = std::lroundf(x);
-    long ly = std::lroundf(y);
+    HDC hDC = GetDC(0);
+    float dpi = (GetDeviceCaps(hDC, LOGPIXELSX) + GetDeviceCaps(hDC, LOGPIXELSY)) / 2.0f;
+    float scaleFactor = dpi / 96;
+    ReleaseDC(0, hDC);
+
+    long lx = lroundf(x * scaleFactor);
+    long ly = lroundf(y * scaleFactor);
+
     INPUT event;
     event.type = INPUT_MOUSE;
     event.mi.dx = lx;

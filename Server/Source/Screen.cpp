@@ -13,17 +13,17 @@
 namespace e47 {
 
 std::shared_ptr<juce::Image> captureScreen(juce::Rectangle<int> rect) {
-    int x = GetSystemMetrics(SM_XVIRTUALSCREEN) + rect.getX();
-    int y = GetSystemMetrics(SM_YVIRTUALSCREEN) + rect.getY();
-    int w = rect.getWidth();
-    int h = rect.getHeight();
-
-    auto ret = std::make_shared<juce::Image>(juce::Image::ARGB, w, h, false);
-
     HDC hDC = GetDC(0);
+    float dpi = (GetDeviceCaps(hDC, LOGPIXELSX) + GetDeviceCaps(hDC, LOGPIXELSY)) / 2.0f;
+    float scaleFactor = dpi / 96;
+    int x = GetSystemMetricsForDpi(SM_XVIRTUALSCREEN, (UINT) roundl(dpi)) + rect.getX();
+    int y = GetSystemMetricsForDpi(SM_YVIRTUALSCREEN, (UINT) roundl(dpi)) + rect.getY();
+    int w = (int) roundl(rect.getWidth() * scaleFactor);
+    int h = (int) roundl(rect.getHeight() * scaleFactor);
     HDC cDC = CreateCompatibleDC(hDC);
     HBITMAP bmap = CreateCompatibleBitmap(hDC, w, h);
     HGDIOBJ oldObj = SelectObject(cDC, bmap);
+    auto ret = std::make_shared<juce::Image>(juce::Image::ARGB, w, h, false);
 
     if (BitBlt(cDC, 0, 0, w, h, hDC, x, y, SRCCOPY)) {
         BITMAPINFO bmi = {0};
@@ -47,6 +47,10 @@ std::shared_ptr<juce::Image> captureScreen(juce::Rectangle<int> rect) {
     DeleteDC(cDC);
     ReleaseDC(0, hDC);
 
+    if (scaleFactor != 1.0) {
+        auto rescaled = std::make_shared<juce::Image>(ret->rescaled(rect.getWidth(), rect.getHeight()));
+        return rescaled;
+    }
     return ret;
 }
 

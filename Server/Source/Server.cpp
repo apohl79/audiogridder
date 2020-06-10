@@ -285,7 +285,7 @@ void Server::run() {
     setsockopt(m_masterSocket.getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
 #endif
 
-    logln("creating listener " << (m_host.length() == 0? "*": m_host) << ":" << (m_port + m_id));
+    logln("creating listener " << (m_host.length() == 0 ? "*" : m_host) << ":" << (m_port + m_id));
     if (m_masterSocket.createListener(m_port + m_id, m_host)) {
         logln("server started: ID=" << m_id << ", PORT=" << m_port + m_id);
         while (!currentThreadShouldExit()) {
