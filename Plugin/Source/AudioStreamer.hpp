@@ -51,7 +51,7 @@ class AudioStreamer : public Thread {
         signalThreadShouldExit();
         notifyWrite();
         notifyRead();
-        stopThread(100);
+        stopThread(-1);
     }
 
     void run() {
