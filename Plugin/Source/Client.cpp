@@ -22,9 +22,7 @@ Client::Client(AudioGridderAudioProcessor* processor)
       m_ready(false),
       m_cmd_socket(nullptr),
       m_audio_socket(nullptr),
-      m_screen_socket(nullptr) {
-    startThread();
-}
+      m_screen_socket(nullptr) {}
 
 Client::~Client() {
     stopThread(-1);
@@ -42,6 +40,7 @@ void Client::run() {
                 if (j.find("NumberOfBuffers") != j.end()) {
                     int newNum = j["NumberOfBuffers"].get<int>();
                     if (NUM_OF_BUFFERS != newNum) {
+                        logln("number of buffers changed from " << NUM_OF_BUFFERS << " to " << newNum);
                         NUM_OF_BUFFERS = newNum;
                         reconnect();
                     }
@@ -51,6 +50,7 @@ void Client::run() {
             logln("parsing config failed: " << e.what());
         }
         if ((!isReady() || m_needsReconnect) && !currentThreadShouldExit()) {
+            logln("(re)connecting...");
             close();
             init();
             bool newState = m_ready;

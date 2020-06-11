@@ -12,24 +12,9 @@
 #include "Message.hpp"
 #include "ServerPlugin.hpp"
 #include "Defaults.hpp"
+#include "Logger.hpp"
 
 #include <boost/lockfree/spsc_queue.hpp>
-
-#if (JUCE_DEBUG && !JUCE_DISABLE_ASSERTIONS)
-#define dbgln(M)                                                                                \
-    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << (uint64_t)this << "] " << M; \
-                                     std::cout << __str << std::endl;)
-#else
-#define dbgln(M)
-#endif
-
-#define logln(M)                                                                                \
-    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << (uint64_t)this << "] " << M; \
-                                     std::cerr << __str << std::endl;)
-
-#define logln_clnt(C, M)                                                                     \
-    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << (uint64_t)C << "] " << M; \
-                                     std::cerr << __str << std::endl;)
 
 class AudioGridderAudioProcessor;
 

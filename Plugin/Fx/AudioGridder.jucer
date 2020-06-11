@@ -14,6 +14,8 @@
       <FILE id="iWAQgS" name="Client.hpp" compile="0" resource="0" file="../Source/Client.hpp"/>
       <FILE id="KFE1km" name="Images.cpp" compile="1" resource="0" file="../Source/Images.cpp"/>
       <FILE id="bNKB6z" name="Images.hpp" compile="0" resource="0" file="../Source/Images.hpp"/>
+      <FILE id="Z0Hcx9" name="Logger.cpp" compile="1" resource="0" file="../Source/Logger.cpp"/>
+      <FILE id="P7cAof" name="Logger.hpp" compile="0" resource="0" file="../Source/Logger.hpp"/>
       <FILE id="TtcZns" name="NewServerWindow.cpp" compile="1" resource="0"
             file="../Source/NewServerWindow.cpp"/>
       <FILE id="IE18nC" name="NewServerWindow.hpp" compile="0" resource="0"
