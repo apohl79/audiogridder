@@ -48,12 +48,16 @@ different servers from your DAW at the same time.
 
 **Server Setup:**
 
-1. Install the PKG on OSX or the Setup EXE on Windows (includes server and plugin binaries).
-2. **On OSX**: Grant AudioGridderServer the Accessibility permission (System
-Preferences -> Security & Privacy -> Privacy Tab) - If you upgrade,
-remove the existing entry and re-add it. **You will not be able to
-control the remote UI otherwise**.
-3. **On Windows**: It's recommended to deactivate scaling.
+1. Install the PKG on OSX or the Setup EXE on Windows. (The installer
+includes the server and plugin binaries.)
+2. **On OSX**: Grant AudioGridderServer the "Accessibility" (Mojave,
+Catalina) and "Screen Recording" (Catalina) permissions (System
+Preferences -> Security & Privacy -> Privacy Tab) - This is also
+required after upgrading to a new version! **You will not be able to
+see/control the remote UI otherwise**.
+3. **On Windows**: It's recommended to deactivate scaling. Even though
+AudioGridder works with scaling enabled, it has a negative impact
+on the performance.
 4. Run the server
 5. Manage your plugins (if you do not want to enable all plugins).
 6. If you want to run multiple servers on a singel machine, you will
@@ -67,7 +71,7 @@ have to assign a different server ID to each instance.
 
 The plugin is currently supported as VST3 and AudioUnit on OSX. AAX is
 likely never coming, as AVID does not seem to support open source
-projects unfortunately. 
+projects unfortunately. See the compatibility section for a workaround.
 
 You are basically plugging a remote insert stack into your DAW's
 channel insert stacks. From there you can insert any pluging available
@@ -77,7 +81,8 @@ instance).
 
 **Plugin Setup:**
 
-1. Install the PKG on OSX or the Setup EXE on Windows (includes server and plugin binaries).
+1. Install the PKG on OSX or the Setup EXE on Windows. (The installer
+includes the server and plugin binaries.)
 2. Run your DAW and insert the AudioGridder plugin.
 3. Add your server endpoint(s) (IP or DNS name) by clicking the server
 icon (this needs to be done only once, as the server settings will be
@@ -97,7 +102,7 @@ will have to connect the client at initialization time.
 - The server supports AudioUnit (Mac only) and VST2/VST3 plugins
 - The plugin is available as AudioUnit (Mac only) and VST3
 - Tested DAWs: Cubase 10 Pro, Logic Pro X, Reaper, Ableton Live
-- ProTools is supposed to be working via Blue Cat's PatchWork
+- ProTools is reportedly working via Blue Cat's PatchWork
 
 ## Reporting of Issues
 
@@ -105,7 +110,40 @@ If you report a new issue, please be as precise as possible. I will
 have to be able to reproduce it or at least get some conclusions from
 the info you provide.
 
-- Report only one issue at a time, if you have multiple problems, please create multiple issues
-- If you see a crash, please attach the stack trace from apples crash dialog
-- Attach the latest server log file (~/Library/Logs/AudioGridderServer/Main_DATE-TIME.log)
-- Minimize the server log (restart the server and just do, what leads to the problem and stop)
+- Report only one issue at a time, if you have multiple problems,
+  please create multiple issues
+- If you see a crash, please attach the stack trace from apples crash
+  dialog
+- Attach the latest log files (see locations below)
+- Minimize the logs (restart the DAW and server and possibly just do,
+  what leads to the problem and stop)
+
+### Logfile locations
+
+**OS X:**
+
+Server:
+
+```~/Library/Logs/AudioGridderServer/AudioGridderServer_DATE_TIME.log```
+
+FX Plugin:
+
+```~/Library/Logs/AudioGridderFX/AudioGridderPlugin_DATE_TIME.log```
+
+Instrument Plugin:
+
+```~/Library/Logs/AudioGridderInstrument/AudioGridderPlugin_DATE_TIME.log```
+
+**Windows:**
+
+Server: 
+
+```C:\Users\<Username>\AppData\Roaming\AudioGridderServer\AudioGridderServer_DATE_TIME.log```
+
+FX Plugin:
+
+```C:\Users\<Username>\AppData\Roaming\AudioGridderFX\AudioGridderPlugin_DATE_TIME.log```
+
+Instrument Plugin:
+
+```C:\Users\<Username>\AppData\Roaming\AudioGridderInstrument\AudioGridderPlugin_DATE_TIME.log```
