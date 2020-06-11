@@ -53,7 +53,7 @@ class Server : public Thread {
     int m_port = DEFAULT_SERVER_PORT;
     int m_id = 0;
     StreamingSocket m_masterSocket;
-    using WorkerList = std::vector<std::unique_ptr<Worker>>;
+    using WorkerList = Array<std::unique_ptr<Worker>>;
     WorkerList m_workers;
     KnownPluginList m_pluginlist;
     std::set<String> m_pluginexclude;
