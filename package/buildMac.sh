@@ -10,7 +10,7 @@ xcodebuild -project Plugin/Inst/Builds/MacOSX/AudioGridderInst.xcodeproj -alltar
 if [ -n "$(which packagesbuild)" ]; then
     VERSION=$(cat package/VERSION)
     TARGET=package/build/AudioGridder_${VERSION}.pkg
-    packagesbuild --package-version "$VERSION" package/AudioGridder.pkgproj
+    packagesbuild -v --package-version "$VERSION" package/AudioGridder.pkgproj
     mv package/build/AudioGridder.pkg $TARGET
 
     echo
