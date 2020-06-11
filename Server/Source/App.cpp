@@ -23,7 +23,7 @@ void App::initialise(const String& commandLineParameters) {
 #ifdef JUCE_MAC
     signal(SIGPIPE, SIG_IGN);
 #endif
-    logln("Commandline: " << commandLineParameters);
+    logln("commandline: " << commandLineParameters);
     auto args = getCommandLineParameterArray();
     String fileToScan = "";
     for (int i = 0; i < args.size(); i++) {
@@ -39,7 +39,7 @@ void App::initialise(const String& commandLineParameters) {
         if (parts.size() > 1) {
             format = parts[1];
         }
-        logln("Scan mode: format=" << format << " id=" << id);
+        logln("scan mode: format=" << format << " id=" << id);
         bool success = Server::scanPlugin(id, format);
         logln("..." << (success ? "success" : "failed"));
         setApplicationReturnValue(success ? 0 : 1);
@@ -87,6 +87,7 @@ void App::showEditor(std::shared_ptr<AudioProcessor> proc, Thread::ThreadID tid,
         std::lock_guard<std::mutex> lock(m_windowMtx);
         forgetEditorIfNeeded();
         if (m_window != nullptr) {
+            logln("show editor: resetting existing processor window");
             m_window->setVisible(false);
             m_window.reset();
         }
@@ -94,6 +95,8 @@ void App::showEditor(std::shared_ptr<AudioProcessor> proc, Thread::ThreadID tid,
         m_windowProc = proc;
         m_windowFunc = func;
         m_window = std::make_unique<ProcessorWindow>(m_windowProc, m_windowFunc);
+    } else {
+        logln("show editor failed: '" << proc->getName() << "' has no editor");
     }
 }
 
@@ -104,10 +107,14 @@ void App::hideEditor(Thread::ThreadID tid) {
         if (m_window != nullptr) {
             m_window->setVisible(false);
             m_window.reset();
+        } else {
+            logln("hide editor called with no active processor window");
         }
         m_windowOwner = nullptr;
         m_windowProc.reset();
         m_windowFunc = nullptr;
+    } else {
+        logln("failed to hide editor: tid does not match window owner");
     }
 }
 
@@ -115,6 +122,7 @@ void App::resetEditor() {
     std::lock_guard<std::mutex> lock(m_windowMtx);
     forgetEditorIfNeeded();
     if (m_window != nullptr) {
+        logln("resetting processor window");
         m_window->setVisible(false);
         m_window.reset();
     }
@@ -124,12 +132,14 @@ void App::restartEditor() {
     std::lock_guard<std::mutex> lock(m_windowMtx);
     forgetEditorIfNeeded();
     if (m_windowProc != nullptr) {
+        logln("recreating processor window");
         m_window = std::make_unique<ProcessorWindow>(m_windowProc, m_windowFunc);
     }
 }
 
 void App::forgetEditorIfNeeded() {
     if (m_windowProc != nullptr && m_windowProc->getActiveEditor() == nullptr && m_window != nullptr) {
+        logln("forgetting editor");
         m_window->forgetEditor();
     }
 }
@@ -139,9 +149,13 @@ Point<float> App::localPointToGlobal(Point<float> lp) {
         auto* ed = m_windowProc->getActiveEditor();
         if (ed != nullptr) {
             return ed->localPointToGlobal(lp);
+        } else {
+            logln("failed to resolve local to global point: processor has no active editor, trying to restart editor");
+            restartEditor();
         }
+    } else {
+        logln("failed to resolve local to global point: no active processor");
     }
-    logln("failed to resolve local to global point");
     return lp;
 }
 

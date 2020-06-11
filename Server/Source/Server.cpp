@@ -20,7 +20,7 @@ using json = nlohmann::json;
 Server::Server() : Thread("Server") { loadConfig(); }
 
 void Server::loadConfig() {
-    logln("starting server...");
+    logln("starting server (version: " << AUDIOGRIDDER_VERSION << ") ...");
     File cfg(SERVER_CONFIG_FILE);
     if (cfg.exists()) {
         FileInputStream fis(cfg);
