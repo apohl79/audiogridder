@@ -107,14 +107,16 @@ void AudioWorker::shutdown() {
 }
 
 void AudioWorker::clear() {
-    m_chain->releaseResources();
-    if (!MessageManager::getInstance()->isThisTheMessageThread()) {
-        if (m_chain->getSize() > 0) {
-            auto pChain = m_chain;
-            MessageManager::callAsync([pChain] { pChain->clear(); });
+    if (nullptr != m_chain) {
+        m_chain->releaseResources();
+        if (!MessageManager::getInstance()->isThisTheMessageThread()) {
+            if (m_chain->getSize() > 0) {
+                auto pChain = m_chain;
+                MessageManager::callAsync([pChain] { pChain->clear(); });
+            }
+        } else {
+            m_chain->clear();
         }
-    } else {
-        m_chain->clear();
     }
 }
 
