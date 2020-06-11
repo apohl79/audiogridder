@@ -61,7 +61,8 @@
         <CONFIGURATION isDebug="1" name="Debug" osxCompatibility="10.7 SDK" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
                        recommendedWarnings="LLVM" headerPath="$(HOME)/audio/vstsdk2.4"/>
         <CONFIGURATION isDebug="1" name="Release" osxCompatibility="10.7 SDK" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
-                       recommendedWarnings="LLVM" headerPath="$(HOME)/audio/vstsdk2.4"/>
+                       recommendedWarnings="LLVM" headerPath="$(HOME)/audio/vstsdk2.4"
+                       optimisation="3"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../audio/JUCE/modules"/>
