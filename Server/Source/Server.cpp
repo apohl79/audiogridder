@@ -292,16 +292,17 @@ void Server::run() {
             auto* clnt = m_masterSocket.waitForNextConnection();
             if (nullptr != clnt) {
                 logln("new client " << clnt->getHostName());
-                m_workers.emplace_back(std::make_unique<Worker>(clnt));
-                m_workers.back()->startThread();
+                auto w = std::make_unique<Worker>(clnt);
+                w->startThread();
+                m_workers.add(std::move(w));
                 // lazy cleanup
                 std::shared_ptr<WorkerList> deadWorkers = std::make_shared<WorkerList>();
-                for (auto it = m_workers.begin(); it < m_workers.end();) {
-                    if (!(*it)->isThreadRunning()) {
-                        deadWorkers->push_back(std::move(*it));
-                        m_workers.erase(it);
+                for (int i = 0; i < m_workers.size();) {
+                    if (!m_workers.getReference(i)->isThreadRunning()) {
+                        deadWorkers->add(std::move(m_workers.getReference(i)));
+                        m_workers.remove(i);
                     } else {
-                        it++;
+                        i++;
                     }
                 }
                 MessageManager::callAsync([deadWorkers] { deadWorkers->clear(); });
