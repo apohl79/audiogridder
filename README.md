@@ -25,7 +25,8 @@ connection through a VPN might be problematic but not impossible.
 
 ## Downloads
 
-Please find the latest binaries to download in the [releases](https://github.com/apohl79/audiogridder/releases) section.
+Please find the latest binaries to download in the
+[releases](https://github.com/apohl79/audiogridder/releases) section.
 
 ## AudioGridder Server
 
@@ -52,9 +53,10 @@ different servers from your DAW at the same time.
 Preferences -> Security & Privacy -> Privacy Tab) - If you upgrade,
 remove the existing entry and re-add it. **You will not be able to
 control the remote UI otherwise**.
-3. Run the server
-4. Manage your plugins (if you do not want to enable all plugins).
-5. If you want to run multiple servers on a singel machine, you will
+3. **On Windows**: It's recommended to deactivate scaling.
+4. Run the server
+5. Manage your plugins (if you do not want to enable all plugins).
+6. If you want to run multiple servers on a singel machine, you will
 have to assign a different server ID to each instance.
 
 <p align="center">
@@ -77,9 +79,11 @@ instance).
 
 1. Install the PKG on OSX or the Setup EXE on Windows (includes server and plugin binaries).
 2. Run your DAW and insert the AudioGridder plugin.
-3. Add your server endpoint(s) (IP or DNS name) by clicking the server icon (this needs
-to be done only once, as the server settings will be shared with new
-plugin instances)<br/>**Note:** Server and client have to be able to directly reach each other. This is because the server will have to connect the client at initialization time.
+3. Add your server endpoint(s) (IP or DNS name) by clicking the server
+icon (this needs to be done only once, as the server settings will be
+shared with new plugin instances)<br/>**Note:** Server and client have
+to be able to directly reach each other. This is because the server
+will have to connect the client at initialization time.
 4. Add remote plugins.
 
 <p align="center">
@@ -97,7 +101,9 @@ plugin instances)<br/>**Note:** Server and client have to be able to directly re
 
 ## Reporting of Issues
 
-If you report a new issue, please be as precise as possible. I will have to be able to reproduce it or at least get some conclusions from the info you provide.
+If you report a new issue, please be as precise as possible. I will
+have to be able to reproduce it or at least get some conclusions from
+the info you provide.
 
 - Report only one issue at a time, if you have multiple problems, please create multiple issues
 - If you see a crash, please attach the stack trace from apples crash dialog
