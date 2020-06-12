@@ -101,10 +101,7 @@ void AudioWorker::run() {
     logln("audio processor terminated");
 }
 
-void AudioWorker::shutdown() {
-    clear();
-    signalThreadShouldExit();
-}
+void AudioWorker::shutdown() { signalThreadShouldExit(); }
 
 void AudioWorker::clear() {
     if (nullptr != m_chain) {
