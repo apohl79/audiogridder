@@ -20,7 +20,7 @@ using json = nlohmann::json;
 Server::Server() : Thread("Server") { loadConfig(); }
 
 void Server::loadConfig() {
-    logln("starting server (version: " << AUDIOGRIDDER_VERSION << ") ...");
+    logln("starting server (version: " << AUDIOGRIDDER_VERSION << ")...");
     File cfg(SERVER_CONFIG_FILE);
     if (cfg.exists()) {
         FileInputStream fis(cfg);
@@ -33,12 +33,32 @@ void Server::loadConfig() {
             logln("AudioUnit support " << (m_enableAU ? "enabled" : "disabled"));
         }
         if (j.find("VST") != j.end()) {
-            m_enableVST = j["VST"].get<bool>();
-            logln("VST3 support " << (m_enableVST ? "enabled" : "disabled"));
+            m_enableVST3 = j["VST"].get<bool>();
+            logln("VST3 support " << (m_enableVST3 ? "enabled" : "disabled"));
+        }
+        m_vst3Folders.clear();
+        if (j.find("VST3Folders") != j.end() && j["VST3Folders"].size() > 0) {
+            logln("VST3 custom folders:");
+            for (auto& s : j["VST3Folders"]) {
+                if (s.get<std::string>().length() > 0) {
+                    logln("  " << s.get<std::string>());
+                    m_vst3Folders.add(s.get<std::string>());
+                }
+            }
         }
         if (j.find("VST2") != j.end()) {
             m_enableVST2 = j["VST2"].get<bool>();
             logln("VST2 support " << (m_enableVST2 ? "enabled" : "disabled"));
+        }
+        m_vst2Folders.clear();
+        if (j.find("VST2Folders") != j.end() && j["VST2Folders"].size() > 0) {
+            logln("VST2 custom folders:");
+            for (auto& s : j["VST2Folders"]) {
+                if (s.get<std::string>().length() > 0) {
+                    logln("  " << s.get<std::string>());
+                    m_vst2Folders.add(s.get<std::string>());
+                }
+            }
         }
         if (j.find("ScreenQuality") != j.end()) {
             m_screenJpgQuality = j["ScreenQuality"].get<float>();
@@ -47,6 +67,7 @@ void Server::loadConfig() {
             m_screenDiffDetection = j["ScreenDiffDetection"].get<bool>();
             logln("screen capture difference detection " << (m_screenDiffDetection ? "enabled" : "disabled"));
         }
+        m_pluginexclude.clear();
         if (j.find("ExcludePlugins") != j.end()) {
             for (auto& s : j["ExcludePlugins"]) {
                 m_pluginexclude.insert(s.get<std::string>());
@@ -69,8 +90,16 @@ void Server::saveConfig() {
     json j;
     j["ID"] = m_id;
     j["AU"] = m_enableAU;
-    j["VST"] = m_enableVST;
+    j["VST"] = m_enableVST3;
+    j["VST3Folders"] = json::array();
+    for (auto& f : m_vst3Folders) {
+        j["VST3Folders"].push_back(f.toStdString());
+    }
     j["VST2"] = m_enableVST2;
+    j["VST2Folders"] = json::array();
+    for (auto& f : m_vst2Folders) {
+        j["VST2Folders"].push_back(f.toStdString());
+    }
     j["ScreenQuality"] = m_screenJpgQuality;
     j["ScreenDiffDetection"] = m_screenDiffDetection;
     j["ExcludePlugins"] = json::array();
@@ -237,7 +266,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
         fmts.push_back(std::make_unique<AudioUnitPluginFormat>());
     }
 #endif
-    if (m_enableVST) {
+    if (m_enableVST3) {
         fmts.push_back(std::make_unique<VST3PluginFormat>());
     }
     if (m_enableVST2) {
@@ -249,7 +278,19 @@ void Server::scanForPlugins(const std::vector<String>& include) {
     loadKnownPluginList();
 
     for (auto& fmt : fmts) {
-        auto fileOrIds = fmt->searchPathsForPlugins(fmt->getDefaultLocationsToSearch(), true);
+        auto searchPaths = fmt->getDefaultLocationsToSearch();
+        if (!fmt->getName().compare("VST3")) {
+            for (auto& f : m_vst3Folders) {
+                searchPaths.addIfNotAlreadyThere(f);
+            }
+        } else if (!fmt->getName().compare("VST")) {
+            for (auto& f : m_vst2Folders) {
+                searchPaths.addIfNotAlreadyThere(f);
+            }
+        }
+        searchPaths.removeRedundantPaths();
+        searchPaths.removeNonExistentPaths();
+        auto fileOrIds = fmt->searchPathsForPlugins(searchPaths, true);
         for (auto& fileOrId : fileOrIds) {
             auto name = fmt->getNameOfPluginFromIdentifier(fileOrId);
             auto plugindesc = m_pluginlist.getTypeForFile(fileOrId);

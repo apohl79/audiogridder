@@ -29,10 +29,14 @@ class Server : public Thread {
     void setId(int i) { m_id = i; }
     bool getEnableAU() const { return m_enableAU; }
     void setEnableAU(bool b) { m_enableAU = b; }
-    bool getEnableVST() const { return m_enableVST; }
-    void setEnableVST(bool b) { m_enableVST = b; }
+    bool getEnableVST3() const { return m_enableVST3; }
+    void setEnableVST3(bool b) { m_enableVST3 = b; }
     bool getEnableVST2() const { return m_enableVST2; }
     void setEnableVST2(bool b) { m_enableVST2 = b; }
+    const StringArray& getVST3Folders() const { return m_vst3Folders; }
+    void setVST3Folders(const StringArray& folders) { m_vst3Folders = folders; }
+    const StringArray& getVST2Folders() const { return m_vst2Folders; }
+    void setVST2Folders(const StringArray& folders) { m_vst2Folders = folders; }
     float getScreenQuality() const { return m_screenJpgQuality; }
     void setScreenQuality(float q) { m_screenJpgQuality = q; }
     bool getScreenDiffDetection() const { return m_screenDiffDetection; }
@@ -58,10 +62,12 @@ class Server : public Thread {
     KnownPluginList m_pluginlist;
     std::set<String> m_pluginexclude;
     bool m_enableAU = true;
-    bool m_enableVST = true;
+    bool m_enableVST3 = true;
     bool m_enableVST2 = true;
     float m_screenJpgQuality = 0.9f;
     bool m_screenDiffDetection = true;
+    StringArray m_vst3Folders;
+    StringArray m_vst2Folders;
 
     void scanNextPlugin(const String& id, const String& fmt);
     void scanForPlugins();
