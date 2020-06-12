@@ -97,8 +97,8 @@ will have to connect the client at initialization time.
 
 ## Compatibility
 
-- Server: OSX 64bit 10.7+, Windows 10
-- Plugin: OSX 64bit 10.11+, Windows 10
+- Server: OSX 64bit 10.7+, Windows 7+
+- Plugin: OSX 64bit 10.11+, Windows 7+
 - The server supports AudioUnit (Mac only) and VST2/VST3 plugins
 - The plugin is available as AudioUnit (Mac only) and VST3
 - Tested DAWs: Cubase 10 Pro, Logic Pro X, Reaper, Ableton Live
