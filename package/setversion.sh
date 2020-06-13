@@ -1,12 +1,25 @@
 #!/bin/bash
 
+DEFAULT_VERSION="1.0.0"
+DEFAULT_VERSION_STR="dev-build"
+
 NUM_VER=$1
 STR_VER=$2
 
-if [ -z "$NUM_VER" ] || [ -z "$STR_VER" ]; then
-    echo "usage: $0 <num version: #.#.#> <str version>"
+if [ -z "$NUM_VER" ]; then
+    NUM_VER=$DEFAULT_VERSION
+fi
+
+if [ -z "$STR_VER" ]; then
+    STR_VER=$DEFAULT_VERSION_STR
+fi
+
+if [ "$NUM_VER" = "-h" ]; then
+    echo "Usage: $0 <num version: #.#.#> <str version>"
     exit 1
 fi
+
+echo "Setting version to: $NUM_VER $STR_VER"
 
 projucer=../JUCE/Projucer.app/Contents/MacOS/Projucer
 
