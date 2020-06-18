@@ -32,6 +32,9 @@ void App::initialise(const String& commandLineParameters) {
         }
     }
     if (fileToScan.length() > 0) {
+#ifdef JUCE_MAC
+        Process::setDockIconVisible(false);
+#endif
         auto parts = StringArray::fromTokens(fileToScan, "|", "");
         String id = parts[0];
         String format = "VST";
