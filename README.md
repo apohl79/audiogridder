@@ -3,15 +3,15 @@
 AudioGridder is a plugin host, that allows you to offload DSP
 processing to remote computers running OS X or Windows. This can come
 in handy when mixing complex projects for instance. AudioGridder comes
-with a plugin in AU/VST3 format and a server that supports VST2/VST3
-and AudioUnit plugins to be hosted across the network. Simply run the
+with a plugin and a server and supports VST2, VST3 and AudioUnit
+formats. Plugins can be hosted across the network. Simply run the
 server component on a remote machine and connect your DAW using the
-AudioGridder AU/VST3 plugin. This allows you to add remote insert
-chains or instruments into your DAW's signal paths. The DSP code of
-the loaded remote plugins will be executed on the remote machine and
-the remote plugin UI's will be streamed over the wire. With
-AudioGridder you get an experience very close to hosting the plugins
-directly in your DAW but not using your local CPU.
+AudioGridder plugin. This allows you to add remote insert chains or
+instruments into your DAW's signal paths. The DSP code of the loaded
+remote plugins will be executed on the remote machine and the remote
+plugin UI's will be streamed over the wire. With AudioGridder you get
+an experience very close to hosting the plugins directly in your DAW
+but not using your local CPU.
 
 <p align="center">
 <img src="https://raw.githubusercontent.com/apohl79/audiogridder/master/images/overview.jpg" width="600" />
@@ -69,9 +69,10 @@ have to assign a different server ID to each instance.
 
 ## AudioGridder Plugin
 
-The plugin is currently supported as VST3 and AudioUnit on OSX. AAX is
-likely never coming, as AVID does not seem to support open source
-projects unfortunately. See the compatibility section for a workaround.
+The plugin is currently supported as VST2, VST3 and AudioUnit on
+OSX. AAX is likely never coming, as AVID does not seem to support open
+source projects unfortunately. See the compatibility section for a
+workaround.
 
 You are basically plugging a remote insert stack into your DAW's
 channel insert stacks. From there you can insert any pluging available
@@ -99,8 +100,8 @@ will have to connect the client at initialization time.
 
 - Server: OSX 64bit 10.7+, Windows 7+
 - Plugin: OSX 64bit 10.11+, Windows 7+
-- The server supports AudioUnit (Mac only) and VST2/VST3 plugins
-- The plugin is available as AudioUnit (Mac only) and VST3
+- The server supports AudioUnit (OSX only) and VST2/VST3 plugins
+- The plugin is available as AudioUnit (OSX only) and VST2/VST3
 - Tested DAWs: Cubase 10 Pro, Logic Pro X, Reaper, Ableton Live
 - ProTools is reportedly working via Blue Cat's PatchWork
 
