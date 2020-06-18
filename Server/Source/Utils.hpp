@@ -8,27 +8,76 @@
 #ifndef Utils_hpp
 #define Utils_hpp
 
-#include "../JuceLibraryCode/JuceHeader.h"
-#include "App.hpp"
+class LogTag {
+  public:
+    LogTag(const String& name) : m_name(name) {}
+    String getLogTag() const {
+        String tag = m_name;
+        tag << ":" << (uint64)this;
+        return tag;
+    }
+
+  private:
+    String m_name;
+};
+
+class LogTagDelegate {
+  public:
+    LogTag* m_logTagSrc;
+    void setLogTagSource(LogTag* r) { m_logTagSrc = r; }
+    LogTag* getLogTagSource() const { return m_logTagSrc; }
+    String getLogTag() const {
+        if (nullptr != m_logTagSrc) {
+            return m_logTagSrc->getLogTag();
+        }
+        return "";
+    }
+};
+
+#ifdef AG_SERVER
+
+#define getApp() dynamic_cast<App*>(JUCEApplication::getInstance())
 
 #if (JUCE_DEBUG && !JUCE_DISABLE_ASSERTIONS)
-#define dbgln(M)                                                                                \
-    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << (uint64_t)this << "] " << M; \
-                                     Logger::writeToLog(__str);)
+#define dbgln(M) \
+    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << getLogTag() << "] " << M; Logger::writeToLog(__str);)
 #else
 #define dbgln(M)
 #endif
 
-#define logln(M)                                                                                \
-    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << (uint64_t)this << "] " << M; \
-                                     Logger::writeToLog(__str);)
-#define logln_static(M) \
-    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[static] " << M; Logger::writeToLog(__str);)
+#define logln(M) \
+    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << getLogTag() << "] " << M; Logger::writeToLog(__str);)
+
+#else
+
+#if JUCE_DEBUG
+#define dbgln(M)                                                                             \
+    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << getLogTag() << "] " << M; \
+                                     AGLogger::getInstance()->log(__str);)
+#else
+#define dbgln(M)
+#endif
+
+#define logln(M)                                                                             \
+    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << getLogTag() << "] " << M; \
+                                     AGLogger::getInstance()->log(__str);)
+
+#endif
 
 namespace e47 {
-
-static inline App& getApp() { return *dynamic_cast<App*>(JUCEApplication::getInstance()); }
-
+static inline void waitForThreadAndLog(LogTag* tag, Thread* t, int millisUntilWarning = 3000) {
+    auto getLogTag = [tag] { return tag->getLogTag(); };
+    if (millisUntilWarning > -1) {
+        auto warnTime = Time::getMillisecondCounter() + (uint32)millisUntilWarning;
+        while (!t->waitForThreadToExit(1000)) {
+            if (Time::getMillisecondCounter() > warnTime) {
+                logln("warning: waiting for thread " << t->getThreadName() << " to finish");
+            }
+        }
+    } else {
+        t->waitForThreadToExit(-1);
+    }
+}
 }  // namespace e47
 
 #endif /* Utils_hpp */

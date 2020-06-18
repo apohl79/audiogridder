@@ -20,7 +20,7 @@ AGLogger::AGLogger(const String& appName, const String& filePrefix) : Thread("AG
 }
 
 AGLogger::~AGLogger() {
-    stopThread(-1);
+    stopThread(3000);
     Logger::setCurrentLogger(nullptr);
     delete m_logger;
 }

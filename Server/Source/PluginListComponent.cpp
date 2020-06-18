@@ -242,7 +242,7 @@ void AudioGridderPluginListComponent::removePluginItem(int index) {
             excludeList.insert(p.fileOrIdentifier);
         }
         list.removeType(p);
-        getApp().getServer().saveConfig();
+        getApp()->getServer().saveConfig();
     }
 }
 
@@ -257,7 +257,7 @@ void AudioGridderPluginListComponent::addPluginItem(int index) {
             excludeList.erase(it);
             // try to add plugin
             std::vector<String> v = {name};
-            getApp().getServer().addPlugins(v, [this, name](bool success) {
+            getApp()->getServer().addPlugins(v, [this, name](bool success) {
                 if (!success) {
                     excludeList.insert(name);
                 }
@@ -271,7 +271,7 @@ void AudioGridderPluginListComponent::rescanPluginItem(int index) {
         index -= list.getNumTypes();
         auto id = list.getBlacklistedFiles()[index];
         list.removeFromBlacklist(id);
-        getApp().getServer().saveKnownPluginList();
+        getApp()->getServer().saveKnownPluginList();
     }
 }
 

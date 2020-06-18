@@ -10,22 +10,6 @@
 
 #include "../JuceLibraryCode/JuceHeader.h"
 
-#if JUCE_DEBUG
-#define dbgln(M)                                                                                \
-    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << (uint64_t)this << "] " << M; \
-                                     AGLogger::getInstance()->log(__str);)
-#else
-#define dbgln(M)
-#endif
-
-#define logln(M)                                                                                \
-    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << (uint64_t)this << "] " << M; \
-                                     AGLogger::getInstance()->log(__str);)
-
-#define logln_clnt(C, M)                                                                     \
-    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << (uint64_t)C << "] " << M; \
-                                     AGLogger::getInstance()->log(__str);)
-
 namespace e47 {
 class AGLogger : public Thread {
   public:

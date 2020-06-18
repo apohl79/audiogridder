@@ -6,9 +6,9 @@
  */
 
 #include "AudioWorker.hpp"
-
 #include "Message.hpp"
-#include "Utils.hpp"
+#include "Defaults.hpp"
+#include "App.hpp"
 
 namespace e47 {
 
@@ -20,7 +20,7 @@ AudioWorker::~AudioWorker() {
         m_socket->close();
     }
     m_recents.clear();
-    stopThread(-1);
+    waitForThreadAndLog(getLogTagSource(), this);
 }
 
 void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channelsIn, int channelsOut, double rate,
@@ -32,6 +32,7 @@ void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channelsIn, int c
     m_channelsIn = channelsIn;
     m_channelsOut = channelsOut;
     m_chain = std::make_shared<ProcessorChain>(ProcessorChain::createBussesProperties(channelsIn == 0));
+    m_chain->setLogTagSource(getLogTagSource());
     if (m_doublePrecission && m_chain->supportsDoublePrecisionProcessing()) {
         m_chain->setProcessingPrecision(AudioProcessor::doublePrecision);
     }
@@ -62,7 +63,8 @@ void AudioWorker::run() {
                 }
                 int bufferChannels = msg.isDouble() ? bufferD.getNumChannels() : bufferF.getNumChannels();
                 if (m_channelsOut > bufferChannels) {
-                    logln("error: channel mismatch");
+                    logln("error processing audio message: buffer has not enough channels: out channels is "
+                          << m_channelsOut << ", but buffer has " << bufferChannels);
                     m_chain->releaseResources();
                     m_socket->close();
                     break;
@@ -135,7 +137,7 @@ AudioWorker::RecentsListType& AudioWorker::getRecentsList(String host) const {
 }
 
 void AudioWorker::addToRecentsList(const String& id, const String& host) {
-    auto& pluginList = getApp().getPluginList();
+    auto& pluginList = getApp()->getPluginList();
     auto plug = pluginList.getTypeForIdentifierString(id);
     if (plug != nullptr) {
         auto& recents = getRecentsList(host);

@@ -10,10 +10,11 @@
 #include "../JuceLibraryCode/JuceHeader.h"
 #include "Client.hpp"
 #include "NumberConversion.hpp"
+#include "Utils.hpp"
 
 #include <set>
 
-class AudioGridderAudioProcessor : public AudioProcessor {
+class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate {
   public:
     AudioGridderAudioProcessor();
     ~AudioGridderAudioProcessor() override;
@@ -56,9 +57,9 @@ class AudioGridderAudioProcessor : public AudioProcessor {
 
     void saveConfig(int numOfBuffers = -1);
 
-    e47::Client& getClient() { return m_client; }
+    e47::Client& getClient() { return *m_client; }
     std::vector<ServerPlugin> getPlugins(const String& type) const;
-    const std::vector<ServerPlugin>& getPlugins() const { return m_client.getPlugins(); }
+    const std::vector<ServerPlugin>& getPlugins() const { return m_client->getPlugins(); }
     std::set<String> getPluginTypes() const;
 
     struct LoadedPlugin {
@@ -94,7 +95,7 @@ class AudioGridderAudioProcessor : public AudioProcessor {
     void setActiveServer(int i);
 
     int getLatencyMillis() const {
-        return e47::as<int>(lround(m_client.NUM_OF_BUFFERS * getBlockSize() * 1000 / getSampleRate()));
+        return e47::as<int>(lround(m_client->NUM_OF_BUFFERS * getBlockSize() * 1000 / getSampleRate()));
     }
 
     // It looks like most hosts do not support dynamic parameter creation or changes to existing parameters. Just the
@@ -131,7 +132,7 @@ class AudioGridderAudioProcessor : public AudioProcessor {
     };
 
   private:
-    e47::Client m_client;
+    std::unique_ptr<e47::Client> m_client;
     std::vector<LoadedPlugin> m_loadedPlugins;
     int m_activePlugin = -1;
     std::vector<String> m_servers;

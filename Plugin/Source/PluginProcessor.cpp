@@ -22,8 +22,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
 #if !JucePlugin_IsSynth
                          .withInput("Input", AudioChannelSet::stereo(), true)
 #endif
-                         .withOutput("Output", AudioChannelSet::stereo(), true)),
-      m_client(this) {
+                         .withOutput("Output", AudioChannelSet::stereo(), true)) {
 
 #ifdef JUCE_MAC
     signal(SIGPIPE, SIG_IGN);
@@ -37,9 +36,12 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
 #endif
 
     AGLogger::initialize("AudioGridder" + mode, "AudioGridderPlugin_");
-    logln_clnt(&m_client, mode << " plugin loaded (version: " << AUDIOGRIDDER_VERSION << ")");
 
-    m_client.startThread();
+    m_client = std::make_unique<e47::Client>(this);
+    setLogTagSource(m_client.get());
+    logln(mode << " plugin loaded (version: " << AUDIOGRIDDER_VERSION << ")");
+
+    m_client->startThread();
 
     updateLatency(0);
 
@@ -57,14 +59,14 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
                 m_activeServer = j["Last"].get<int>();
             }
             if (j.find("NumberOfBuffers") != j.end()) {
-                m_client.NUM_OF_BUFFERS = j["NumberOfBuffers"].get<int>();
+                m_client->NUM_OF_BUFFERS = j["NumberOfBuffers"].get<int>();
             }
             if (j.find("NumberOfAutomationSlots") != j.end()) {
                 m_numberOfAutomationSlots = j["NumberOfAutomationSlots"].get<int>();
             }
         }
     } catch (json::parse_error& e) {
-        logln_clnt(&m_client, "parsing config failed: " << e.what());
+        logln("parsing config failed: " << e.what());
     }
 
     m_unusedParam.name = "(unassigned)";
@@ -78,16 +80,16 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     }
 
     // load plugins on reconnect
-    m_client.setOnConnectCallback([this] {
-        logln_clnt(&m_client, "connected");
+    m_client->setOnConnectCallback([this] {
+        logln("connected");
         int idx = 0;
         for (auto& p : m_loadedPlugins) {
-            p.ok = m_client.addPlugin(p.id, p.presets, p.params, p.settings);
-            logln_clnt(&m_client, "loading " << p.name << " (" << p.id << ")... " << (p.ok ? "ok" : "failed"));
+            p.ok = m_client->addPlugin(p.id, p.presets, p.params, p.settings);
+            logln("loading " << p.name << " (" << p.id << ")... " << (p.ok ? "ok" : "failed"));
             if (p.ok) {
-                updateLatency(m_client.getLatencySamples());
+                updateLatency(m_client->getLatencySamples());
                 if (p.bypassed) {
-                    m_client.bypassPlugin(idx);
+                    m_client->bypassPlugin(idx);
                 }
                 for (auto& param : p.params) {
                     if (param.automationSlot > -1) {
@@ -109,8 +111,8 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
         });
     });
     // handle connection close
-    m_client.setOnCloseCallback([this] {
-        logln_clnt(&m_client, "disconnected");
+    m_client->setOnCloseCallback([this] {
+        logln("disconnected");
         MessageManager::callAsync([this] {
             auto* editor = getActiveEditor();
             if (editor != nullptr) {
@@ -119,14 +121,14 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
         });
     });
     if (m_activeServer > -1 && as<size_t>(m_activeServer) < m_servers.size()) {
-        m_client.setServer(m_servers[as<size_t>(m_activeServer)]);
+        m_client->setServer(m_servers[as<size_t>(m_activeServer)]);
     }
 }
 
 AudioGridderAudioProcessor::~AudioGridderAudioProcessor() {
-    m_client.signalThreadShouldExit();
-    m_client.close();
-    logln_clnt(&m_client, "plugin unloaded");
+    m_client->signalThreadShouldExit();
+    m_client->close();
+    logln("plugin unloaded");
     AGLogger::cleanup();
 }
 
@@ -163,12 +165,12 @@ const String AudioGridderAudioProcessor::getProgramName(int /* index */) { retur
 void AudioGridderAudioProcessor::changeProgramName(int /* index */, const String& /* newName */) {}
 
 void AudioGridderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
-    logln_clnt(&m_client, "prepareToPlay: sampleRate = " << sampleRate << ", samplesPerBlock=" << samplesPerBlock);
-    m_client.init(getTotalNumInputChannels(), getTotalNumOutputChannels(), sampleRate, samplesPerBlock,
-                  isUsingDoublePrecision());
+    logln("prepareToPlay: sampleRate = " << sampleRate << ", samplesPerBlock=" << samplesPerBlock);
+    m_client->init(getTotalNumInputChannels(), getTotalNumOutputChannels(), sampleRate, samplesPerBlock,
+                   isUsingDoublePrecision());
 }
 
-void AudioGridderAudioProcessor::releaseResources() { logln_clnt(&m_client, "releaseResources"); }
+void AudioGridderAudioProcessor::releaseResources() { logln("releaseResources"); }
 
 bool AudioGridderAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
     if (layouts.getMainOutputChannelSet() != AudioChannelSet::mono() &&
@@ -197,16 +199,16 @@ void AudioGridderAudioProcessor::processBlockReal(AudioBuffer<T>& buffer, MidiBu
         buffer.clear(i, 0, buffer.getNumSamples());
     }
 
-    if (!m_client.isReadyLockFree()) {
+    if (!m_client->isReadyLockFree()) {
         for (auto i = 0; i < buffer.getNumChannels(); ++i) {
             buffer.clear(i, 0, buffer.getNumSamples());
         }
     } else {
         if ((buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) || midiMessages.getNumEvents() > 0) {
-            m_client.send(buffer, midiMessages, posInfo);
-            m_client.read(buffer, midiMessages);
-            if (m_client.getLatencySamples() != getLatencySamples()) {
-                updateLatency(m_client.getLatencySamples());
+            m_client->send(buffer, midiMessages, posInfo);
+            m_client->read(buffer, midiMessages);
+            if (m_client->getLatencySamples() != getLatencySamples()) {
+                updateLatency(m_client->getLatencySamples());
             }
         }
     }
@@ -231,7 +233,7 @@ void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<float>& buffer
                 buf.remove(0);
             }
         } else {
-            logln_clnt(&m_client, "processBlockBypassed: error: m_bypassBufferF has less channels than buffer");
+            logln("processBlockBypassed: error: m_bypassBufferF has less channels than buffer");
         }
     }
 }
@@ -255,13 +257,13 @@ void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<double>& buffe
                 buf.remove(0);
             }
         } else {
-            logln_clnt(&m_client, "processBlockBypassed: error: m_bypassBufferD has less channels than buffer");
+            logln("processBlockBypassed: error: m_bypassBufferD has less channels than buffer");
         }
     }
 }
 
 void AudioGridderAudioProcessor::updateLatency(int samples) {
-    logln_clnt(&m_client, "updating latency samples to " << samples);
+    logln("updating latency samples to " << samples);
     setLatencySamples(samples);
     int channels = getTotalNumOutputChannels();
     std::lock_guard<std::mutex> lock(m_bypassBufferMtx);
@@ -302,7 +304,7 @@ bool AudioGridderAudioProcessor::hasEditor() const { return true; }
 AudioProcessorEditor* AudioGridderAudioProcessor::createEditor() { return new AudioGridderAudioProcessorEditor(*this); }
 
 void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData) {
-    logln_clnt(&m_client, "getStateInformation");
+    logln("getStateInformation");
 
     json j;
     auto jservers = json::array();
@@ -315,8 +317,8 @@ void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData) {
     auto jplugs = json::array();
     for (size_t i = 0; i < m_loadedPlugins.size(); i++) {
         auto& plug = m_loadedPlugins[i];
-        if (m_client.isReadyLockFree()) {
-            auto settings = m_client.getPluginSettings(static_cast<int>(i));
+        if (m_client->isReadyLockFree()) {
+            auto settings = m_client->getPluginSettings(static_cast<int>(i));
             if (settings.getSize() > 0) {
                 plug.settings = settings.toBase64Encoding();
             }
@@ -346,7 +348,7 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
         jservers.push_back(srv.toStdString());
     }
     if (numOfBuffers < 0) {
-        numOfBuffers = m_client.NUM_OF_BUFFERS;
+        numOfBuffers = m_client->NUM_OF_BUFFERS;
     }
     json jcfg;
     jcfg["_comment_"] = "PLEASE DO NOT CHANGE THIS FILE WHILE YOUR DAW IS RUNNING AND HAS AUDIOGRIDDER PLUGINS LOADED";
@@ -361,7 +363,7 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
 }
 
 void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
-    logln_clnt(&m_client, "setStateInformation");
+    logln("setStateInformation");
 
     std::string dump(static_cast<const char*>(data), as<size_t>(sizeInBytes));
     try {
@@ -407,11 +409,11 @@ void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeI
             }
         }
         if (m_activeServer > -1 && as<size_t>(m_activeServer) < m_servers.size()) {
-            m_client.setServer(m_servers[as<size_t>(m_activeServer)]);
-            m_client.reconnect();
+            m_client->setServer(m_servers[as<size_t>(m_activeServer)]);
+            m_client->reconnect();
         }
     } catch (json::parse_error& e) {
-        logln_clnt(&m_client, "parsing state info failed: " << e.what());
+        logln("parsing state info failed: " << e.what());
     }
 }
 
@@ -427,7 +429,7 @@ std::vector<ServerPlugin> AudioGridderAudioProcessor::getPlugins(const String& t
 
 std::set<String> AudioGridderAudioProcessor::getPluginTypes() const {
     std::set<String> ret;
-    for (auto& plugin : m_client.getPlugins()) {
+    for (auto& plugin : m_client->getPlugins()) {
         ret.insert(plugin.getType());
     }
     return ret;
@@ -436,13 +438,13 @@ std::set<String> AudioGridderAudioProcessor::getPluginTypes() const {
 bool AudioGridderAudioProcessor::loadPlugin(const String& id, const String& name) {
     StringArray presets;
     Array<e47::Client::Parameter> params;
-    logln_clnt(&m_client, "loading " << name << " (" << id << ")... ");
+    logln("loading " << name << " (" << id << ")... ");
     suspendProcessing(true);
-    bool success = m_client.addPlugin(id, presets, params);
+    bool success = m_client->addPlugin(id, presets, params);
     suspendProcessing(false);
-    logln_clnt(&m_client, "..." << (success ? "ok" : "error"));
+    logln("..." << (success ? "ok" : "error"));
     if (success) {
-        updateLatency(m_client.getLatencySamples());
+        updateLatency(m_client->getLatencySamples());
         m_loadedPlugins.push_back({id, name, "", presets, params, false, true});
     }
     return success;
@@ -450,9 +452,9 @@ bool AudioGridderAudioProcessor::loadPlugin(const String& id, const String& name
 
 void AudioGridderAudioProcessor::unloadPlugin(int idx) {
     suspendProcessing(true);
-    m_client.delPlugin(idx);
+    m_client->delPlugin(idx);
     suspendProcessing(false);
-    updateLatency(m_client.getLatencySamples());
+    updateLatency(m_client->getLatencySamples());
     if (idx == m_activePlugin) {
         hidePlugin();
     } else if (idx < m_activePlugin) {
@@ -468,16 +470,16 @@ void AudioGridderAudioProcessor::unloadPlugin(int idx) {
 }
 
 void AudioGridderAudioProcessor::editPlugin(int idx) {
-    logln_clnt(&m_client, "edit plugin " << idx);
-    m_client.editPlugin(idx);
+    logln("edit plugin " << idx);
+    m_client->editPlugin(idx);
     m_activePlugin = idx;
 }
 
 void AudioGridderAudioProcessor::hidePlugin(bool updateServer) {
-    logln_clnt(&m_client, "hiding plugin: active plugin "
-                              << m_activePlugin << ", " << (updateServer ? "updating server" : "not updating server"));
+    logln("hiding plugin: active plugin " << m_activePlugin << ", "
+                                          << (updateServer ? "updating server" : "not updating server"));
     if (updateServer) {
-        m_client.hidePlugin();
+        m_client->hidePlugin();
     }
     m_activePlugin = -1;
 }
@@ -491,30 +493,30 @@ bool AudioGridderAudioProcessor::isBypassed(int idx) {
 
 void AudioGridderAudioProcessor::bypassPlugin(int idx) {
     if (idx > -1 && as<size_t>(idx) < m_loadedPlugins.size()) {
-        logln_clnt(&m_client, "bypassing plugin " << idx);
-        m_client.bypassPlugin(idx);
+        logln("bypassing plugin " << idx);
+        m_client->bypassPlugin(idx);
         m_loadedPlugins[as<size_t>(idx)].bypassed = true;
     } else {
-        logln_clnt(&m_client, "failed to bypass plugin " << idx << ": out of range");
+        logln("failed to bypass plugin " << idx << ": out of range");
     }
 }
 
 void AudioGridderAudioProcessor::unbypassPlugin(int idx) {
     if (idx > -1 && as<size_t>(idx) < m_loadedPlugins.size()) {
-        logln_clnt(&m_client, "unbypassing plugin " << idx);
-        m_client.unbypassPlugin(idx);
+        logln("unbypassing plugin " << idx);
+        m_client->unbypassPlugin(idx);
         m_loadedPlugins[as<size_t>(idx)].bypassed = false;
     } else {
-        logln_clnt(&m_client, "failed to unbypass plugin " << idx << ": out of range");
+        logln("failed to unbypass plugin " << idx << ": out of range");
     }
 }
 
 void AudioGridderAudioProcessor::exchangePlugins(int idxA, int idxB) {
     if (idxA > -1 && as<size_t>(idxA) < m_loadedPlugins.size() && idxB > -1 &&
         as<size_t>(idxB) < m_loadedPlugins.size()) {
-        logln_clnt(&m_client, "exchanging plugins " << idxA << " and " << idxB);
+        logln("exchanging plugins " << idxA << " and " << idxB);
         suspendProcessing(true);
-        m_client.exchangePlugins(idxA, idxB);
+        m_client->exchangePlugins(idxA, idxB);
         suspendProcessing(false);
         std::swap(m_loadedPlugins[as<size_t>(idxA)], m_loadedPlugins[as<size_t>(idxB)]);
         if (idxA == m_activePlugin) {
@@ -531,12 +533,12 @@ void AudioGridderAudioProcessor::exchangePlugins(int idxA, int idxB) {
             }
         }
     } else {
-        logln_clnt(&m_client, "failed to exchange plugins " << idxA << " and " << idxB << ": out of range");
+        logln("failed to exchange plugins " << idxA << " and " << idxB << ": out of range");
     }
 }
 
 bool AudioGridderAudioProcessor::enableParamAutomation(int idx, int paramIdx, int slot) {
-    logln_clnt(&m_client, "enabling automation for plugin " << idx << ", parameter " << paramIdx << ", slot " << slot);
+    logln("enabling automation for plugin " << idx << ", parameter " << paramIdx << ", slot " << slot);
     auto& param = m_loadedPlugins[as<size_t>(idx)].params.getReference(paramIdx);
     Parameter* pparam = nullptr;
     if (slot == -1) {
@@ -556,13 +558,13 @@ bool AudioGridderAudioProcessor::enableParamAutomation(int idx, int paramIdx, in
         updateHostDisplay();
         return true;
     }
-    logln_clnt(&m_client, "failed to enable automation: no slot available, "
-                              << "you can increase the value for NumberOfAutomationSlots in the config");
+    logln("failed to enable automation: no slot available, "
+          << "you can increase the value for NumberOfAutomationSlots in the config");
     return false;
 }
 
 void AudioGridderAudioProcessor::disableParamAutomation(int idx, int paramIdx) {
-    logln_clnt(&m_client, "disabling automation for plugin " << idx << ", parameter " << paramIdx);
+    logln("disabling automation for plugin " << idx << ", parameter " << paramIdx);
     auto& param = m_loadedPlugins[as<size_t>(idx)].params.getReference(paramIdx);
     auto* pparam = dynamic_cast<Parameter*>(getParameters()[param.automationSlot]);
     pparam->reset();
@@ -571,7 +573,7 @@ void AudioGridderAudioProcessor::disableParamAutomation(int idx, int paramIdx) {
 }
 
 void AudioGridderAudioProcessor::delServer(int idx) {
-    logln_clnt(&m_client, "deleting server " << idx);
+    logln("deleting server " << idx);
     int i = 0;
     for (auto it = m_servers.begin(); it < m_servers.end(); it++) {
         if (i++ == idx) {
@@ -583,11 +585,11 @@ void AudioGridderAudioProcessor::delServer(int idx) {
 
 void AudioGridderAudioProcessor::setActiveServer(int idx) {
     if (idx > -1 && as<size_t>(idx) < m_servers.size()) {
-        logln_clnt(&m_client, "setting server " << idx << " active");
+        logln("setting server " << idx << " active");
         m_activeServer = idx;
-        m_client.setServer(m_servers[as<size_t>(idx)]);
+        m_client->setServer(m_servers[as<size_t>(idx)]);
     } else {
-        logln_clnt(&m_client, "failed to set server " << idx << " active: out of range");
+        logln("failed to set server " << idx << " active: out of range");
     }
 }
 

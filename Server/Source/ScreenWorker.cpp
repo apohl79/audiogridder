@@ -7,8 +7,8 @@
 
 #include "ScreenWorker.hpp"
 #include "Message.hpp"
-#include "Utils.hpp"
 #include "ImageDiff.hpp"
+#include "App.hpp"
 
 namespace e47 {
 
@@ -16,7 +16,7 @@ ScreenWorker::~ScreenWorker() {
     if (nullptr != m_socket && m_socket->isConnected()) {
         m_socket->close();
     }
-    stopThread(-1);
+    waitForThreadAndLog(getLogTagSource(), this);
 }
 
 void ScreenWorker::init(std::unique_ptr<StreamingSocket> s) { m_socket = std::move(s); }
@@ -25,10 +25,10 @@ void ScreenWorker::run() {
     logln("screen processor started");
 
     Message<ScreenCapture> msg;
-    float qual = getApp().getServer().getScreenQuality();
+    float qual = getApp()->getServer().getScreenQuality();
     PNGImageFormat png;
     JPEGImageFormat jpg;
-    bool diffDetect = getApp().getServer().getScreenDiffDetection();
+    bool diffDetect = getApp()->getServer().getScreenDiffDetection();
     uint32_t captureCount = 0;
     while (!currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected()) {
         std::unique_lock<std::mutex> lock(m_currentImageLock);
@@ -61,8 +61,8 @@ void ScreenWorker::run() {
 
             if (brightness >= mostlyWhite || brightness <= mostlyBlack) {
                 logln("resetting editor window");
-                MessageManager::callAsync([] { getApp().resetEditor(); });
-                MessageManager::callAsync([] { getApp().restartEditor(); });
+                MessageManager::callAsync([] { getApp()->resetEditor(); });
+                MessageManager::callAsync([] { getApp()->restartEditor(); });
             } else {
                 if (diffPxCount > 0) {
                     MemoryOutputStream mos;
@@ -116,7 +116,7 @@ void ScreenWorker::showEditor(std::shared_ptr<AudioProcessor> proc) {
         m_lastImage.reset();
         m_currentImageLock.unlock();
 
-        getApp().showEditor(proc, tid, [this](std::shared_ptr<Image> i, int w, int h) {
+        getApp()->showEditor(proc, tid, [this](std::shared_ptr<Image> i, int w, int h) {
             if (nullptr != i) {
                 std::lock_guard<std::mutex> lock(m_currentImageLock);
                 m_lastImage = m_currentImage;
@@ -137,7 +137,7 @@ void ScreenWorker::showEditor(std::shared_ptr<AudioProcessor> proc) {
 void ScreenWorker::hideEditor() {
     auto tid = getThreadId();
     MessageManager::callAsync([this, tid] {
-        getApp().hideEditor(tid);
+        getApp()->hideEditor(tid);
 
         std::lock_guard<std::mutex> lock(m_currentImageLock);
         m_currentImage.reset();

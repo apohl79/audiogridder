@@ -9,10 +9,11 @@
 #define ProcessorChain_hpp
 
 #include "../JuceLibraryCode/JuceHeader.h"
+#include "Utils.hpp"
 
 namespace e47 {
 
-class ProcessorChain : public AudioProcessor {
+class ProcessorChain : public AudioProcessor, public LogTagDelegate {
   public:
     class PlayHead : public AudioPlayHead {
       public:
@@ -68,7 +69,7 @@ class ProcessorChain : public AudioProcessor {
     static std::shared_ptr<AudioPluginInstance> loadPlugin(const String& fileOrIdentifier, double sampleRate,
                                                            int blockSize);
     bool addPluginProcessor(const String& id);
-    bool addProcessor(std::shared_ptr<AudioPluginInstance> processor);
+    void addProcessor(std::shared_ptr<AudioPluginInstance> processor);
     size_t getSize() const { return m_processors.size(); }
     std::shared_ptr<AudioPluginInstance> getProcessor(int index);
 

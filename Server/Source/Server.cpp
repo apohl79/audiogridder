@@ -10,17 +10,21 @@
 #endif
 
 #include "Server.hpp"
-#include "Utils.hpp"
 #include "json.hpp"
+#include "Version.hpp"
+#include "App.hpp"
 
 namespace e47 {
 
 using json = nlohmann::json;
 
-Server::Server() : Thread("Server") { loadConfig(); }
+Server::Server() : Thread("Server"), LogTag("server") {
+    logln("starting server (version: " << AUDIOGRIDDER_VERSION << ")...");
+    loadConfig();
+}
 
 void Server::loadConfig() {
-    logln("starting server (version: " << AUDIOGRIDDER_VERSION << ")...");
+    logln("loading config");
     File cfg(SERVER_CONFIG_FILE);
     if (cfg.exists()) {
         FileInputStream fis(cfg);
@@ -87,6 +91,7 @@ void Server::loadConfig() {
 }
 
 void Server::saveConfig() {
+    logln("saving config");
     json j;
     j["ID"] = m_id;
     j["AU"] = m_enableAU;
@@ -135,12 +140,13 @@ Server::~Server() {
     if (m_masterSocket.isConnected()) {
         m_masterSocket.close();
     }
-    stopThread(-1);
+    waitForThreadAndLog(this, this);
     m_pluginlist.clear();
     logln("server terminated");
 }
 
 void Server::shutdown() {
+    logln("shutting down");
     m_masterSocket.close();
     for (auto& w : m_workers) {
         logln("shutting down worker, isRunning=" << (int)w->isThreadRunning());
@@ -215,7 +221,8 @@ bool Server::scanPlugin(const String& id, const String& format) {
     }
     KnownPluginList plist;
     loadKnownPluginList(plist);
-    logln_static("scanning id=" << id << " fmt=" << format);
+    auto getLogTag = [] { return "server"; };
+    logln("scanning id=" << id << " fmt=" << format);
     bool success = true;
     PluginDirectoryScanner scanner(plist, *fmt, {}, true, File(DEAD_MANS_FILE));
     scanner.setFilesOrIdentifiersToScan({id});
@@ -297,7 +304,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
             if ((nullptr == plugindesc || fmt->pluginNeedsRescanning(*plugindesc)) &&
                 !m_pluginlist.getBlacklistedFiles().contains(fileOrId) && !shouldExclude(name, include)) {
                 logln("  scanning: " << name);
-                getApp().setSplashInfo(String("Scanning plugin ") + name + "...");
+                getApp()->setSplashInfo(String("Scanning plugin ") + name + "...");
                 scanNextPlugin(fileOrId, fmt->getName());
             } else {
                 logln("  (skipping: " << name << ")");
@@ -320,7 +327,7 @@ void Server::run() {
     saveConfig();
     saveKnownPluginList();
 
-    getApp().hideSplashWindow();
+    getApp()->hideSplashWindow();
 
 #ifdef JUCE_MAC
     setsockopt(m_masterSocket.getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);

@@ -12,13 +12,14 @@
 #include "Worker.hpp"
 #include "Defaults.hpp"
 #include "ProcessorChain.hpp"
+#include "Utils.hpp"
 
 #include <set>
 #include <thread>
 
 namespace e47 {
 
-class Server : public Thread {
+class Server : public Thread, public LogTag {
   public:
     Server();
     virtual ~Server();

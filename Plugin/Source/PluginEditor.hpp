@@ -10,6 +10,7 @@
 #include "../JuceLibraryCode/JuceHeader.h"
 #include "PluginButton.hpp"
 #include "PluginProcessor.hpp"
+#include "Utils.hpp"
 
 class AudioGridderAudioProcessorEditor : public AudioProcessorEditor, public PluginButton::Listener {
   public:

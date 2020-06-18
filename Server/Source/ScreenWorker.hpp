@@ -9,12 +9,13 @@
 #define ScreenWorker_hpp
 
 #include "../JuceLibraryCode/JuceHeader.h"
+#include "Utils.hpp"
 
 #include <thread>
 
 namespace e47 {
 
-class ScreenWorker : public Thread {
+class ScreenWorker : public Thread, public LogTagDelegate {
   public:
     ScreenWorker() : Thread("ScreenWorker") {}
     virtual ~ScreenWorker();

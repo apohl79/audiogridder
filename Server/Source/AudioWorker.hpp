@@ -11,6 +11,7 @@
 #include "../JuceLibraryCode/JuceHeader.h"
 #include "ProcessorChain.hpp"
 #include "Message.hpp"
+#include "Utils.hpp"
 
 #include <thread>
 
@@ -24,7 +25,7 @@ struct audio_chunk_hdr_t {
 
 class ProcessorChain;
 
-class AudioWorker : public Thread {
+class AudioWorker : public Thread, public LogTagDelegate {
   public:
     AudioWorker() : Thread("AudioWorker") {}
     virtual ~AudioWorker() override;

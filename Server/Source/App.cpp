@@ -7,7 +7,6 @@
 
 #include "App.hpp"
 #include "Server.hpp"
-#include "Utils.hpp"
 
 #ifdef JUCE_MAC
 #include <signal.h>
@@ -15,7 +14,7 @@
 
 namespace e47 {
 
-App::App() : m_menuWindow(this) {}
+App::App() : LogTag("app") {}
 
 void App::initialise(const String& commandLineParameters) {
     m_logger = FileLogger::createDateStampedLogger(getApplicationName(), "AudioGridderServer_", ".log", "");
@@ -47,6 +46,7 @@ void App::initialise(const String& commandLineParameters) {
     } else {
         showSplashWindow();
         setSplashInfo("Starting server...");
+        m_menuWindow = std::make_unique<MenuBarWindow>(this);
         m_server = std::make_unique<Server>();
         m_server->startThread();
     }
@@ -63,6 +63,8 @@ void App::shutdown() {
 }
 
 void App::restartServer() {
+    logln("restarting server...");
+
     hideEditor();
     hidePluginList();
     hideServerSettings();
@@ -71,6 +73,8 @@ void App::restartServer() {
     setSplashInfo("Restarting server...");
 
     std::thread([this] {
+        logln("running restart thread");
+
         // leave message thread context
         m_server->shutdown();
         m_server->waitForThreadToExit(-1);

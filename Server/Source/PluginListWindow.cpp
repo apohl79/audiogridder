@@ -5,8 +5,8 @@
  * Author: Andreas Pohl
  */
 
-#include "PluginListWindow.hpp"
 #include "App.hpp"
+#include "PluginListWindow.hpp"
 #include "Server.hpp"
 
 namespace e47 {

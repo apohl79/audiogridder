@@ -9,7 +9,7 @@
 #define AudioStreamer_hpp
 
 template <typename T>
-class AudioStreamer : public Thread {
+class AudioStreamer : public Thread, public LogTagDelegate {
   public:
     struct AudioMidiBuffer {
         int channelsRequested = -1;
@@ -37,6 +37,8 @@ class AudioStreamer : public Thread {
           socket(sock),
           writeQ(as<size_t>(clnt->NUM_OF_BUFFERS * 2)),
           readQ(as<size_t>(clnt->NUM_OF_BUFFERS * 2)) {
+        setLogTagSource(client);
+
         for (int i = 0; i < clnt->NUM_OF_BUFFERS; i++) {
             AudioMidiBuffer buf;
             buf.audio.setSize(clnt->m_channelsOut, clnt->m_samplesPerBlock);
@@ -48,25 +50,28 @@ class AudioStreamer : public Thread {
     }
 
     ~AudioStreamer() {
+        logln("audio streamer cleaning up");
         signalThreadShouldExit();
         notifyWrite();
         notifyRead();
-        stopThread(-1);
+        waitForThreadAndLog(getLogTagSource(), this);
+        logln("audio streamer cleanup done");
     }
 
     void run() {
+        logln("audio streamer ready");
         while (!currentThreadShouldExit() && !error && socket->isConnected()) {
             while (writeQ.read_available() > 0) {
                 AudioMidiBuffer buf;
                 writeQ.pop(buf);
                 if (!sendReal(buf)) {
-                    logln_clnt(client, "error: " << getInstanceString() << ": send failed");
+                    logln("error: " << getInstanceString() << ": send failed");
                     setError();
                     return;
                 }
                 MessageHelper::Error err;
                 if (!readReal(buf, &err)) {
-                    logln_clnt(client, "error: " << getInstanceString() << ": read failed: " << err.toString());
+                    logln("error: " << getInstanceString() << ": read failed: " << err.toString());
                     setError();
                     return;
                 }
@@ -75,6 +80,7 @@ class AudioStreamer : public Thread {
             }
             waitWrite();
         }
+        logln("audio streamer terminated");
     }
 
     void send(AudioBuffer<T>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
@@ -96,7 +102,7 @@ class AudioStreamer : public Thread {
                 notifyWrite();
             } else {
                 if (!copyToWorkingBuffer(workingSendBuf, workingSendSamples, buffer, midi, client->m_channelsIn == 0)) {
-                    logln_clnt(client, "error: " << getInstanceString() << ": send error");
+                    logln("error: " << getInstanceString() << ": send error");
                     setError();
                     return;
                 }
@@ -133,7 +139,7 @@ class AudioStreamer : public Thread {
             buf.midi.addEvents(midi, 0, buffer.getNumSamples(), 0);
             buf.posInfo = posInfo;
             if (!sendReal(buf)) {
-                logln_clnt(client, "error: " << getInstanceString() << ": send failed");
+                logln("error: " << getInstanceString() << ": send failed");
                 setError();
             }
         }
@@ -159,7 +165,7 @@ class AudioStreamer : public Thread {
                     }
                     readQ.pop(buf);
                     if (!copyToWorkingBuffer(workingReadBuf, workingReadSamples, buf.audio, buf.midi)) {
-                        logln_clnt(client, "error: " << getInstanceString() << ": read error");
+                        logln("error: " << getInstanceString() << ": read error");
                         setError();
                         return;
                     }
@@ -179,7 +185,7 @@ class AudioStreamer : public Thread {
             buf.audio.setSize(buffer.getNumChannels(), buffer.getNumSamples());
             MessageHelper::Error err;
             if (!readReal(buf, &err)) {
-                logln_clnt(client, "error: " << getInstanceString() << ": read failed: " << err.toString());
+                logln("error: " << getInstanceString() << ": read failed: " << err.toString());
                 setError();
                 return;
             }
@@ -227,14 +233,12 @@ class AudioStreamer : public Thread {
     bool waitRead() {
         if (client->NUM_OF_BUFFERS > 1 && readQ.read_available() < as<size_t>(client->NUM_OF_BUFFERS / 2) &&
             readQ.read_available() > 0) {
-            logln_clnt(client, "warning: " << getInstanceString() << ": input buffer below 50% ("
-                                           << readQ.read_available() << "/" << client->NUM_OF_BUFFERS << ")");
+            logln("warning: " << getInstanceString() << ": input buffer below 50% (" << readQ.read_available() << "/"
+                              << client->NUM_OF_BUFFERS << ")");
         } else if (readQ.read_available() == 0) {
             if (client->NUM_OF_BUFFERS > 1) {
-                logln_clnt(
-                    client,
-                    "warning: " << getInstanceString()
-                                << ": read queue empty, waiting for data, try increasing the NumberOfBuffers value");
+                logln("warning: " << getInstanceString()
+                                  << ": read queue empty, waiting for data, try increasing the NumberOfBuffers value");
             }
             if (!error && !threadShouldExit()) {
                 std::unique_lock<std::mutex> lock(readMtx);
@@ -252,7 +256,7 @@ class AudioStreamer : public Thread {
                              bool midiOnly = false) {
         if (!midiOnly) {
             if (src.getNumChannels() < 1) {
-                logln_clnt(client, "error: " << getInstanceString() << ": copy failed, source audio buffer empty");
+                logln("error: " << getInstanceString() << ": copy failed, source audio buffer empty");
                 return false;
             }
             if ((dst.audio.getNumSamples() - workingSamples) < src.getNumSamples()) {

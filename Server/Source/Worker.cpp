@@ -7,9 +7,9 @@
 
 #include "Worker.hpp"
 #include "KeyAndMouse.hpp"
-#include "Utils.hpp"
 #include "Defaults.hpp"
 #include "NumberConversion.hpp"
+#include "App.hpp"
 
 #ifdef JUCE_MAC
 #include <sys/socket.h>
@@ -17,11 +17,16 @@
 
 namespace e47 {
 
+Worker::Worker(StreamingSocket* clnt) : Thread("Worker"), LogTag("worker"), m_client(clnt) {
+    m_audio.setLogTagSource(this);
+    m_screen.setLogTagSource(this);
+}
+
 Worker::~Worker() {
     if (nullptr != m_client && m_client->isConnected()) {
         m_client->close();
     }
-    stopThread(-1);
+    waitForThreadAndLog(this, this);
 }
 
 String Worker::getStringFrom(const PluginDescription& d) {
@@ -69,7 +74,7 @@ void Worker::run() {
         }
 
         // send list of plugins
-        auto& pluginList = getApp().getPluginList();
+        auto& pluginList = getApp()->getPluginList();
         String list;
         for (auto& plugin : pluginList.getTypes()) {
             if ((plugin.numInputChannels > 0 && cfg.channelsIn > 0) ||
@@ -259,7 +264,7 @@ void Worker::handleMessage(std::shared_ptr<Message<HidePlugin>> /* msg */) {
 void Worker::handleMessage(std::shared_ptr<Message<Mouse>> msg) {
     auto ev = *pDATA(msg);
     MessageManager::callAsync([ev] {
-        auto point = getApp().localPointToGlobal(Point<float>(ev.x, ev.y));
+        auto point = getApp()->localPointToGlobal(Point<float>(ev.x, ev.y));
         uint64_t flags = 0;
         if (ev.isShiftDown) {
             setShiftKey(flags);

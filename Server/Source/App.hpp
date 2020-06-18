@@ -15,13 +15,14 @@
 #include "PluginListWindow.hpp"
 #include "ServerSettingsWindow.hpp"
 #include "SplashWindow.hpp"
+#include "Utils.hpp"
 
 namespace e47 {
 
 class Server;
 class PluginListWindow;
 
-class App : public JUCEApplication, public MenuBarModel {
+class App : public JUCEApplication, public MenuBarModel, public LogTag {
   public:
     using WindowCaptureCallback = std::function<void(std::shared_ptr<Image> image, int width, int height)>;
 
@@ -208,7 +209,7 @@ class App : public JUCEApplication, public MenuBarModel {
     WindowCaptureCallback m_windowFunc;
     std::mutex m_windowMtx;
     FileLogger* m_logger;
-    MenuBarWindow m_menuWindow;
+    std::unique_ptr<MenuBarWindow> m_menuWindow;
 };
 
 }  // namespace e47

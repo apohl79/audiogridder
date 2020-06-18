@@ -13,6 +13,7 @@
 #include "ServerPlugin.hpp"
 #include "Defaults.hpp"
 #include "Logger.hpp"
+#include "Utils.hpp"
 
 #include <boost/lockfree/spsc_queue.hpp>
 
@@ -20,7 +21,7 @@ class AudioGridderAudioProcessor;
 
 namespace e47 {
 
-class Client : public Thread, public MouseListener, public KeyListener {
+class Client : public Thread, public LogTag, public MouseListener, public KeyListener {
   public:
     Client(AudioGridderAudioProcessor* processor);
     ~Client() override;
@@ -102,29 +103,29 @@ class Client : public Thread, public MouseListener, public KeyListener {
             client.m_clientMtxId = id;
         }
         ~dbglock() {
-            client.m_clientMtx.unlock();
             client.m_clientMtxId = 0;
+            client.m_clientMtx.unlock();
         }
     };
     friend dbglock;
 
     void send(AudioBuffer<float>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
-        dbglock(*this, 1);
+        dbglock lock(*this, 1);
         m_audioStreamerF->send(buffer, midi, posInfo);
     }
 
     void send(AudioBuffer<double>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
-        dbglock(*this, 2);
+        dbglock lock(*this, 2);
         m_audioStreamerD->send(buffer, midi, posInfo);
     }
 
     void read(AudioBuffer<float>& buffer, MidiBuffer& midi) {
-        dbglock(*this, 3);
+        dbglock lock(*this, 3);
         m_audioStreamerF->read(buffer, midi);
     }
 
     void read(AudioBuffer<double>& buffer, MidiBuffer& midi) {
-        dbglock(*this, 4);
+        dbglock lock(*this, 4);
         m_audioStreamerD->read(buffer, midi);
     }
 
@@ -186,17 +187,22 @@ class Client : public Thread, public MouseListener, public KeyListener {
 
     std::mutex m_clientMtx;
     int m_clientMtxId = 0;
-    std::atomic_bool m_ready;
+    std::atomic_bool m_ready{false};
     std::atomic_bool m_error{false};
     std::unique_ptr<StreamingSocket> m_cmd_socket;
     std::unique_ptr<StreamingSocket> m_audio_socket;
     std::unique_ptr<StreamingSocket> m_screen_socket;
     std::vector<ServerPlugin> m_plugins;
 
-    class ScreenReceiver : public Thread {
+    class ScreenReceiver : public Thread, public LogTagDelegate {
       public:
-        ScreenReceiver(Client* clnt, StreamingSocket* sock) : Thread("ScreenWorker"), m_client(clnt), m_socket(sock) {}
-        ~ScreenReceiver() { stopThread(100); }
+        ScreenReceiver(Client* clnt, StreamingSocket* sock) : Thread("ScreenWorker"), m_client(clnt), m_socket(sock) {
+            setLogTagSource(clnt);
+        }
+        ~ScreenReceiver() {
+            signalThreadShouldExit();
+            waitForThreadAndLog(m_client, this, 1000);
+        }
         void run();
 
       private:

@@ -12,6 +12,7 @@
 #include "AudioWorker.hpp"
 #include "Message.hpp"
 #include "ScreenWorker.hpp"
+#include "Utils.hpp"
 
 #include <thread>
 
@@ -19,9 +20,9 @@ namespace e47 {
 
 class Server;
 
-class Worker : public Thread {
+class Worker : public Thread, public LogTag {
   public:
-    Worker(StreamingSocket* clnt) : Thread("Worker"), m_client(clnt) {}
+    Worker(StreamingSocket* clnt);
     ~Worker() override;
     void run() override;
 

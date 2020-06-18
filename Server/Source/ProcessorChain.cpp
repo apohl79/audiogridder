@@ -6,8 +6,8 @@
  */
 
 #include "ProcessorChain.hpp"
-#include "Utils.hpp"
 #include "NumberConversion.hpp"
+#include "App.hpp"
 
 namespace e47 {
 
@@ -127,13 +127,14 @@ std::shared_ptr<AudioPluginInstance> ProcessorChain::loadPlugin(PluginDescriptio
     auto inst =
         std::shared_ptr<AudioPluginInstance>(plugmgr.createPluginInstance(plugdesc, sampleRate, blockSize, err));
     if (nullptr == inst) {
-        logln_static("failed loading plugin " << plugdesc.fileOrIdentifier << ": " << err);
+        auto getLogTag = [] { return "processorchain"; };
+        logln("failed loading plugin " << plugdesc.fileOrIdentifier << ": " << err);
     }
     return inst;
 }
 
 std::shared_ptr<AudioPluginInstance> ProcessorChain::loadPlugin(const String& id, double sampleRate, int blockSize) {
-    auto& pluglist = getApp().getPluginList();
+    auto& pluglist = getApp()->getPluginList();
     auto plugdesc = pluglist.getTypeForIdentifierString(id);
     // try fallback
     if (nullptr == plugdesc) {
@@ -142,7 +143,8 @@ std::shared_ptr<AudioPluginInstance> ProcessorChain::loadPlugin(const String& id
     if (nullptr != plugdesc) {
         return loadPlugin(*plugdesc, sampleRate, blockSize);
     } else {
-        logln_static("failed to find plugin descriptor");
+        auto getLogTag = [] { return "processorchain"; };
+        logln("failed to find plugin descriptor");
     }
     return nullptr;
 }
@@ -173,16 +175,16 @@ bool ProcessorChain::addPluginProcessor(const String& id) {
         } else {
             preProcessBlocks<float>(inst);
         }
-        return addProcessor(inst);
+        addProcessor(inst);
+        return true;
     }
     return false;
 }
 
-bool ProcessorChain::addProcessor(std::shared_ptr<AudioPluginInstance> processor) {
+void ProcessorChain::addProcessor(std::shared_ptr<AudioPluginInstance> processor) {
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     m_processors.push_back(processor);
     updateNoLock();
-    return true;
 }
 
 void ProcessorChain::delProcessor(int idx) {

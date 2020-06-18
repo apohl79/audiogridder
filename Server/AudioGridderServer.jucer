@@ -2,7 +2,7 @@
 
 <JUCERPROJECT id="WnSnfL" name="AudioGridderServer" projectType="guiapp" jucerVersion="5.4.7"
               companyName="e47" companyCopyright="2020 Andreas Pohl" companyWebsite="https://www.e47.org"
-              companyEmail="audiogridder@e47.org" version="1.0.0">
+              companyEmail="audiogridder@e47.org" version="1.0.0" defines="AG_SERVER">
   <MAINGROUP id="UHvWdw" name="AudioGridderServer">
     <GROUP id="{8F99D8B9-9047-FC76-4952-10CB146DAED4}" name="Resources">
       <FILE id="TxAv0c" name="server.png" compile="0" resource="1" file="Resources/server.png"/>
