@@ -128,6 +128,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
 AudioGridderAudioProcessor::~AudioGridderAudioProcessor() {
     m_client->signalThreadShouldExit();
     m_client->close();
+    waitForThreadAndLog(m_client.get(), m_client.get());
     logln("plugin unloaded");
     AGLogger::cleanup();
 }

@@ -22,7 +22,6 @@ Client::Client(AudioGridderAudioProcessor* processor) : Thread("Client"), LogTag
 
 Client::~Client() {
     signalThreadShouldExit();
-    waitForThreadAndLog(this, this);
     close();
 }
 
