@@ -17,45 +17,100 @@ namespace e47 {
 App::App() : LogTag("app") {}
 
 void App::initialise(const String& commandLineParameters) {
-    m_logger = FileLogger::createDateStampedLogger(getApplicationName(), "AudioGridderServer_", ".log", "");
-    Logger::setCurrentLogger(m_logger);
 #ifdef JUCE_MAC
     signal(SIGPIPE, SIG_IGN);
 #endif
-    logln("commandline: " << commandLineParameters);
     auto args = getCommandLineParameterArray();
+    enum Modes { SCAN, MASTER, SERVER };
+    Modes mode = MASTER;
     String fileToScan = "";
     for (int i = 0; i < args.size(); i++) {
         if (!args[i].compare("-scan") && args.size() >= i + 2) {
             fileToScan = args[i + 1];
+            mode = SCAN;
+            break;
+        } else if (!args[i].compare("-server")) {
+            mode = SERVER;
             break;
         }
     }
-    if (fileToScan.length() > 0) {
-#ifdef JUCE_MAC
-        Process::setDockIconVisible(false);
-#endif
-        auto parts = StringArray::fromTokens(fileToScan, "|", "");
-        String id = parts[0];
-        String format = "VST";
-        if (parts.size() > 1) {
-            format = parts[1];
-        }
-        logln("scan mode: format=" << format << " id=" << id);
-        bool success = Server::scanPlugin(id, format);
-        logln("..." << (success ? "success" : "failed"));
-        setApplicationReturnValue(success ? 0 : 1);
-        quit();
-    } else {
-        showSplashWindow();
-        setSplashInfo("Starting server...");
-        m_menuWindow = std::make_unique<MenuBarWindow>(this);
-        m_server = std::make_unique<Server>();
-        m_server->startThread();
+    String logname = "AudioGridderServer_";
+    switch (mode) {
+        case MASTER:
+            logname << "Master_";
+            break;
+        case SCAN:
+            logname << "Scan_";
+            break;
+        default:
+            break;
     }
+    m_logger = FileLogger::createDateStampedLogger(getApplicationName(), logname, ".log", "");
+    Logger::setCurrentLogger(m_logger);
+    logln("commandline: " << commandLineParameters);
+    switch (mode) {
+        case SCAN:
+#ifdef JUCE_MAC
+            Process::setDockIconVisible(false);
+#endif
+            if (fileToScan.length() > 0) {
+                auto parts = StringArray::fromTokens(fileToScan, "|", "");
+                String id = parts[0];
+                String format = "VST";
+                if (parts.size() > 1) {
+                    format = parts[1];
+                }
+                logln("scan mode: format=" << format << " id=" << id);
+                bool success = Server::scanPlugin(id, format);
+                logln("..." << (success ? "success" : "failed"));
+                setApplicationReturnValue(success ? 0 : 1);
+                quit();
+            } else {
+                logln("error: fileToScan missing");
+                setApplicationReturnValue(1);
+                quit();
+            }
+            break;
+        case SERVER:
+            showSplashWindow();
+            setSplashInfo("Starting server...");
+            m_menuWindow = std::make_unique<MenuBarWindow>(this);
+            m_server = std::make_unique<Server>();
+            m_server->startThread();
+            break;
+        case MASTER:
+#ifdef JUCE_MAC
+            Process::setDockIconVisible(false);
+#endif
+            ChildProcess proc;
+            StringArray proc_args;
+            proc_args.add(File::getSpecialLocation(File::currentExecutableFile).getFullPathName());
+            proc_args.add("-server");
+            uint32 ec = 0;
+            do {
+                if (proc.start(proc_args)) {
+                    while (proc.isRunning()) {
+                        Thread::sleep(100);
+                    }
+                    ec = proc.getExitCode();
+                    if (ec != 0) {
+                        logln("error: server failed with exit code " << as<int>(ec));
+                    }
+                } else {
+                    logln("error: failed to start server process");
+                    setApplicationReturnValue(1);
+                    quit();
+                    ec = 0;
+                }
+            } while (ec != 0);
+            quit();
+            break;
+    }
+    logln("initialise complete");
 }
 
 void App::shutdown() {
+    logln("shutdown");
     if (m_server != nullptr) {
         m_server->shutdown();
         m_server->waitForThreadToExit(-1);
@@ -63,6 +118,7 @@ void App::shutdown() {
     }
     Logger::setCurrentLogger(nullptr);
     delete m_logger;
+    setApplicationReturnValue(0);
 }
 
 void App::restartServer() {
