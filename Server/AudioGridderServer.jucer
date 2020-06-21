@@ -2,24 +2,33 @@
 
 <JUCERPROJECT id="WnSnfL" name="AudioGridderServer" projectType="guiapp" jucerVersion="5.4.7"
               companyName="e47" companyCopyright="2020 Andreas Pohl" companyWebsite="https://www.e47.org"
-              companyEmail="audiogridder@e47.org" version="1.0.0" defines="AG_SERVER">
+              companyEmail="audiogridder@e47.org" version="1.0.0" defines="AG_SERVER&#10;"
+              headerPath="../../Source&#10;../../../Common/Source">
   <MAINGROUP id="UHvWdw" name="AudioGridderServer">
     <GROUP id="{8F99D8B9-9047-FC76-4952-10CB146DAED4}" name="Resources">
       <FILE id="TxAv0c" name="server.png" compile="0" resource="1" file="Resources/server.png"/>
+    </GROUP>
+    <GROUP id="{385AE6BC-8F0F-5D7D-102A-4D9FCF6538EC}" name="Common">
+      <FILE id="nNSIIt" name="Defaults.hpp" compile="0" resource="0" file="../Common/Source/Defaults.hpp"/>
+      <FILE id="mieNIL" name="ImageDiff.hpp" compile="0" resource="0" file="../Common/Source/ImageDiff.hpp"/>
+      <FILE id="mzbQrZ" name="json.hpp" compile="0" resource="0" file="../Common/Source/json.hpp"/>
+      <FILE id="TUrZAw" name="KeyAndMouseCommon.hpp" compile="0" resource="0"
+            file="../Common/Source/KeyAndMouseCommon.hpp"/>
+      <FILE id="olKSf7" name="Message.hpp" compile="0" resource="0" file="../Common/Source/Message.hpp"/>
+      <FILE id="lOlfoU" name="NumberConversion.hpp" compile="0" resource="0"
+            file="../Common/Source/NumberConversion.hpp"/>
+      <FILE id="hCUKCJ" name="Utils.hpp" compile="0" resource="0" file="../Common/Source/Utils.hpp"/>
+      <FILE id="V3zRoR" name="Version.hpp" compile="0" resource="0" file="../Common/Source/Version.hpp"/>
     </GROUP>
     <GROUP id="{D06A4BA4-CF35-72D8-62D7-9A05D88F919C}" name="Source">
       <FILE id="ynJPyR" name="App.cpp" compile="1" resource="0" file="Source/App.cpp"/>
       <FILE id="jaoo5q" name="App.hpp" compile="0" resource="0" file="Source/App.hpp"/>
       <FILE id="YxNmm4" name="AudioWorker.cpp" compile="1" resource="0" file="Source/AudioWorker.cpp"/>
       <FILE id="SVahV1" name="AudioWorker.hpp" compile="0" resource="0" file="Source/AudioWorker.hpp"/>
-      <FILE id="C2S389" name="Defaults.hpp" compile="0" resource="0" file="Source/Defaults.hpp"/>
-      <FILE id="q2LAET" name="ImageDiff.hpp" compile="0" resource="0" file="Source/ImageDiff.hpp"/>
       <FILE id="a2CnKT" name="Images.cpp" compile="1" resource="0" file="Source/Images.cpp"/>
       <FILE id="AfCHJU" name="Images.hpp" compile="0" resource="0" file="Source/Images.hpp"/>
-      <FILE id="JtAYTR" name="json.hpp" compile="0" resource="0" file="Source/json.hpp"/>
       <FILE id="tC3soa" name="KeyAndMouse.cpp" compile="1" resource="0" file="Source/KeyAndMouse.cpp"/>
       <FILE id="qptnsE" name="KeyAndMouse.hpp" compile="0" resource="0" file="Source/KeyAndMouse.hpp"/>
-      <FILE id="YPI7wt" name="Message.hpp" compile="0" resource="0" file="Source/Message.hpp"/>
       <FILE id="nK9xoD" name="NumberConversion.hpp" compile="0" resource="0"
             file="Source/NumberConversion.hpp"/>
       <FILE id="lwoFf2" name="PluginListComponent.cpp" compile="1" resource="0"
@@ -49,8 +58,6 @@
             file="Source/ServerSettingsWindow.hpp"/>
       <FILE id="DxDUnd" name="SplashWindow.hpp" compile="0" resource="0"
             file="Source/SplashWindow.hpp"/>
-      <FILE id="nwBJ5F" name="Utils.hpp" compile="0" resource="0" file="Source/Utils.hpp"/>
-      <FILE id="DN84Ne" name="Version.hpp" compile="0" resource="0" file="Source/Version.hpp"/>
       <FILE id="cjxAbW" name="Worker.cpp" compile="1" resource="0" file="Source/Worker.cpp"/>
       <FILE id="ng9B9v" name="Worker.hpp" compile="0" resource="0" file="Source/Worker.hpp"/>
     </GROUP>
@@ -60,7 +67,7 @@
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" osxCompatibility="10.7 SDK" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
                        recommendedWarnings="LLVM" headerPath="$(HOME)/audio/vstsdk2.4"/>
-        <CONFIGURATION isDebug="1" name="Release" osxCompatibility="10.7 SDK" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
+        <CONFIGURATION isDebug="1" name="Release" osxCompatibility="10.7 SDK" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING&#10;JUCE_DISABLE_ASSERTIONS"
                        recommendedWarnings="LLVM" headerPath="$(HOME)/audio/vstsdk2.4"
                        optimisation="3"/>
       </CONFIGURATIONS>
@@ -83,7 +90,7 @@
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" defines="JUCE_WINDOWS&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
                        headerPath="Z:\vstsdk2.4"/>
-        <CONFIGURATION isDebug="0" name="Release" defines="JUCE_WINDOWS&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
+        <CONFIGURATION isDebug="0" name="Release" defines="JUCE_WINDOWS&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING&#10;JUCE_DISABLE_ASSERTIONS"
                        headerPath="Z:\vstsdk2.4" useRuntimeLibDLL="0"/>
       </CONFIGURATIONS>
       <MODULEPATHS>

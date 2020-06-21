@@ -21,3 +21,6 @@ done
 for f in $(find $DIR/Server/Source -name "*.[ch]pp"); do
     format $f
 done
+for f in $(find $DIR/Common/Source -name "*.[ch]pp"); do
+    format $f
+done

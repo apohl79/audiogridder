@@ -3,10 +3,22 @@
 <JUCERPROJECT id="JM1hGs" name="AudioGridderInst" projectType="audioplug" jucerVersion="5.4.7"
               companyName="e47" companyCopyright="2020 Andreas Pohl" companyWebsite="https://www.e47.org"
               companyEmail="audiogridder@e47.org" pluginFormats="buildAU,buildVST,buildVST3"
-              pluginManufacturerCode="XE47" pluginCode="E402" headerPath="../../../../Server/Source&#10;"
+              pluginManufacturerCode="XE47" pluginCode="E402" headerPath="../../Source&#10;../../../../Common/Source&#10;"
               pluginName="AGridder" pluginVST3Category="Instrument,Network"
               version="1.0.0" pluginCharacteristicsValue="pluginIsSynth,pluginProducesMidiOut,pluginWantsMidiIn">
   <MAINGROUP id="tTbkq6" name="AudioGridderInst">
+    <GROUP id="{3368243C-E955-A248-6B2F-5609CABD8F4F}" name="Common">
+      <FILE id="uEnPnR" name="Defaults.hpp" compile="0" resource="0" file="../../Common/Source/Defaults.hpp"/>
+      <FILE id="O60LQQ" name="ImageDiff.hpp" compile="0" resource="0" file="../../Common/Source/ImageDiff.hpp"/>
+      <FILE id="TVidPD" name="json.hpp" compile="0" resource="0" file="../../Common/Source/json.hpp"/>
+      <FILE id="vVoVj4" name="KeyAndMouseCommon.hpp" compile="0" resource="0"
+            file="../../Common/Source/KeyAndMouseCommon.hpp"/>
+      <FILE id="WsZh1v" name="Message.hpp" compile="0" resource="0" file="../../Common/Source/Message.hpp"/>
+      <FILE id="yCHJOt" name="NumberConversion.hpp" compile="0" resource="0"
+            file="../../Common/Source/NumberConversion.hpp"/>
+      <FILE id="Qwiqkn" name="Utils.hpp" compile="0" resource="0" file="../../Common/Source/Utils.hpp"/>
+      <FILE id="jXVo1g" name="Version.hpp" compile="0" resource="0" file="../../Common/Source/Version.hpp"/>
+    </GROUP>
     <GROUP id="{A2A08E54-1037-9844-5B73-F16B657A5259}" name="Source">
       <FILE id="JYgJIV" name="AudioStreamer.hpp" compile="0" resource="0"
             file="../Source/AudioStreamer.hpp"/>

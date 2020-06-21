@@ -8,7 +8,7 @@
 #ifndef Message_hpp
 #define Message_hpp
 
-#include "KeyAndMouse.hpp"
+#include "KeyAndMouseCommon.hpp"
 #include "NumberConversion.hpp"
 #include "json.hpp"
 
