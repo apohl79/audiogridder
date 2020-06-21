@@ -293,7 +293,6 @@ void Client::close() {
     }
     if (nullptr != m_cmd_socket) {
         if (m_cmd_socket->isConnected()) {
-            quit();
             m_cmd_socket->close();
         }
         m_cmd_socket.reset();
