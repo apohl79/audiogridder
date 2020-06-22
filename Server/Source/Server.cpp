@@ -13,6 +13,7 @@
 #include "json.hpp"
 #include "Version.hpp"
 #include "App.hpp"
+#include "Metrics.hpp"
 
 namespace e47 {
 
@@ -21,6 +22,7 @@ using json = nlohmann::json;
 Server::Server() : Thread("Server"), LogTag("server") {
     logln("starting server (version: " << AUDIOGRIDDER_VERSION << ")...");
     loadConfig();
+    TimeStatistics::initialize();
 }
 
 void Server::loadConfig() {
@@ -142,6 +144,7 @@ Server::~Server() {
     }
     waitForThreadAndLog(this, this);
     m_pluginlist.clear();
+    TimeStatistics::cleanup();
     logln("server terminated");
 }
 

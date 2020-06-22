@@ -15,6 +15,8 @@
       <FILE id="TUrZAw" name="KeyAndMouseCommon.hpp" compile="0" resource="0"
             file="../Common/Source/KeyAndMouseCommon.hpp"/>
       <FILE id="olKSf7" name="Message.hpp" compile="0" resource="0" file="../Common/Source/Message.hpp"/>
+      <FILE id="hFSlhs" name="Metrics.cpp" compile="1" resource="0" file="../Common/Source/Metrics.cpp"/>
+      <FILE id="teWAXE" name="Metrics.hpp" compile="0" resource="0" file="../Common/Source/Metrics.hpp"/>
       <FILE id="lOlfoU" name="NumberConversion.hpp" compile="0" resource="0"
             file="../Common/Source/NumberConversion.hpp"/>
       <FILE id="hCUKCJ" name="Utils.hpp" compile="0" resource="0" file="../Common/Source/Utils.hpp"/>

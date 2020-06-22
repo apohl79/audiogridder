@@ -3,7 +3,7 @@
 <JUCERPROJECT id="JM1hGs" name="AudioGridder" projectType="audioplug" jucerVersion="5.4.7"
               companyName="e47" companyCopyright="2020 Andreas Pohl" companyWebsite="https://www.e47.org"
               companyEmail="audiogridder@e47.org" pluginFormats="buildAU,buildVST,buildVST3"
-              pluginManufacturerCode="XE47" pluginCode="E401" headerPath="../../Source&#10;../../../../Common/Source&#10;"
+              pluginManufacturerCode="XE47" pluginCode="E401" headerPath="../../../Source&#10;../../../../Common/Source&#10;"
               pluginName="AGridder" pluginVST3Category="Network" version="1.0.0"
               pluginAUMainType="'aufx'">
   <MAINGROUP id="tTbkq6" name="AudioGridder">
@@ -14,6 +14,8 @@
       <FILE id="Dmjsrg" name="KeyAndMouseCommon.hpp" compile="0" resource="0"
             file="../../Common/Source/KeyAndMouseCommon.hpp"/>
       <FILE id="kHdL6a" name="Message.hpp" compile="0" resource="0" file="../../Common/Source/Message.hpp"/>
+      <FILE id="vBs8XC" name="Metrics.cpp" compile="1" resource="0" file="../../Common/Source/Metrics.cpp"/>
+      <FILE id="znpWTc" name="Metrics.hpp" compile="0" resource="0" file="../../Common/Source/Metrics.hpp"/>
       <FILE id="tai7su" name="NumberConversion.hpp" compile="0" resource="0"
             file="../../Common/Source/NumberConversion.hpp"/>
       <FILE id="I8QGZk" name="Utils.hpp" compile="0" resource="0" file="../../Common/Source/Utils.hpp"/>

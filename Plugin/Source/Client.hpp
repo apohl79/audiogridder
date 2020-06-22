@@ -12,8 +12,8 @@
 #include "Message.hpp"
 #include "ServerPlugin.hpp"
 #include "Defaults.hpp"
-#include "Logger.hpp"
 #include "Utils.hpp"
+#include "Metrics.hpp"
 
 #include <boost/lockfree/spsc_queue.hpp>
 

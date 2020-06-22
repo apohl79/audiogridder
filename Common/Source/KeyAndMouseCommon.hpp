@@ -5,7 +5,6 @@
  * Author: Andreas Pohl
  */
 
-
 #ifndef MouseEvType_hpp
 #define MouseEvType_hpp
 
@@ -48,7 +47,7 @@ const uint16_t NOKEY = 0xFF;
 static inline uint16_t getKeyCode(std::string s) {
     auto it = VKeyMap.find(s);
     if (it != VKeyMap.end()) {
-        return (uint16_t) it->second;
+        return (uint16_t)it->second;
     }
     return NOKEY;
 }

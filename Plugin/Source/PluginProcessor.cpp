@@ -9,6 +9,7 @@
 #include "PluginEditor.hpp"
 #include "json.hpp"
 #include "Logger.hpp"
+#include "Metrics.hpp"
 #include "Version.hpp"
 
 #include <signal.h>
@@ -36,6 +37,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
 #endif
 
     AGLogger::initialize("AudioGridder" + mode, "AudioGridderPlugin_");
+    TimeStatistics::initialize();
 
     m_client = std::make_unique<e47::Client>(this);
     setLogTagSource(m_client.get());
@@ -130,6 +132,7 @@ AudioGridderAudioProcessor::~AudioGridderAudioProcessor() {
     m_client->close();
     waitForThreadAndLog(m_client.get(), m_client.get());
     logln("plugin unloaded");
+    TimeStatistics::cleanup();
     AGLogger::cleanup();
 }
 

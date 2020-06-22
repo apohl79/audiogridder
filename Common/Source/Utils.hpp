@@ -8,6 +8,40 @@
 #ifndef Utils_hpp
 #define Utils_hpp
 
+#ifdef AG_SERVER
+
+#define getApp() dynamic_cast<App*>(JUCEApplication::getInstance())
+
+#if (JUCE_DEBUG && !JUCE_DISABLE_ASSERTIONS)
+#define dbgln(M) \
+    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << getLogTag() << "] " << M; Logger::writeToLog(__str);)
+#else
+#define dbgln(M)
+#endif
+
+#define logln(M) \
+    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << getLogTag() << "] " << M; Logger::writeToLog(__str);)
+
+#else
+
+#include "Logger.hpp"
+
+#if JUCE_DEBUG
+#define dbgln(M)                                                                             \
+    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << getLogTag() << "] " << M; \
+                                     AGLogger::getInstance()->log(__str);)
+#else
+#define dbgln(M)
+#endif
+
+#define logln(M)                                                                             \
+    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << getLogTag() << "] " << M; \
+                                     AGLogger::getInstance()->log(__str);)
+
+#endif
+
+namespace e47 {
+
 class LogTag {
   public:
     LogTag(const String& name) : m_name(name) {}
@@ -34,37 +68,6 @@ class LogTagDelegate {
     }
 };
 
-#ifdef AG_SERVER
-
-#define getApp() dynamic_cast<App*>(JUCEApplication::getInstance())
-
-#if (JUCE_DEBUG && !JUCE_DISABLE_ASSERTIONS)
-#define dbgln(M) \
-    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << getLogTag() << "] " << M; Logger::writeToLog(__str);)
-#else
-#define dbgln(M)
-#endif
-
-#define logln(M) \
-    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << getLogTag() << "] " << M; Logger::writeToLog(__str);)
-
-#else
-
-#if JUCE_DEBUG
-#define dbgln(M)                                                                             \
-    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << getLogTag() << "] " << M; \
-                                     AGLogger::getInstance()->log(__str);)
-#else
-#define dbgln(M)
-#endif
-
-#define logln(M)                                                                             \
-    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << getLogTag() << "] " << M; \
-                                     AGLogger::getInstance()->log(__str);)
-
-#endif
-
-namespace e47 {
 static inline void waitForThreadAndLog(LogTag* tag, Thread* t, int millisUntilWarning = 3000) {
     auto getLogTag = [tag] { return tag->getLogTag(); };
     if (millisUntilWarning > -1) {
@@ -78,6 +81,7 @@ static inline void waitForThreadAndLog(LogTag* tag, Thread* t, int millisUntilWa
         t->waitForThreadToExit(-1);
     }
 }
+
 }  // namespace e47
 
 #endif /* Utils_hpp */

@@ -9,6 +9,7 @@
 #include "Message.hpp"
 #include "Defaults.hpp"
 #include "App.hpp"
+#include "Metrics.hpp"
 
 namespace e47 {
 
@@ -57,6 +58,7 @@ void AudioWorker::run() {
         // Read audio chunk
         if (m_socket->waitUntilReady(true, 1000)) {
             if (msg.readFromClient(m_socket.get(), bufferF, bufferD, midi, posInfo, m_chain->getExtraChannels(), &e)) {
+                auto duration = TimeStatistics::getDuration();
                 if (hasToSetPlayHead) {  // do not set the playhead before it's initialized
                     m_chain->setPlayHead(&playHead);
                     hasToSetPlayHead = false;

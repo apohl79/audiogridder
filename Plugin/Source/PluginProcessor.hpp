@@ -14,7 +14,7 @@
 
 #include <set>
 
-class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate {
+class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDelegate {
   public:
     AudioGridderAudioProcessor();
     ~AudioGridderAudioProcessor() override;

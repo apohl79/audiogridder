@@ -24,6 +24,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
     boost::lockfree::spsc_queue<AudioMidiBuffer> writeQ, readQ;
     std::mutex writeMtx, readMtx;
     std::condition_variable writeCv, readCv;
+    TimeStatistics::Duration duration;
 
     AudioMidiBuffer workingSendBuf, workingReadBuf;
     int workingSendSamples = 0;
@@ -36,7 +37,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
           client(clnt),
           socket(sock),
           writeQ(as<size_t>(clnt->NUM_OF_BUFFERS * 2)),
-          readQ(as<size_t>(clnt->NUM_OF_BUFFERS * 2)) {
+          readQ(as<size_t>(clnt->NUM_OF_BUFFERS * 2)),
+          duration(TimeStatistics::getDuration()) {
         setLogTagSource(client);
 
         for (int i = 0; i < clnt->NUM_OF_BUFFERS; i++) {
@@ -64,6 +66,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
             while (writeQ.read_available() > 0) {
                 AudioMidiBuffer buf;
                 writeQ.pop(buf);
+                duration.reset();
                 if (!sendReal(buf)) {
                     logln("error: " << getInstanceString() << ": send failed");
                     setError();
@@ -75,6 +78,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                     setError();
                     return;
                 }
+                duration.update();
                 readQ.push(std::move(buf));
                 notifyRead();
             }
@@ -138,6 +142,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
             }
             buf.midi.addEvents(midi, 0, buffer.getNumSamples(), 0);
             buf.posInfo = posInfo;
+            duration.reset();
             if (!sendReal(buf)) {
                 logln("error: " << getInstanceString() << ": send failed");
                 setError();
@@ -189,6 +194,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                 setError();
                 return;
             }
+            duration.update();
             buffer.makeCopyOf(buf.audio);
             midi.clear();
             midi.addEvents(buf.midi, 0, buffer.getNumSamples(), 0);
