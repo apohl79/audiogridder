@@ -28,6 +28,29 @@ connection through a VPN might be problematic but not impossible.
 Please find the latest binaries to download in the
 [releases](https://github.com/apohl79/audiogridder/releases) section.
 
+## Reporting of Bugs/Issues
+
+If you report a new issue, please be as precise as possible. To
+identify the root cause of an issue, it is necessary to be able to
+reproduce it or at least get some conclusions from the info you
+provide.
+
+- Report only one issue at a time, if you have multiple problems,
+  please create multiple issues.
+- Minimize the log files:
+  - Wipe all AudioGridder log folders (see below).
+  - Restart the server.
+  - Restart the DAW.
+  - Load only the minimal amount of plugins needed to run into the
+    problem you have.
+  - Take only the actions that lead to the problem you have.
+- Attach the log files to the issue (see locations below) as zip.
+- If you see a crash on OSX, please attach the crash report to
+  the issue (crash report dialog or see locations below) as zip.
+- If you see a crash on Windows, the log file directories contain dump
+  files, just follow the steps to "minimize the log files" and you are
+  good.
+
 ## AudioGridder Server
 
 The server supports VST2, VST3 and AudioUnit plugin formats. Installation
@@ -105,46 +128,41 @@ will have to connect the client at initialization time.
 - Tested DAWs: Cubase 10 Pro, Logic Pro X, Reaper, Ableton Live
 - ProTools is reportedly working via Blue Cat's PatchWork
 
-## Reporting of Issues
-
-If you report a new issue, please be as precise as possible. I will
-have to be able to reproduce it or at least get some conclusions from
-the info you provide.
-
-- Report only one issue at a time, if you have multiple problems,
-  please create multiple issues
-- If you see a crash, please attach the stack trace from apples crash
-  dialog
-- Attach the latest log files (see locations below)
-- Minimize the logs (restart the DAW and server and possibly just do,
-  what leads to the problem and stop)
-
-### Logfile locations
+### Bug Report Diagnostics Locations
 
 **OS X:**
 
-Server:
+Server Logs:
 
 ```~/Library/Logs/AudioGridderServer/AudioGridderServer_DATE_TIME.log```
 
-FX Plugin:
+FX Plugin Logs:
 
 ```~/Library/Logs/AudioGridderFX/AudioGridderPlugin_DATE_TIME.log```
 
-Instrument Plugin:
+Instrument Plugin Logs:
 
 ```~/Library/Logs/AudioGridderInstrument/AudioGridderPlugin_DATE_TIME.log```
 
+Crash Reports:
+
+```~/Library/Logs/DiagnosticReports```
+```/Library/Logs/DiagnosticReports``` (system wide)
+
+If the server crashes the report will be named
+AudioGridderServer_DATE-TIME*. If a plugin crashes, it will crash
+the DAW. Thus the crash report will be prefixed by the DAW name.
+
 **Windows:**
 
-Server: 
+Server Logs:
 
 ```C:\Users\<Username>\AppData\Roaming\AudioGridderServer\AudioGridderServer_DATE_TIME.log```
 
-FX Plugin:
+FX Plugin Logs:
 
 ```C:\Users\<Username>\AppData\Roaming\AudioGridderFX\AudioGridderPlugin_DATE_TIME.log```
 
-Instrument Plugin:
+Instrument Plugin Logs:
 
 ```C:\Users\<Username>\AppData\Roaming\AudioGridderInstrument\AudioGridderPlugin_DATE_TIME.log```
