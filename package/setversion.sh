@@ -38,5 +38,12 @@ $projucer --set-version $NUM_VER Plugin/Inst/AudioGridder.jucer
 
 cat package/Version.hpp.in | sed "s/#STR_VER#/$STR_VER/" > Common/Source/Version.hpp
 cat package/AudioGridder.iss.in | sed "s/#STR_VER#/$STR_VER/" > package/AudioGridder.iss
+cat package/archiveWin.bat.in | sed "s/#STR_VER#/$STR_VER/" > package/archiveWin.bat
 
 echo $STR_VER > package/VERSION
+
+if [ "$STR_VER" != "dev-build" ]; then
+    mkdir -p ../Archive/Builds/$STR_VER/win
+    mkdir -p ../Archive/Builds/$STR_VER/osx
+    sudo chmod -R g+rw ../Archive/Builds
+fi

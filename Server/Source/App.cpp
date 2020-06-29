@@ -8,6 +8,10 @@
 #include "App.hpp"
 #include "Server.hpp"
 
+#ifdef JUCE_WINDOWS
+#include "MiniDump.hpp"
+#endif
+
 #ifdef JUCE_MAC
 #include <signal.h>
 #endif
@@ -34,18 +38,24 @@ void App::initialise(const String& commandLineParameters) {
             break;
         }
     }
-    String logname = "AudioGridderServer_";
+    String logName = "AudioGridderServer_";
     switch (mode) {
         case MASTER:
-            logname << "Master_";
+            logName << "Master_";
             break;
         case SCAN:
-            logname << "Scan_";
+            logName << "Scan_";
             break;
         default:
             break;
     }
-    m_logger = FileLogger::createDateStampedLogger(getApplicationName(), logname, ".log", "");
+#ifdef JUCE_WINDOWS
+    auto dumpPath = FileLogger::getSystemLogFileFolder().getFullPathName();
+    auto appName = getApplicationName();
+    MiniDump::initialize(dumpPath.toWideCharPointer(), appName.toWideCharPointer(), logName.toWideCharPointer(),
+                         AUDIOGRIDDER_VERSIONW, false);
+#endif
+    m_logger = FileLogger::createDateStampedLogger(getApplicationName(), logName, ".log", "");
     Logger::setCurrentLogger(m_logger);
     logln("commandline: " << commandLineParameters);
     switch (mode) {

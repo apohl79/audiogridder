@@ -17,6 +17,8 @@
       <FILE id="olKSf7" name="Message.hpp" compile="0" resource="0" file="../Common/Source/Message.hpp"/>
       <FILE id="hFSlhs" name="Metrics.cpp" compile="1" resource="0" file="../Common/Source/Metrics.cpp"/>
       <FILE id="teWAXE" name="Metrics.hpp" compile="0" resource="0" file="../Common/Source/Metrics.hpp"/>
+      <FILE id="LDo1nR" name="MiniDump.cpp" compile="1" resource="0" file="../Common/Source/MiniDump.cpp"/>
+      <FILE id="XPg3Qc" name="MiniDump.hpp" compile="0" resource="0" file="../Common/Source/MiniDump.hpp"/>
       <FILE id="lOlfoU" name="NumberConversion.hpp" compile="0" resource="0"
             file="../Common/Source/NumberConversion.hpp"/>
       <FILE id="hCUKCJ" name="Utils.hpp" compile="0" resource="0" file="../Common/Source/Utils.hpp"/>
@@ -92,7 +94,7 @@
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" defines="JUCE_WINDOWS&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
                        headerPath="Z:\vstsdk2.4"/>
-        <CONFIGURATION isDebug="0" name="Release" defines="JUCE_WINDOWS&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING&#10;JUCE_DISABLE_ASSERTIONS"
+        <CONFIGURATION isDebug="1" name="Release" defines="JUCE_WINDOWS&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING&#10;JUCE_DISABLE_ASSERTIONS"
                        headerPath="Z:\vstsdk2.4" useRuntimeLibDLL="0"/>
       </CONFIGURATIONS>
       <MODULEPATHS>

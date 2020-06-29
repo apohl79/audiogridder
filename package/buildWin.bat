@@ -9,4 +9,6 @@ msbuild ..\Plugin\Inst\Builds\VisualStudio2019\AudioGridderInst.sln /nologo /p:C
 
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /Obuild AudioGridder.iss
 
+call archiveWin.bat
+
 pause

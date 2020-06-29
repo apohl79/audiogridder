@@ -9,5 +9,6 @@
 #define Version_hpp
 
 #define AUDIOGRIDDER_VERSION "dev-build"
+#define AUDIOGRIDDER_VERSIONW L"dev-build"
 
 #endif /* Version_hpp */

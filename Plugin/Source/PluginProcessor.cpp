@@ -12,7 +12,13 @@
 #include "Metrics.hpp"
 #include "Version.hpp"
 
+#ifdef JUCE_WINDOWS
+#include "MiniDump.hpp"
+#endif
+
+#ifdef JUCE_MAC
 #include <signal.h>
+#endif
 
 using json = nlohmann::json;
 
@@ -36,7 +42,16 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     mode = "FX";
 #endif
 
-    AGLogger::initialize("AudioGridder" + mode, "AudioGridderPlugin_");
+    String appName = "AudioGridder" + mode;
+    String logName = "AudioGridderPlugin_";
+
+#ifdef JUCE_WINDOWS
+    auto dumpPath = FileLogger::getSystemLogFileFolder().getFullPathName();
+    MiniDump::initialize(dumpPath.toWideCharPointer(), appName.toWideCharPointer(), logName.toWideCharPointer(),
+                         AUDIOGRIDDER_VERSIONW, true);
+#endif
+
+    AGLogger::initialize(appName, logName);
     TimeStatistics::initialize();
 
     m_client = std::make_unique<e47::Client>(this);
