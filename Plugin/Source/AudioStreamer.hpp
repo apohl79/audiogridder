@@ -82,7 +82,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                 readQ.push(std::move(buf));
                 notifyRead();
             }
-            waitWrite();
+            while (!waitWrite()) {}
         }
         logln("audio streamer terminated");
     }
@@ -157,15 +157,18 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         AudioMidiBuffer buf;
         if (client->NUM_OF_BUFFERS > 1) {
             if (buffer.getNumSamples() == client->m_samplesPerBlock && workingReadSamples == 0) {
-                if (waitRead()) {
-                    readQ.pop(buf);
-                    buffer.makeCopyOf(buf.audio);
-                    midi.clear();
-                    midi.addEvents(buf.midi, 0, buffer.getNumSamples(), 0);
+                if (!waitRead()) {
+                    logln("error: " << getInstanceString() << ": waitRead failed");
+                    return;
                 }
+                readQ.pop(buf);
+                buffer.makeCopyOf(buf.audio);
+                midi.clear();
+                midi.addEvents(buf.midi, 0, buffer.getNumSamples(), 0);
             } else {
                 while (workingReadSamples < buffer.getNumSamples()) {
                     if (!waitRead()) {
+                        logln("error: " << getInstanceString() << ": waitRead failed");
                         return;
                     }
                     readQ.pop(buf);
@@ -221,14 +224,15 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         writeCv.notify_one();
     }
 
-    void waitWrite() {
-        if (writeQ.read_available() == 0 && !error && !currentThreadShouldExit()) {
-            std::unique_lock<std::mutex> lock(writeMtx);
-            try {
-                writeCv.wait(lock, [this] { return writeQ.read_available() > 0 || currentThreadShouldExit(); });
-            } catch (...) {
-            }
+    bool waitWrite() {
+        if (error || currentThreadShouldExit()) {
+            return false;
         }
+        if (writeQ.read_available() == 0) {
+            std::unique_lock<std::mutex> lock(writeMtx);
+            return writeCv.wait_for(lock, std::chrono::seconds(1), [this] { return writeQ.read_available() > 0 || currentThreadShouldExit(); });
+        }
+        return true;
     }
 
     void notifyRead() {
@@ -248,11 +252,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
             }
             if (!error && !threadShouldExit()) {
                 std::unique_lock<std::mutex> lock(readMtx);
-                try {
-                    readCv.wait(lock, [this] { return readQ.read_available() > 0 || threadShouldExit(); });
-                } catch (...) {
-                    return false;
-                }
+                return readCv.wait_for(lock, std::chrono::seconds(1), [this] { return readQ.read_available() > 0 || threadShouldExit(); });
             }
         }
         return true;
