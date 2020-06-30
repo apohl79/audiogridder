@@ -147,6 +147,7 @@ Instrument Plugin Logs:
 Crash Reports:
 
 ```~/Library/Logs/DiagnosticReports```
+
 ```/Library/Logs/DiagnosticReports``` (system wide)
 
 If the server crashes the report will be named
