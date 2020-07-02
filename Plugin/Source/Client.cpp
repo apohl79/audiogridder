@@ -46,7 +46,7 @@ void Client::run() {
         } catch (json::parse_error& e) {
             logln("parsing config failed: " << e.what());
         }
-        if ((!isReady() || m_needsReconnect) && !currentThreadShouldExit()) {
+        if ((!isReady(15000) || m_needsReconnect) && !currentThreadShouldExit()) {
             logln("(re)connecting...");
             close();
             init();
@@ -229,8 +229,9 @@ void Client::init() {
         // receive plugin list
         m_plugins.clear();
         Message<PluginList> msg;
-        if (!msg.read(m_cmd_socket.get())) {
-            logln("failed reading plugin list");
+        MessageHelper::Error err;
+        if (!msg.read(m_cmd_socket.get(), &err, 5000)) {
+            logln("failed reading plugin list: " << err.toString());
             return;
         }
         String listChunk(PLD(msg).str, as<size_t>(*PLD(msg).size));
@@ -249,8 +250,8 @@ void Client::init() {
     }
 }
 
-bool Client::isReady() {
-    int retry = 100;
+bool Client::isReady(int timeout) {
+    int retry = timeout / 10;
     bool locked = false;
     while (retry-- > 0) {
         if ((locked = m_clientMtx.try_lock()) == true) {
@@ -265,8 +266,7 @@ bool Client::isReady() {
                   nullptr != m_audio_socket && m_audio_socket->isConnected();
         m_clientMtx.unlock();
     } else {
-        logln(getLoadedPluginsString() << ": isReady can't acquire lock, returning stale result, locked by "
-                                       << m_clientMtxId);
+        logln(getLoadedPluginsString() << ": error: isReady can't acquire lock, locked by " << m_clientMtxId);
         m_error = true;
     }
     return !m_error && m_ready;
@@ -336,6 +336,7 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
     if (!isReadyLockFree()) {
         return false;
     };
+    MessageHelper::Error err;
     Message<AddPlugin> msg;
     PLD(msg).setString(id);
     dbglock lock(*this, 11);
@@ -351,14 +352,14 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
         }
         m_latency = result->getReturnCode();
         Message<Presets> msgPresets;
-        if (!msgPresets.read(m_cmd_socket.get())) {
-            logln("  failed to read presets");
+        if (!msgPresets.read(m_cmd_socket.get(), &err)) {
+            logln("  failed to read presets: " << err.toString());
             return false;
         }
         presets = StringArray::fromTokens(msgPresets.payload.getString(), "|", "");
         Message<Parameters> msgParams;
-        if (!msgParams.read(m_cmd_socket.get())) {
-            logln("  failed to read parameters");
+        if (!msgParams.read(m_cmd_socket.get(), &err)) {
+            logln("  failed to read parameters: " << err.toString());
             return false;
         }
         auto jparams = msgParams.payload.getJson();
@@ -433,12 +434,13 @@ MemoryBlock Client::getPluginSettings(int idx) {
         m_error = true;
     } else {
         Message<PluginSettings> res;
-        if (res.read(m_cmd_socket.get())) {
+        MessageHelper::Error err;
+        if (res.read(m_cmd_socket.get(), &err, 5000)) {
             if (*res.payload.size > 0) {
                 block.append(res.payload.data, as<size_t>(*res.payload.size));
             }
         } else {
-            logln(getLoadedPluginsString() << "failed to read PluginSettings message");
+            logln(getLoadedPluginsString() << ": failed to read PluginSettings message: " << err.toString());
             m_error = true;
         }
     }
@@ -482,9 +484,10 @@ std::vector<ServerPlugin> Client::getRecents() {
         return recents;
     };
     Message<RecentsList> msg;
+    MessageHelper::Error err;
     dbglock lock(*this, 19);
     msg.send(m_cmd_socket.get());
-    if (msg.read(m_cmd_socket.get())) {
+    if (msg.read(m_cmd_socket.get(), &err, 5000)) {
         String listChunk(PLD(msg).str, as<size_t>(*PLD(msg).size));
         auto list = StringArray::fromLines(listChunk);
         for (auto& line : list) {
@@ -493,7 +496,7 @@ std::vector<ServerPlugin> Client::getRecents() {
             }
         }
     } else {
-        logln(getLoadedPluginsString() << "failed to read RecentsList message");
+        logln(getLoadedPluginsString() << ": failed to read RecentsList message: " << err.toString());
         m_error = true;
     }
     return recents;
@@ -520,12 +523,14 @@ float Client::getParameterValue(int idx, int paramIdx) {
     dbglock lock(*this, 21);
     msg.send(m_cmd_socket.get());
     Message<ParameterValue> ret;
-    if (ret.read(m_cmd_socket.get())) {
+    MessageHelper::Error err;
+    if (ret.read(m_cmd_socket.get(), &err)) {
         if (DATA(msg)->idx == DATA(ret)->idx && DATA(msg)->paramIdx == DATA(ret)->paramIdx) {
             return DATA(ret)->value;
         }
     }
-    logln(getLoadedPluginsString() << ": failed to read parameter value idx=" << idx << " paramIdx=" << paramIdx);
+    logln(getLoadedPluginsString() << ": failed to read parameter value idx=" << idx << " paramIdx=" << paramIdx << ": "
+                                   << err.toString());
     m_error = true;
     return 0;
 }
@@ -545,9 +550,9 @@ void Client::setParameterValue(int idx, int paramIdx, float val) {
 void Client::ScreenReceiver::run() {
     using MsgType = Message<ScreenCapture>;
     MsgType msg;
-    MessageHelper::Error e;
+    MessageHelper::Error err;
     do {
-        if (msg.read(m_socket, &e, 200)) {
+        if (msg.read(m_socket, &err, 200)) {
             if (PLD(msg).hdr->size > 0) {
                 if (DATA(msg)[1] == 'P' && DATA(msg)[2] == 'N' && DATA(msg)[3] == 'G') {
                     auto img = std::make_shared<Image>(PNGImageFormat::loadFrom(DATA(msg), PLD(msg).hdr->size));
@@ -564,8 +569,11 @@ void Client::ScreenReceiver::run() {
                 m_client->setPluginScreen(nullptr, 0, 0);
             }
         }
-    } while (!currentThreadShouldExit() && (e.code == MessageHelper::E_NONE || e.code == MessageHelper::E_TIMEOUT));
-    signalThreadShouldExit();
+    } while (!currentThreadShouldExit() && (err.code == MessageHelper::E_NONE || err.code == MessageHelper::E_TIMEOUT));
+    if (!currentThreadShouldExit()) {
+        logln("screen receiver failed to read message: " << err.toString());
+        signalThreadShouldExit();
+    }
     m_client->m_error = true;
     logln("screen receiver terminated");
 }

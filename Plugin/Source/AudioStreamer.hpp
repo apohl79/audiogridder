@@ -82,7 +82,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                 readQ.push(std::move(buf));
                 notifyRead();
             }
-            while (!waitWrite()) {}
+            while (!waitWrite()) {
+            }
         }
         logln("audio streamer terminated");
     }
@@ -230,7 +231,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         }
         if (writeQ.read_available() == 0) {
             std::unique_lock<std::mutex> lock(writeMtx);
-            return writeCv.wait_for(lock, std::chrono::seconds(1), [this] { return writeQ.read_available() > 0 || currentThreadShouldExit(); });
+            return writeCv.wait_for(lock, std::chrono::seconds(1),
+                                    [this] { return writeQ.read_available() > 0 || currentThreadShouldExit(); });
         }
         return true;
     }
@@ -252,7 +254,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
             }
             if (!error && !threadShouldExit()) {
                 std::unique_lock<std::mutex> lock(readMtx);
-                return readCv.wait_for(lock, std::chrono::seconds(1), [this] { return readQ.read_available() > 0 || threadShouldExit(); });
+                return readCv.wait_for(lock, std::chrono::seconds(1),
+                                       [this] { return readQ.read_available() > 0 || threadShouldExit(); });
             }
         }
         return true;

@@ -89,7 +89,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     int getSamplesPerBlock() const { return m_samplesPerBlock; }
     int getLatencySamples() const { return m_latency + NUM_OF_BUFFERS * m_samplesPerBlock; }
 
-    bool isReady();
+    bool isReady(int timeout = 1000);
     bool isReadyLockFree();
     void init(int channelsIn, int channelsOut, double rate, int samplesPerBlock, bool doublePrecission);
 
