@@ -43,6 +43,13 @@ void AGLogger::run() {
 }
 
 void AGLogger::log(String msg) {
+    auto inst = getInstance();
+    if (nullptr != inst) {
+        inst->logReal(std::move(msg));
+    }
+}
+
+void AGLogger::logReal(String msg) {
     std::lock_guard<std::mutex> lock(m_mtx);
     m_msgQ[m_msgQIdx].push(std::move(msg));
     m_cv.notify_one();

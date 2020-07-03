@@ -16,7 +16,8 @@ class AGLogger : public Thread {
     AGLogger(const String& appName, const String& filePrefix);
     ~AGLogger() override;
     void run() override;
-    void log(String msg);
+
+    static void log(String msg);
 
     static void initialize(const String& appName, const String& filePrefix);
     static std::shared_ptr<AGLogger> getInstance();
@@ -28,6 +29,8 @@ class AGLogger : public Thread {
     size_t m_msgQIdx = 0;
     std::mutex m_mtx;
     std::condition_variable m_cv;
+
+    void logReal(String msg);
 
     static std::shared_ptr<AGLogger> m_inst;
     static std::mutex m_instMtx;

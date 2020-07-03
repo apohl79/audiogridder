@@ -27,16 +27,14 @@
 #include "Logger.hpp"
 
 #if JUCE_DEBUG
-#define dbgln(M)                                                                             \
-    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << getLogTag() << "] " << M; \
-                                     AGLogger::getInstance()->log(__str);)
+#define dbgln(M) \
+    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << getLogTag() << "] " << M; AGLogger::log(__str);)
 #else
 #define dbgln(M)
 #endif
 
-#define logln(M)                                                                             \
-    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << getLogTag() << "] " << M; \
-                                     AGLogger::getInstance()->log(__str);)
+#define logln(M) \
+    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << getLogTag() << "] " << M; AGLogger::log(__str);)
 
 #endif
 
