@@ -23,12 +23,42 @@ low latency and enough bandwidth. There is basically no limitation on
 the network side, but your DAW has some latency needs. So a common DSL
 connection through a VPN might be problematic but not impossible.
 
-## Downloads
+# Table of Contents
+
+   * [Downloads](#downloads)
+   * [Features](#features)
+   * [Compatibility](#compatibility)
+   * [Reporting of Bugs/Issues](#reporting-of-bugsissues)
+   * [AudioGridder Server](#audiogridder-server)
+      * [Server Installation](#server-installation)
+   * [AudioGridder Plugin](#audiogridder-plugin)
+      * [Plugin Installation](#plugin-installation)
+   * [Bug Report Diagnostics Locations](#bug-report-diagnostics-locations)
+   * [Donation](#donation)
+
+# Downloads
 
 Please find the latest binaries to download in the
 [releases](https://github.com/apohl79/audiogridder/releases) section.
 
-## Reporting of Bugs/Issues
+# Features
+
+- VST2 / VST3 / AudioUnit (OSX only)
+- Effects & Instrument Plugins
+- Latency compensation
+- Local control of remote plugin UI's
+- Unlimited remote plugin chains
+
+# Compatibility
+
+- Server: OSX 64bit 10.7+, Windows 7+
+- Plugin: OSX 64bit 10.11+, Windows 7+
+- The server supports AudioUnit (OSX only) and VST2/VST3 plugins
+- The plugin is available as AudioUnit (OSX only) and VST2/VST3
+- Tested DAWs: Cubase 10 Pro, Logic Pro X, Reaper, Ableton Live
+- ProTools is reportedly working via Blue Cat's PatchWork
+
+# Reporting of Bugs/Issues
 
 If you report a new issue, please be as precise as possible. To
 identify the root cause of an issue, it is necessary to be able to
@@ -51,7 +81,7 @@ provide.
   files, just follow the steps to "minimize the log files" and you are
   good.
 
-## AudioGridder Server
+# AudioGridder Server
 
 The server supports VST2, VST3 and AudioUnit plugin formats. Installation
 and setup is straight forward. There is multiple possibilities for
@@ -69,7 +99,7 @@ via "server[:ID]".
 You can also run multiple servers within your network and access
 different servers from your DAW at the same time.
 
-**Server Setup:**
+## Server Installation
 
 1. Install the PKG on OSX or the Setup EXE on Windows. (The installer
 includes the server and plugin binaries.)
@@ -90,7 +120,7 @@ have to assign a different server ID to each instance.
 <img src="https://raw.githubusercontent.com/apohl79/audiogridder/master/images/server.jpg" />
 </p>
 
-## AudioGridder Plugin
+# AudioGridder Plugin
 
 The plugin is currently supported as VST2, VST3 and AudioUnit on
 OSX. AAX is likely never coming, as AVID does not seem to support open
@@ -103,7 +133,7 @@ on the connected remote server. Each plugin instance will connect to a
 single remote server instance (which can be different for each
 instance). 
 
-**Plugin Setup:**
+## Plugin Installation
 
 1. Install the PKG on OSX or the Setup EXE on Windows. (The installer
 includes the server and plugin binaries.)
@@ -119,16 +149,7 @@ will have to connect the client at initialization time.
 <img src="https://raw.githubusercontent.com/apohl79/audiogridder/master/images/plugin.jpg" />
 </p>
 
-## Compatibility
-
-- Server: OSX 64bit 10.7+, Windows 7+
-- Plugin: OSX 64bit 10.11+, Windows 7+
-- The server supports AudioUnit (OSX only) and VST2/VST3 plugins
-- The plugin is available as AudioUnit (OSX only) and VST2/VST3
-- Tested DAWs: Cubase 10 Pro, Logic Pro X, Reaper, Ableton Live
-- ProTools is reportedly working via Blue Cat's PatchWork
-
-### Bug Report Diagnostics Locations
+# Bug Report Diagnostics Locations
 
 **OS X:**
 
@@ -167,3 +188,14 @@ FX Plugin Logs:
 Instrument Plugin Logs:
 
 ```C:\Users\<Username>\AppData\Roaming\AudioGridderInstrument\AudioGridderPlugin_DATE_TIME.log```
+
+# Donation
+
+If you like AudioGridder and want to support its further development, you are welcome to donate. :-)
+
+<form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_top">
+<input type="hidden" name="cmd" value="_s-xclick" />
+<input type="hidden" name="hosted_button_id" value="MF9TGYY8P8GG4" />
+<input type="image" src="https://www.paypalobjects.com/en_US/DK/i/btn/btn_donateCC_LG.gif" border="0" name="submit" title="PayPal - The safer, easier way to pay online!" alt="Donate with PayPal button" />
+<img alt="" border="0" src="https://www.paypal.com/en_DE/i/scr/pixel.gif" width="1" height="1" />
+</form>
