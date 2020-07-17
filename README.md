@@ -1,27 +1,29 @@
 # AudioGridder
 
-AudioGridder is a plugin host, that allows you to offload DSP
-processing to remote computers running OS X or Windows. This can come
-in handy when mixing complex projects for instance. AudioGridder comes
+AudioGridder is a plugin host, that allows you to offload the DSP
+processing of audio plugins to remote computers running OSX or
+Windows. This can come in handy when mixing complex projects or
+running CPU intensive instruments for instance. AudioGridder comes
 with a plugin and a server and supports VST2, VST3 and AudioUnit
-formats. Plugins can be hosted across the network. Simply run the
-server component on a remote machine and connect your DAW using the
-AudioGridder plugin. This allows you to add remote insert chains or
-instruments into your DAW's signal paths. The DSP code of the loaded
-remote plugins will be executed on the remote machine and the remote
-plugin UI's will be streamed over the wire. With AudioGridder you get
-an experience very close to hosting the plugins directly in your DAW
-but not using your local CPU.
+plugin Formats. Plugins can be hosted and accessed across the network
+- simply run the AudioGridder server on a remote machine and connect
+your DAW using the AudioGridder plugin. This allows you to add remote
+insert chains or instruments into your DAW's signal paths. The DSP
+code of the loaded remote plugins will be executed on the remote
+machine and the remote plugin UI's will be streamed over the
+wire. With AudioGridder you get an experience very close to hosting
+the plugins directly in your DAW but not using your local CPU.
 
 <p align="center">
 <img src="https://raw.githubusercontent.com/apohl79/audiogridder/master/images/overview.jpg" width="600" />
 </p>
 
-This setup proves to be working very well on wired networks. Wireless
-networks work as well given you have a proper connection that provides
-low latency and enough bandwidth. There is basically no limitation on
-the network side, but your DAW has some latency needs. So a common DSL
-connection through a VPN might be problematic but not impossible.
+Wired networks prove to be working very well. Wireless networks work
+as well given you have a proper connection that provides low enough
+latency and enough bandwidth. AudioGridder has no limitation on the
+network side, but your DAW has some latency needs. Thus a common DSL
+connection through a VPN tunnel might be problematic but not
+impossible.
 
 # Table of Contents
 
@@ -44,10 +46,11 @@ Please find the latest binaries to download in the
 # Features
 
 - VST2 / VST3 / AudioUnit (OSX only)
-- Effects & Instrument Plugins
+- Effect & Instrument plugins
 - Latency compensation
+- 32/64 bit float processing
 - Local control of remote plugin UI's
-- Unlimited remote plugin chains
+- Unlimited remote effect plugin chains
 
 # Compatibility
 
@@ -83,21 +86,22 @@ provide.
 
 # AudioGridder Server
 
-The server supports VST2, VST3 and AudioUnit plugin formats. Installation
-and setup is straight forward. There is multiple possibilities for
-your setup. It's suggested, that you dedicate each server to a single
-remote DAW workspace. That is because each server can only stream a
-single UI at the same time.
+The server supports VST2, VST3 and AudioUnit plugin formats. There is
+multiple possibilities for your setup. It's suggested, that you
+dedicate each server instance to a single remote DAW workspace. That
+is because each server can only stream a single UI at the same time.
 
-You can run multiple parallel UI user sessions on a Mac. Setup a user
-for each remote workspace, create a UI session (via VNC for example)
-and run a separate server instance in each session. You need to assign
-a different server ID to each instance (in the server settings). You
-can easily address each instance from the AudioGridder plugin
-via "server[:ID]".
+You can run multiple parallel UI user sessions on OSX and
+Windows. Setup a user for each remote workspace, create a UI session
+(via VNC, note that RDP is not working reliably with AudioGridder) and
+run a separate server instance in each session. You need to assign a
+different server ID to each instance (in the server settings). In your
+DAW you can address each server instance from the AudioGridder plugin
+via "server[:ID]" notation.
 
 You can also run multiple servers within your network and access
-different servers from your DAW at the same time.
+different servers from your DAW at the same time (in different plugin
+instances).
 
 ## Server Installation
 
@@ -113,7 +117,7 @@ AudioGridder works with scaling enabled, it has a negative impact
 on the performance.
 4. Run the server
 5. Manage your plugins (if you do not want to enable all plugins).
-6. If you want to run multiple servers on a singel machine, you will
+6. If you want to run multiple servers on a single machine, you will
 have to assign a different server ID to each instance.
 
 <p align="center">
@@ -123,15 +127,22 @@ have to assign a different server ID to each instance.
 # AudioGridder Plugin
 
 The plugin is currently supported as VST2, VST3 and AudioUnit on
-OSX. AAX is likely never coming, as AVID does not seem to support open
-source projects unfortunately. See the compatibility section for a
-workaround.
+OSX. *Note:* AAX is likely never coming, as AVID does not seem to
+support open source projects unfortunately. See the compatibility
+section for a workaround.
 
-You are basically plugging a remote insert stack into your DAW's
-channel insert stacks. From there you can insert any pluging available
-on the connected remote server. Each plugin instance will connect to a
-single remote server instance (which can be different for each
-instance). 
+With the AudioGridder FX plugin you can plug a remote insert effect
+chain into your DAW's channel inserts. From there you can insert any
+FX plugin available on the connected server.
+
+Instruments work similarly. Create a software instrument track in your
+DAW and select the AudioGridder plugin as instrument. Now you can load
+any of the instrument plugins available on the server.
+
+Each AudioGridder plugin instance will connect to a single remote
+server instance. But each separate loaded plugin instance can connect
+to a different server, so you can connect to multiple servers from your
+DAW at the same time. 
 
 ## Plugin Installation
 
