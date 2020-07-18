@@ -663,9 +663,10 @@ void Client::sendMouseEvent(MouseEvType ev, Point<float> p, bool isShiftDown, bo
 }
 
 bool Client::keyPressed(const KeyPress& kp, Component* /* originatingComponent */) {
-    if (!isReadyLockFree()) {
-        return true;
+    if (!isReadyLockFree() || m_processor->getActivePlugin() == -1) {
+        return false;
     };
+    bool consumed = true;
     auto modkeys = kp.getModifiers();
     std::vector<uint16_t> keysToPress;
     if (modkeys.isShiftDown()) {
@@ -681,6 +682,7 @@ bool Client::keyPressed(const KeyPress& kp, Component* /* originatingComponent *
         keysToPress.push_back(getKeyCode("Escape"));
     } else if (kp.isKeyCurrentlyDown(KeyPress::spaceKey)) {
         keysToPress.push_back(getKeyCode("Space"));
+        consumed = false; // don't consume the space key
     } else if (kp.isKeyCurrentlyDown(KeyPress::returnKey)) {
         keysToPress.push_back(getKeyCode("Return"));
     } else if (kp.isKeyCurrentlyDown(KeyPress::tabKey)) {
@@ -758,7 +760,7 @@ bool Client::keyPressed(const KeyPress& kp, Component* /* originatingComponent *
     dbglock lock(*this, 24);
     msg.send(m_cmd_socket.get());
 
-    return true;
+    return consumed;
 }
 
 StreamingSocket* Client::accept(StreamingSocket& sock) const {
