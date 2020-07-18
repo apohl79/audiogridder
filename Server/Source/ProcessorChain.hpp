@@ -78,6 +78,8 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
 
     float getParameterValue(int idx, int paramIdx);
 
+    void update();
+
     void clear();
 
     String toString();
@@ -100,10 +102,13 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
         for (auto& p : m_processors) {
             if (!p->isSuspended()) {
                 p->processBlock(buffer, midiMessages);
+                latency += p->getLatencySamples();
             }
-            latency += p->getLatencySamples();
         }
-        setLatencySamples(latency);
+        if (latency != getLatencySamples()) {
+            logln("updating latency samples to " << latency);
+            setLatencySamples(latency);
+        }
     }
 
     template <typename T>

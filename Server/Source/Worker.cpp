@@ -316,6 +316,7 @@ void Worker::handleMessage(std::shared_ptr<Message<BypassPlugin>> msg) {
     auto proc = m_audio.getProcessor(pPLD(msg).getNumber());
     if (nullptr != proc) {
         proc->suspendProcessing(true);
+        m_audio.update();
     }
 }
 
@@ -323,6 +324,7 @@ void Worker::handleMessage(std::shared_ptr<Message<UnbypassPlugin>> msg) {
     auto proc = m_audio.getProcessor(pPLD(msg).getNumber());
     if (nullptr != proc) {
         proc->suspendProcessing(false);
+        m_audio.update();
     }
 }
 

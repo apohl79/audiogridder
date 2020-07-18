@@ -682,7 +682,7 @@ bool Client::keyPressed(const KeyPress& kp, Component* /* originatingComponent *
         keysToPress.push_back(getKeyCode("Escape"));
     } else if (kp.isKeyCurrentlyDown(KeyPress::spaceKey)) {
         keysToPress.push_back(getKeyCode("Space"));
-        consumed = false; // don't consume the space key
+        consumed = false;  // don't consume the space key
     } else if (kp.isKeyCurrentlyDown(KeyPress::returnKey)) {
         keysToPress.push_back(getKeyCode("Return"));
     } else if (kp.isKeyCurrentlyDown(KeyPress::tabKey)) {

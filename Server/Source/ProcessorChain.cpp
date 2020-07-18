@@ -199,26 +199,37 @@ void ProcessorChain::delProcessor(int idx) {
     updateNoLock();
 }
 
+void ProcessorChain::update() {
+    std::lock_guard<std::mutex> lock(m_processors_mtx);
+    updateNoLock();
+}
+
 void ProcessorChain::updateNoLock() {
     int latency = 0;
     bool supportsDouble = true;
     m_extraChannels = 0;
     for (auto& proc : m_processors) {
-        latency += proc->getLatencySamples();
-        if (!proc->supportsDoublePrecisionProcessing()) {
-            supportsDouble = false;
+        if (!proc->isSuspended()) {
+            latency += proc->getLatencySamples();
+            if (!proc->supportsDoublePrecisionProcessing()) {
+                supportsDouble = false;
+            }
+            int extraInChannels = proc->getTotalNumInputChannels() - proc->getMainBusNumInputChannels();
+            int extraOutChannels = proc->getTotalNumOutputChannels() - proc->getMainBusNumOutputChannels();
+            m_extraChannels = jmax(m_extraChannels, extraInChannels, extraOutChannels);
         }
-        int extraInChannels = proc->getTotalNumInputChannels() - proc->getMainBusNumInputChannels();
-        int extraOutChannels = proc->getTotalNumOutputChannels() - proc->getMainBusNumOutputChannels();
-        m_extraChannels = jmax(m_extraChannels, extraInChannels, extraOutChannels);
     }
     if (latency != getLatencySamples()) {
         logln("updating latency samples to " << latency);
         setLatencySamples(latency);
     }
     m_supportsDoublePrecission = supportsDouble;
-    if (m_processors.size() > 0) {
-        m_tailSecs = m_processors.back()->getTailLengthSeconds();
+    auto it = m_processors.rbegin();
+    while (it != m_processors.rend() && (*it)->isSuspended()) {
+        it++;
+    }
+    if (it != m_processors.rend()) {
+        m_tailSecs = (*it)->getTailLengthSeconds();
     } else {
         m_tailSecs = 0.0;
     }
