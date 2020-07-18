@@ -43,9 +43,24 @@ namespace e47 {
 class LogTag {
   public:
     LogTag(const String& name) : m_name(name) {}
+
+    String getStrWithLeadingZero(int n) const {
+        String s = "";
+        if (n < 10) {
+            s << "0";
+        }
+        s << n;
+        return s;
+    }
+
     String getLogTag() const {
-        String tag = m_name;
-        tag << ":" << (uint64)this;
+        auto now = Time::getCurrentTime();
+        auto H = getStrWithLeadingZero(now.getHours());
+        auto M = getStrWithLeadingZero(now.getMinutes());
+        auto S = getStrWithLeadingZero(now.getSeconds());
+        auto m = getStrWithLeadingZero(now.getMilliseconds());
+        String tag = "";
+        tag << H << ":" << M << ":" << S << "." << m << "|" << m_name << "|" << (uint64)this;
         return tag;
     }
 

@@ -41,12 +41,18 @@ void Client::run() {
                         NUM_OF_BUFFERS = newNum;
                         reconnect();
                     }
+                } else if (j.find("LoadPluginTimeout") != j.end()) {
+                    int newNum = j["LoadPluginTimeout"].get<int>();
+                    if (LOAD_PLUGIN_TIMEOUT != newNum) {
+                        logln("timeout for leading a plugin changed from " << LOAD_PLUGIN_TIMEOUT << " to " << newNum);
+                        LOAD_PLUGIN_TIMEOUT = newNum;
+                    }
                 }
             }
         } catch (json::parse_error& e) {
             logln("parsing config failed: " << e.what());
         }
-        if ((!isReady(15000) || m_needsReconnect) && !currentThreadShouldExit()) {
+        if ((!isReady(LOAD_PLUGIN_TIMEOUT + 5000) || m_needsReconnect) && !currentThreadShouldExit()) {
             logln("(re)connecting...");
             close();
             init();
@@ -341,9 +347,9 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
     PLD(msg).setString(id);
     dbglock lock(*this, 11);
     if (msg.send(m_cmd_socket.get())) {
-        auto result = MessageFactory::getResult(m_cmd_socket.get(), 10);
+        auto result = MessageFactory::getResult(m_cmd_socket.get(), LOAD_PLUGIN_TIMEOUT, &err);
         if (nullptr == result) {
-            logln("  failed to get result");
+            logln("  failed to get result: " << err.toString());
             return false;
         }
         if (result->getReturnCode() < 0) {

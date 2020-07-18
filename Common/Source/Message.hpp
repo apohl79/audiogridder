@@ -776,17 +776,25 @@ class MessageFactory {
         return nullptr;
     }
 
-    static std::shared_ptr<Result> getResult(StreamingSocket* socket, int retry = 5) {
+    static std::shared_ptr<Result> getResult(StreamingSocket* socket, int retry = 5,
+                                             MessageHelper::Error* e = nullptr) {
         if (nullptr != socket) {
             auto msg = std::make_shared<Message<Result>>();
-            MessageHelper::Error e;
+            MessageHelper::Error err;
             do {
-                if (msg->read(socket, &e)) {
+                if (msg->read(socket, &err)) {
                     auto res = std::make_shared<Result>();
                     *res = std::move(msg->payload);
                     return res;
                 }
-            } while (retry-- > 0 && e.code == MessageHelper::E_TIMEOUT);
+            } while (retry-- > 0 && err.code == MessageHelper::E_TIMEOUT);
+            if (nullptr != e) {
+                *e = err;
+                String m = "unable to retrieve result message after ";
+                m << retry;
+                m << " attempts";
+                MessageHelper::seterrstr(e, m);
+            }
         }
         return nullptr;
     }

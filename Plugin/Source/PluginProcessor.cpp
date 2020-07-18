@@ -58,8 +58,6 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     setLogTagSource(m_client.get());
     logln(mode << " plugin loaded (version: " << AUDIOGRIDDER_VERSION << ")");
 
-    m_client->startThread();
-
     updateLatency(0);
 
     File cfg(PLUGIN_CONFIG_FILE);
@@ -77,6 +75,9 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
             }
             if (j.find("NumberOfBuffers") != j.end()) {
                 m_client->NUM_OF_BUFFERS = j["NumberOfBuffers"].get<int>();
+            }
+            if (j.find("LoadPluginTimeout") != j.end()) {
+                m_client->LOAD_PLUGIN_TIMEOUT = j["LoadPluginTimeout"].get<int>();
             }
             if (j.find("NumberOfAutomationSlots") != j.end()) {
                 m_numberOfAutomationSlots = j["NumberOfAutomationSlots"].get<int>();
@@ -101,8 +102,9 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
         logln("connected");
         int idx = 0;
         for (auto& p : m_loadedPlugins) {
+            logln("loading " << p.name << " (" << p.id << ") [on connect]... ");
             p.ok = m_client->addPlugin(p.id, p.presets, p.params, p.settings);
-            logln("loading " << p.name << " (" << p.id << ")... " << (p.ok ? "ok" : "failed"));
+            logln("..." << (p.ok ? "ok" : "failed"));
             if (p.ok) {
                 updateLatency(m_client->getLatencySamples());
                 if (p.bypassed) {
@@ -140,6 +142,8 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     if (m_activeServer > -1 && as<size_t>(m_activeServer) < m_servers.size()) {
         m_client->setServer(m_servers[as<size_t>(m_activeServer)]);
     }
+
+    m_client->startThread();
 }
 
 AudioGridderAudioProcessor::~AudioGridderAudioProcessor() {
@@ -218,16 +222,17 @@ void AudioGridderAudioProcessor::processBlockReal(AudioBuffer<T>& buffer, MidiBu
         buffer.clear(i, 0, buffer.getNumSamples());
     }
 
-    if (!m_client->isReadyLockFree()) {
-        for (auto i = 0; i < buffer.getNumChannels(); ++i) {
-            buffer.clear(i, 0, buffer.getNumSamples());
-        }
-    } else {
-        if ((buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) || midiMessages.getNumEvents() > 0) {
+    if ((buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) || midiMessages.getNumEvents() > 0) {
+        if (m_client->audioLock()) {
             m_client->send(buffer, midiMessages, posInfo);
             m_client->read(buffer, midiMessages);
+            m_client->audioUnlock();
             if (m_client->getLatencySamples() != getLatencySamples()) {
                 updateLatency(m_client->getLatencySamples());
+            }
+        } else {
+            for (auto i = 0; i < buffer.getNumChannels(); ++i) {
+                buffer.clear(i, 0, buffer.getNumSamples());
             }
         }
     }

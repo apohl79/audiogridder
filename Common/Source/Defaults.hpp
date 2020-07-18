@@ -29,6 +29,7 @@ static const String DEAD_MANS_FILE =
 
 static constexpr int DEFAULT_NUM_OF_BUFFERS = 8;
 static constexpr int DEFAULT_NUM_RECENTS = 10;
+static constexpr int DEFAULT_LOAD_PLUGIN_TIMEOUT = 15;
 
 static constexpr uint32 DEFAULT_BG_COLOR = 0xff222222;
 static constexpr uint32 DEFAULT_BUTTON_COLOR = 0xff333333;

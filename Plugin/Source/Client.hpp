@@ -75,6 +75,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     };
 
     int NUM_OF_BUFFERS = DEFAULT_NUM_OF_BUFFERS;
+    int LOAD_PLUGIN_TIMEOUT = DEFAULT_LOAD_PLUGIN_TIMEOUT;
 
     void run() override;
 
@@ -109,25 +110,35 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     };
     friend dbglock;
 
+    bool audioLock() {
+        if (m_clientMtx.try_lock()) {
+            if (isReadyLockFree()) {
+                m_clientMtxId = 1;
+                return true;
+            }
+            m_clientMtx.unlock();
+        }
+        return false;
+    }
+
+    void audioUnlock() {
+        if (m_clientMtxId == 1) {
+            m_clientMtxId = 0;
+            m_clientMtx.unlock();
+        }
+    }
+
     void send(AudioBuffer<float>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
-        dbglock lock(*this, 1);
         m_audioStreamerF->send(buffer, midi, posInfo);
     }
 
     void send(AudioBuffer<double>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
-        dbglock lock(*this, 2);
         m_audioStreamerD->send(buffer, midi, posInfo);
     }
 
-    void read(AudioBuffer<float>& buffer, MidiBuffer& midi) {
-        dbglock lock(*this, 3);
-        m_audioStreamerF->read(buffer, midi);
-    }
+    void read(AudioBuffer<float>& buffer, MidiBuffer& midi) { m_audioStreamerF->read(buffer, midi); }
 
-    void read(AudioBuffer<double>& buffer, MidiBuffer& midi) {
-        dbglock lock(*this, 4);
-        m_audioStreamerD->read(buffer, midi);
-    }
+    void read(AudioBuffer<double>& buffer, MidiBuffer& midi) { m_audioStreamerD->read(buffer, midi); }
 
     const auto& getPlugins() const { return m_plugins; }
     Image getPluginScreen();  // create copy
