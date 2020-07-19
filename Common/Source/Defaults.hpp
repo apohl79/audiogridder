@@ -27,7 +27,7 @@ static const String KNOWN_PLUGINS_FILE =
 static const String DEAD_MANS_FILE =
     File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + "\\.audiogridderserver.crash";
 static const String SERVER_RUN_FILE =
-File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + "\\.audiogridderserver.running";
+    File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + "\\.audiogridderserver.running";
 #endif
 
 static constexpr int DEFAULT_NUM_OF_BUFFERS = 8;

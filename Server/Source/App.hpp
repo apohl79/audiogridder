@@ -73,7 +73,10 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
 
         void mouseUp(const MouseEvent& /* event */) override {
 #ifdef JUCE_MAC
-            showDropdownMenu(m_app->getMenuForIndex(0, "Tray"));
+            auto menu = m_app->getMenuForIndex(0, "Tray");
+            menu.addSeparator();
+            menu.addItem("Quit", [this] { m_app->systemRequestedQuit(); });
+            showDropdownMenu(menu);
 #else
             auto menu = m_app->getMenuForIndex(0, "Tray");
             menu.addSeparator();
