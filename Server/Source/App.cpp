@@ -92,28 +92,38 @@ void App::initialise(const String& commandLineParameters) {
 #ifdef JUCE_MAC
             Process::setDockIconVisible(false);
 #endif
-            ChildProcess proc;
-            StringArray proc_args;
-            proc_args.add(File::getSpecialLocation(File::currentExecutableFile).getFullPathName());
-            proc_args.add("-server");
-            uint32 ec = 0;
-            do {
-                if (proc.start(proc_args)) {
-                    while (proc.isRunning()) {
-                        Thread::sleep(100);
+            std::thread([this] {
+                ChildProcess proc;
+                StringArray proc_args;
+                proc_args.add(File::getSpecialLocation(File::currentExecutableFile).getFullPathName());
+                proc_args.add("-server");
+                uint32 ec = 0;
+                bool done = false;
+                do {
+                    if (proc.start(proc_args)) {
+                        while (proc.isRunning()) {
+                            Thread::sleep(100);
+                        }
+                        ec = proc.getExitCode();
+                        if (ec != 0) {
+                            logln("error: server failed with exit code " << as<int>(ec));
+                        }
+                        File serverRunFile(SERVER_RUN_FILE);
+                        if (serverRunFile.exists()) {
+                            logln("error: server did non shutdown properly");
+                            serverRunFile.deleteFile();
+                        } else {
+                            done = true;
+                        }
+                    } else {
+                        logln("error: failed to start server process");
+                        setApplicationReturnValue(1);
+                        quit();
+                        done = true;
                     }
-                    ec = proc.getExitCode();
-                    if (ec != 0) {
-                        logln("error: server failed with exit code " << as<int>(ec));
-                    }
-                } else {
-                    logln("error: failed to start server process");
-                    setApplicationReturnValue(1);
-                    quit();
-                    ec = 0;
-                }
-            } while (ec != 0);
-            quit();
+                } while (!done);
+                quit();
+            }).detach();
             break;
     }
     logln("initialise complete");

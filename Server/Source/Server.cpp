@@ -21,6 +21,8 @@ using json = nlohmann::json;
 
 Server::Server() : Thread("Server"), LogTag("server") {
     logln("starting server (version: " << AUDIOGRIDDER_VERSION << ")...");
+    File runFile(SERVER_RUN_FILE);
+    runFile.create();
     loadConfig();
     TimeStatistics::initialize();
 }
@@ -146,6 +148,8 @@ Server::~Server() {
     m_pluginlist.clear();
     TimeStatistics::cleanup();
     logln("server terminated");
+    File runFile(SERVER_RUN_FILE);
+    runFile.deleteFile();
 }
 
 void Server::shutdown() {

@@ -16,6 +16,7 @@ static const String SERVER_CONFIG_FILE = "~/.audiogridderserver";
 static const String PLUGIN_CONFIG_FILE = "~/.audiogridder";
 static const String KNOWN_PLUGINS_FILE = "~/.audiogridderserver.cache";
 static const String DEAD_MANS_FILE = "~/.audiogridderserver.crash";
+static const String SERVER_RUN_FILE = "~/.audiogridderserver.running";
 #else
 static const String SERVER_CONFIG_FILE =
     File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + "\\.audiogridderserver";
@@ -25,6 +26,8 @@ static const String KNOWN_PLUGINS_FILE =
     File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + "\\.audiogridderserver.cache";
 static const String DEAD_MANS_FILE =
     File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + "\\.audiogridderserver.crash";
+static const String SERVER_RUN_FILE =
+File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + "\\.audiogridderserver.running";
 #endif
 
 static constexpr int DEFAULT_NUM_OF_BUFFERS = 8;
