@@ -5,7 +5,7 @@ processing of audio plugins to remote computers running OSX or
 Windows. This can come in handy when mixing complex projects or
 running CPU intensive instruments for instance. AudioGridder comes
 with a plugin and a server and supports VST2, VST3 and AudioUnit
-plugin Formats. Plugins can be hosted and accessed across the network:
+plugin formats. Plugins can be hosted and accessed across the network:
 simply run the AudioGridder server on a remote machine and connect
 your DAW using the AudioGridder plugin. This allows you to add remote
 insert chains or instruments into your DAW's signal paths. The DSP
