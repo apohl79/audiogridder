@@ -44,10 +44,12 @@ class LogTag {
   public:
     LogTag(const String& name) : m_name(name) {}
 
-    String getStrWithLeadingZero(int n) const {
+    String getStrWithLeadingZero(int n, int digits = 2) const {
         String s = "";
-        if (n < 10) {
-            s << "0";
+        while (digits-- > 0) {
+            if (n < pow(10, digits)) {
+                s << "0";
+            }
         }
         s << n;
         return s;
@@ -58,7 +60,7 @@ class LogTag {
         auto H = getStrWithLeadingZero(now.getHours());
         auto M = getStrWithLeadingZero(now.getMinutes());
         auto S = getStrWithLeadingZero(now.getSeconds());
-        auto m = getStrWithLeadingZero(now.getMilliseconds());
+        auto m = getStrWithLeadingZero(now.getMilliseconds(), 3);
         String tag = "";
         tag << H << ":" << M << ":" << S << "." << m << "|" << m_name << "|" << (uint64)this;
         return tag;
