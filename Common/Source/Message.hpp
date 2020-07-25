@@ -687,38 +687,36 @@ class Message {
                 if (e47::read(socket, &hdr, sizeof(hdr))) {
                     auto t = T::Type;
                     if (t > 0 && hdr.type != t) {
-                        std::cerr << "invalid message type " << hdr.type << " (" << t << " expected)" << std::endl;
                         success = false;
-                        MessageHelper::seterr(e, MessageHelper::E_DATA);
+                        String estr;
+                        estr << "invalid message type " << hdr.type << " (" << t << " expected)";
+                        MessageHelper::seterr(e, MessageHelper::E_DATA, estr);
                     } else {
                         payload.setType(hdr.type);
                         if (hdr.size > 0) {
                             if (hdr.size > MAX_SIZE) {
-                                std::cerr << "max size of " << MAX_SIZE << " bytes exceeded (" << hdr.size << " bytes)"
-                                          << std::endl;
                                 success = false;
-                                MessageHelper::seterr(e, MessageHelper::E_DATA);
+                                String estr;
+                                estr << "max size of " << MAX_SIZE << " bytes exceeded (" << hdr.size << " bytes)";
+                                MessageHelper::seterr(e, MessageHelper::E_DATA, estr);
                             } else {
                                 if (payload.getSize() != hdr.size) {
                                     payload.setSize(hdr.size);
                                 }
                                 if (!e47::read(socket, payload.getData(), hdr.size)) {
-                                    std::cerr << "failed to read message body" << std::endl;
                                     success = false;
-                                    MessageHelper::seterr(e, MessageHelper::E_DATA);
+                                    MessageHelper::seterr(e, MessageHelper::E_DATA, "failed to read message body");
                                 }
                             }
                         }
                     }
                 } else {
-                    std::cerr << "failed to read message header" << std::endl;
                     success = false;
-                    MessageHelper::seterr(e, MessageHelper::E_DATA);
+                    MessageHelper::seterr(e, MessageHelper::E_DATA, "failed to read message header");
                 }
             } else if (ret < 0) {
-                std::cerr << "failed to wait for message header" << std::endl;
                 success = false;
-                MessageHelper::seterr(e, MessageHelper::E_SYSCALL);
+                MessageHelper::seterr(e, MessageHelper::E_SYSCALL, "failed to wait for message header");
             } else {
                 success = false;
                 MessageHelper::seterr(e, MessageHelper::E_TIMEOUT);
