@@ -147,9 +147,8 @@ void TimeStatistics::initialize() {
 
 void TimeStatistics::cleanup() {
     std::lock_guard<std::mutex> lock(m_instMtx);
-    if (m_instRefCount > 1) {
-        m_instRefCount--;
-    } else {
+    m_instRefCount--;
+    if (m_instRefCount == 0) {
         m_inst->signalThreadShouldExit();
         m_inst.reset();
     }
