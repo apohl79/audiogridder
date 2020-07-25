@@ -46,7 +46,7 @@ class LogTag {
 
     String getStrWithLeadingZero(int n, int digits = 2) const {
         String s = "";
-        while (digits-- > 0) {
+        while (--digits > 0) {
             if (n < pow(10, digits)) {
                 s << "0";
             }
