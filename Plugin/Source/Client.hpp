@@ -79,11 +79,11 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
 
     void run() override;
 
-    void setServer(const String& host, int port = DEFAULT_SERVER_PORT);
+    void setServer(const ServerString& srv);
     String getServerHost();
     String getServerHostAndID();
     int getServerPort();
-    int getId() const { return m_id; }
+    int getServerID();
     int getChannelsIn() const { return m_channelsIn; }
     int getChannelsOut() const { return m_channelsOut; }
     double getSampleRate() const { return m_rate; }
@@ -185,9 +185,9 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
   private:
     AudioGridderAudioProcessor* m_processor;
     std::mutex m_srvMtx;
-    String m_srvHost = "127.0.0.1";
+    String m_srvHost = "";
     int m_srvPort = DEFAULT_SERVER_PORT;
-    int m_id = 0;
+    int m_srvId = 0;
     bool m_needsReconnect = false;
     int m_channelsIn = 0;
     int m_channelsOut = 0;

@@ -14,6 +14,7 @@
 #include "Version.hpp"
 #include "App.hpp"
 #include "Metrics.hpp"
+#include "ServiceResponder.hpp"
 
 namespace e47 {
 
@@ -35,6 +36,9 @@ void Server::loadConfig() {
         json j = json::parse(fis.readEntireStreamAsString().toStdString());
         if (j.find("ID") != j.end()) {
             m_id = j["ID"].get<int>();
+        }
+        if (j.find("NAME") != j.end()) {
+            m_name = j["NAME"].get<std::string>();
         }
         if (j.find("AU") != j.end()) {
             m_enableAU = j["AU"].get<bool>();
@@ -98,6 +102,7 @@ void Server::saveConfig() {
     logln("saving config");
     json j;
     j["ID"] = m_id;
+    j["NAME"] = m_name.toStdString();
     j["AU"] = m_enableAU;
     j["VST"] = m_enableVST3;
     j["VST3Folders"] = json::array();
@@ -147,6 +152,7 @@ Server::~Server() {
     waitForThreadAndLog(this, this);
     m_pluginlist.clear();
     TimeStatistics::cleanup();
+    ServiceResponder::cleanup();
     logln("server terminated");
     File runFile(SERVER_RUN_FILE);
     runFile.deleteFile();
@@ -161,6 +167,12 @@ void Server::shutdown() {
         w->waitForThreadToExit(-1);
     }
     signalThreadShouldExit();
+}
+
+void Server::setName(const String& name) {
+    m_name = name;
+    ServiceResponder::setHostName(name);
+    logln("setting server name to " << name);
 }
 
 bool Server::shouldExclude(const String& name) {
@@ -340,9 +352,16 @@ void Server::run() {
     setsockopt(m_masterSocket.getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
 #endif
 
+    ServiceResponder::initialize(m_port + m_id, m_id, m_name);
+
+    if (m_name.isEmpty()) {
+        m_name = ServiceResponder::getHostName();
+        saveConfig();
+    }
+
     logln("creating listener " << (m_host.length() == 0 ? "*" : m_host) << ":" << (m_port + m_id));
     if (m_masterSocket.createListener(m_port + m_id, m_host)) {
-        logln("server started: ID=" << m_id << ", PORT=" << m_port + m_id);
+        logln("server started: ID=" << m_id << ", PORT=" << m_port + m_id << ", NAME=" << m_name);
         while (!currentThreadShouldExit()) {
             auto* clnt = m_masterSocket.waitForNextConnection();
             if (nullptr != clnt) {

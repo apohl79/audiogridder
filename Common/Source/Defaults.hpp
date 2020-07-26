@@ -37,4 +37,6 @@ static constexpr int DEFAULT_LOAD_PLUGIN_TIMEOUT = 15;
 static constexpr uint32 DEFAULT_BG_COLOR = 0xff222222;
 static constexpr uint32 DEFAULT_BUTTON_COLOR = 0xff333333;
 
+static const String MDNS_SERVICE_NAME = "_audiogridder._tcp.local.";
+
 #endif /* Defaults_hpp */

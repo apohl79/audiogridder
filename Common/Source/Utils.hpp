@@ -72,6 +72,8 @@ class LogTag {
 
 class LogTagDelegate {
   public:
+    LogTagDelegate() {}
+    LogTagDelegate(LogTag* r) : m_logTagSrc(r) {}
     LogTag* m_logTagSrc;
     void setLogTagSource(LogTag* r) { m_logTagSrc = r; }
     LogTag* getLogTagSource() const { return m_logTagSrc; }
@@ -96,6 +98,71 @@ static inline void waitForThreadAndLog(LogTag* tag, Thread* t, int millisUntilWa
         t->waitForThreadToExit(-1);
     }
 }
+
+class ServerString {
+  public:
+    ServerString() {}
+
+    ServerString(const String& s) {
+        auto hostParts = StringArray::fromTokens(s, ":", "");
+        if (hostParts.size() > 1) {
+            m_host = hostParts[0];
+            m_id = hostParts[1].getIntValue();
+            if (hostParts.size() > 2) {
+                m_name = hostParts[2];
+            }
+        } else {
+            m_host = s;
+            m_id = 0;
+        }
+    }
+
+    ServerString(const String& host, const String& name, int id) : m_host(host), m_name(name), m_id(id) {}
+
+    ServerString(const ServerString& other) : m_host(other.m_host), m_name(other.m_name), m_id(other.m_id) {}
+
+    bool operator==(const ServerString& other) const {
+        return m_host == other.m_host && m_name == other.m_name && m_id == other.m_id;
+    }
+
+    const String& getHost() const { return m_host; }
+    const String& getName() const { return m_name; }
+    int getID() const { return m_id; }
+
+    String getHostAndID() const {
+        String ret = m_host;
+        if (m_id > 0) {
+            ret << ":" << m_id;
+        }
+        return ret;
+    }
+
+    String getNameAndID() const {
+        String ret = m_name;
+        if (m_id > 0) {
+            ret << ":" << m_id;
+        }
+        return ret;
+    }
+
+    String toString() const {
+        String ret = "Server(";
+        ret << "name=" << m_name << ", ";
+        ret << "host=" << m_host << ", ";
+        ret << "id=" << m_id << ")";
+        return ret;
+    }
+
+    String serialize() const {
+        String ret = m_host;
+        ret << ":" << m_id << ":" << m_name;
+        return ret;
+    }
+
+  private:
+    String m_host, m_name;
+    int m_id;
+};
 
 }  // namespace e47
 

@@ -18,12 +18,13 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     setUsingNativeTitleBar(true);
 
     int totalWidth = 500;
-    int totalHeight = 480;
+    int totalHeight = 520;
     int borderLR = 15;  // left/right border
     int borderTB = 15;  // top/botton border
     int rowHeight = 40;
 
     int fieldWidth = 50;
+    int wideFieldWidth = 250;
     int fieldHeight = 25;
     int labelWidth = 250;
     int labelHeight = 30;
@@ -43,6 +44,10 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
         return Rectangle<int>(totalWidth - fieldWidth - borderLR, borderTB + r * rowHeight + 3, fieldWidth,
                               fieldHeight);
     };
+    auto getWideFieldBounds = [&](int r) {
+        return Rectangle<int>(totalWidth - wideFieldWidth - borderLR, borderTB + r * rowHeight + 3, wideFieldWidth,
+                              fieldHeight);
+    };
     auto getCheckBoxBounds = [&](int r) {
         return Rectangle<int>(totalWidth - checkBoxWidth - borderLR, borderTB + r * rowHeight + 3, checkBoxWidth,
                               checkBoxHeight);
@@ -56,6 +61,18 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     String tmpStr;
 
     auto label = std::make_unique<Label>();
+    label->setText("Server Name:", NotificationType::dontSendNotification);
+    label->setBounds(getLabelBounds(row));
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
+
+    m_nameText.setText(m_app->getServer().getName());
+    m_nameText.setBounds(getWideFieldBounds(row));
+    addChildAndSetID(&m_nameText, "name");
+
+    row++;
+
+    label = std::make_unique<Label>();
     label->setText("Server ID:", NotificationType::dontSendNotification);
     label->setBounds(getLabelBounds(row));
     addChildAndSetID(label.get(), "lbl");
@@ -198,6 +215,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_saveButton.onClick = [this, app] {
         auto appCpy = app;
         appCpy->getServer().setId(m_idText.getText().getIntValue());
+        appCpy->getServer().setName(m_nameText.getText());
         appCpy->getServer().setEnableAU(m_auSupport.getToggleState());
         appCpy->getServer().setEnableVST3(m_vst3Support.getToggleState());
         appCpy->getServer().setEnableVST2(m_vst2Support.getToggleState());

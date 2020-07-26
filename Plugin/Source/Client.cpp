@@ -52,7 +52,14 @@ void Client::run() {
         } catch (json::parse_error& e) {
             logln("parsing config failed: " << e.what());
         }
-        if ((!isReady(LOAD_PLUGIN_TIMEOUT + 5000) || m_needsReconnect) && !currentThreadShouldExit()) {
+        if (m_srvHost.isEmpty()) {
+            auto servers = m_processor->getServersMDNS();
+            if (servers.size() > 0) {
+                setServer(servers[0]);
+            }
+        }
+        if ((!isReady(LOAD_PLUGIN_TIMEOUT + 5000) || m_needsReconnect) && m_srvHost.isNotEmpty() &&
+            !currentThreadShouldExit()) {
             logln("(re)connecting...");
             close();
             init();
@@ -76,20 +83,13 @@ void Client::run() {
     logln("client loop terminated");
 }
 
-void Client::setServer(const String& host, int port) {
-    logln("setting server to " << host << ":" << port << " (ID=" << m_id << ")");
+void Client::setServer(const ServerString& srv) {
+    logln("setting server to " << srv.toString());
     String currHost = getServerHostAndID();
     std::lock_guard<std::mutex> lock(m_srvMtx);
-    if (currHost.compare(host) || m_srvPort != port) {
-        auto hostParts = StringArray::fromTokens(host, ":", "");
-        if (hostParts.size() > 1) {
-            m_srvHost = hostParts[0];
-            m_id = hostParts[1].getIntValue();
-        } else {
-            m_srvHost = host;
-            m_id = 0;
-        }
-        m_srvPort = port;
+    if (currHost.compare(srv.getHostAndID())) {
+        m_srvHost = srv.getHost();
+        m_srvId = srv.getID();
         m_needsReconnect = true;
     }
 }
@@ -99,11 +99,16 @@ String Client::getServerHost() {
     return m_srvHost;
 }
 
+int Client::getServerID() {
+    std::lock_guard<std::mutex> lock(m_srvMtx);
+    return m_srvId;
+}
+
 String Client::getServerHostAndID() {
     std::lock_guard<std::mutex> lock(m_srvMtx);
     String h = m_srvHost;
-    if (m_id > 0) {
-        h << ":" << m_id;
+    if (m_srvId > 0) {
+        h << ":" << m_srvId;
     }
     return h;
 }
@@ -152,8 +157,8 @@ void Client::init() {
     {
         std::lock_guard<std::mutex> lock(m_srvMtx);
         host = m_srvHost;
-        id = m_id;
-        port = m_srvPort + m_id;
+        id = m_srvId;
+        port = m_srvPort + m_srvId;
     }
     dbglock lock(*this, 9);
     m_error = true;

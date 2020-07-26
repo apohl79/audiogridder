@@ -28,6 +28,8 @@ class Server : public Thread, public LogTag {
     void saveConfig();
     int getId() const { return m_id; }
     void setId(int i) { m_id = i; }
+    const String& getName() const { return m_name; }
+    void setName(const String& name);
     bool getEnableAU() const { return m_enableAU; }
     void setEnableAU(bool b) { m_enableAU = b; }
     bool getEnableVST3() const { return m_enableVST3; }
@@ -57,6 +59,7 @@ class Server : public Thread, public LogTag {
     String m_host;
     int m_port = DEFAULT_SERVER_PORT;
     int m_id = 0;
+    String m_name;
     StreamingSocket m_masterSocket;
     using WorkerList = Array<std::unique_ptr<Worker>>;
     WorkerList m_workers;

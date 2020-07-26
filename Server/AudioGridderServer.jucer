@@ -14,6 +14,12 @@
       <FILE id="mzbQrZ" name="json.hpp" compile="0" resource="0" file="../Common/Source/json.hpp"/>
       <FILE id="TUrZAw" name="KeyAndMouseCommon.hpp" compile="0" resource="0"
             file="../Common/Source/KeyAndMouseCommon.hpp"/>
+      <FILE id="nlNtvz" name="mDNS.cpp" compile="1" resource="0" file="../Common/Source/mDNS.cpp"/>
+      <FILE id="ofljdU" name="mDNS.hpp" compile="0" resource="0" file="../Common/Source/mDNS.hpp"/>
+      <FILE id="CfKC0h" name="mDNSConnector.cpp" compile="1" resource="0"
+            file="../Common/Source/mDNSConnector.cpp"/>
+      <FILE id="ZsxIoW" name="mDNSConnector.hpp" compile="0" resource="0"
+            file="../Common/Source/mDNSConnector.hpp"/>
       <FILE id="olKSf7" name="Message.hpp" compile="0" resource="0" file="../Common/Source/Message.hpp"/>
       <FILE id="hFSlhs" name="Metrics.cpp" compile="1" resource="0" file="../Common/Source/Metrics.cpp"/>
       <FILE id="teWAXE" name="Metrics.hpp" compile="0" resource="0" file="../Common/Source/Metrics.hpp"/>
@@ -48,8 +54,8 @@
       <FILE id="MZnIYD" name="ProcessorChain.hpp" compile="0" resource="0"
             file="Source/ProcessorChain.hpp"/>
       <FILE id="ksFBj4" name="Screen.cpp" compile="1" resource="0" file="Source/Screen.cpp"/>
-      <FILE id="HmVpM7" name="Screen.mm" compile="1" resource="0" file="Source/Screen.mm"/>
       <FILE id="cCYAYL" name="Screen.h" compile="0" resource="0" file="Source/Screen.h"/>
+      <FILE id="HmVpM7" name="Screen.mm" compile="1" resource="0" file="Source/Screen.mm"/>
       <FILE id="Ahq5XH" name="ScreenWorker.cpp" compile="1" resource="0"
             file="Source/ScreenWorker.cpp"/>
       <FILE id="SWP3JK" name="ScreenWorker.hpp" compile="0" resource="0"
@@ -60,6 +66,10 @@
             file="Source/ServerSettingsWindow.cpp"/>
       <FILE id="ySzlOj" name="ServerSettingsWindow.hpp" compile="0" resource="0"
             file="Source/ServerSettingsWindow.hpp"/>
+      <FILE id="ETvOPM" name="ServiceResponder.cpp" compile="1" resource="0"
+            file="Source/ServiceResponder.cpp"/>
+      <FILE id="ClkxKa" name="ServiceResponder.hpp" compile="0" resource="0"
+            file="Source/ServiceResponder.hpp"/>
       <FILE id="DxDUnd" name="SplashWindow.hpp" compile="0" resource="0"
             file="Source/SplashWindow.hpp"/>
       <FILE id="cjxAbW" name="Worker.cpp" compile="1" resource="0" file="Source/Worker.cpp"/>

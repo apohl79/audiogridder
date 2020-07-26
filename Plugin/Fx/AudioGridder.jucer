@@ -13,6 +13,12 @@
       <FILE id="b7Jhvp" name="json.hpp" compile="0" resource="0" file="../../Common/Source/json.hpp"/>
       <FILE id="Dmjsrg" name="KeyAndMouseCommon.hpp" compile="0" resource="0"
             file="../../Common/Source/KeyAndMouseCommon.hpp"/>
+      <FILE id="M5OJsI" name="mDNS.cpp" compile="1" resource="0" file="../../Common/Source/mDNS.cpp"/>
+      <FILE id="YBVEZu" name="mDNS.hpp" compile="0" resource="0" file="../../Common/Source/mDNS.hpp"/>
+      <FILE id="VZ8etI" name="mDNSConnector.cpp" compile="1" resource="0"
+            file="../../Common/Source/mDNSConnector.cpp"/>
+      <FILE id="eU7GCJ" name="mDNSConnector.hpp" compile="0" resource="0"
+            file="../../Common/Source/mDNSConnector.hpp"/>
       <FILE id="kHdL6a" name="Message.hpp" compile="0" resource="0" file="../../Common/Source/Message.hpp"/>
       <FILE id="vBs8XC" name="Metrics.cpp" compile="1" resource="0" file="../../Common/Source/Metrics.cpp"/>
       <FILE id="znpWTc" name="Metrics.hpp" compile="0" resource="0" file="../../Common/Source/Metrics.hpp"/>
@@ -50,6 +56,10 @@
             file="../Source/PluginProcessor.hpp"/>
       <FILE id="jBgUv5" name="ServerPlugin.hpp" compile="0" resource="0"
             file="../Source/ServerPlugin.hpp"/>
+      <FILE id="qNLsnB" name="ServiceReceiver.cpp" compile="1" resource="0"
+            file="../Source/ServiceReceiver.cpp"/>
+      <FILE id="jzUfLj" name="ServiceReceiver.hpp" compile="0" resource="0"
+            file="../Source/ServiceReceiver.hpp"/>
     </GROUP>
   </MAINGROUP>
   <EXPORTFORMATS>

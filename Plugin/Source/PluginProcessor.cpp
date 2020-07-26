@@ -10,6 +10,7 @@
 #include "json.hpp"
 #include "Logger.hpp"
 #include "Metrics.hpp"
+#include "ServiceReceiver.hpp"
 #include "Version.hpp"
 
 #ifdef JUCE_WINDOWS
@@ -53,12 +54,23 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
 
     AGLogger::initialize(appName, logName);
     TimeStatistics::initialize();
+    ServiceReceiver::initialize([this] {
+        MessageManager::callAsync([this] {
+            auto* editor = getActiveEditor();
+            if (editor != nullptr) {
+                dynamic_cast<AudioGridderAudioProcessorEditor*>(editor)->setConnected(m_client->isReadyLockFree());
+            }
+        });
+    });
 
     m_client = std::make_unique<e47::Client>(this);
     setLogTagSource(m_client.get());
     logln(mode << " plugin loaded (version: " << AUDIOGRIDDER_VERSION << ")");
 
     updateLatency(0);
+
+    String activeServer;
+    int activeServerLegacyCfg = -1;
 
     File cfg(PLUGIN_CONFIG_FILE);
     try {
@@ -67,11 +79,14 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
             json j = json::parse(fis.readEntireStreamAsString().toStdString());
             if (j.find("Servers") != j.end()) {
                 for (auto& srv : j["Servers"]) {
-                    m_servers.push_back(srv.get<std::string>());
+                    m_servers.add(srv.get<std::string>());
                 }
             }
+            if (j.find("LastServer") != j.end()) {
+                activeServer = j["LastServer"].get<std::string>();
+            }
             if (j.find("Last") != j.end()) {
-                m_activeServer = j["Last"].get<int>();
+                activeServerLegacyCfg = j["Last"].get<int>();
             }
             if (j.find("NumberOfBuffers") != j.end()) {
                 m_client->NUM_OF_BUFFERS = j["NumberOfBuffers"].get<int>();
@@ -139,8 +154,10 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
             }
         });
     });
-    if (m_activeServer > -1 && as<size_t>(m_activeServer) < m_servers.size()) {
-        m_client->setServer(m_servers[as<size_t>(m_activeServer)]);
+    if (activeServer.isNotEmpty()) {
+        m_client->setServer(activeServer);
+    } else if (activeServerLegacyCfg > -1 && activeServerLegacyCfg < m_servers.size()) {
+        m_client->setServer(m_servers[activeServerLegacyCfg]);
     }
 
     m_client->startThread();
@@ -152,6 +169,7 @@ AudioGridderAudioProcessor::~AudioGridderAudioProcessor() {
     waitForThreadAndLog(m_client.get(), m_client.get());
     logln("plugin unloaded");
     TimeStatistics::cleanup();
+    ServiceReceiver::cleanup();
     AGLogger::cleanup();
 }
 
@@ -337,7 +355,7 @@ void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData) {
     }
     j["version"] = 2;
     j["servers"] = jservers;
-    j["activeServer"] = m_activeServer;
+    j["activeServerStr"] = m_client->getServerHostAndID().toStdString();
     auto jplugs = json::array();
     for (size_t i = 0; i < m_loadedPlugins.size(); i++) {
         auto& plug = m_loadedPlugins[i];
@@ -377,7 +395,7 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
     json jcfg;
     jcfg["_comment_"] = "PLEASE DO NOT CHANGE THIS FILE WHILE YOUR DAW IS RUNNING AND HAS AUDIOGRIDDER PLUGINS LOADED";
     jcfg["Servers"] = jservers;
-    jcfg["Last"] = m_activeServer;
+    jcfg["LastServer"] = m_client->getServerHostAndID().toStdString();
     jcfg["NumberOfBuffers"] = numOfBuffers;
     jcfg["NumberOfAutomationSlots"] = m_numberOfAutomationSlots;
     File cfg(PLUGIN_CONFIG_FILE);
@@ -399,11 +417,15 @@ void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeI
         m_servers.clear();
         if (j.find("servers") != j.end()) {
             for (auto& srv : j["servers"]) {
-                m_servers.push_back(srv.get<std::string>());
+                m_servers.add(srv.get<std::string>());
             }
         }
-        if (j.find("activeServer") != j.end()) {
-            m_activeServer = j["activeServer"].get<int>();
+        String activeServerStr;
+        int activeServer = -1;
+        if (j.find("activeServerStr") != j.end()) {
+            activeServerStr = j["activeServerStr"].get<std::string>();
+        } else if (j.find("activeServer") != j.end()) {
+            activeServer = j["activeServer"].get<int>();
         }
         if (j.find("loadedPlugins") != j.end()) {
             for (auto& plug : j["loadedPlugins"]) {
@@ -432,8 +454,11 @@ void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeI
                 }
             }
         }
-        if (m_activeServer > -1 && as<size_t>(m_activeServer) < m_servers.size()) {
-            m_client->setServer(m_servers[as<size_t>(m_activeServer)]);
+        if (activeServerStr.isNotEmpty()) {
+            m_client->setServer(activeServerStr);
+            m_client->reconnect();
+        } else if (activeServer > -1 && activeServer < m_servers.size()) {
+            m_client->setServer(m_servers[activeServer]);
             m_client->reconnect();
         }
     } catch (json::parse_error& e) {
@@ -596,26 +621,27 @@ void AudioGridderAudioProcessor::disableParamAutomation(int idx, int paramIdx) {
     param.automationSlot = -1;
 }
 
-void AudioGridderAudioProcessor::delServer(int idx) {
-    logln("deleting server " << idx);
-    int i = 0;
-    for (auto it = m_servers.begin(); it < m_servers.end(); it++) {
-        if (i++ == idx) {
-            m_servers.erase(it);
-            return;
-        }
+void AudioGridderAudioProcessor::delServer(const String& s) {
+    if (m_servers.contains(s)) {
+        logln("deleting server " << s);
+        m_servers.removeString(s);
+    } else {
+        logln("can't delete server " << s << ": not found");
     }
 }
 
-void AudioGridderAudioProcessor::setActiveServer(int idx) {
-    if (idx > -1 && as<size_t>(idx) < m_servers.size()) {
-        logln("setting server " << idx << " active");
-        m_activeServer = idx;
-        m_client->setServer(m_servers[as<size_t>(idx)]);
-    } else {
-        logln("failed to set server " << idx << " active: out of range");
+void AudioGridderAudioProcessor::setActiveServer(const ServerString& s) { m_client->setServer(s); }
+
+String AudioGridderAudioProcessor::getActiveServerName() const {
+    String ret = ServiceReceiver::hostToName(m_client->getServerHost());
+    int id = m_client->getServerID();
+    if (id > 0) {
+        ret << ":" << id;
     }
+    return ret;
 }
+
+Array<ServerString> AudioGridderAudioProcessor::getServersMDNS() { return ServiceReceiver::getServers(); }
 
 float AudioGridderAudioProcessor::Parameter::getValue() const {
     if (m_idx > -1 && m_paramIdx > -1) {

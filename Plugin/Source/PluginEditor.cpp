@@ -382,7 +382,7 @@ void AudioGridderAudioProcessorEditor::focusOfChildComponentChanged(FocusChangeT
 void AudioGridderAudioProcessorEditor::setConnected(bool connected) {
     m_connected = connected;
     if (connected) {
-        String srvTxt = m_processor.getClient().getServerHostAndID();
+        String srvTxt = m_processor.getActiveServerName();
         srvTxt << " (+" << m_processor.getLatencyMillis() << "ms)";
         m_srvLabel.setText(srvTxt, NotificationType::dontSendNotification);
         auto& plugins = m_processor.getLoadedPlugins();
@@ -434,22 +434,43 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
     m.addSubMenu("Buffer Size", bufMenu);
     m.addSectionHeader("Servers");
     auto& servers = m_processor.getServers();
-    for (int i = 0; as<size_t>(i) < servers.size(); i++) {
-        if (i == m_processor.getActiveServer()) {
+    auto active = m_processor.getActiveServerHost();
+    for (auto s : servers) {
+        if (s == active) {
             PopupMenu srvMenu;
             srvMenu.addItem("Reconnect", [this] { m_processor.getClient().reconnect(); });
-            m.addSubMenu(servers[as<size_t>(i)], srvMenu, true, nullptr, true, 0);
+            m.addSubMenu(s, srvMenu, true, nullptr, true, 0);
         } else {
             PopupMenu srvMenu;
-            srvMenu.addItem("Connect", [this, i] {
-                m_processor.setActiveServer(i);
+            srvMenu.addItem("Connect", [this, s] {
+                m_processor.setActiveServer(s);
                 m_processor.saveConfig();
             });
-            srvMenu.addItem("Remove", [this, i] {
-                m_processor.delServer(i);
+            srvMenu.addItem("Remove", [this, s] {
+                m_processor.delServer(s);
                 m_processor.saveConfig();
             });
-            m.addSubMenu(servers[as<size_t>(i)], srvMenu);
+            m.addSubMenu(s, srvMenu);
+        }
+    }
+    auto serversMDNS = m_processor.getServersMDNS();
+    if (serversMDNS.size() > 0) {
+        for (auto s : serversMDNS) {
+            if (servers.contains(s.getHostAndID())) {
+                continue;
+            }
+            if (s.getHostAndID() == active) {
+                PopupMenu srvMenu;
+                srvMenu.addItem("Reconnect", [this] { m_processor.getClient().reconnect(); });
+                m.addSubMenu(s.getNameAndID(), srvMenu, true, nullptr, true, 0);
+            } else {
+                PopupMenu srvMenu;
+                srvMenu.addItem("Connect", [this, s] {
+                    m_processor.setActiveServer(s);
+                    m_processor.saveConfig();
+                });
+                m.addSubMenu(s.getNameAndID(), srvMenu);
+            }
         }
     }
     m.addSeparator();
@@ -457,7 +478,7 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
         auto w = new NewServerWindow(as<float>(getScreenX() + 2), as<float>(getScreenY() + 30));
         w->onOk([this](String server) {
             m_processor.addServer(server);
-            m_processor.setActiveServer(as<int>(m_processor.getServers().size() - 1));
+            m_processor.setActiveServer(server);
             m_processor.saveConfig();
         });
         w->setAlwaysOnTop(true);

@@ -89,10 +89,12 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
     void disableParamAutomation(int idx, int paramIdx);
 
     auto& getServers() const { return m_servers; }
-    void addServer(const String& s) { m_servers.push_back(s); }
-    void delServer(int idx);
-    int getActiveServer() const { return m_activeServer; }
-    void setActiveServer(int i);
+    void addServer(const String& s) { m_servers.add(s); }
+    void delServer(const String& s);
+    String getActiveServerHost() const { return m_client->getServerHostAndID(); }
+    String getActiveServerName() const;
+    void setActiveServer(const e47::ServerString& s);
+    Array<e47::ServerString> getServersMDNS();
 
     int getLatencyMillis() const {
         return e47::as<int>(lround(m_client->NUM_OF_BUFFERS * getBlockSize() * 1000 / getSampleRate()));
@@ -135,8 +137,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
     std::unique_ptr<e47::Client> m_client;
     std::vector<LoadedPlugin> m_loadedPlugins;
     int m_activePlugin = -1;
-    std::vector<String> m_servers;
-    int m_activeServer = 0;
+    StringArray m_servers;
 
     int m_numberOfAutomationSlots = 16;
     LoadedPlugin m_unusedDummyPlugin;
