@@ -8,7 +8,8 @@
 #ifndef ProcessorChain_hpp
 #define ProcessorChain_hpp
 
-#include "../JuceLibraryCode/JuceHeader.h"
+#include <JuceHeader.h>
+
 #include "Utils.hpp"
 
 namespace e47 {

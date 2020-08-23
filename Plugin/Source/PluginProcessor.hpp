@@ -7,12 +7,12 @@
 
 #pragma once
 
-#include "../JuceLibraryCode/JuceHeader.h"
+#include <JuceHeader.h>
+#include <set>
+
 #include "Client.hpp"
 #include "NumberConversion.hpp"
 #include "Utils.hpp"
-
-#include <set>
 
 class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDelegate {
   public:

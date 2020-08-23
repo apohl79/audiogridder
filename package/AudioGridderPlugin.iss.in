@@ -1,19 +1,15 @@
 [Setup]
-AppName=AudioGridder
+AppName=AudioGridder Plugin
 AppVersion=#STR_VER#
-DefaultDirName={commonpf64}\AudioGridderServer
+DefaultDirName={commonpf64}
 DefaultGroupName=AudioGridder
-OutputBaseFilename=AudioGridder_#STR_VER#
+OutputBaseFilename=AudioGridderPlugin_#STR_VER#
 
 [Files]
-Source: "..\Server\Builds\VisualStudio2019\x64\Release\App\AudioGridderServer.exe"; DestDir: "{app}"
-Source: "..\Plugin\Fx\Builds\VisualStudio2019\x64\Release\VST3\AudioGridder.vst3"; DestDir: {code:GetVST3Dir}
-Source: "..\Plugin\Inst\Builds\VisualStudio2019\x64\Release\VST3\AudioGridderInst.vst3"; DestDir: {code:GetVST3Dir}
-Source: "..\Plugin\Fx\Builds\VisualStudio2019\x64\Release\VST\AudioGridder.dll"; DestDir: {code:GetVST2Dir}
-Source: "..\Plugin\Inst\Builds\VisualStudio2019\x64\Release\VST\AudioGridderInst.dll"; DestDir: {code:GetVST2Dir}
-
-[Icons]
-Name: "{autoprograms}\AudioGridderServer"; Filename: "{app}\AudioGridderServer.exe"
+Source: "..\Plugin\Fx\Builds\VisualStudio2019\x64\Release\VST3\AudioGridder.vst3"; DestDir: {code:GetVST3Dir}; Flags: ignoreversion
+Source: "..\Plugin\Inst\Builds\VisualStudio2019\x64\Release\VST3\AudioGridderInst.vst3"; DestDir: {code:GetVST3Dir}; Flags: ignoreversion
+Source: "..\Plugin\Fx\Builds\VisualStudio2019\x64\Release\VST\AudioGridder.dll"; DestDir: {code:GetVST2Dir}; Flags: ignoreversion
+Source: "..\Plugin\Inst\Builds\VisualStudio2019\x64\Release\VST\AudioGridderInst.dll"; DestDir: {code:GetVST2Dir}; Flags: ignoreversion
 
 [Code]
 var
@@ -56,13 +52,21 @@ begin
   Result := True;
 end;
 
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  if (PageId = wpSelectDir) then begin
+     Result := True;
+     exit;
+  end;
+  Result := False;
+end;
+
 function UpdateReadyMemo(Space, NewLine, MemoUserInfoInfo, MemoDirInfo, MemoTypeInfo,
   MemoComponentsInfo, MemoGroupInfo, MemoTasksInfo: String): String;
 var
   S: String;
 begin
   S := '';
-  S := S + MemoDirInfo + NewLine + NewLine;
   S := S + 'VST3 plugin location:' + NewLine;
   S := S + Space + VST3DirPage.Values[0] + NewLine + NewLine;
   S := S + 'VST2 plugin location:' + NewLine;

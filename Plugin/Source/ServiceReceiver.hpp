@@ -10,7 +10,7 @@
 #ifndef ServiceReceiver_hpp
 #define ServiceReceiver_hpp
 
-#include "../JuceLibraryCode/JuceHeader.h"
+#include <JuceHeader.h>
 #include "mDNS.hpp"
 #include "Utils.hpp"
 

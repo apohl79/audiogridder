@@ -10,7 +10,8 @@
 #ifndef ServiceResponder_hpp
 #define ServiceResponder_hpp
 
-#include "../JuceLibraryCode/JuceHeader.h"
+#include <JuceHeader.h>
+
 #include "Utils.hpp"
 #include "mDNSConnector.hpp"
 

@@ -11,9 +11,17 @@
 #include "../JuceLibraryCode/AppConfig.h"
 #include <juce_graphics/juce_graphics.h>
 
+using namespace juce;
+
 namespace e47 {
 
-std::shared_ptr<juce::Image> captureScreen(juce::Rectangle<int> rect);
+std::shared_ptr<Image> captureScreenNative(Rectangle<int> rect);
+
+#ifdef JUCE_MAC
+int getCaptureDeviceIndex();
+void askForScreenRecordingPermission();
+bool askForAccessibilityPermission();
+#endif
 
 }
 

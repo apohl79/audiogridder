@@ -15,6 +15,7 @@
 #include "App.hpp"
 #include "Metrics.hpp"
 #include "ServiceResponder.hpp"
+#include "ScreenRecorder.hpp"
 
 namespace e47 {
 
@@ -72,12 +73,30 @@ void Server::loadConfig() {
                 }
             }
         }
-        if (j.find("ScreenQuality") != j.end()) {
-            m_screenJpgQuality = j["ScreenQuality"].get<float>();
+        if (j.find("ScreenCapturingFFmpeg") != j.end()) {
+            m_screenCapturingFFmpeg = j["ScreenCapturingFFmpeg"].get<bool>();
         }
+        if (j.find("ScreenCapturingOff") != j.end()) {
+            m_screenCapturingOff = j["ScreenCapturingOff"].get<bool>();
+        }
+        String scmode;
+        if (m_screenCapturingOff) {
+            scmode = "off";
+        } else if (m_screenCapturingFFmpeg) {
+            scmode = "ffmpeg";
+            MessageManager::callAsync([] { ScreenRecorder::initialize(); });
+        } else {
+            scmode = "native";
+        }
+        logln("screen capturing mode: " << scmode);
         if (j.find("ScreenDiffDetection") != j.end()) {
             m_screenDiffDetection = j["ScreenDiffDetection"].get<bool>();
-            logln("screen capture difference detection " << (m_screenDiffDetection ? "enabled" : "disabled"));
+            if (!m_screenCapturingFFmpeg && !m_screenCapturingOff) {
+                logln("screen capture difference detection " << (m_screenDiffDetection ? "enabled" : "disabled"));
+            }
+        }
+        if (j.find("ScreenQuality") != j.end()) {
+            m_screenJpgQuality = j["ScreenQuality"].get<float>();
         }
         m_pluginexclude.clear();
         if (j.find("ExcludePlugins") != j.end()) {
@@ -114,6 +133,8 @@ void Server::saveConfig() {
     for (auto& f : m_vst2Folders) {
         j["VST2Folders"].push_back(f.toStdString());
     }
+    j["ScreenCapturingFFmpeg"] = m_screenCapturingFFmpeg;
+    j["ScreenCapturingOff"] = m_screenCapturingOff;
     j["ScreenQuality"] = m_screenJpgQuality;
     j["ScreenDiffDetection"] = m_screenDiffDetection;
     j["ExcludePlugins"] = json::array();

@@ -38,13 +38,15 @@
 
 #endif
 
+#define setLogTagStatic(t) auto getLogTag = [] { return LogTag::getTaggedStr(t, "static"); };
+
 namespace e47 {
 
 class LogTag {
   public:
     LogTag(const String& name) : m_name(name) {}
 
-    String getStrWithLeadingZero(int n, int digits = 2) const {
+    static String getStrWithLeadingZero(int n, int digits = 2) {
         String s = "";
         while (--digits > 0) {
             if (n < pow(10, digits)) {
@@ -55,16 +57,24 @@ class LogTag {
         return s;
     }
 
-    String getLogTag() const {
+    static String getTimeStr() {
         auto now = Time::getCurrentTime();
         auto H = getStrWithLeadingZero(now.getHours());
         auto M = getStrWithLeadingZero(now.getMinutes());
         auto S = getStrWithLeadingZero(now.getSeconds());
         auto m = getStrWithLeadingZero(now.getMilliseconds(), 3);
+        String ret = "";
+        ret << H << ":" << M << ":" << S << "." << m;
+        return ret;
+    }
+
+    static String getTaggedStr(const String& name, const String& ptr) {
         String tag = "";
-        tag << H << ":" << M << ":" << S << "." << m << "|" << m_name << "|" << (uint64)this;
+        tag << getTimeStr() << "|" << name << "|" << ptr;
         return tag;
     }
+
+    String getLogTag() const { return getTaggedStr(m_name, String((uint64)this)); }
 
   private:
     String m_name;
@@ -163,6 +173,20 @@ class ServerString {
     String m_host, m_name;
     int m_id;
 };
+
+inline void callOnMessageThread(std::function<void()> fn) {
+    std::mutex mtx;
+    std::condition_variable cv;
+    bool done = false;
+    MessageManager::callAsync([&] {
+        std::lock_guard<std::mutex> lock(mtx);
+        fn();
+        done = true;
+        cv.notify_one();
+    });
+    std::unique_lock<std::mutex> lock(mtx);
+    cv.wait(lock, [&done] { return done; });
+}
 
 }  // namespace e47
 

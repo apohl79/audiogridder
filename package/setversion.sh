@@ -21,7 +21,7 @@ fi
 
 echo "Setting version to: $NUM_VER $STR_VER"
 
-projucer=../JUCE/Projucer.app/Contents/MacOS/Projucer
+projucer=../JUCE6/Projucer.app/Contents/MacOS/Projucer
 
 if [ -n "$PROJUCER" ]; then
     projucer=$PROJUCER
@@ -37,7 +37,8 @@ $projucer --set-version $NUM_VER Plugin/Fx/AudioGridder.jucer
 $projucer --set-version $NUM_VER Plugin/Inst/AudioGridder.jucer
 
 cat package/Version.hpp.in | sed "s/#STR_VER#/$STR_VER/" > Common/Source/Version.hpp
-cat package/AudioGridder.iss.in | sed "s/#STR_VER#/$STR_VER/" > package/AudioGridder.iss
+cat package/AudioGridderPlugin.iss.in | sed "s/#STR_VER#/$STR_VER/" > package/AudioGridderPlugin.iss
+cat package/AudioGridderServer.iss.in | sed "s/#STR_VER#/$STR_VER/" > package/AudioGridderServer.iss
 cat package/archiveWin.bat.in | sed "s/#STR_VER#/$STR_VER/" > package/archiveWin.bat
 
 echo $STR_VER > package/VERSION
@@ -45,5 +46,6 @@ echo $STR_VER > package/VERSION
 if [ "$STR_VER" != "dev-build" ]; then
     mkdir -p ../Archive/Builds/$STR_VER/win
     mkdir -p ../Archive/Builds/$STR_VER/osx
+    mkdir -p ../Archive/Builds/$STR_VER/osx10.7
     sudo chmod -R g+rw ../Archive/Builds
 fi

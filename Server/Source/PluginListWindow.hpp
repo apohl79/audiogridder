@@ -8,7 +8,8 @@
 #ifndef PluginListWindow_hpp
 #define PluginListWindow_hpp
 
-#include "../JuceLibraryCode/JuceHeader.h"
+#include <JuceHeader.h>
+
 #include "PluginListComponent.hpp"
 
 namespace e47 {

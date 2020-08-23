@@ -177,14 +177,14 @@ class AudioMessage {
                     return false;
                 }
             }
-            const uint8* midiData;
             MidiHeader midiHdr;
-            MidiBuffer::Iterator midiIt(midi);
-            while (midiIt.getNextEvent(midiData, midiHdr.size, midiHdr.sampleNumber)) {
+            for (auto midiIt = midi.begin(); midiIt != midi.end(); midiIt++) {
+                midiHdr.size = (*midiIt).numBytes;
+                midiHdr.sampleNumber = (*midiIt).samplePosition;
                 if (!send(socket, reinterpret_cast<const char*>(&midiHdr), sizeof(midiHdr))) {
                     return false;
                 }
-                if (!send(socket, reinterpret_cast<const char*>(midiData), midiHdr.size)) {
+                if (!send(socket, reinterpret_cast<const char*>((*midiIt).data), midiHdr.size)) {
                     return false;
                 }
             }
@@ -212,14 +212,14 @@ class AudioMessage {
                     return false;
                 }
             }
-            const uint8* midiData;
             MidiHeader midiHdr;
-            MidiBuffer::Iterator midiIt(midi);
-            while (midiIt.getNextEvent(midiData, midiHdr.size, midiHdr.sampleNumber)) {
+            for (auto midiIt = midi.begin(); midiIt != midi.end(); midiIt++) {
+                midiHdr.size = (*midiIt).numBytes;
+                midiHdr.sampleNumber = (*midiIt).samplePosition;
                 if (!send(socket, reinterpret_cast<const char*>(&midiHdr), sizeof(midiHdr))) {
                     return false;
                 }
-                if (!send(socket, reinterpret_cast<const char*>(midiData), midiHdr.size)) {
+                if (!send(socket, reinterpret_cast<const char*>((*midiIt).data), midiHdr.size)) {
                     return false;
                 }
             }
@@ -529,6 +529,7 @@ class ScreenCapture : public Payload {
     struct hdr_t {
         int width;
         int height;
+        double scale;
         size_t size;
     };
     hdr_t* hdr;
@@ -536,10 +537,11 @@ class ScreenCapture : public Payload {
 
     ScreenCapture() : Payload(Type) { realign(); }
 
-    void setImage(int width, int height, const void* p, size_t size) {
+    void setImage(int width, int height, double scale, const void* p, size_t size) {
         setSize(as<int>(sizeof(hdr_t) + size));
         hdr->width = width;
         hdr->height = height;
+        hdr->scale = scale;
         hdr->size = size;
         if (nullptr != p) {
             memcpy(data, p, size);

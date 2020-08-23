@@ -14,14 +14,16 @@ namespace e47 {
 
 namespace ImageDiff {
 
-bool operator==(const PixelARGB& lhs, const PixelARGB& rhs) { return lhs.getNativeARGB() == rhs.getNativeARGB(); }
+static bool operator==(const PixelARGB& lhs, const PixelARGB& rhs) {
+    return lhs.getNativeARGB() == rhs.getNativeARGB();
+}
 
-bool operator!=(const PixelARGB& lhs, const PixelARGB& rhs) { return !(lhs == rhs); }
+static bool operator!=(const PixelARGB& lhs, const PixelARGB& rhs) { return !(lhs == rhs); }
 
 using PerPixelFn = std::function<void(const PixelARGB& px)>;
 
-uint64_t getDelta(const uint8_t* imgFrom, const uint8_t* imgTo, uint8_t* imgDelta, int width, int height,
-                  PerPixelFn fn = nullptr) {
+inline uint64_t getDelta(const uint8_t* imgFrom, const uint8_t* imgTo, uint8_t* imgDelta, int width, int height,
+                         PerPixelFn fn = nullptr) {
     uint64_t count = 0;
     auto* pxFrom = reinterpret_cast<const PixelARGB*>(imgFrom);
     auto* pxTo = reinterpret_cast<const PixelARGB*>(imgTo);
@@ -44,7 +46,7 @@ uint64_t getDelta(const uint8_t* imgFrom, const uint8_t* imgTo, uint8_t* imgDelt
     return count;
 }
 
-uint64_t getDelta(const Image& imgFrom, const Image& imgTo, const Image& imgDelta, PerPixelFn fn = nullptr) {
+inline uint64_t getDelta(const Image& imgFrom, const Image& imgTo, const Image& imgDelta, PerPixelFn fn = nullptr) {
     if (imgFrom.getBounds() == imgTo.getBounds() && imgDelta.getBounds() == imgTo.getBounds()) {
         int width = imgTo.getWidth();
         int height = imgTo.getHeight();
@@ -56,7 +58,7 @@ uint64_t getDelta(const Image& imgFrom, const Image& imgTo, const Image& imgDelt
     return 0;
 }
 
-uint64_t applyDelta(uint8_t* imgDst, const uint8_t* imgDelta, int width, int height) {
+inline uint64_t applyDelta(uint8_t* imgDst, const uint8_t* imgDelta, int width, int height) {
     uint64_t count = 0;
     auto* pxDst = reinterpret_cast<PixelARGB*>(imgDst);
     auto* pxDelta = reinterpret_cast<const PixelARGB*>(imgDelta);
@@ -72,7 +74,7 @@ uint64_t applyDelta(uint8_t* imgDst, const uint8_t* imgDelta, int width, int hei
     return count;
 }
 
-uint64_t applyDelta(Image& imgDst, const Image& imgDelta) {
+inline uint64_t applyDelta(Image& imgDst, const Image& imgDelta) {
     if (imgDelta.getBounds() == imgDst.getBounds()) {
         int width = imgDelta.getWidth();
         int height = imgDelta.getHeight();
@@ -88,7 +90,7 @@ inline float getBrightness(const PixelARGB& px) {
     return col.getFloatRed() / 3 + col.getFloatGreen() / 3 + col.getFloatBlue() / 3;
 }
 
-float getBrightness(const uint8_t* img, int width, int height) {
+inline float getBrightness(const uint8_t* img, int width, int height) {
     auto* px = reinterpret_cast<const PixelARGB*>(img);
     float brightness = 0;
     for (int y = 0; y < height; y++) {
@@ -100,7 +102,7 @@ float getBrightness(const uint8_t* img, int width, int height) {
     return brightness;
 }
 
-float getBrightness(const Image& img) {
+inline float getBrightness(const Image& img) {
     int width = img.getWidth();
     int height = img.getHeight();
     const Image::BitmapData bd(img, 0, 0, width, height);

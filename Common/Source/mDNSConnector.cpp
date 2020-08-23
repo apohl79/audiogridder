@@ -13,11 +13,13 @@
 #include <Winsock2.h>
 #include <Ws2tcpip.h>
 #include <iphlpapi.h>
-// Link with Iphlpapi.lib
-#pragma comment(lib, "IPHLPAPI.lib")
+// Link with iphlpapi.lib
+#pragma comment(lib, "iphlpapi.lib")
 #else
 #include <netdb.h>
 #include <ifaddrs.h>
+#include <sys/select.h>
+#include <unistd.h>
 #endif
 
 namespace e47 {

@@ -8,13 +8,13 @@
 #ifndef Worker_hpp
 #define Worker_hpp
 
-#include "../JuceLibraryCode/JuceHeader.h"
+#include <JuceHeader.h>
+#include <thread>
+
 #include "AudioWorker.hpp"
 #include "Message.hpp"
 #include "ScreenWorker.hpp"
 #include "Utils.hpp"
-
-#include <thread>
 
 namespace e47 {
 

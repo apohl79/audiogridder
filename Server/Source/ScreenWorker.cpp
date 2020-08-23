@@ -24,6 +24,39 @@ void ScreenWorker::init(std::unique_ptr<StreamingSocket> s) { m_socket = std::mo
 void ScreenWorker::run() {
     logln("screen processor started");
 
+    if (getApp()->getServer().getScreenCapturingFFmpeg()) {
+        runFFmpeg();
+    } else {
+        runNative();
+    }
+
+    hideEditor();
+
+    logln("screen processor terminated");
+}
+
+void ScreenWorker::runFFmpeg() {
+    Message<ScreenCapture> msg;
+    while (!currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected()) {
+        std::unique_lock<std::mutex> lock(m_currentImageLock);
+        m_currentImageCv.wait(lock, [this] { return m_updated; });
+        m_updated = false;
+
+        if (m_imageBuf.size() > 0) {
+            if (m_imageBuf.size() <= Message<ScreenCapture>::MAX_SIZE) {
+                msg.payload.setImage(m_width, m_height, m_scale, m_imageBuf.data(), m_imageBuf.size());
+                lock.unlock();
+                msg.send(m_socket.get());
+            } else {
+                logln(
+                    "plugin screen image data exceeds max message size, Message::MAX_SIZE has to be "
+                    "increased.");
+            }
+        }
+    }
+}
+
+void ScreenWorker::runNative() {
     Message<ScreenCapture> msg;
     float qual = getApp()->getServer().getScreenQuality();
     PNGImageFormat png;
@@ -84,20 +117,17 @@ void ScreenWorker::run() {
                                 "increased.");
                         }
                     } else {
-                        msg.payload.setImage(m_width, m_height, mos.getData(), mos.getDataSize());
+                        msg.payload.setImage(m_width, m_height, 1, mos.getData(), mos.getDataSize());
                         msg.send(m_socket.get());
                     }
                 }
             }
         } else {
             // another client took over, notify this one
-            msg.payload.setImage(0, 0, nullptr, 0);
+            msg.payload.setImage(0, 0, 0, nullptr, 0);
             msg.send(m_socket.get());
         }
     }
-    hideEditor();
-
-    logln("screen processor terminated");
 }
 
 void ScreenWorker::shutdown() {
@@ -110,28 +140,48 @@ void ScreenWorker::shutdown() {
 
 void ScreenWorker::showEditor(std::shared_ptr<AudioProcessor> proc) {
     auto tid = getThreadId();
-    MessageManager::callAsync([this, proc, tid] {
-        m_currentImageLock.lock();
-        m_currentImage.reset();
-        m_lastImage.reset();
-        m_currentImageLock.unlock();
 
-        getApp()->showEditor(proc, tid, [this](std::shared_ptr<Image> i, int w, int h) {
-            if (nullptr != i) {
+    if (getApp()->getServer().getScreenCapturingFFmpeg()) {
+        MessageManager::callAsync([] { getApp()->resetEditor(); });
+        MessageManager::callAsync([this, proc, tid] {
+            getApp()->showEditor(proc, tid, [this](const uint8_t* data, int size, int w, int h, double scale) {
                 std::lock_guard<std::mutex> lock(m_currentImageLock);
-                m_lastImage = m_currentImage;
-                m_currentImage = i;
-                if (m_lastImage == nullptr || m_lastImage->getBounds() != m_currentImage->getBounds() ||
-                    m_diffImage == nullptr) {
-                    m_diffImage = std::make_shared<Image>(Image::ARGB, w, h, false);
+                if (m_imageBuf.size() < (size_t)size) {
+                    m_imageBuf.resize((size_t)size);
                 }
+                memcpy(m_imageBuf.data(), data, (size_t)size);
                 m_width = w;
                 m_height = h;
+                m_scale = scale;
                 m_updated = true;
                 m_currentImageCv.notify_one();
-            }
+            });
         });
-    });
+    } else {
+        MessageManager::callAsync([] { getApp()->resetEditor(); });
+        MessageManager::callAsync([this, proc, tid] {
+            m_currentImageLock.lock();
+            m_currentImage.reset();
+            m_lastImage.reset();
+            m_currentImageLock.unlock();
+
+            getApp()->showEditor(proc, tid, [this](std::shared_ptr<Image> i, int w, int h) {
+                if (nullptr != i) {
+                    std::lock_guard<std::mutex> lock(m_currentImageLock);
+                    m_lastImage = m_currentImage;
+                    m_currentImage = i;
+                    if (m_lastImage == nullptr || m_lastImage->getBounds() != m_currentImage->getBounds() ||
+                        m_diffImage == nullptr) {
+                        m_diffImage = std::make_shared<Image>(Image::ARGB, w, h, false);
+                    }
+                    m_width = w;
+                    m_height = h;
+                    m_updated = true;
+                    m_currentImageCv.notify_one();
+                }
+            });
+        });
+    }
 }
 
 void ScreenWorker::hideEditor() {

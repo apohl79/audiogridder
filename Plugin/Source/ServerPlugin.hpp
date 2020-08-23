@@ -8,7 +8,7 @@
 #ifndef ServerPlugin_hpp
 #define ServerPlugin_hpp
 
-#include "../JuceLibraryCode/JuceHeader.h"
+#include <JuceHeader.h>
 
 class ServerPlugin {
   public:

@@ -8,7 +8,7 @@
 #ifndef PluginButton_hpp
 #define PluginButton_hpp
 
-#include "../JuceLibraryCode/JuceHeader.h"
+#include <JuceHeader.h>
 
 class PluginButton : public TextButton {
   public:

@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "../JuceLibraryCode/JuceHeader.h"
+#include <JuceHeader.h>
 #include "PluginButton.hpp"
 #include "PluginProcessor.hpp"
 #include "Utils.hpp"

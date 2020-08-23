@@ -1,0 +1,21 @@
+[Setup]
+AppName=AudioGridder
+AppVersion=#STR_VER#
+DefaultDirName={commonpf64}\AudioGridderServer
+DefaultGroupName=AudioGridder
+OutputBaseFilename=AudioGridderServer_#STR_VER#
+
+[Files]
+Source: "..\Server\Builds\VisualStudio2019\x64\Release\App\AudioGridderServer.exe"; DestDir: "{app}"; Flags: ignoreversion
+
+[Icons]
+Name: "{autoprograms}\AudioGridderServer"; Filename: "{app}\AudioGridderServer.exe"
+
+[Code]
+function NextButtonClick(PageId: Integer): Boolean;
+begin
+    Result := True;
+    if (PageId = wpReady) and FileExists(ExpandConstant('{userappdata}\.audiogridderserver.running')) then begin
+        MsgBox('AudioGridder Server seems to be running. Please terminate it before you continue!', mbError, MB_OK);
+    end;
+end;

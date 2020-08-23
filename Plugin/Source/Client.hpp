@@ -8,12 +8,14 @@
 #ifndef Client_hpp
 #define Client_hpp
 
-#include "../JuceLibraryCode/JuceHeader.h"
+#include <JuceHeader.h>
+
 #include "Message.hpp"
 #include "ServerPlugin.hpp"
 #include "Defaults.hpp"
 #include "Utils.hpp"
 #include "Metrics.hpp"
+#include "ImageReader.hpp"
 
 #include <boost/lockfree/spsc_queue.hpp>
 
@@ -209,6 +211,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
       public:
         ScreenReceiver(Client* clnt, StreamingSocket* sock) : Thread("ScreenWorker"), m_client(clnt), m_socket(sock) {
             setLogTagSource(clnt);
+            m_imgReader.setLogTagSource(clnt);
         }
         ~ScreenReceiver() {
             signalThreadShouldExit();
@@ -220,6 +223,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
         Client* m_client;
         StreamingSocket* m_socket;
         std::shared_ptr<Image> m_image;
+        ImageReader m_imgReader;
     };
 
     friend ScreenReceiver;

@@ -8,12 +8,12 @@
 #ifndef AudioWorker_hpp
 #define AudioWorker_hpp
 
-#include "../JuceLibraryCode/JuceHeader.h"
+#include <JuceHeader.h>
+#include <thread>
+
 #include "ProcessorChain.hpp"
 #include "Message.hpp"
 #include "Utils.hpp"
-
-#include <thread>
 
 namespace e47 {
 

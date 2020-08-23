@@ -12,7 +12,7 @@
 
 namespace e47 {
 
-std::shared_ptr<juce::Image> captureScreen(juce::Rectangle<int> rect) {
+std::shared_ptr<juce::Image> captureScreenNative(juce::Rectangle<int> rect) {
     HDC hDC = GetDC(0);
     float dpi = (GetDeviceCaps(hDC, LOGPIXELSX) + GetDeviceCaps(hDC, LOGPIXELSY)) / 2.0f;
     float scaleFactor = dpi / 96;

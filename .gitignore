@@ -4,7 +4,7 @@
 JuceLibraryCode
 Builds
 package/build/*
-package/AudioGridder.iss
+package/AudioGridder*.iss
 package/VERSION
 package/archiveWin.bat
 

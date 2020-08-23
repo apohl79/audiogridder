@@ -8,7 +8,7 @@
 #ifndef Logger_hpp
 #define Logger_hpp
 
-#include "../JuceLibraryCode/JuceHeader.h"
+#include <JuceHeader.h>
 
 namespace e47 {
 class AGLogger : public Thread {

@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="WnSnfL" name="AudioGridderServer" projectType="guiapp" jucerVersion="5.4.7"
-              companyName="e47" companyCopyright="2020 Andreas Pohl" companyWebsite="https://www.e47.org"
-              companyEmail="audiogridder@e47.org" version="1.0.0" defines="AG_SERVER&#10;"
-              headerPath="../../Source&#10;../../../Common/Source">
+<JUCERPROJECT id="WnSnfL" name="AudioGridderServer" projectType="guiapp" companyName="e47"
+              companyCopyright="2020 Andreas Pohl" companyWebsite="https://www.e47.org"
+              companyEmail="audiogridder@e47.org" version="1.0.0" defines="AG_SERVER"
+              headerPath="../../Source&#10;../../../Common/Source" displaySplashScreen="1"
+              jucerFormatVersion="1">
   <MAINGROUP id="UHvWdw" name="AudioGridderServer">
     <GROUP id="{8F99D8B9-9047-FC76-4952-10CB146DAED4}" name="Resources">
       <FILE id="TxAv0c" name="server.png" compile="0" resource="1" file="Resources/server.png"/>
@@ -39,8 +40,6 @@
       <FILE id="AfCHJU" name="Images.hpp" compile="0" resource="0" file="Source/Images.hpp"/>
       <FILE id="tC3soa" name="KeyAndMouse.cpp" compile="1" resource="0" file="Source/KeyAndMouse.cpp"/>
       <FILE id="qptnsE" name="KeyAndMouse.hpp" compile="0" resource="0" file="Source/KeyAndMouse.hpp"/>
-      <FILE id="nK9xoD" name="NumberConversion.hpp" compile="0" resource="0"
-            file="Source/NumberConversion.hpp"/>
       <FILE id="lwoFf2" name="PluginListComponent.cpp" compile="1" resource="0"
             file="Source/PluginListComponent.cpp"/>
       <FILE id="uS9tXT" name="PluginListComponent.hpp" compile="0" resource="0"
@@ -56,6 +55,10 @@
       <FILE id="ksFBj4" name="Screen.cpp" compile="1" resource="0" file="Source/Screen.cpp"/>
       <FILE id="cCYAYL" name="Screen.h" compile="0" resource="0" file="Source/Screen.h"/>
       <FILE id="HmVpM7" name="Screen.mm" compile="1" resource="0" file="Source/Screen.mm"/>
+      <FILE id="PYbMnD" name="ScreenRecorder.cpp" compile="1" resource="0"
+            file="Source/ScreenRecorder.cpp"/>
+      <FILE id="zJBibN" name="ScreenRecorder.hpp" compile="0" resource="0"
+            file="Source/ScreenRecorder.hpp"/>
       <FILE id="Ahq5XH" name="ScreenWorker.cpp" compile="1" resource="0"
             file="Source/ScreenWorker.cpp"/>
       <FILE id="SWP3JK" name="ScreenWorker.hpp" compile="0" resource="0"
@@ -77,13 +80,17 @@
     </GROUP>
   </MAINGROUP>
   <EXPORTFORMATS>
-    <XCODE_MAC targetFolder="Builds/MacOSX" smallIcon="TxAv0c" bigIcon="TxAv0c">
+    <XCODE_MAC targetFolder="Builds/MacOSX" smallIcon="TxAv0c" bigIcon="TxAv0c"
+               externalLibraries="avdevice&#10;avcodec&#10;avformat&#10;avfilter&#10;avutil&#10;swscale&#10;swresample&#10;webp&#10;webpmux"
+               extraFrameworks="AVFoundation,CoreMedia,VideoToolbox">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" osxCompatibility="10.7 SDK" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
-                       recommendedWarnings="LLVM" headerPath="$(HOME)/audio/vstsdk2.4"/>
-        <CONFIGURATION isDebug="1" name="Release" osxCompatibility="10.7 SDK" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING&#10;JUCE_DISABLE_ASSERTIONS"
-                       recommendedWarnings="LLVM" headerPath="$(HOME)/audio/vstsdk2.4"
-                       optimisation="3"/>
+        <CONFIGURATION isDebug="1" name="Debug" osxCompatibility="10.8 SDK" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
+                       recommendedWarnings="LLVM" headerPath="$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg"
+                       libraryPath="$(HOME)/audio/FFmpeg/inst-osx/lib"/>
+        <CONFIGURATION isDebug="1" name="Release" osxCompatibility="10.8 SDK" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING&#10;JUCE_DISABLE_ASSERTIONS"
+                       recommendedWarnings="LLVM" headerPath="$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg"
+                       optimisation="3" libraryPath="$(HOME)/audio/FFmpeg/inst-osx/lib"
+                       linkTimeOptimisation="1"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../audio/JUCE/modules"/>
@@ -100,12 +107,39 @@
         <MODULEPATH id="juce_opengl" path="../audio/JUCE/modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
-    <VS2019 targetFolder="Builds/VisualStudio2019" smallIcon="TxAv0c" bigIcon="TxAv0c">
+    <XCODE_MAC targetFolder="Builds/MacOSX10.7" externalLibraries="avdevice&#10;avcodec&#10;avformat&#10;avfilter&#10;avutil&#10;swscale&#10;swresample&#10;webp&#10;webpmux"
+               smallIcon="TxAv0c" bigIcon="TxAv0c" extraFrameworks="AVFoundation,CoreMedia,VideoToolbox">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" headerPath="$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg"
+                       libraryPath="$(HOME)/audio/FFmpeg/inst-osx-10.7/lib" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
+                       recommendedWarnings="LLVM" osxCompatibility="10.7 SDK"/>
+        <CONFIGURATION isDebug="0" name="Release" headerPath="$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg"
+                       libraryPath="$(HOME)/audio/FFmpeg/inst-osx-10.7/lib" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING&#10;JUCE_DISABLE_ASSERTIONS"
+                       recommendedWarnings="LLVM" osxCompatibility="10.7 SDK"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_opengl"/>
+        <MODULEPATH id="juce_gui_extra"/>
+        <MODULEPATH id="juce_gui_basics"/>
+        <MODULEPATH id="juce_graphics"/>
+        <MODULEPATH id="juce_events"/>
+        <MODULEPATH id="juce_data_structures"/>
+        <MODULEPATH id="juce_cryptography"/>
+        <MODULEPATH id="juce_core"/>
+        <MODULEPATH id="juce_audio_processors"/>
+        <MODULEPATH id="juce_audio_formats"/>
+        <MODULEPATH id="juce_audio_devices"/>
+        <MODULEPATH id="juce_audio_basics"/>
+      </MODULEPATHS>
+    </XCODE_MAC>
+    <VS2019 targetFolder="Builds/VisualStudio2019" smallIcon="TxAv0c" bigIcon="TxAv0c"
+            externalLibraries="libavdevice.lib&#10;libavcodec.lib&#10;libavformat.lib&#10;libavfilter.lib&#10;libavutil.lib&#10;libswscale.lib&#10;libswresample.lib&#10;libwebp.lib&#10;libwebpmux.lib&#10;">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" defines="JUCE_WINDOWS&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
-                       headerPath="Z:\vstsdk2.4"/>
+                       headerPath="Z:\vstsdk2.4&#10;Z:\FFmpeg" libraryPath="Z:\FFmpeg\inst-win\lib"/>
         <CONFIGURATION isDebug="1" name="Release" defines="JUCE_WINDOWS&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING&#10;JUCE_DISABLE_ASSERTIONS"
-                       headerPath="Z:\vstsdk2.4" useRuntimeLibDLL="0"/>
+                       headerPath="Z:\vstsdk2.4&#10;Z:\FFmpeg" useRuntimeLibDLL="0"
+                       libraryPath="Z:\FFmpeg\inst-win\lib"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_opengl"/>

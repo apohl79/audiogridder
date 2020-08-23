@@ -10,7 +10,7 @@
 #ifndef PluginListComponent_hpp
 #define PluginListComponent_hpp
 
-#include "../JuceLibraryCode/JuceHeader.h"
+#include <JuceHeader.h>
 #include <set>
 
 namespace e47 {

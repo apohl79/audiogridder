@@ -18,10 +18,10 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     setUsingNativeTitleBar(true);
 
     int totalWidth = 500;
-    int totalHeight = 520;
+    int totalHeight = 80;
     int borderLR = 15;  // left/right border
     int borderTB = 15;  // top/botton border
-    int rowHeight = 40;
+    int rowHeight = 35;
 
     int fieldWidth = 50;
     int wideFieldWidth = 250;
@@ -86,25 +86,19 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 
     row++;
 
+#ifdef JUCE_MAC
     label = std::make_unique<Label>();
     label->setText("AudioUnit Support:", NotificationType::dontSendNotification);
     label->setBounds(getLabelBounds(row));
-#ifdef JUCE_WINDOWS
-    label->setAlpha(0.5);
-#endif
     addChildAndSetID(label.get(), "lbl");
     m_components.push_back(std::move(label));
 
     m_auSupport.setBounds(getCheckBoxBounds(row));
     m_auSupport.setToggleState(m_app->getServer().getEnableAU(), NotificationType::dontSendNotification);
-#ifdef JUCE_WINDOWS
-    m_auSupport.setToggleState(false, NotificationType::dontSendNotification);
-    m_auSupport.setAlpha(0.5);
-    m_auSupport.setEnabled(false);
-#endif
     addChildAndSetID(&m_auSupport, "au");
 
     row++;
+#endif
 
     label = std::make_unique<Label>();
     label->setText("VST3 Support:", NotificationType::dontSendNotification);
@@ -173,23 +167,66 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     row += largeFieldRows;
 
     label = std::make_unique<Label>();
-    label->setText("Screen Capture Diff Detection:", NotificationType::dontSendNotification);
+    label->setText("Screen Capturing Mode:", NotificationType::dontSendNotification);
     label->setBounds(getLabelBounds(row));
     addChildAndSetID(label.get(), "lbl");
     m_components.push_back(std::move(label));
+
+    m_screenCapturingMode.setBounds(getWideFieldBounds(row));
+    m_screenCapturingMode.addItem("FFmpeg", 1);
+    m_screenCapturingMode.addItem("Legacy", 2);
+    m_screenCapturingMode.addItem("Disabled", 3);
+    int mode = 1;
+    if (m_app->getServer().getScreenCapturingOff()) {
+        mode = 3;
+    } else if (!m_app->getServer().getScreenCapturingFFmpeg()) {
+        mode = 2;
+    }
+    m_screenCapturingMode.setSelectedId(mode, NotificationType::dontSendNotification);
+    m_screenCapturingMode.onChange = [this] {
+        if (m_screenCapturingMode.getSelectedId() != 2) {
+            m_screenDiffDetectionLbl.setAlpha(0.5);
+            m_screenDiffDetection.setEnabled(false);
+            m_screenDiffDetection.setAlpha(0.5);
+            m_screenJpgQualityLbl.setAlpha(0.5);
+            m_screenJpgQuality.setEnabled(false);
+            m_screenJpgQuality.setAlpha(0.5);
+        } else {
+            m_screenDiffDetectionLbl.setAlpha(1);
+            m_screenDiffDetection.setEnabled(true);
+            m_screenDiffDetection.setAlpha(1);
+            m_screenJpgQualityLbl.setAlpha(1);
+            m_screenJpgQuality.setEnabled(true);
+            m_screenJpgQuality.setAlpha(1);
+            if (nullptr != m_screenDiffDetection.onClick) {
+                m_screenDiffDetection.onClick();
+            }
+        }
+    };
+    m_screenCapturingMode.onChange();
+    addChildAndSetID(&m_screenCapturingMode, "captmode");
+
+    row++;
+
+    label = std::make_unique<Label>();
+    m_screenDiffDetectionLbl.setText("Screen Capture Diff Detection:", NotificationType::dontSendNotification);
+    m_screenDiffDetectionLbl.setBounds(getLabelBounds(row));
+    addChildAndSetID(&m_screenDiffDetectionLbl, "lbl");
 
     m_screenDiffDetection.setBounds(getCheckBoxBounds(row));
     m_screenDiffDetection.setToggleState(m_app->getServer().getScreenDiffDetection(),
                                          NotificationType::dontSendNotification);
     m_screenDiffDetection.onClick = [this] {
-        if (m_screenDiffDetection.getToggleState()) {
-            m_screenJpgQualityLbl.setAlpha(0.5);
-            m_screenJpgQuality.setEnabled(false);
-            m_screenJpgQuality.setAlpha(0.5);
-        } else {
-            m_screenJpgQualityLbl.setAlpha(1);
-            m_screenJpgQuality.setEnabled(true);
-            m_screenJpgQuality.setAlpha(1);
+        if (m_screenCapturingMode.getSelectedId() == 2) {
+            if (m_screenDiffDetection.getToggleState()) {
+                m_screenJpgQualityLbl.setAlpha(0.5);
+                m_screenJpgQuality.setEnabled(false);
+                m_screenJpgQuality.setAlpha(0.5);
+            } else {
+                m_screenJpgQualityLbl.setAlpha(1);
+                m_screenJpgQuality.setEnabled(true);
+                m_screenJpgQuality.setAlpha(1);
+            }
         }
     };
     m_screenDiffDetection.onClick();
@@ -209,6 +246,8 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 
     row++;
 
+    totalHeight += row * rowHeight;
+
     m_saveButton.setButtonText("Save");
     m_saveButton.setBounds(totalWidth / 2 - saveButtonWidth / 2, totalHeight - borderTB - saveButtonHeight,
                            saveButtonWidth, saveButtonHeight);
@@ -219,6 +258,20 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
         appCpy->getServer().setEnableAU(m_auSupport.getToggleState());
         appCpy->getServer().setEnableVST3(m_vst3Support.getToggleState());
         appCpy->getServer().setEnableVST2(m_vst2Support.getToggleState());
+        switch (m_screenCapturingMode.getSelectedId()) {
+            case 1:
+                appCpy->getServer().setScreenCapturingFFmpeg(true);
+                appCpy->getServer().setScreenCapturingOff(false);
+                break;
+            case 2:
+                appCpy->getServer().setScreenCapturingFFmpeg(false);
+                appCpy->getServer().setScreenCapturingOff(false);
+                break;
+            case 3:
+                appCpy->getServer().setScreenCapturingFFmpeg(false);
+                appCpy->getServer().setScreenCapturingOff(true);
+                break;
+        }
         appCpy->getServer().setScreenDiffDetection(m_screenDiffDetection.getToggleState());
         float qual = m_screenJpgQuality.getText().getFloatValue();
         if (qual < 0.1) {

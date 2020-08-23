@@ -7,11 +7,12 @@
 
 #include "Client.hpp"
 #include "PluginProcessor.hpp"
-#include "ImageDiff.hpp"
 #include "NumberConversion.hpp"
 
 #ifdef JUCE_WINDOWS
 #include "windows.h"
+#else
+#include "fcntl.h"
 #endif
 
 namespace e47 {
@@ -565,17 +566,11 @@ void Client::ScreenReceiver::run() {
     do {
         if (msg.read(m_socket, &err, 200)) {
             if (PLD(msg).hdr->size > 0) {
-                if (DATA(msg)[1] == 'P' && DATA(msg)[2] == 'N' && DATA(msg)[3] == 'G') {
-                    auto img = std::make_shared<Image>(PNGImageFormat::loadFrom(DATA(msg), PLD(msg).hdr->size));
-                    if (m_image == nullptr || m_image->getBounds() != img->getBounds()) {
-                        m_image = img;
-                    } else {
-                        ImageDiff::applyDelta(*m_image, *img);
-                    }
-                } else {
-                    m_image = std::make_shared<Image>(JPEGImageFormat::loadFrom(DATA(msg), PLD(msg).hdr->size));
-                }
-                m_client->setPluginScreen(m_image, PLD(msg).hdr->width, PLD(msg).hdr->height);
+                int width = (int)(PLD(msg).hdr->width / PLD(msg).hdr->scale);
+                int height = (int)(PLD(msg).hdr->height / PLD(msg).hdr->scale);
+                m_client->setPluginScreen(m_imgReader.read(DATA(msg), PLD(msg).hdr->size, PLD(msg).hdr->width,
+                                                           PLD(msg).hdr->height, PLD(msg).hdr->scale),
+                                          width, height);
             } else {
                 m_client->setPluginScreen(nullptr, 0, 0);
             }

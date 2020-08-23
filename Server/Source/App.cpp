@@ -7,6 +7,7 @@
 
 #include "App.hpp"
 #include "Server.hpp"
+#include "Screen.h"
 
 #ifdef JUCE_WINDOWS
 #include "MiniDump.hpp"
@@ -85,6 +86,13 @@ void App::initialise(const String& commandLineParameters) {
             showSplashWindow();
             setSplashInfo("Starting server...");
             m_menuWindow = std::make_unique<MenuBarWindow>(this);
+#ifdef JUCE_MAC
+            if (!askForAccessibilityPermission()) {
+                AlertWindow::showMessageBox(
+                    AlertWindow::WarningIcon, "Warning",
+                    "AudioGridder needs the Accessibility permission to remote control plugins.", "OK");
+            }
+#endif
             m_server = std::make_unique<Server>();
             m_server->startThread();
             break;

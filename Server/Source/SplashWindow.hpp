@@ -8,7 +8,8 @@
 #ifndef SplashWindow_hpp
 #define SplashWindow_hpp
 
-#include "../JuceLibraryCode/JuceHeader.h"
+#include <JuceHeader.h>
+
 #include "Images.hpp"
 #include "Version.hpp"
 
@@ -22,8 +23,9 @@ class SplashWindow : public TopLevelWindow {
         lf.setColour(PopupMenu::backgroundColourId, Colour(DEFAULT_BG_COLOR));
         lf.setColour(TextEditor::backgroundColourId, Colour(DEFAULT_BUTTON_COLOR));
         lf.setColour(TextButton::buttonColourId, Colour(DEFAULT_BUTTON_COLOR));
+        lf.setColour(ComboBox::backgroundColourId, Colour(DEFAULT_BUTTON_COLOR));
         lf.setColour(ListBox::backgroundColourId, Colour(DEFAULT_BG_COLOR));
-        lf.setUsingNativeAlertWindows(true);
+        lf.setColour(AlertWindow::backgroundColourId, Colour(DEFAULT_BG_COLOR));
 
         centreWithSize(400, 180);
 

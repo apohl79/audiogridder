@@ -10,7 +10,7 @@
 #ifndef mDNSConnector_hpp
 #define mDNSConnector_hpp
 
-#include "../JuceLibraryCode/JuceHeader.h"
+#include <JuceHeader.h>
 #include "Utils.hpp"
 #include "mDNS.hpp"
 
