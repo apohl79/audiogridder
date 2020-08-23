@@ -203,6 +203,8 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
 
   private:
     std::unique_ptr<Server> m_server;
+    std::unique_ptr<std::thread> m_child;
+    std::atomic_bool m_stopChild{false};
     std::unique_ptr<ProcessorWindow> m_window;
     std::unique_ptr<PluginListWindow> m_pluginListWindow;
     std::unique_ptr<ServerSettingsWindow> m_srvSettingsWindow;

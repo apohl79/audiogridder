@@ -46,7 +46,7 @@ void App::initialise(const String& commandLineParameters) {
         case SCAN:
             logName << "Scan_";
             break;
-        default:
+        case SERVER:
             break;
     }
 #ifdef JUCE_WINDOWS
@@ -92,7 +92,7 @@ void App::initialise(const String& commandLineParameters) {
 #ifdef JUCE_MAC
             Process::setDockIconVisible(false);
 #endif
-            std::thread([this] {
+            m_child = std::make_unique<std::thread>([this] {
                 ChildProcess proc;
                 StringArray proc_args;
                 proc_args.add(File::getSpecialLocation(File::currentExecutableFile).getFullPathName());
@@ -103,6 +103,17 @@ void App::initialise(const String& commandLineParameters) {
                     if (proc.start(proc_args)) {
                         while (proc.isRunning()) {
                             Thread::sleep(100);
+                            if (m_stopChild) {
+                                logln("killing child process");
+                                proc.kill();
+                                proc.waitForProcessToFinish(-1);
+                                File serverRunFile(SERVER_RUN_FILE);
+                                if (serverRunFile.exists()) {
+                                    serverRunFile.deleteFile();
+                                }
+                                done = true;
+                                break;
+                            }
                         }
                         ec = proc.getExitCode();
                         if (ec != 0) {
@@ -123,7 +134,7 @@ void App::initialise(const String& commandLineParameters) {
                     }
                 } while (!done);
                 quit();
-            }).detach();
+            });
             break;
     }
     logln("initialise complete");
@@ -135,6 +146,12 @@ void App::shutdown() {
         m_server->shutdown();
         m_server->waitForThreadToExit(-1);
         m_server.reset();
+    }
+    if (m_child != nullptr) {
+        m_stopChild = true;
+        if (m_child->joinable()) {
+            m_child->join();
+        }
     }
     Logger::setCurrentLogger(nullptr);
     delete m_logger;
