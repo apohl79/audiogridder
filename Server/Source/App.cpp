@@ -46,7 +46,7 @@ void App::initialise(const String& commandLineParameters) {
         case SCAN:
             logName << "Scan_";
             break;
-        default:
+        case SERVER:
             break;
     }
 #ifdef JUCE_WINDOWS
@@ -92,7 +92,7 @@ void App::initialise(const String& commandLineParameters) {
 #ifdef JUCE_MAC
             Process::setDockIconVisible(false);
 #endif
-            std::thread([this] {
+            m_child = std::make_unique<std::thread>([this] {
                 ChildProcess proc;
                 StringArray proc_args;
                 proc_args.add(File::getSpecialLocation(File::currentExecutableFile).getFullPathName());
@@ -103,6 +103,17 @@ void App::initialise(const String& commandLineParameters) {
                     if (proc.start(proc_args)) {
                         while (proc.isRunning()) {
                             Thread::sleep(100);
+                            if (m_stopChild) {
+                                logln("killing child process");
+                                proc.kill();
+                                proc.waitForProcessToFinish(-1);
+                                File serverRunFile(SERVER_RUN_FILE);
+                                if (serverRunFile.exists()) {
+                                    serverRunFile.deleteFile();
+                                }
+                                done = true;
+                                break;
+                            }
                         }
                         ec = proc.getExitCode();
                         if (ec != 0) {
@@ -123,7 +134,7 @@ void App::initialise(const String& commandLineParameters) {
                     }
                 } while (!done);
                 quit();
-            }).detach();
+            });
             break;
     }
     logln("initialise complete");
@@ -135,6 +146,12 @@ void App::shutdown() {
         m_server->shutdown();
         m_server->waitForThreadToExit(-1);
         m_server.reset();
+    }
+    if (m_child != nullptr) {
+        m_stopChild = true;
+        if (m_child->joinable()) {
+            m_child->join();
+        }
     }
     Logger::setCurrentLogger(nullptr);
     delete m_logger;
@@ -165,7 +182,7 @@ void App::restartServer() {
 
 const KnownPluginList& App::getPluginList() { return m_server->getPluginList(); }
 
-void App::showEditor(std::shared_ptr<AudioProcessor> proc, Thread::ThreadID tid, WindowCaptureCallback func) {
+void App::showEditor(std::shared_ptr<AudioProcessor> proc, Thread::ThreadID tid, WindowCaptureCallbackNative func) {
     if (proc->hasEditor()) {
         std::lock_guard<std::mutex> lock(m_windowMtx);
         forgetEditorIfNeeded();
@@ -176,8 +193,26 @@ void App::showEditor(std::shared_ptr<AudioProcessor> proc, Thread::ThreadID tid,
         }
         m_windowOwner = tid;
         m_windowProc = proc;
-        m_windowFunc = func;
-        m_window = std::make_unique<ProcessorWindow>(m_windowProc, m_windowFunc);
+        m_windowFuncNative = func;
+        m_window = std::make_unique<ProcessorWindow>(m_windowProc, m_windowFuncNative);
+    } else {
+        logln("show editor failed: '" << proc->getName() << "' has no editor");
+    }
+}
+
+void App::showEditor(std::shared_ptr<AudioProcessor> proc, Thread::ThreadID tid, WindowCaptureCallbackFFmpeg func) {
+    if (proc->hasEditor()) {
+        std::lock_guard<std::mutex> lock(m_windowMtx);
+        forgetEditorIfNeeded();
+        if (m_window != nullptr) {
+            logln("show editor: resetting existing processor window");
+            m_window->setVisible(false);
+            m_window.reset();
+        }
+        m_windowOwner = tid;
+        m_windowProc = proc;
+        m_windowFuncFFmpeg = func;
+        m_window = std::make_unique<ProcessorWindow>(m_windowProc, m_windowFuncFFmpeg);
     } else {
         logln("show editor failed: '" << proc->getName() << "' has no editor");
     }
@@ -195,7 +230,8 @@ void App::hideEditor(Thread::ThreadID tid) {
         }
         m_windowOwner = nullptr;
         m_windowProc.reset();
-        m_windowFunc = nullptr;
+        m_windowFuncNative = nullptr;
+        m_windowFuncFFmpeg = nullptr;
     } else {
         logln("failed to hide editor: tid does not match window owner");
     }
@@ -216,7 +252,7 @@ void App::restartEditor() {
     forgetEditorIfNeeded();
     if (m_windowProc != nullptr) {
         logln("recreating processor window");
-        m_window = std::make_unique<ProcessorWindow>(m_windowProc, m_windowFunc);
+        m_window = std::make_unique<ProcessorWindow>(m_windowProc, m_windowFuncNative);
     }
 }
 
