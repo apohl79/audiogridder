@@ -9,7 +9,7 @@
 
 namespace e47 {
 
-std::unique_ptr<TimeStatistics> TimeStatistics::m_inst;
+std::shared_ptr<TimeStatistics> TimeStatistics::m_inst;
 std::mutex TimeStatistics::m_instMtx;
 size_t TimeStatistics::m_instRefCount = 0;
 
@@ -134,12 +134,15 @@ void TimeStatistics::run() {
     }
 }
 
-TimeStatistics::Duration TimeStatistics::getDuration() { return Duration(*m_inst); }
+TimeStatistics::Duration TimeStatistics::getDuration() {
+    std::lock_guard<std::mutex> lock(m_instMtx);
+    return Duration(m_inst);
+}
 
 void TimeStatistics::initialize() {
     std::lock_guard<std::mutex> lock(m_instMtx);
     if (nullptr == m_inst) {
-        m_inst = std::make_unique<TimeStatistics>();
+        m_inst = std::make_shared<TimeStatistics>();
         m_inst->startThread();
     }
     m_instRefCount++;
