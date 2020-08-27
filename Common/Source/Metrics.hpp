@@ -8,7 +8,7 @@
 #ifndef Metrics_hpp
 #define Metrics_hpp
 
-#include "../JuceLibraryCode/JuceHeader.h"
+#include <JuceHeader.h>
 #include "Utils.hpp"
 
 namespace e47 {
@@ -17,7 +17,7 @@ class TimeStatistics : public Thread, public LogTag {
   public:
     class Duration {
       public:
-        Duration(TimeStatistics& t) : m_timer(t), m_start(Time::getHighResolutionTicks()) {}
+        Duration(std::shared_ptr<TimeStatistics> t) : m_timer(t), m_start(Time::getHighResolutionTicks()) {}
         ~Duration() { update(); }
 
         void finish() {
@@ -29,7 +29,7 @@ class TimeStatistics : public Thread, public LogTag {
             if (!m_finished) {
                 auto end = Time::getHighResolutionTicks();
                 double ms = Time::highResolutionTicksToSeconds(end - m_start) * 1000;
-                m_timer.update(ms);
+                m_timer->update(ms);
                 m_start = end;
             }
         }
@@ -37,7 +37,7 @@ class TimeStatistics : public Thread, public LogTag {
         void reset() { m_start = Time::getHighResolutionTicks(); }
 
       private:
-        TimeStatistics& m_timer;
+        std::shared_ptr<TimeStatistics> m_timer;
         int64 m_start;
         bool m_finished = false;
     };
@@ -84,7 +84,7 @@ class TimeStatistics : public Thread, public LogTag {
     size_t m_numOfBins;
     double m_binSize;
 
-    static std::unique_ptr<TimeStatistics> m_inst;
+    static std::shared_ptr<TimeStatistics> m_inst;
     static std::mutex m_instMtx;
     static size_t m_instRefCount;
 };
