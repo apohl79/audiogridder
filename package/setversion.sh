@@ -21,7 +21,7 @@ fi
 
 echo "Setting version to: $NUM_VER $STR_VER"
 
-projucer=../JUCE/Projucer.app/Contents/MacOS/Projucer
+projucer=../JUCE5/Projucer.app/Contents/MacOS/Projucer
 
 if [ -n "$PROJUCER" ]; then
     projucer=$PROJUCER
