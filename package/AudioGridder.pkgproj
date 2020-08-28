@@ -63,7 +63,7 @@
 													<array>
 														<dict>
 															<key>BUNDLE_CAN_DOWNGRADE</key>
-															<false/>
+															<true/>
 															<key>BUNDLE_POSTINSTALL_PATH</key>
 															<dict>
 																<key>PATH_TYPE</key>
@@ -91,7 +91,7 @@
 														</dict>
 														<dict>
 															<key>BUNDLE_CAN_DOWNGRADE</key>
-															<false/>
+															<true/>
 															<key>BUNDLE_POSTINSTALL_PATH</key>
 															<dict>
 																<key>PATH_TYPE</key>
@@ -643,7 +643,7 @@
 													<array>
 														<dict>
 															<key>BUNDLE_CAN_DOWNGRADE</key>
-															<false/>
+															<true/>
 															<key>BUNDLE_POSTINSTALL_PATH</key>
 															<dict>
 																<key>PATH_TYPE</key>
@@ -671,7 +671,7 @@
 														</dict>
 														<dict>
 															<key>BUNDLE_CAN_DOWNGRADE</key>
-															<false/>
+															<true/>
 															<key>BUNDLE_POSTINSTALL_PATH</key>
 															<dict>
 																<key>PATH_TYPE</key>
@@ -1167,7 +1167,7 @@
 							<array>
 								<dict>
 									<key>BUNDLE_CAN_DOWNGRADE</key>
-									<false/>
+									<true/>
 									<key>BUNDLE_POSTINSTALL_PATH</key>
 									<dict>
 										<key>PATH_TYPE</key>
@@ -1712,7 +1712,7 @@
 													<array>
 														<dict>
 															<key>BUNDLE_CAN_DOWNGRADE</key>
-															<false/>
+															<true/>
 															<key>BUNDLE_POSTINSTALL_PATH</key>
 															<dict>
 																<key>PATH_TYPE</key>
@@ -1740,7 +1740,7 @@
 														</dict>
 														<dict>
 															<key>BUNDLE_CAN_DOWNGRADE</key>
-															<false/>
+															<true/>
 															<key>BUNDLE_POSTINSTALL_PATH</key>
 															<dict>
 																<key>PATH_TYPE</key>
