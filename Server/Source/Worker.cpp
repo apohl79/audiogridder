@@ -264,7 +264,7 @@ void Worker::handleMessage(std::shared_ptr<Message<HidePlugin>> /* msg */) {
 void Worker::handleMessage(std::shared_ptr<Message<Mouse>> msg) {
     auto ev = *pDATA(msg);
     MessageManager::callAsync([ev] {
-        auto point = getApp()->localPointToGlobal(Point<float>(ev.x, ev.y));
+        auto point = getApp()->localPointToGlobal(juce::Point<float>(ev.x, ev.y));
         uint64_t flags = 0;
         if (ev.isShiftDown) {
             setShiftKey(flags);

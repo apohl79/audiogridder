@@ -46,7 +46,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     void restartEditor();
     void forgetEditorIfNeeded();
 
-    Point<float> localPointToGlobal(Point<float> lp);
+    juce::Point<float> localPointToGlobal(juce::Point<float> lp);
 
     class MenuBarWindow : public DocumentWindow, public SystemTrayIconComponent {
       public:

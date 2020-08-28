@@ -227,7 +227,7 @@ void App::forgetEditorIfNeeded() {
     }
 }
 
-Point<float> App::localPointToGlobal(Point<float> lp) {
+juce::Point<float> App::localPointToGlobal(juce::Point<float> lp) {
     if (m_windowProc != nullptr) {
         auto* ed = m_windowProc->getActiveEditor();
         if (ed != nullptr) {

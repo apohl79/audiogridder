@@ -177,7 +177,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     void mouseDoubleClick(const MouseEvent& event) override;
     void mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wheel) override;
 
-    void sendMouseEvent(MouseEvType ev, Point<float> p, bool isShiftDown, bool isCtrlDown, bool isAltDown);
+    void sendMouseEvent(MouseEvType ev, juce::Point<float> p, bool isShiftDown, bool isCtrlDown, bool isAltDown);
 
     // KeyListener
     bool keyPressed(const KeyPress& kp, Component* originatingComponent) override;

@@ -284,14 +284,14 @@ void setControlKey(uint64_t& flags) {
 #elif defined(JUCE_WINDOWS)
     flags |= VK_CONTROL;
 #endif
-};
+}
 void setAltKey(uint64_t& flags) {
 #if defined(JUCE_MAC)
     flags |= kCGEventFlagMaskAlternate;
 #elif defined(JUCE_WINDOWS)
     flags |= VK_MENU;
 #endif
-};
+}
 
 void keyEventDown(uint16_t keyCode, uint64_t flags) { keyEvent(keyCode, flags, true); }
 

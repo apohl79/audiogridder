@@ -647,7 +647,7 @@ void Client::mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& /*
     dbgln("unhanbdled mouseWheelMove " << event.position.x << ":" << event.position.y);
 }
 
-void Client::sendMouseEvent(MouseEvType ev, Point<float> p, bool isShiftDown, bool isCtrlDown, bool isAltDown) {
+void Client::sendMouseEvent(MouseEvType ev, juce::Point<float> p, bool isShiftDown, bool isCtrlDown, bool isAltDown) {
     if (!isReadyLockFree()) {
         return;
     };

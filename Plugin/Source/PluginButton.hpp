@@ -43,7 +43,7 @@ class PluginButton : public TextButton {
     String m_id;
     bool m_withExtraButtons = true;
     Rectangle<int> m_bypassArea, m_moveUpArea, m_moveDownArea, m_deleteArea;
-    Point<int> m_lastMousePosition;
+    juce::Point<int> m_lastMousePosition;
 };
 
 #endif /* PluginButton_hpp */
