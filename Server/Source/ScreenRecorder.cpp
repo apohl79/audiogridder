@@ -357,7 +357,9 @@ bool ScreenRecorder::prepareOutput() {
 
 void ScreenRecorder::record() {
     logln("started capturing: rectangle " << m_captureRect.getX() << "," << m_captureRect.getY() << ":"
-                                          << m_captureRect.getWidth() << "x" << m_captureRect.getHeight());
+                                          << m_captureRect.getWidth() << "x" << m_captureRect.getHeight() << " scale *"
+                                          << m_scale << " <- input rectange " << m_captureCodecCtx->width << "x"
+                                          << m_captureCodecCtx->height);
     int retRDF;
     do {
         retRDF = av_read_frame(m_captureFmtCtx, m_capturePacket);
