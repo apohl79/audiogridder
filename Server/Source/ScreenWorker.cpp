@@ -145,6 +145,9 @@ void ScreenWorker::showEditor(std::shared_ptr<AudioProcessor> proc) {
         MessageManager::callAsync([] { getApp()->resetEditor(); });
         MessageManager::callAsync([this, proc, tid] {
             getApp()->showEditor(proc, tid, [this](const uint8_t* data, int size, int w, int h, double scale) {
+                if (currentThreadShouldExit()) {
+                    return;
+                }
                 std::lock_guard<std::mutex> lock(m_currentImageLock);
                 if (m_imageBuf.size() < (size_t)size) {
                     m_imageBuf.resize((size_t)size);
@@ -167,6 +170,9 @@ void ScreenWorker::showEditor(std::shared_ptr<AudioProcessor> proc) {
 
             getApp()->showEditor(proc, tid, [this](std::shared_ptr<Image> i, int w, int h) {
                 if (nullptr != i) {
+                    if (currentThreadShouldExit()) {
+                        return;
+                    }
                     std::lock_guard<std::mutex> lock(m_currentImageLock);
                     m_lastImage = m_currentImage;
                     m_currentImage = i;
