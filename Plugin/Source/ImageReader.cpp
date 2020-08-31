@@ -15,57 +15,61 @@ namespace e47 {
 ImageReader::ImageReader() {}
 
 std::shared_ptr<Image> ImageReader::read(const char* data, size_t size, int width, int height, double scale) {
-    if (size > 4 && data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F') {
-        if ((m_width != width || m_height != height) && nullptr != m_inputCodecCtx) {
-            closeCodec();
-        }
-        m_width = width;
-        m_height = height;
-        m_scale = scale;
-        if (nullptr == m_inputCodecCtx) {
-            if (!initCodec()) {
-                logln("failed to initialize codec");
-                return nullptr;
+    if (nullptr != data) {
+        if (size > 4 && data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F') {
+            if ((m_width != width || m_height != height) && nullptr != m_inputCodecCtx) {
+                closeCodec();
             }
-        }
-        int ret;
-        if (nullptr == m_inputPacket->buf || (size_t)m_inputPacket->size < size) {
-            ret = av_new_packet(m_inputPacket, (int)size);
-            if (ret != 0) {
-                logln("av_new_packet failed: " << ret);
-                return nullptr;
-            }
-        }
-        memcpy(m_inputPacket->data, data, size);
-        ret = avcodec_send_packet(m_inputCodecCtx, m_inputPacket);
-        if (ret < 0) {
-            logln("avcodec_send_packet failed: " << ret);
-            return nullptr;
-        }
-        do {
-            ret = avcodec_receive_frame(m_inputCodecCtx, m_inputFrame);
-            if (ret >= 0) {
-                // put decoded frame into a juce image
-                sws_scale(m_swsCtx, m_inputFrame->data, m_inputFrame->linesize, 0, m_inputFrame->height,
-                          m_outputFrame->data, m_outputFrame->linesize);
-                if (nullptr == m_image || m_image->getWidth() != m_inputFrame->width ||
-                    m_image->getHeight() != m_inputFrame->height) {
-                    m_image = std::make_shared<Image>(Image::ARGB, m_inputFrame->width, m_inputFrame->height, false);
+            m_width = width;
+            m_height = height;
+            m_scale = scale;
+            if (nullptr == m_inputCodecCtx) {
+                if (!initCodec()) {
+                    logln("failed to initialize codec");
+                    return nullptr;
                 }
-                Image::BitmapData bd(*m_image, 0, 0, m_image->getWidth(), m_image->getHeight());
-                memcpy(bd.data, m_outputFrame->data[0], (size_t)(m_outputFrame->linesize[0] * m_outputFrame->height));
             }
-        } while (ret == AVERROR(EAGAIN));
-    } else if (size > 3 && data[1] == 'P' && data[2] == 'N' && data[3] == 'G') {
-        auto img = std::make_shared<Image>(PNGImageFormat::loadFrom(data, size));
-        if (m_image == nullptr || m_image->getBounds() != img->getBounds()) {
-            m_image = img;
-        } else {
-            ImageDiff::applyDelta(*m_image, *img);
-        }
+            int ret;
+            if (nullptr == m_inputPacket->buf || (size_t)m_inputPacket->size < size) {
+                ret = av_new_packet(m_inputPacket, (int)size);
+                if (ret != 0) {
+                    logln("av_new_packet failed: " << ret);
+                    return nullptr;
+                }
+            }
+            memcpy(m_inputPacket->data, data, size);
+            ret = avcodec_send_packet(m_inputCodecCtx, m_inputPacket);
+            if (ret < 0) {
+                logln("avcodec_send_packet failed: " << ret);
+                return nullptr;
+            }
+            do {
+                ret = avcodec_receive_frame(m_inputCodecCtx, m_inputFrame);
+                if (ret >= 0) {
+                    // put decoded frame into a juce image
+                    sws_scale(m_swsCtx, m_inputFrame->data, m_inputFrame->linesize, 0, m_inputFrame->height,
+                              m_outputFrame->data, m_outputFrame->linesize);
+                    if (nullptr == m_image || m_image->getWidth() != m_inputFrame->width ||
+                        m_image->getHeight() != m_inputFrame->height) {
+                        m_image =
+                            std::make_shared<Image>(Image::ARGB, m_inputFrame->width, m_inputFrame->height, false);
+                    }
+                    Image::BitmapData bd(*m_image, 0, 0, m_image->getWidth(), m_image->getHeight());
+                    memcpy(bd.data, m_outputFrame->data[0],
+                           (size_t)(m_outputFrame->linesize[0] * m_outputFrame->height));
+                }
+            } while (ret == AVERROR(EAGAIN));
+        } else if (size > 3 && data[1] == 'P' && data[2] == 'N' && data[3] == 'G') {
+            auto img = std::make_shared<Image>(PNGImageFormat::loadFrom(data, size));
+            if (m_image == nullptr || m_image->getBounds() != img->getBounds()) {
+                m_image = img;
+            } else {
+                ImageDiff::applyDelta(*m_image, *img);
+            }
 
-    } else {
-        m_image = std::make_shared<Image>(JPEGImageFormat::loadFrom(data, size));
+        } else {
+            m_image = std::make_shared<Image>(JPEGImageFormat::loadFrom(data, size));
+        }
     }
     return m_image;
 }
