@@ -34,3 +34,7 @@ cp -r Server/Builds/MacOSX/build/Release/AudioGridderServer.app ../Archive/Build
 cp -r Server/Builds/MacOSX10.7/build/Release/AudioGridderServer.app ../Archive/Builds/$VERSION/osx10.7/
 cp -r Plugin/Fx/Builds/MacOSX/build/Release/AudioGridder.* ../Archive/Builds/$VERSION/osx/
 cp -r Plugin/Inst/Builds/MacOSX/build/Release/AudioGridderInst.* ../Archive/Builds/$VERSION/osx/
+
+cd package/build
+zip AudioGridder_#STR_VER#-osx.zip AudioGridderPlugin_#STR_VER#.pkg AudioGridderServer10.7_#STR_VER#.pkg AudioGridderServer_#STR_VER#.pkg
+cd -

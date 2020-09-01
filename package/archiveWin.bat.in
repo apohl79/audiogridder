@@ -7,3 +7,4 @@ copy /B ..\Plugin\Inst\Builds\VisualStudio2019\x64\Release\VST3\AudioGridderInst
 copy /B ..\Plugin\Inst\Builds\VisualStudio2019\x64\Release\VST\AudioGridderInst.dll ..\..\Archive\Builds\#STR_VER#\win
 copy /B "..\Plugin\Inst\Builds\VisualStudio2019\x64\Release\Shared Code\AudioGridderInst_SharedCode.pdb" ..\..\Archive\Builds\#STR_VER#\win
 
+powershell "Compress-Archive -Path AudioGridderPlugin_#STR_VER#.exe,AudioGridderServer_#STR_VER#.exe -DestinationPath AudioGridder_#STR_VER#-win.zip"
