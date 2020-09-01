@@ -42,13 +42,15 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
 
     void restartServer();
 
-    void showEditor(std::shared_ptr<AudioProcessor> proc, Thread::ThreadID tid, WindowCaptureCallbackNative func);
-    void showEditor(std::shared_ptr<AudioProcessor> proc, Thread::ThreadID tid, WindowCaptureCallbackFFmpeg func);
+    void showEditor(std::shared_ptr<AGProcessor> proc, Thread::ThreadID tid, WindowCaptureCallbackNative func);
+    void showEditor(std::shared_ptr<AGProcessor> proc, Thread::ThreadID tid, WindowCaptureCallbackFFmpeg func);
     void hideEditor(Thread::ThreadID tid = nullptr);
 
     void resetEditor();
     void restartEditor();
     void forgetEditorIfNeeded();
+
+    void updateScreenCaptureArea(int val);
 
     Point<float> localPointToGlobal(Point<float> lp);
 
@@ -150,22 +152,22 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
 
     class ProcessorWindow : public DocumentWindow, private Timer {
       public:
-        ProcessorWindow(std::shared_ptr<AudioProcessor> proc, WindowCaptureCallbackNative func)
-            : DocumentWindow(proc->getName(), Colours::lightgrey, 0),
+        ProcessorWindow(std::shared_ptr<AGProcessor> proc, WindowCaptureCallbackNative func)
+            : DocumentWindow(proc->getPlugin()->getName(), Colours::lightgrey, 0),
               m_processor(proc),
               m_callbackNative(func),
               m_callbackFFmpeg(nullptr) {
-            if (m_processor->hasEditor()) {
+            if (m_processor->getPlugin()->hasEditor()) {
                 createEditor();
             }
         }
 
-        ProcessorWindow(std::shared_ptr<AudioProcessor> proc, WindowCaptureCallbackFFmpeg func)
-            : DocumentWindow(proc->getName(), Colours::lightgrey, 0),
+        ProcessorWindow(std::shared_ptr<AGProcessor> proc, WindowCaptureCallbackFFmpeg func)
+            : DocumentWindow(proc->getPlugin()->getName(), Colours::lightgrey, 0),
               m_processor(proc),
               m_callbackNative(nullptr),
               m_callbackFFmpeg(func) {
-            if (m_processor->hasEditor()) {
+            if (m_processor->getPlugin()->hasEditor()) {
                 createEditor();
             }
         }
@@ -190,27 +192,47 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
             }
         }
 
-        void resized() override {
-            ResizableWindow::resized();
-            if (m_screenRec.isRecording() && m_processor->hasEditor() && nullptr != m_editor &&
-                m_editorBounds != m_editor->getScreenBounds()) {
-                m_editorBounds = m_editor->getScreenBounds();
+        Rectangle<int> getScreenCaptureRect() {
+            if (nullptr != m_editor && nullptr != m_processor) {
+                auto rect = m_editor->getScreenBounds();
+                rect.setSize(rect.getWidth() + m_processor->getAdditionalScreenCapturingSpace(),
+                             rect.getHeight() + m_processor->getAdditionalScreenCapturingSpace());
+                if (rect.getRight() > m_totalRect.getRight()) {
+                    rect.setRight(m_totalRect.getRight());
+                }
+                if (rect.getBottom() > m_totalRect.getBottom()) {
+                    rect.setBottom(m_totalRect.getBottom());
+                }
+                return rect;
+            }
+            return m_screenCaptureRect;
+        }
+
+        void updateScreenCaptureArea() {
+            if (m_screenRec.isRecording() && m_processor->getPlugin()->hasEditor() && nullptr != m_editor &&
+                m_screenCaptureRect != getScreenCaptureRect()) {
+                m_screenCaptureRect = getScreenCaptureRect();
                 m_screenRec.stop();
-                m_screenRec.resume(m_editor->getScreenBounds());
+                m_screenRec.resume(m_screenCaptureRect);
             }
         }
 
+        void resized() override {
+            ResizableWindow::resized();
+            updateScreenCaptureArea();
+        }
+
       private:
-        std::shared_ptr<AudioProcessor> m_processor;
+        std::shared_ptr<AGProcessor> m_processor;
         AudioProcessorEditor* m_editor = nullptr;
         ScreenRecorder m_screenRec;
         WindowCaptureCallbackNative m_callbackNative;
         WindowCaptureCallbackFFmpeg m_callbackFFmpeg;
-        Rectangle<int> m_editorBounds;
+        Rectangle<int> m_screenCaptureRect, m_totalRect;
 
         void createEditor() {
-            m_editor = m_processor->createEditorIfNeeded();
-            m_editorBounds = m_editor->getScreenBounds();
+            m_totalRect = Desktop::getInstance().getDisplays().getMainDisplay().totalArea;
+            m_editor = m_processor->getPlugin()->createEditorIfNeeded();
             setContentNonOwned(m_editor, true);
             setTitleBarHeight(30);
             setVisible(true);
@@ -218,7 +240,8 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
                 if (m_callbackNative) {
                     startTimer(50);
                 } else {
-                    m_screenRec.start(m_editor->getScreenBounds(), m_callbackFFmpeg);
+                    m_screenCaptureRect = getScreenCaptureRect();
+                    m_screenRec.start(m_screenCaptureRect, m_callbackFFmpeg);
                 }
             }
         }
@@ -230,8 +253,9 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
                 return;
             }
             if (m_callbackNative) {
-                m_callbackNative(captureScreenNative(m_editor->getScreenBounds()), m_editor->getWidth(),
-                                 m_editor->getHeight());
+                m_screenCaptureRect = getScreenCaptureRect();
+                m_callbackNative(captureScreenNative(m_screenCaptureRect), m_screenCaptureRect.getWidth(),
+                                 m_screenCaptureRect.getHeight());
             }
         }
 
@@ -246,7 +270,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     std::unique_ptr<ServerSettingsWindow> m_srvSettingsWindow;
     std::unique_ptr<SplashWindow> m_splashWindow;
     Thread::ThreadID m_windowOwner;
-    std::shared_ptr<AudioProcessor> m_windowProc;
+    std::shared_ptr<AGProcessor> m_windowProc;
     WindowCaptureCallbackNative m_windowFuncNative;
     WindowCaptureCallbackFFmpeg m_windowFuncFFmpeg;
     std::mutex m_windowMtx;

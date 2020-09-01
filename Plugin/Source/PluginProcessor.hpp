@@ -87,6 +87,10 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
     void exchangePlugins(int idxA, int idxB);
     bool enableParamAutomation(int idx, int paramIdx, int slot = -1);
     void disableParamAutomation(int idx, int paramIdx);
+    void increaseSCArea();
+    void decreaseSCArea();
+
+    const int SCAREA_STEPS = 30;
 
     auto& getServers() const { return m_servers; }
     void addServer(const String& s) { m_servers.add(s); }

@@ -40,7 +40,7 @@ class AudioWorker : public Thread, public LogTagDelegate {
     bool addPlugin(const String& id);
     void delPlugin(int idx);
     void exchangePlugins(int idxA, int idxB);
-    std::shared_ptr<AudioPluginInstance> getProcessor(int idx) const { return m_chain->getProcessor(idx); }
+    std::shared_ptr<AGProcessor> getProcessor(int idx) const { return m_chain->getProcessor(idx); }
     int getSize() const { return static_cast<int>(m_chain->getSize()); }
     int getLatencySamples() const { return m_chain->getLatencySamples(); }
     void update() { m_chain->update(); }

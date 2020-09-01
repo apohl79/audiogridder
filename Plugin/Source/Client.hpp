@@ -169,6 +169,8 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     float getParameterValue(int idx, int paramIdx);
     void setParameterValue(int idx, int paramIdx, float val);
 
+    void updateScreenCaptureArea(int val);
+
     // MouseListener
     void mouseMove(const MouseEvent& event) override;
     void mouseEnter(const MouseEvent& event) override;

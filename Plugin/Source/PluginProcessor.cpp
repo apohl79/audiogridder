@@ -630,6 +630,16 @@ void AudioGridderAudioProcessor::delServer(const String& s) {
     }
 }
 
+void AudioGridderAudioProcessor::increaseSCArea() {
+    logln("increasing screen capturing area by +" << SCAREA_STEPS << "px");
+    m_client->updateScreenCaptureArea(SCAREA_STEPS);
+}
+
+void AudioGridderAudioProcessor::decreaseSCArea() {
+    logln("decreasing screen capturing area by -" << SCAREA_STEPS << "px");
+    m_client->updateScreenCaptureArea(-SCAREA_STEPS);
+}
+
 void AudioGridderAudioProcessor::setActiveServer(const ServerString& s) { m_client->setServer(s); }
 
 String AudioGridderAudioProcessor::getActiveServerName() const {

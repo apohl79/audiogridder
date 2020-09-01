@@ -43,6 +43,7 @@ class Worker : public Thread, public LogTag {
     void handleMessage(std::shared_ptr<Message<Preset>> msg);
     void handleMessage(std::shared_ptr<Message<ParameterValue>> msg);
     void handleMessage(std::shared_ptr<Message<GetParameterValue>> msg);
+    void handleMessage(std::shared_ptr<Message<UpdateScreenCaptureArea>> msg);
 
   private:
     std::unique_ptr<StreamingSocket> m_client;

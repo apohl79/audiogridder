@@ -138,7 +138,7 @@ void ScreenWorker::shutdown() {
     m_currentImageCv.notify_one();
 }
 
-void ScreenWorker::showEditor(std::shared_ptr<AudioProcessor> proc) {
+void ScreenWorker::showEditor(std::shared_ptr<AGProcessor> proc) {
     auto tid = getThreadId();
 
     if (getApp()->getServer().getScreenCapturingFFmpeg()) {

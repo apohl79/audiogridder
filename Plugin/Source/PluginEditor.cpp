@@ -51,7 +51,7 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
     m_newPluginButton.setButtonText("+");
     m_newPluginButton.setOnClickWithModListener(this);
     addAndMakeVisible(m_pluginScreen);
-    m_pluginScreen.setBounds(200, 1, 100, 100);
+    m_pluginScreen.setBounds(200, SCREENTOOLS_HEIGHT + SCREENTOOLS_MARGIN * 2, 1, 1);
     m_pluginScreen.setWantsKeyboardFocus(true);
     m_pluginScreen.addMouseListener(&m_processor.getClient(), true);
     m_pluginScreen.addKeyListener(&m_processor.getClient());
@@ -76,6 +76,21 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
     if (active > -1) {
         m_pluginButtons[as<size_t>(active)]->setActive(true);
     }
+
+    m_stPlus.setButtonText("+");
+    m_stPlus.setBounds(201, 1, 1, 1);
+    m_stPlus.setColour(ComboBox::outlineColourId, Colour(DEFAULT_BUTTON_COLOR));
+    m_stPlus.setConnectedEdges(Button::ConnectedOnLeft | Button::ConnectedOnRight | Button::ConnectedOnTop |
+                               Button::ConnectedOnBottom);
+    m_stPlus.addListener(this);
+    addAndMakeVisible(&m_stPlus);
+    m_stMinus.setButtonText("-");
+    m_stMinus.setBounds(201, 1, 1, 1);
+    m_stMinus.setColour(ComboBox::outlineColourId, Colour(DEFAULT_BUTTON_COLOR));
+    m_stMinus.setConnectedEdges(Button::ConnectedOnLeft | Button::ConnectedOnRight | Button::ConnectedOnTop |
+                                Button::ConnectedOnBottom);
+    m_stMinus.addListener(this);
+    addAndMakeVisible(&m_stMinus);
 
     setSize(200, 100);
 }
@@ -104,8 +119,13 @@ void AudioGridderAudioProcessorEditor::resized() {
     int windowHeight = jmax(100, top);
     int windowWidth = 200;
     if (m_processor.getActivePlugin() != -1) {
-        windowHeight = jmax(windowHeight, m_pluginScreen.getHeight());
+        int screenHeight = m_pluginScreen.getHeight() + SCREENTOOLS_HEIGHT;
+        windowHeight = jmax(windowHeight, screenHeight);
         windowWidth += m_pluginScreen.getWidth();
+        m_stMinus.setBounds(windowWidth - SCREENTOOLS_HEIGHT - SCREENTOOLS_MARGIN * 2, SCREENTOOLS_MARGIN,
+                            SCREENTOOLS_HEIGHT, SCREENTOOLS_HEIGHT);
+        m_stPlus.setBounds(windowWidth - SCREENTOOLS_HEIGHT * 2 - SCREENTOOLS_MARGIN * 3, SCREENTOOLS_MARGIN,
+                           SCREENTOOLS_HEIGHT, SCREENTOOLS_HEIGHT);
     }
     if (getWidth() != windowWidth || getHeight() != windowHeight) {
         setSize(windowWidth, windowHeight);
@@ -326,6 +346,15 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
             m.addSubMenu("Automation", params);
             m.showAt(button);
         }
+    }
+}
+
+void AudioGridderAudioProcessorEditor::buttonClicked(Button* button) {
+    TextButton* tb = reinterpret_cast<TextButton*>(button);
+    if (tb == &m_stPlus) {
+        m_processor.increaseSCArea();
+    } else if (tb == &m_stMinus) {
+        m_processor.decreaseSCArea();
     }
 }
 

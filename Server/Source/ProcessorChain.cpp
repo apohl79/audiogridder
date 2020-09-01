@@ -16,14 +16,16 @@ std::mutex ProcessorChain::m_pluginLoaderMtx;
 void ProcessorChain::prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock) {
     setRateAndBufferSizeDetails(sampleRate, maximumExpectedSamplesPerBlock);
     std::lock_guard<std::mutex> lock(m_processors_mtx);
-    for (auto& p : m_processors) {
+    for (auto& proc : m_processors) {
+        auto p = proc->getPlugin();
         p->prepareToPlay(sampleRate, maximumExpectedSamplesPerBlock);
     }
 }
 
 void ProcessorChain::releaseResources() {
     std::lock_guard<std::mutex> lock(m_processors_mtx);
-    for (auto& p : m_processors) {
+    for (auto& proc : m_processors) {
+        auto p = proc->getPlugin();
         p->releaseResources();
     }
 }
@@ -77,7 +79,8 @@ bool ProcessorChain::updateChannels(int channelsIn, int channelsOut) {
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     m_extraChannels = 0;
     for (auto& proc : m_processors) {
-        if (!setProcessorBusesLayout(proc)) {
+        auto p = proc->getPlugin();
+        if (!setProcessorBusesLayout(p)) {
             return false;
         }
     }
@@ -182,8 +185,9 @@ bool ProcessorChain::addPluginProcessor(const String& id) {
 }
 
 void ProcessorChain::addProcessor(std::shared_ptr<AudioPluginInstance> processor) {
+    auto agproc = std::make_shared<AGProcessor>(processor);
     std::lock_guard<std::mutex> lock(m_processors_mtx);
-    m_processors.push_back(processor);
+    m_processors.push_back(agproc);
     updateNoLock();
 }
 
@@ -209,13 +213,14 @@ void ProcessorChain::updateNoLock() {
     bool supportsDouble = true;
     m_extraChannels = 0;
     for (auto& proc : m_processors) {
-        if (!proc->isSuspended()) {
-            latency += proc->getLatencySamples();
-            if (!proc->supportsDoublePrecisionProcessing()) {
+        auto p = proc->getPlugin();
+        if (!p->isSuspended()) {
+            latency += p->getLatencySamples();
+            if (!p->supportsDoublePrecisionProcessing()) {
                 supportsDouble = false;
             }
-            int extraInChannels = proc->getTotalNumInputChannels() - proc->getMainBusNumInputChannels();
-            int extraOutChannels = proc->getTotalNumOutputChannels() - proc->getMainBusNumOutputChannels();
+            int extraInChannels = p->getTotalNumInputChannels() - p->getMainBusNumInputChannels();
+            int extraOutChannels = p->getTotalNumOutputChannels() - p->getMainBusNumOutputChannels();
             m_extraChannels = jmax(m_extraChannels, extraInChannels, extraOutChannels);
         }
     }
@@ -225,17 +230,17 @@ void ProcessorChain::updateNoLock() {
     }
     m_supportsDoublePrecission = supportsDouble;
     auto it = m_processors.rbegin();
-    while (it != m_processors.rend() && (*it)->isSuspended()) {
+    while (it != m_processors.rend() && (*it)->getPlugin()->isSuspended()) {
         it++;
     }
     if (it != m_processors.rend()) {
-        m_tailSecs = (*it)->getTailLengthSeconds();
+        m_tailSecs = (*it)->getPlugin()->getTailLengthSeconds();
     } else {
         m_tailSecs = 0.0;
     }
 }
 
-std::shared_ptr<AudioPluginInstance> ProcessorChain::getProcessor(int index) {
+std::shared_ptr<AGProcessor> ProcessorChain::getProcessor(int index) {
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     if (index > -1 && as<size_t>(index) < m_processors.size()) {
         return m_processors[as<size_t>(index)];
@@ -253,7 +258,7 @@ void ProcessorChain::exchangeProcessors(int idxA, int idxB) {
 float ProcessorChain::getParameterValue(int idx, int paramIdx) {
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     if (idx > -1 && as<size_t>(idx) < m_processors.size()) {
-        for (auto& p : m_processors[as<size_t>(idx)]->getParameters()) {
+        for (auto& p : m_processors[as<size_t>(idx)]->getPlugin()->getParameters()) {
             if (paramIdx == p->getParameterIndex()) {
                 return p->getValue();
             }
@@ -272,7 +277,8 @@ String ProcessorChain::toString() {
     String ret;
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     bool first = true;
-    for (auto& p : m_processors) {
+    for (auto& proc : m_processors) {
+        auto p = proc->getPlugin();
         if (!first) {
             ret << " > ";
         } else {

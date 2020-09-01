@@ -763,6 +763,13 @@ bool Client::keyPressed(const KeyPress& kp, Component* /* originatingComponent *
     return consumed;
 }
 
+void Client::updateScreenCaptureArea(int val) {
+    Message<UpdateScreenCaptureArea> msg;
+    PLD(msg).setNumber(val);
+    dbglock lock(*this, 25);
+    msg.send(m_cmd_socket.get());
+}
+
 StreamingSocket* Client::accept(StreamingSocket& sock) const {
     StreamingSocket* clnt = nullptr;
     int retry = 100;

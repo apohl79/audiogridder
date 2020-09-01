@@ -14,6 +14,22 @@
 
 namespace e47 {
 
+class AGProcessor {
+  public:
+    AGProcessor(std::shared_ptr<AudioPluginInstance> p) : m_plugin(p) {}
+
+    std::shared_ptr<AudioPluginInstance> getPlugin() const { return m_plugin; }
+
+    void updateScreenCaptureArea(int val) {
+        m_additionalScreenSpace = m_additionalScreenSpace + val > 0 ? m_additionalScreenSpace + val : 0;
+    }
+    int getAdditionalScreenCapturingSpace() { return m_additionalScreenSpace; }
+
+  private:
+    std::shared_ptr<AudioPluginInstance> m_plugin;
+    int m_additionalScreenSpace = 0;
+};
+
 class ProcessorChain : public AudioProcessor, public LogTagDelegate {
   public:
     class PlayHead : public AudioPlayHead {
@@ -72,7 +88,7 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
     bool addPluginProcessor(const String& id);
     void addProcessor(std::shared_ptr<AudioPluginInstance> processor);
     size_t getSize() const { return m_processors.size(); }
-    std::shared_ptr<AudioPluginInstance> getProcessor(int index);
+    std::shared_ptr<AGProcessor> getProcessor(int index);
 
     void delProcessor(int idx);
     void exchangeProcessors(int idxA, int idxB);
@@ -86,7 +102,7 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
     String toString();
 
   private:
-    std::vector<std::shared_ptr<AudioPluginInstance>> m_processors;
+    std::vector<std::shared_ptr<AGProcessor>> m_processors;
     std::mutex m_processors_mtx;
 
     static std::mutex m_pluginLoaderMtx;
@@ -100,7 +116,8 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
     void processBlockReal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
         int latency = 0;
         std::lock_guard<std::mutex> lock(m_processors_mtx);
-        for (auto& p : m_processors) {
+        for (auto& proc : m_processors) {
+            auto p = proc->getPlugin();
             if (!p->isSuspended()) {
                 p->processBlock(buffer, midiMessages);
                 latency += p->getLatencySamples();

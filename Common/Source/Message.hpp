@@ -22,12 +22,35 @@ using json = nlohmann::json;
 struct MessageHelper {
     enum ErrorCode { E_NONE, E_DATA, E_TIMEOUT, E_STATE, E_SYSCALL, E_SIZE };
 
+    static String errorCodeToString(ErrorCode ec) {
+        switch (ec) {
+            case E_NONE:
+                return "E_NONE";
+                break;
+            case E_DATA:
+                return "E_DATA";
+                break;
+            case E_TIMEOUT:
+                return "E_TIMEOUT";
+                break;
+            case E_STATE:
+                return "E_STATE";
+                break;
+            case E_SYSCALL:
+                return "E_SYSCALL";
+                break;
+            case E_SIZE:
+                return "E_SIZE";
+                break;
+        }
+    }
+
     struct Error {
         ErrorCode code = E_NONE;
         String str = "";
         String toString() const {
             String ret = "EC=";
-            ret << code;
+            ret << errorCodeToString(code);
             ret << " STR=" << str;
             return ret;
         }
@@ -664,6 +687,12 @@ class Preset : public DataPayload<preset_t> {
   public:
     static constexpr int Type = 21;
     Preset() : DataPayload<preset_t>(Type) {}
+};
+
+class UpdateScreenCaptureArea : public NumberPayload {
+  public:
+    static constexpr int Type = 22;
+    UpdateScreenCaptureArea() : NumberPayload(Type) {}
 };
 
 template <typename T>
