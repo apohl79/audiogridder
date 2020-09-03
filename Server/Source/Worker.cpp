@@ -308,7 +308,7 @@ void Worker::handleMessage(std::shared_ptr<Message<GetPluginSettings>> msg) {
     auto proc = m_audio.getProcessor(pPLD(msg).getNumber());
     if (nullptr != proc) {
         MemoryBlock block;
-        proc->getPlugin()->getStateInformation(block);
+        proc->getStateInformation(block);
         Message<PluginSettings> ret;
         ret.payload.setData(block.begin(), static_cast<int>(block.getSize()));
         ret.send(m_client.get());
@@ -318,16 +318,34 @@ void Worker::handleMessage(std::shared_ptr<Message<GetPluginSettings>> msg) {
 void Worker::handleMessage(std::shared_ptr<Message<BypassPlugin>> msg) {
     auto proc = m_audio.getProcessor(pPLD(msg).getNumber());
     if (nullptr != proc) {
-        proc->getPlugin()->suspendProcessing(true);
-        m_audio.update();
+        bool runOnMsgThread = false;
+        if (m_shouldHideEditor) {
+            m_screen.hideEditor();
+            m_shouldHideEditor = false;
+            // Hiding an editor has to run on the msg thread. This has to be finished before unloading the plugin. By
+            // adding a task to the message queue, we can ensure this.
+            runOnMsgThread = true;
+        }
+        auto unloadfunc = [this, proc] {
+            proc->unload();
+            m_audio.update();
+        };
+        if (runOnMsgThread) {
+            MessageManager::callAsync(unloadfunc);
+        } else {
+            unloadfunc();
+        }
     }
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<UnbypassPlugin>> msg) {
     auto proc = m_audio.getProcessor(pPLD(msg).getNumber());
     if (nullptr != proc) {
-        proc->getPlugin()->suspendProcessing(false);
-        m_audio.update();
+        if (proc->load()) {
+            m_audio.update();
+        } else {
+            logln("unbypass failed: can't load plugin");
+        }
     }
 }
 
@@ -346,14 +364,20 @@ void Worker::handleMessage(std::shared_ptr<Message<RecentsList>> msg) {
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<Preset>> msg) {
-    m_audio.getProcessor(pDATA(msg)->idx)->getPlugin()->setCurrentProgram(pDATA(msg)->preset);
+    auto p = m_audio.getProcessor(pDATA(msg)->idx)->getPlugin();
+    if (nullptr != p) {
+        p->setCurrentProgram(pDATA(msg)->preset);
+    }
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<ParameterValue>> msg) {
-    for (auto* p : m_audio.getProcessor(pDATA(msg)->idx)->getPlugin()->getParameters()) {
-        if (pDATA(msg)->paramIdx == p->getParameterIndex()) {
-            p->setValue(pDATA(msg)->value);
-            return;
+    auto p = m_audio.getProcessor(pDATA(msg)->idx)->getPlugin();
+    if (nullptr != p) {
+        for (auto* param : p->getParameters()) {
+            if (pDATA(msg)->paramIdx == param->getParameterIndex()) {
+                param->setValue(pDATA(msg)->value);
+                return;
+            }
         }
     }
 }

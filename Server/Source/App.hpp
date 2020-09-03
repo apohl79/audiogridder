@@ -153,21 +153,21 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     class ProcessorWindow : public DocumentWindow, private Timer {
       public:
         ProcessorWindow(std::shared_ptr<AGProcessor> proc, WindowCaptureCallbackNative func)
-            : DocumentWindow(proc->getPlugin()->getName(), Colours::lightgrey, 0),
+            : DocumentWindow(proc->getName(), Colours::lightgrey, 0),
               m_processor(proc),
               m_callbackNative(func),
               m_callbackFFmpeg(nullptr) {
-            if (m_processor->getPlugin()->hasEditor()) {
+            if (m_processor->hasEditor()) {
                 createEditor();
             }
         }
 
         ProcessorWindow(std::shared_ptr<AGProcessor> proc, WindowCaptureCallbackFFmpeg func)
-            : DocumentWindow(proc->getPlugin()->getName(), Colours::lightgrey, 0),
+            : DocumentWindow(proc->getName(), Colours::lightgrey, 0),
               m_processor(proc),
               m_callbackNative(nullptr),
               m_callbackFFmpeg(func) {
-            if (m_processor->getPlugin()->hasEditor()) {
+            if (m_processor->hasEditor()) {
                 createEditor();
             }
         }
@@ -209,7 +209,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
         }
 
         void updateScreenCaptureArea() {
-            if (m_screenRec.isRecording() && m_processor->getPlugin()->hasEditor() && nullptr != m_editor &&
+            if (m_screenRec.isRecording() && m_processor->hasEditor() && nullptr != m_editor &&
                 m_screenCaptureRect != getScreenCaptureRect()) {
                 m_screenCaptureRect = getScreenCaptureRect();
                 m_screenRec.stop();
@@ -232,7 +232,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
 
         void createEditor() {
             m_totalRect = Desktop::getInstance().getDisplays().getMainDisplay().totalArea;
-            m_editor = m_processor->getPlugin()->createEditorIfNeeded();
+            m_editor = m_processor->createEditorIfNeeded();
             setContentNonOwned(m_editor, true);
             setTitleBarHeight(30);
             setVisible(true);

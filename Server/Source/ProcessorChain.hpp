@@ -14,20 +14,143 @@
 
 namespace e47 {
 
+class ProcessorChain;
+
 class AGProcessor {
   public:
-    AGProcessor(std::shared_ptr<AudioPluginInstance> p) : m_plugin(p) {}
+    AGProcessor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize)
+        : m_chain(chain), m_id(id), m_sampleRate(sampleRate), m_blockSize(blockSize) {}
 
-    std::shared_ptr<AudioPluginInstance> getPlugin() const { return m_plugin; }
+    std::shared_ptr<AudioPluginInstance> getPlugin() {
+        std::lock_guard<std::mutex> lock(m_pluginMtx);
+        return m_plugin;
+    }
 
     void updateScreenCaptureArea(int val) {
         m_additionalScreenSpace = m_additionalScreenSpace + val > 0 ? m_additionalScreenSpace + val : 0;
     }
+
     int getAdditionalScreenCapturingSpace() { return m_additionalScreenSpace; }
 
+    static std::shared_ptr<AudioPluginInstance> loadPlugin(PluginDescription& plugdesc, double sampleRate,
+                                                           int blockSize);
+    static std::shared_ptr<AudioPluginInstance> loadPlugin(const String& fileOrIdentifier, double sampleRate,
+                                                           int blockSize);
+
+    bool load();
+    void unload();
+
+    template <typename T>
+    bool processBlock(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
+        auto p = getPlugin();
+        if (nullptr != p && !p->isSuspended()) {
+            p->processBlock(buffer, midiMessages);
+            return true;
+        }
+        return false;
+    }
+
+    void prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock) {
+        auto p = getPlugin();
+        if (nullptr != p) {
+            p->prepareToPlay(sampleRate, maximumExpectedSamplesPerBlock);
+        }
+    }
+
+    void releaseResources() {
+        auto p = getPlugin();
+        if (nullptr != p) {
+            p->releaseResources();
+        }
+    }
+
+    int getLatencySamples() {
+        auto p = getPlugin();
+        if (nullptr != p) {
+            return p->getLatencySamples();
+        }
+        return 0;
+    }
+
+    const String getName() {
+        auto p = getPlugin();
+        if (nullptr != p) {
+            return p->getName();
+        }
+        return "";
+    }
+
+    bool hasEditor() {
+        auto p = getPlugin();
+        if (nullptr != p) {
+            return p->hasEditor();
+        }
+        return false;
+    }
+
+    bool isSuspended() {
+        auto p = getPlugin();
+        if (nullptr != p) {
+            return p->isSuspended();
+        }
+        return true;
+    }
+
+    double getTailLengthSeconds() {
+        auto p = getPlugin();
+        if (nullptr != p) {
+            return p->getTailLengthSeconds();
+        }
+        return 0.0;
+    }
+
+    AudioProcessorEditor* createEditorIfNeeded() {
+        auto p = getPlugin();
+        if (nullptr != p) {
+            return p->createEditorIfNeeded();
+        }
+        return nullptr;
+    }
+
+    AudioProcessorEditor* getActiveEditor() {
+        auto p = getPlugin();
+        if (nullptr != p) {
+            return p->getActiveEditor();
+        }
+        return nullptr;
+    }
+
+    void getStateInformation(juce::MemoryBlock& destData) {
+        auto p = getPlugin();
+        if (nullptr != p) {
+            p->getStateInformation(destData);
+        }
+    }
+
+    void setStateInformation(const void* data, int sizeInBytes) {
+        auto p = getPlugin();
+        if (nullptr != p) {
+            p->setStateInformation(data, sizeInBytes);
+        }
+    }
+
+    void suspendProcessing(const bool shouldBeSuspended) {
+        auto p = getPlugin();
+        if (nullptr != p) {
+            p->suspendProcessing(shouldBeSuspended);
+        }
+    }
+
   private:
+    ProcessorChain& m_chain;
+    String m_id;
+    double m_sampleRate;
+    int m_blockSize;
     std::shared_ptr<AudioPluginInstance> m_plugin;
+    std::mutex m_pluginMtx;
     int m_additionalScreenSpace = 0;
+
+    static std::mutex m_pluginLoaderMtx;
 };
 
 class ProcessorChain : public AudioProcessor, public LogTagDelegate {
@@ -81,12 +204,9 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
     void getStateInformation(juce::MemoryBlock& /* destData */) override {}
     void setStateInformation(const void* /* data */, int /* sizeInBytes */) override {}
 
-    static std::shared_ptr<AudioPluginInstance> loadPlugin(PluginDescription& plugdesc, double sampleRate,
-                                                           int blockSize);
-    static std::shared_ptr<AudioPluginInstance> loadPlugin(const String& fileOrIdentifier, double sampleRate,
-                                                           int blockSize);
+    bool initPluginInstance(std::shared_ptr<AudioPluginInstance> processor);
     bool addPluginProcessor(const String& id);
-    void addProcessor(std::shared_ptr<AudioPluginInstance> processor);
+    void addProcessor(std::shared_ptr<AGProcessor> processor);
     size_t getSize() const { return m_processors.size(); }
     std::shared_ptr<AGProcessor> getProcessor(int index);
 
@@ -105,8 +225,6 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
     std::vector<std::shared_ptr<AGProcessor>> m_processors;
     std::mutex m_processors_mtx;
 
-    static std::mutex m_pluginLoaderMtx;
-
     std::atomic_bool m_supportsDoublePrecission{true};
     std::atomic<double> m_tailSecs{0.0};
 
@@ -117,10 +235,8 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
         int latency = 0;
         std::lock_guard<std::mutex> lock(m_processors_mtx);
         for (auto& proc : m_processors) {
-            auto p = proc->getPlugin();
-            if (!p->isSuspended()) {
-                p->processBlock(buffer, midiMessages);
-                latency += p->getLatencySamples();
+            if (proc->processBlock(buffer, midiMessages)) {
+                latency += proc->getLatencySamples();
             }
         }
         if (latency != getLatencySamples()) {

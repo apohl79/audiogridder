@@ -191,7 +191,7 @@ void App::restartServer() {
 const KnownPluginList& App::getPluginList() { return m_server->getPluginList(); }
 
 void App::showEditor(std::shared_ptr<AGProcessor> proc, Thread::ThreadID tid, WindowCaptureCallbackNative func) {
-    if (proc->getPlugin()->hasEditor()) {
+    if (proc->hasEditor()) {
         std::lock_guard<std::mutex> lock(m_windowMtx);
         forgetEditorIfNeeded();
         if (m_window != nullptr) {
@@ -204,12 +204,12 @@ void App::showEditor(std::shared_ptr<AGProcessor> proc, Thread::ThreadID tid, Wi
         m_windowFuncNative = func;
         m_window = std::make_unique<ProcessorWindow>(m_windowProc, m_windowFuncNative);
     } else {
-        logln("show editor failed: '" << proc->getPlugin()->getName() << "' has no editor");
+        logln("show editor failed: '" << proc->getName() << "' has no editor");
     }
 }
 
 void App::showEditor(std::shared_ptr<AGProcessor> proc, Thread::ThreadID tid, WindowCaptureCallbackFFmpeg func) {
-    if (proc->getPlugin()->hasEditor()) {
+    if (proc->hasEditor()) {
         std::lock_guard<std::mutex> lock(m_windowMtx);
         forgetEditorIfNeeded();
         if (m_window != nullptr) {
@@ -222,7 +222,7 @@ void App::showEditor(std::shared_ptr<AGProcessor> proc, Thread::ThreadID tid, Wi
         m_windowFuncFFmpeg = func;
         m_window = std::make_unique<ProcessorWindow>(m_windowProc, m_windowFuncFFmpeg);
     } else {
-        logln("show editor failed: '" << proc->getPlugin()->getName() << "' has no editor");
+        logln("show editor failed: '" << proc->getName() << "' has no editor");
     }
 }
 
@@ -266,7 +266,7 @@ void App::restartEditor() {
 
 void App::forgetEditorIfNeeded() {
     // No lock, locked already
-    if (m_windowProc != nullptr && m_windowProc->getPlugin()->getActiveEditor() == nullptr && m_window != nullptr) {
+    if (m_windowProc != nullptr && m_windowProc->getActiveEditor() == nullptr && m_window != nullptr) {
         logln("forgetting editor");
         m_window->forgetEditor();
     }
@@ -283,7 +283,7 @@ void App::updateScreenCaptureArea(int val) {
 Point<float> App::localPointToGlobal(Point<float> lp) {
     std::lock_guard<std::mutex> lock(m_windowMtx);
     if (m_windowProc != nullptr) {
-        auto* ed = m_windowProc->getPlugin()->getActiveEditor();
+        auto* ed = m_windowProc->getActiveEditor();
         if (ed != nullptr) {
             return ed->localPointToGlobal(lp);
         } else {
