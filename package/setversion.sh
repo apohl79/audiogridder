@@ -39,7 +39,7 @@ $projucer --set-version $NUM_VER Plugin/Inst/AudioGridder.jucer
 cat package/Version.hpp.in | sed "s/#STR_VER#/$STR_VER/" > Common/Source/Version.hpp
 cat package/AudioGridderPlugin.iss.in | sed "s/#STR_VER#/$STR_VER/" > package/AudioGridderPlugin.iss
 cat package/AudioGridderServer.iss.in | sed "s/#STR_VER#/$STR_VER/" > package/AudioGridderServer.iss
-cat package/archiveWin.bat.in | sed "s/#STR_VER#/$STR_VER/" > package/archiveWin.bat
+cat package/archiveWin.bat.in | sed "s/#STR_VER#/$STR_VER/g" > package/archiveWin.bat
 
 echo $STR_VER > package/VERSION
 
