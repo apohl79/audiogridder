@@ -121,6 +121,9 @@ void Worker::run() {
                     case GetPluginSettings::Type:
                         handleMessage(Message<Any>::convert<GetPluginSettings>(msg));
                         break;
+                    case SetPluginSettings::Type:
+                        handleMessage(Message<Any>::convert<SetPluginSettings>(msg));
+                        break;
                     case BypassPlugin::Type:
                         handleMessage(Message<Any>::convert<BypassPlugin>(msg));
                         break;
@@ -312,6 +315,23 @@ void Worker::handleMessage(std::shared_ptr<Message<GetPluginSettings>> msg) {
         Message<PluginSettings> ret;
         ret.payload.setData(block.begin(), static_cast<int>(block.getSize()));
         ret.send(m_client.get());
+    }
+}
+
+void Worker::handleMessage(std::shared_ptr<Message<SetPluginSettings>> msg) {
+    auto proc = m_audio.getProcessor(pPLD(msg).getNumber());
+    if (nullptr != proc) {
+        Message<PluginSettings> msgSettings;
+        if (!msgSettings.read(m_client.get())) {
+            logln("failed to read PluginSettings message");
+            m_client->close();
+            return;
+        }
+        if (*msgSettings.payload.size > 0) {
+            MemoryBlock block;
+            block.append(msgSettings.payload.data, as<size_t>(*msgSettings.payload.size));
+            proc->setStateInformation(block.getData(), static_cast<int>(block.getSize()));
+        }
     }
 }
 

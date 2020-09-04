@@ -92,6 +92,12 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
 
     const int SCAREA_STEPS = 30;
 
+    void storeSettingsA();
+    void storeSettingsB();
+    void restoreSettingsA();
+    void restoreSettingsB();
+    void resetSettingsAB();
+
     auto& getServers() const { return m_servers; }
     void addServer(const String& s) { m_servers.add(s); }
     void delServer(const String& s);
@@ -150,6 +156,8 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
     Array<Array<float>> m_bypassBufferF;
     Array<Array<double>> m_bypassBufferD;
     std::mutex m_bypassBufferMtx;
+
+    String m_settingsA, m_settingsB;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioGridderAudioProcessor)
 };

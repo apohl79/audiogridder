@@ -599,15 +599,21 @@ class GetPluginSettings : public NumberPayload {
     GetPluginSettings() : NumberPayload(Type) {}
 };
 
-class PluginSettings : public BinaryPayload {
+class SetPluginSettings : public NumberPayload {
   public:
     static constexpr int Type = 11;
+    SetPluginSettings() : NumberPayload(Type) {}
+};
+
+class PluginSettings : public BinaryPayload {
+  public:
+    static constexpr int Type = 12;
     PluginSettings() : BinaryPayload(Type) {}
 };
 
 class Key : public BinaryPayload {
   public:
-    static constexpr int Type = 12;
+    static constexpr int Type = 13;
     Key() : BinaryPayload(Type) {}
 
     const uint16_t* getKeyCodes() const { return reinterpret_cast<const uint16_t*>(data); }
@@ -616,13 +622,13 @@ class Key : public BinaryPayload {
 
 class BypassPlugin : public NumberPayload {
   public:
-    static constexpr int Type = 13;
+    static constexpr int Type = 14;
     BypassPlugin() : NumberPayload(Type) {}
 };
 
 class UnbypassPlugin : public NumberPayload {
   public:
-    static constexpr int Type = 14;
+    static constexpr int Type = 15;
     UnbypassPlugin() : NumberPayload(Type) {}
 };
 
@@ -633,19 +639,19 @@ struct exchange_t {
 
 class ExchangePlugins : public DataPayload<exchange_t> {
   public:
-    static constexpr int Type = 15;
+    static constexpr int Type = 16;
     ExchangePlugins() : DataPayload<exchange_t>(Type) {}
 };
 
 class RecentsList : public StringPayload {
   public:
-    static constexpr int Type = 16;
+    static constexpr int Type = 17;
     RecentsList() : StringPayload(Type) {}
 };
 
 class Parameters : public JsonPayload {
   public:
-    static constexpr int Type = 17;
+    static constexpr int Type = 18;
     Parameters() : JsonPayload(Type) {}
 };
 
@@ -657,7 +663,7 @@ struct parametervalue_t {
 
 class ParameterValue : public DataPayload<parametervalue_t> {
   public:
-    static constexpr int Type = 18;
+    static constexpr int Type = 19;
     ParameterValue() : DataPayload<parametervalue_t>(Type) {}
 };
 
@@ -668,13 +674,13 @@ struct getparametervalue_t {
 
 class GetParameterValue : public DataPayload<getparametervalue_t> {
   public:
-    static constexpr int Type = 19;
+    static constexpr int Type = 20;
     GetParameterValue() : DataPayload<getparametervalue_t>(Type) {}
 };
 
 class Presets : public StringPayload {
   public:
-    static constexpr int Type = 20;
+    static constexpr int Type = 21;
     Presets() : StringPayload(Type) {}
 };
 
@@ -685,13 +691,13 @@ struct preset_t {
 
 class Preset : public DataPayload<preset_t> {
   public:
-    static constexpr int Type = 21;
+    static constexpr int Type = 22;
     Preset() : DataPayload<preset_t>(Type) {}
 };
 
 class UpdateScreenCaptureArea : public NumberPayload {
   public:
-    static constexpr int Type = 22;
+    static constexpr int Type = 23;
     UpdateScreenCaptureArea() : NumberPayload(Type) {}
 };
 

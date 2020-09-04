@@ -459,6 +459,26 @@ MemoryBlock Client::getPluginSettings(int idx) {
     return block;
 }
 
+void Client::setPluginSettings(int idx, String settings) {
+    Message<SetPluginSettings> msg;
+    PLD(msg).setNumber(idx);
+    dbglock lock(*this, 30);
+    if (!msg.send(m_cmd_socket.get())) {
+        m_error = true;
+    } else {
+        Message<PluginSettings> msgSettings;
+        if (settings.isNotEmpty()) {
+            MemoryBlock block;
+            block.fromBase64Encoding(settings);
+            msgSettings.payload.setData(block.begin(), static_cast<int>(block.getSize()));
+        }
+        if (!msgSettings.send(m_cmd_socket.get())) {
+            logln("failed to send settings");
+            m_error = true;
+        }
+    }
+}
+
 void Client::bypassPlugin(int idx) {
     if (!isReadyLockFree()) {
         return;

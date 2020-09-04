@@ -160,6 +160,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     void editPlugin(int idx);
     void hidePlugin();
     MemoryBlock getPluginSettings(int idx);
+    void setPluginSettings(int idx, String settings);
     void bypassPlugin(int idx);
     void unbypassPlugin(int idx);
     void exchangePlugins(int idxA, int idxB);

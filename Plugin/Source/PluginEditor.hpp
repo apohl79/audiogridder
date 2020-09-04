@@ -34,6 +34,7 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
 
     const int SCREENTOOLS_HEIGHT = 17;
     const int SCREENTOOLS_MARGIN = 3;
+    const int SCREENTOOLS_AB_WIDTH = 12;
 
     std::vector<std::unique_ptr<PluginButton>> m_pluginButtons;
     PluginButton m_newPluginButton;
@@ -43,11 +44,19 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     bool m_connected = false;
 
     // screen tools
-    TextButton m_stPlus, m_stMinus;
+    TextButton m_stPlus, m_stMinus, m_stA, m_stB;
+    int m_currentActiveAB = -1;
+    TextButton* m_hilightedStButton = nullptr;
 
     Button* addPluginButton(const String& id, const String& name);
     std::vector<Button*> getPluginButtons(const String& id);
     int getPluginIndex(const String& name);
+
+    void initStButtons();
+    void enableStButton(TextButton* b);
+    void disableStButton(TextButton* b);
+    void hilightStButton(TextButton* b);
+    bool isHilightedStButton(TextButton* b);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioGridderAudioProcessorEditor)
 };

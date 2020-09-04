@@ -640,6 +640,45 @@ void AudioGridderAudioProcessor::decreaseSCArea() {
     m_client->updateScreenCaptureArea(-SCAREA_STEPS);
 }
 
+void AudioGridderAudioProcessor::storeSettingsA() {
+    if (m_activePlugin < 0) {
+        return;
+    }
+    auto settings = m_client->getPluginSettings(m_activePlugin);
+    if (settings.getSize() > 0) {
+        m_settingsA = settings.toBase64Encoding();
+    }
+}
+
+void AudioGridderAudioProcessor::storeSettingsB() {
+    if (m_activePlugin < 0) {
+        return;
+    }
+    auto settings = m_client->getPluginSettings(m_activePlugin);
+    if (settings.getSize() > 0) {
+        m_settingsB = settings.toBase64Encoding();
+    }
+}
+
+void AudioGridderAudioProcessor::restoreSettingsA() {
+    if (m_activePlugin < 0) {
+        return;
+    }
+    m_client->setPluginSettings(m_activePlugin, m_settingsA);
+}
+
+void AudioGridderAudioProcessor::restoreSettingsB() {
+    if (m_activePlugin < 0) {
+        return;
+    }
+    m_client->setPluginSettings(m_activePlugin, m_settingsB);
+}
+
+void AudioGridderAudioProcessor::resetSettingsAB() {
+    m_settingsA = "";
+    m_settingsB = "";
+}
+
 void AudioGridderAudioProcessor::setActiveServer(const ServerString& s) { m_client->setServer(s); }
 
 String AudioGridderAudioProcessor::getActiveServerName() const {

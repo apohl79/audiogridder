@@ -36,6 +36,7 @@ class Worker : public Thread, public LogTag {
     void handleMessage(std::shared_ptr<Message<Mouse>> msg);
     void handleMessage(std::shared_ptr<Message<Key>> msg);
     void handleMessage(std::shared_ptr<Message<GetPluginSettings>> msg);
+    void handleMessage(std::shared_ptr<Message<SetPluginSettings>> msg);
     void handleMessage(std::shared_ptr<Message<BypassPlugin>> msg);
     void handleMessage(std::shared_ptr<Message<UnbypassPlugin>> msg);
     void handleMessage(std::shared_ptr<Message<ExchangePlugins>> msg);
