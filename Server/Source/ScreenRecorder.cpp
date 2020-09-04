@@ -322,8 +322,10 @@ bool ScreenRecorder::prepareOutput() {
     m_outputFrame->width = m_captureRect.getWidth();
     m_outputFrame->height = m_captureRect.getHeight();
     m_outputFrame->format = m_outputCodecCtx->pix_fmt;
-    m_outputFrameBuf = (uint8_t*)av_malloc((size_t)av_image_get_buffer_size(
-        m_outputCodecCtx->pix_fmt, m_outputCodecCtx->width, m_outputCodecCtx->height, 1));
+    m_outputFrameBuf =
+        (uint8_t*)av_malloc((size_t)av_image_get_buffer_size(m_outputCodecCtx->pix_fmt, m_outputCodecCtx->width,
+                                                             m_outputCodecCtx->height, 1) +
+                            AV_INPUT_BUFFER_PADDING_SIZE);
     av_image_fill_arrays(m_outputFrame->data, m_outputFrame->linesize, m_outputFrameBuf, m_outputCodecCtx->pix_fmt,
                          m_outputCodecCtx->width, m_outputCodecCtx->height, 1);
 

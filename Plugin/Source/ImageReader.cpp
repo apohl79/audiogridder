@@ -119,7 +119,8 @@ bool ImageReader::initCodec() {
     m_outputFrame->width = m_width;
     m_outputFrame->height = m_height;
     m_outputFrame->format = fmt;
-    m_outputFrameBuf = (uint8_t*)av_malloc((size_t)av_image_get_buffer_size(fmt, m_width, m_height, 1));
+    m_outputFrameBuf =
+        (uint8_t*)av_malloc((size_t)av_image_get_buffer_size(fmt, m_width, m_height, 1) + AV_INPUT_BUFFER_PADDING_SIZE);
     av_image_fill_arrays(m_outputFrame->data, m_outputFrame->linesize, m_outputFrameBuf, fmt, m_width, m_height, 1);
 
     m_swsCtx = sws_getContext(m_width, m_height, m_inputCodecCtx->pix_fmt, m_width, m_height, fmt, SWS_FAST_BILINEAR,
