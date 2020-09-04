@@ -70,7 +70,7 @@
                extraFrameworks="AVFoundation,CoreMedia,VideoToolbox">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" headerPath="/usr/local/include&#10;$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg"
-                       recommendedWarnings="LLVM" libraryPath="$(HOME)/audio/FFmpeg/inst-osx/lib"
+                       recommendedWarnings="LLVM" libraryPath="$(HOME)/audio/FFmpeg/inst-osx-dbg/lib"
                        defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING&#10;"/>
         <CONFIGURATION isDebug="1" name="Release" headerPath="/usr/local/include&#10;$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg"
                        recommendedWarnings="LLVM" enablePluginBinaryCopyStep="0" optimisation="3"
