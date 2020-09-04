@@ -1,5 +1,10 @@
 #!/bin/bash
 
+TOOLCHAIN=/Applications/Xcode10.3.app/Contents/Developer
+
+LAST_TC=$(xcode-select -p)
+sudo xcode-select -s $TOOLCHAIN
+
 xcodebuild -project Server/Builds/MacOSX/AudioGridderServer.xcodeproj -alltargets -configuration Release clean
 xcodebuild -project Server/Builds/MacOSX/AudioGridderServer.xcodeproj -alltargets -configuration Release build
 xcodebuild -project Server/Builds/MacOSX10.7/AudioGridderServer.xcodeproj -alltargets -configuration Release clean
@@ -8,6 +13,8 @@ xcodebuild -project Plugin/Fx/Builds/MacOSX/AudioGridder.xcodeproj -alltargets -
 xcodebuild -project Plugin/Fx/Builds/MacOSX/AudioGridder.xcodeproj -alltargets -configuration Release build
 xcodebuild -project Plugin/Inst/Builds/MacOSX/AudioGridderInst.xcodeproj -alltargets -configuration Release clean
 xcodebuild -project Plugin/Inst/Builds/MacOSX/AudioGridderInst.xcodeproj -alltargets -configuration Release build
+
+sudo xcode-select -s $LAST_TC
 
 VERSION=$(cat package/VERSION)
 
@@ -36,5 +43,5 @@ cp -r Plugin/Fx/Builds/MacOSX/build/Release/AudioGridder.* ../Archive/Builds/$VE
 cp -r Plugin/Inst/Builds/MacOSX/build/Release/AudioGridderInst.* ../Archive/Builds/$VERSION/osx/
 
 cd package/build
-zip AudioGridder_#STR_VER#-osx.zip AudioGridderPlugin_#STR_VER#.pkg AudioGridderServer10.7_#STR_VER#.pkg AudioGridderServer_#STR_VER#.pkg
+zip AudioGridder_$VERSION-osx.zip AudioGridderPlugin_$VERSION.pkg AudioGridderServer10.7_$VERSION.pkg AudioGridderServer_$VERSION.pkg
 cd -
