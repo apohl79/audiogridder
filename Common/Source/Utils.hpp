@@ -111,7 +111,7 @@ static inline void waitForThreadAndLog(LogTag* tag, Thread* t, int millisUntilWa
 
 class ServerString {
   public:
-    ServerString() {}
+    ServerString() { refresh(); }
 
     ServerString(const String& s) {
         auto hostParts = StringArray::fromTokens(s, ":", "");
@@ -125,11 +125,14 @@ class ServerString {
             m_host = s;
             m_id = 0;
         }
+        refresh();
     }
 
-    ServerString(const String& host, const String& name, int id) : m_host(host), m_name(name), m_id(id) {}
+    ServerString(const String& host, const String& name, int id) : m_host(host), m_name(name), m_id(id) { refresh(); }
 
-    ServerString(const ServerString& other) : m_host(other.m_host), m_name(other.m_name), m_id(other.m_id) {}
+    ServerString(const ServerString& other) : m_host(other.m_host), m_name(other.m_name), m_id(other.m_id) {
+        refresh();
+    }
 
     bool operator==(const ServerString& other) const {
         return m_host == other.m_host && m_name == other.m_name && m_id == other.m_id;
@@ -169,9 +172,13 @@ class ServerString {
         return ret;
     }
 
+    Time getUpdated() const { return m_updated; }
+    void refresh() { m_updated = Time::getCurrentTime(); }
+
   private:
     String m_host, m_name;
     int m_id;
+    Time m_updated;
 };
 
 inline void callOnMessageThread(std::function<void()> fn) {

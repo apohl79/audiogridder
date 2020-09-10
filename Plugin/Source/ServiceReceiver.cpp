@@ -41,6 +41,7 @@ void ServiceReceiver::run() {
         logln("failed to open client socket(s)");
         return;
     }
+
     while (!currentThreadShouldExit()) {
         m_currentResult.clear();
 
@@ -61,8 +62,29 @@ void ServiceReceiver::run() {
         m_currentResult.sort(comp);
 
         std::lock_guard<std::mutex> lock(m_serverMtx);
-        if (m_servers != m_currentResult) {
-            m_servers = m_currentResult;
+        bool changed = false;
+        for (auto& s1 : m_currentResult) {
+            bool exists = false;
+            for (auto& s2 : m_servers) {
+                if (s1 == s2) {
+                    s2.refresh();
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) {
+                m_servers.add(s1);
+                changed = true;
+            }
+        }
+        auto now = Time::getCurrentTime().toMilliseconds();
+        for (auto& s : m_servers) {
+            if (s.getUpdated().toMilliseconds() + 30000 < now) {
+                m_servers.remove(&s);
+                changed = true;
+            }
+        }
+        if (changed) {
             logln("updated server list:");
             for (auto& s : m_servers) {
                 logln("  " << s.toString());
