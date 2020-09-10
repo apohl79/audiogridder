@@ -9,11 +9,13 @@
 #define Metrics_hpp
 
 #include <JuceHeader.h>
+#include <unordered_map>
+
 #include "Utils.hpp"
 
 namespace e47 {
 
-class TimeStatistics : public Thread, public LogTag {
+class TimeStatistics : public LogTag {
   public:
     class Duration {
       public:
@@ -61,17 +63,25 @@ class TimeStatistics : public Thread, public LogTag {
         void updateBin(size_t bin, size_t c) { dist[bin].second += c; }
     };
 
+    class Aggregator : public Thread {
+      public:
+        friend TimeStatistics;
+        Aggregator() : Thread("Aggregator") {}
+        ~Aggregator() { stopThread(3000); }
+        void run();
+    };
+
     TimeStatistics(size_t numOfBins = 10, double binSize = 2 /* ms */)
-        : Thread("TimeStatistics"), LogTag("stats"), m_numOfBins(numOfBins), m_binSize(binSize) {}
-    ~TimeStatistics();
+        : LogTag("stats"), m_numOfBins(numOfBins), m_binSize(binSize) {}
+    ~TimeStatistics() {}
 
     void update(double t);
     void aggregate();
     Histogram get1minHistogram();
     void run();
-    void log();
+    void log(const String& name);
 
-    static Duration getDuration();
+    static Duration getDuration(const String& name);
 
     static void initialize();
     static void cleanup();
@@ -84,9 +94,11 @@ class TimeStatistics : public Thread, public LogTag {
     size_t m_numOfBins;
     double m_binSize;
 
-    static std::shared_ptr<TimeStatistics> m_inst;
-    static std::mutex m_instMtx;
-    static size_t m_instRefCount;
+    using StatsMap = std::unordered_map<String, std::shared_ptr<TimeStatistics>>;
+    static std::unique_ptr<Aggregator> m_aggregator;
+    static StatsMap m_stats;
+    static std::mutex m_aggregatorMtx;
+    static size_t m_aggregatorRefCount;
 };
 
 }  // namespace e47

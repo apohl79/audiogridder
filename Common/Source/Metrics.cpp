@@ -9,11 +9,10 @@
 
 namespace e47 {
 
-std::shared_ptr<TimeStatistics> TimeStatistics::m_inst;
-std::mutex TimeStatistics::m_instMtx;
-size_t TimeStatistics::m_instRefCount = 0;
-
-TimeStatistics::~TimeStatistics() { stopThread(3000); }
+std::unique_ptr<TimeStatistics::Aggregator> TimeStatistics::m_aggregator;
+TimeStatistics::StatsMap TimeStatistics::m_stats;
+std::mutex TimeStatistics::m_aggregatorMtx;
+size_t TimeStatistics::m_aggregatorRefCount = 0;
 
 void TimeStatistics::update(double t) {
     std::lock_guard<std::mutex> lock(m_mtx);
@@ -90,12 +89,13 @@ TimeStatistics::Histogram TimeStatistics::get1minHistogram() {
     return aggregate;
 }
 
-void TimeStatistics::log() {
+void TimeStatistics::log(const String& name) {
     auto hist = get1minHistogram();
     if (hist.count > 0) {
-        logln("total " << hist.count << ", avg " << String(hist.avg, 2) << "ms, min " << String(hist.min, 2)
-                       << "ms, max " << String(hist.max, 2) << "ms");
-        String out = " dist ";
+        logln(name << ": total " << hist.count << ", avg " << String(hist.avg, 2) << "ms, min " << String(hist.min, 2)
+                   << "ms, max " << String(hist.max, 2) << "ms");
+        String out = name;
+        out << ":  dist ";
         size_t count = 0;
         for (auto& p : hist.dist) {
             if (count > 0) {
@@ -117,43 +117,58 @@ void TimeStatistics::log() {
     }
 }
 
-void TimeStatistics::run() {
-    int count = 0;
+void TimeStatistics::Aggregator::run() {
+    int count = 1;
     while (!currentThreadShouldExit()) {
         int sleepfor = 10000 / 50;
         while (!currentThreadShouldExit() && sleepfor-- > 0) {
             Thread::sleep(50);
         }
         if (!currentThreadShouldExit()) {
-            aggregate();
-            if (++count >= 6) {
-                log();
-                count = 0;
+            StatsMap hmcpy;
+            {
+                std::lock_guard<std::mutex> lock(m_aggregatorMtx);
+                hmcpy = m_stats;
             }
+            for (auto s : hmcpy) {
+                s.second->aggregate();
+                if (count == 0) {
+                    s.second->log(s.first);
+                }
+            }
+            ++count %= 6;
         }
     }
 }
 
-TimeStatistics::Duration TimeStatistics::getDuration() {
-    std::lock_guard<std::mutex> lock(m_instMtx);
-    return Duration(m_inst);
+TimeStatistics::Duration TimeStatistics::getDuration(const String& name) {
+    std::lock_guard<std::mutex> lock(m_aggregatorMtx);
+    std::shared_ptr<TimeStatistics> stat;
+    auto it = m_stats.find(name);
+    if (m_stats.end() == it) {
+        auto itnew = m_stats.emplace(name, std::make_shared<TimeStatistics>());
+        stat = itnew.first->second;
+    } else {
+        stat = it->second;
+    }
+    return Duration(stat);
 }
 
 void TimeStatistics::initialize() {
-    std::lock_guard<std::mutex> lock(m_instMtx);
-    if (nullptr == m_inst) {
-        m_inst = std::make_shared<TimeStatistics>();
-        m_inst->startThread();
+    std::lock_guard<std::mutex> lock(m_aggregatorMtx);
+    if (nullptr == m_aggregator) {
+        m_aggregator = std::make_unique<Aggregator>();
+        m_aggregator->startThread();
     }
-    m_instRefCount++;
+    m_aggregatorRefCount++;
 }
 
 void TimeStatistics::cleanup() {
-    std::lock_guard<std::mutex> lock(m_instMtx);
-    m_instRefCount--;
-    if (m_instRefCount == 0) {
-        m_inst->signalThreadShouldExit();
-        m_inst.reset();
+    std::lock_guard<std::mutex> lock(m_aggregatorMtx);
+    m_aggregatorRefCount--;
+    if (m_aggregatorRefCount == 0) {
+        m_aggregator->signalThreadShouldExit();
+        m_aggregator.reset();
     }
 }
 
