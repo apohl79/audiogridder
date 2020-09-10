@@ -29,6 +29,10 @@ int mDNSConnector::openClientSockets(int maxSockets, int port) {
     // Thus we need to open one socket for each interface and address family
 
 #ifdef JUCE_WINDOWS
+    // Make sure windows sockets are initialized
+    StreamingSocket dummy;
+    ignoreUnused(dummy);
+
     PIP_ADAPTER_ADDRESSES adapter_address = nullptr;
     ULONG address_size = 8000;
     unsigned int ret;
