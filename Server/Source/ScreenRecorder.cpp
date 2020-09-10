@@ -7,6 +7,7 @@
 
 #include "ScreenRecorder.hpp"
 #include "Screen.h"
+#include "Metrics.hpp"
 
 namespace e47 {
 
@@ -29,7 +30,8 @@ void ScreenRecorder::initialize() {
     }
 
     m_scale = Desktop::getInstance().getDisplays().getMainDisplay().scale;
-    m_quality = (int)(BASE_QUALITY / m_scale);
+    // m_quality = (int)(BASE_QUALITY / m_scale);
+    m_quality = BASE_QUALITY;
 
     avdevice_register_all();
 
@@ -56,7 +58,6 @@ void ScreenRecorder::initialize() {
         return;
     }
 
-    // m_outputCodec = avcodec_find_encoder(AV_CODEC_ID_MJPEG);
     m_outputCodec = avcodec_find_encoder_by_name("libwebp");
     if (nullptr == m_outputCodec) {
         logln("unable to find output codec");
@@ -298,8 +299,8 @@ bool ScreenRecorder::prepareOutput() {
     m_outputCodecCtx->pix_fmt = AV_PIX_FMT_YUV420P;
     m_outputCodecCtx->time_base.num = 1;
     m_outputCodecCtx->time_base.den = 30;
-    m_outputCodecCtx->width = m_captureRect.getWidth();
-    m_outputCodecCtx->height = m_captureRect.getHeight();
+    m_outputCodecCtx->width = (int)(m_captureRect.getWidth() / m_scale);
+    m_outputCodecCtx->height = (int)(m_captureRect.getHeight() / m_scale);
     AVDictionary* opts = nullptr;
     av_dict_set(&opts, "preset", "none", 0);
     av_dict_set(&opts, "compression_level", "1", 0);
@@ -319,19 +320,18 @@ bool ScreenRecorder::prepareOutput() {
     } else {
         av_frame_unref(m_outputFrame);
     }
-    m_outputFrame->width = m_captureRect.getWidth();
-    m_outputFrame->height = m_captureRect.getHeight();
+    m_outputFrame->width = m_outputCodecCtx->width;
+    m_outputFrame->height = m_outputCodecCtx->height;
     m_outputFrame->format = m_outputCodecCtx->pix_fmt;
-    m_outputFrameBuf =
-        (uint8_t*)av_malloc((size_t)av_image_get_buffer_size(m_outputCodecCtx->pix_fmt, m_outputCodecCtx->width,
-                                                             m_outputCodecCtx->height, 1) +
-                            AV_INPUT_BUFFER_PADDING_SIZE);
+    m_outputFrameBuf = (uint8_t*)av_malloc(
+        (size_t)av_image_get_buffer_size(m_outputCodecCtx->pix_fmt, m_outputFrame->width, m_outputFrame->height, 1) +
+        AV_INPUT_BUFFER_PADDING_SIZE);
     av_image_fill_arrays(m_outputFrame->data, m_outputFrame->linesize, m_outputFrameBuf, m_outputCodecCtx->pix_fmt,
-                         m_outputCodecCtx->width, m_outputCodecCtx->height, 1);
+                         m_outputFrame->width, m_outputFrame->height, 1);
 
     m_swsCtx = sws_getContext(m_captureRect.getWidth(), m_captureRect.getHeight(), m_captureCodecCtx->pix_fmt,
-                              m_captureRect.getWidth(), m_captureRect.getHeight(), m_outputCodecCtx->pix_fmt,
-                              SWS_FAST_BILINEAR, nullptr, nullptr, nullptr);
+                              m_outputFrame->width, m_outputFrame->height, m_outputCodecCtx->pix_fmt, SWS_FAST_BILINEAR,
+                              nullptr, nullptr, nullptr);
     if (nullptr == m_swsCtx) {
         logln("prepareOutput: sws_getContext failed");
         return false;
@@ -362,11 +362,15 @@ void ScreenRecorder::record() {
                                           << m_captureRect.getWidth() << "x" << m_captureRect.getHeight() << " scale *"
                                           << m_scale << " <- input rectange " << m_captureCodecCtx->width << "x"
                                           << m_captureCodecCtx->height);
+    auto durationPkt = TimeStatistics::getDuration("screen-pkt");
+    auto durationScale = TimeStatistics::getDuration("screen-scale");
+    auto durationEnc = TimeStatistics::getDuration("screen-enc");
     int retRDF;
     do {
         retRDF = av_read_frame(m_captureFmtCtx, m_capturePacket);
         if (retRDF == 0) {
             if (m_capturePacket->stream_index == m_captureStreamIndex) {
+                durationPkt.reset();
                 int retSDP = avcodec_send_packet(m_captureCodecCtx, m_capturePacket);
                 if (retSDP < 0) {
                     logln("avcodec_send_packet failed: " << retSDP);
@@ -391,10 +395,13 @@ void ScreenRecorder::record() {
                         }
 
                         // convert pixel format
-                        sws_scale(m_swsCtx, frame->data, frame->linesize, 0, m_captureRect.getHeight(),
-                                  m_outputFrame->data, m_outputFrame->linesize);
+                        durationScale.reset();
+                        sws_scale(m_swsCtx, frame->data, frame->linesize, 0, frame->height, m_outputFrame->data,
+                                  m_outputFrame->linesize);
+                        durationScale.update();
 
                         // convert to WEBP
+                        durationEnc.reset();
                         int retSDF = avcodec_send_frame(m_outputCodecCtx, m_outputFrame);
                         if (retSDF < 0) {
                             logln("avcodec_send_frame failed: " << retSDF);
@@ -403,9 +410,10 @@ void ScreenRecorder::record() {
                         int retRCP;
                         do {
                             retRCP = avcodec_receive_packet(m_outputCodecCtx, m_outputPacket);
+                            durationEnc.update();
                             if (retRCP == 0) {
-                                m_callback(m_outputPacket->data, m_outputPacket->size, m_captureRect.getWidth(),
-                                           m_captureRect.getHeight(), m_scale);
+                                m_callback(m_outputPacket->data, m_outputPacket->size, m_outputFrame->width,
+                                           m_outputFrame->height, 1 /*m_scale*/);
                                 av_packet_unref(m_outputPacket);
                             }
                         } while (retRCP == AVERROR(EAGAIN));
@@ -413,6 +421,7 @@ void ScreenRecorder::record() {
                     }
                 } while (retRCF == AVERROR(EAGAIN));
                 av_packet_unref(m_capturePacket);
+                durationPkt.update();
             }
         }
     } while (m_capture && (retRDF == 0 || retRDF == AVERROR(EAGAIN)));
