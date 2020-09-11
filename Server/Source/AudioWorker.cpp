@@ -48,6 +48,7 @@ void AudioWorker::run() {
     MidiBuffer midi;
     AudioMessage msg;
     AudioPlayHead::CurrentPositionInfo posInfo;
+    auto duration = TimeStatistics::getDuration("audio");
 
     ProcessorChain::PlayHead playHead(&posInfo);
     m_chain->prepareToPlay(m_rate, m_samplesPerBlock);
@@ -58,7 +59,7 @@ void AudioWorker::run() {
         // Read audio chunk
         if (m_socket->waitUntilReady(true, 1000)) {
             if (msg.readFromClient(m_socket.get(), bufferF, bufferD, midi, posInfo, m_chain->getExtraChannels(), &e)) {
-                auto duration = TimeStatistics::getDuration();
+                duration.reset();
                 if (hasToSetPlayHead) {  // do not set the playhead before it's initialized
                     m_chain->setPlayHead(&playHead);
                     hasToSetPlayHead = false;
@@ -91,6 +92,7 @@ void AudioWorker::run() {
                     logln("error: failed to send audio data to client");
                     m_socket->close();
                 }
+                duration.update();
             } else {
                 logln("error: failed to read audio message: " << e.toString());
                 m_socket->close();

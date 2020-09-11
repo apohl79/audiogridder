@@ -38,7 +38,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
           socket(sock),
           writeQ(as<size_t>(clnt->NUM_OF_BUFFERS * 2)),
           readQ(as<size_t>(clnt->NUM_OF_BUFFERS * 2)),
-          duration(TimeStatistics::getDuration()) {
+          duration(TimeStatistics::getDuration("audio")) {
         setLogTagSource(client);
 
         for (int i = 0; i < clnt->NUM_OF_BUFFERS; i++) {

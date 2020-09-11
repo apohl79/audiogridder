@@ -25,6 +25,7 @@ void setControlKey(uint64_t& flags);
 void setAltKey(uint64_t& flags);
 
 void mouseEvent(MouseEvType t, float x, float y, uint64_t flags = 0);
+void mouseScrollEvent(float x, float y, float deltaX, float deltaY, bool isSmooth);
 void keyEventDown(uint16_t keyCode, uint64_t flags = 0);
 void keyEventUp(uint16_t keyCode, uint64_t flags = 0);
 

@@ -271,17 +271,21 @@ void Worker::handleMessage(std::shared_ptr<Message<Mouse>> msg) {
     auto ev = *pDATA(msg);
     MessageManager::callAsync([ev] {
         auto point = getApp()->localPointToGlobal(Point<float>(ev.x, ev.y));
-        uint64_t flags = 0;
-        if (ev.isShiftDown) {
-            setShiftKey(flags);
+        if (ev.type == MouseEvType::WHEEL) {
+            mouseScrollEvent(point.x, point.y, ev.deltaX, ev.deltaY, ev.isSmooth);
+        } else {
+            uint64_t flags = 0;
+            if (ev.isShiftDown) {
+                setShiftKey(flags);
+            }
+            if (ev.isCtrlDown) {
+                setControlKey(flags);
+            }
+            if (ev.isAltDown) {
+                setAltKey(flags);
+            }
+            mouseEvent(ev.type, point.x, point.y, flags);
         }
-        if (ev.isCtrlDown) {
-            setControlKey(flags);
-        }
-        if (ev.isAltDown) {
-            setAltKey(flags);
-        }
-        mouseEvent(ev.type, point.x, point.y, flags);
     });
 }
 

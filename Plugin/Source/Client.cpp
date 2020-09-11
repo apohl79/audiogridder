@@ -663,11 +663,15 @@ void Client::mouseDoubleClick(const MouseEvent& event) {
     dbgln("unhandled mouseDoubleClick " << event.position.x << ":" << event.position.y);
 }
 
-void Client::mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& /* wheel */) {
-    dbgln("unhanbdled mouseWheelMove " << event.position.x << ":" << event.position.y);
+void Client::mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wheel) {
+    if (!wheel.isInertial) {
+        sendMouseEvent(MouseEvType::WHEEL, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
+                       event.mods.isAltDown(), &wheel);
+    }
 }
 
-void Client::sendMouseEvent(MouseEvType ev, Point<float> p, bool isShiftDown, bool isCtrlDown, bool isAltDown) {
+void Client::sendMouseEvent(MouseEvType ev, Point<float> p, bool isShiftDown, bool isCtrlDown, bool isAltDown,
+                            const MouseWheelDetails* wheel) {
     if (!isReadyLockFree()) {
         return;
     };
@@ -678,6 +682,15 @@ void Client::sendMouseEvent(MouseEvType ev, Point<float> p, bool isShiftDown, bo
     DATA(msg)->isShiftDown = isShiftDown;
     DATA(msg)->isCtrlDown = isCtrlDown;
     DATA(msg)->isAltDown = isAltDown;
+    if (ev == MouseEvType::WHEEL && nullptr != wheel) {
+        DATA(msg)->deltaX = wheel->deltaX;
+        DATA(msg)->deltaY = wheel->isReversed ? -wheel->deltaY : wheel->deltaY;
+        DATA(msg)->isSmooth = wheel->isSmooth;
+    } else {
+        DATA(msg)->deltaX = 0;
+        DATA(msg)->deltaY = 0;
+        DATA(msg)->isSmooth = false;
+    }
     dbglock lock(*this, 23);
     msg.send(m_cmd_socket.get());
 }

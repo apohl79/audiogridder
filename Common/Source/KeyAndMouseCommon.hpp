@@ -5,8 +5,8 @@
  * Author: Andreas Pohl
  */
 
-#ifndef MouseEvType_hpp
-#define MouseEvType_hpp
+#ifndef KeyAndMouseCommon_hpp
+#define KeyAndMouseCommon_hpp
 
 #include <unordered_map>
 
@@ -20,7 +20,8 @@ enum MouseEvType : uint8_t {
     RIGHT_DRAG,
     OTHER_DOWN,
     OTHER_UP,
-    OTHER_DRAG
+    OTHER_DRAG,
+    WHEEL
 };
 
 const std::unordered_map<std::string, int> VKeyMap = {
@@ -61,4 +62,4 @@ static inline std::string getKeyName(uint16_t code) {
     return "";
 }
 
-#endif /* MouseEvType_hpp */
+#endif /* KeyAndMouseCommon_hpp */

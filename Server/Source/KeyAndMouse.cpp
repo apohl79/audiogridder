@@ -14,8 +14,10 @@
 
 #include <iostream>
 #include <utility>
+#include <JuceHeader.h>
 
 #include "KeyAndMouse.hpp"
+#include "Utils.hpp"
 
 namespace e47 {
 
@@ -28,7 +30,29 @@ void mouseEventReal(CGMouseButton button, CGEventType type, CGPoint location, CG
     CFRelease(event);
 }
 
-std::pair<CGMouseButton, CGEventType> toMouseButtonType(MouseEvType t) {
+void mouseScrollEventReal(float deltaX, float deltaY) {
+    if (deltaX == 0 && deltaY == 0) {
+        return;
+    }
+    CGEventRef event = nullptr;
+    if (deltaX != 0) {
+        event = CGEventCreateScrollWheelEvent(nullptr, kCGScrollEventUnitPixel, 2, (int)lround(deltaY),
+                                              (int)lround(deltaX));
+    } else if (deltaY != 0) {
+        event = CGEventCreateScrollWheelEvent(nullptr, kCGScrollEventUnitPixel, 1, (int)lround(deltaY));
+    }
+    CGEventPost(kCGSessionEventTap, event);
+    CFRelease(event);
+}
+
+void keyEventReal(uint16_t keyCode, uint64_t flags, bool keyDown) {
+    CGEventRef ev = CGEventCreateKeyboardEvent(nullptr, keyCode, keyDown);
+    CGEventSetFlags(ev, flags | CGEventGetFlags(ev));
+    CGEventPost(kCGSessionEventTap, ev);
+    CFRelease(ev);
+}
+
+inline std::pair<CGMouseButton, CGEventType> toMouseButtonType(MouseEvType t) {
     CGMouseButton button;
     CGEventType type;
     switch (t) {
@@ -72,10 +96,25 @@ std::pair<CGMouseButton, CGEventType> toMouseButtonType(MouseEvType t) {
             button = kCGMouseButtonCenter;
             type = kCGEventOtherMouseDragged;
             break;
+        case MouseEvType::WHEEL:
+            button = kCGMouseButtonLeft;
+            type = kCGEventNull;
+            break;
     }
     return std::make_pair(button, type);
 }
 #elif defined(JUCE_WINDOWS)
+void sendInput(INPUT* in) {
+    if (SendInput(1, in, sizeof(INPUT)) != 1) {
+        auto err = GetLastError();
+        LPSTR lpMsgBuf;
+        FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
+                      err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&lpMsgBuf, 0, NULL);
+        setLogTagStatic("keyandmouse");
+        logln("SendInput failed: EC=" << err << " DESC=" << lpMsgBuf);
+    }
+}
+
 void sendKey(WORD vk, bool keyDown) {
     INPUT event;
     event.type = INPUT_KEYBOARD;
@@ -88,49 +127,19 @@ void sendKey(WORD vk, bool keyDown) {
     }
     event.ki.time = 0;
     event.ki.dwExtraInfo = NULL;
-    SendInput(1, &event, sizeof(INPUT));
+    sendInput(&event);
 }
-#endif
 
-void mouseEvent(MouseEvType t, float x, float y, uint64_t flags) {
-#if defined(JUCE_MAC)
-    auto bt = toMouseButtonType(t);
-    CGPoint loc = CGPointMake(x, y);
-    mouseEventReal(bt.first, bt.second, loc, flags);
-#elif defined(JUCE_WINDOWS)
-    HDC hDC = GetDC(0);
-    float dpi = (GetDeviceCaps(hDC, LOGPIXELSX) + GetDeviceCaps(hDC, LOGPIXELSY)) / 2.0f;
-    float scaleFactor = dpi / 96;
-    ReleaseDC(0, hDC);
-
-    long lx = lroundf(x * scaleFactor);
-    long ly = lroundf(y * scaleFactor);
-
-    INPUT event;
+void mouseEventReal(POINT pos, DWORD evFlags, uint64_t flags) {
+    INPUT event = {0};
     event.type = INPUT_MOUSE;
-    event.mi.dx = lx;
-    event.mi.dy = ly;
+    event.mi.dx = pos.x;
+    event.mi.dy = pos.y;
     event.mi.mouseData = 0;
     event.mi.time = 0;
     event.mi.dwExtraInfo = NULL;
-    event.mi.dwFlags = MOUSEEVENTF_ABSOLUTE;
-    switch (t) {
-        case MouseEvType::MOVE:
-            event.mi.dwFlags |= MOUSEEVENTF_MOVE;
-            break;
-        case MouseEvType::LEFT_UP:
-            event.mi.dwFlags |= MOUSEEVENTF_LEFTUP;
-            break;
-        case MouseEvType::LEFT_DOWN:
-            event.mi.dwFlags |= MOUSEEVENTF_LEFTDOWN;
-            break;
-        case MouseEvType::RIGHT_UP:
-            event.mi.dwFlags |= MOUSEEVENTF_RIGHTUP;
-            break;
-        case MouseEvType::RIGHT_DOWN:
-            event.mi.dwFlags |= MOUSEEVENTF_RIGHTDOWN;
-            break;
-    }
+    event.mi.dwFlags = evFlags;
+
     // modifiers down
     if ((flags & VK_SHIFT) == VK_SHIFT) {
         sendKey(VK_SHIFT, true);
@@ -142,13 +151,8 @@ void mouseEvent(MouseEvType t, float x, float y, uint64_t flags) {
         sendKey(VK_MENU, true);
     }
 
-    // Remember: The input desktop must be the current desktop when you call SetCursorPos.
-    // Call OpenInputDesktop to determine whether the current desktop is the input desktop. If it
-    // is not, call SetThreadDesktop with the HDESK returned by OpenInputDesktop to switch to that
-    // desktop.
-    // Moves the cursor to the specified screen coordinates.
-    SetCursorPos(lx, ly);
-    SendInput(1, &event, sizeof(INPUT));
+    SetCursorPos(pos.x, pos.y);
+    sendInput(&event);
 
     // modifiers up
     if ((flags & VK_SHIFT) == VK_SHIFT) {
@@ -160,22 +164,101 @@ void mouseEvent(MouseEvType t, float x, float y, uint64_t flags) {
     if ((flags & VK_MENU) == VK_MENU) {
         sendKey(VK_MENU, false);
     }
-#endif
 }
 
-void keyEvent(uint16_t keyCode, uint64_t flags, bool keyDown) {
-#if defined(JUCE_MAC)
-    CGEventRef ev = CGEventCreateKeyboardEvent(nullptr, keyCode, keyDown);
-    CGEventSetFlags(ev, flags | CGEventGetFlags(ev));
-    CGEventPost(kCGSessionEventTap, ev);
-    CFRelease(ev);
-#elif defined(JUCE_WINDOWS)
+void mouseScrollEventReal(POINT pos, DWORD deltaX, DWORD deltaY) {
+    SetCursorPos(pos.x, pos.y);
+
+    INPUT event = {0};
+    event.type = INPUT_MOUSE;
+    event.mi.time = 0;
+    event.mi.dx = 0;
+    event.mi.dy = 0;
+    event.mi.dwExtraInfo = NULL;
+    if (deltaX != 0) {
+        event.mi.dwFlags = MOUSEEVENTF_HWHEEL;
+        event.mi.mouseData = deltaX;
+        sendInput(&event);
+    }
+    if (deltaY != 0) {
+        event.mi.dwFlags = MOUSEEVENTF_WHEEL;
+        event.mi.mouseData = deltaY;
+        sendInput(&event);
+    }
+}
+
+void keyEventReal(WORD vk, uint64_t flags, bool keyDown) {
+    // modifiers down
+    if (keyDown) {
+        if ((flags & VK_SHIFT) == VK_SHIFT) {
+            sendKey(VK_SHIFT, true);
+        }
+        if ((flags & VK_CONTROL) == VK_CONTROL) {
+            sendKey(VK_CONTROL, true);
+        }
+        if ((flags & VK_MENU) == VK_MENU) {
+            sendKey(VK_MENU, true);
+        }
+    }
+
+    // send key
+    sendKey(vk, keyDown);
+
+    // modifiers up
+    if (!keyDown) {
+        if ((flags & VK_SHIFT) == VK_SHIFT) {
+            sendKey(VK_SHIFT, false);
+        }
+        if ((flags & VK_CONTROL) == VK_CONTROL) {
+            sendKey(VK_CONTROL, false);
+        }
+        if ((flags & VK_MENU) == VK_MENU) {
+            sendKey(VK_MENU, false);
+        }
+    }
+}
+
+inline POINT getScaledPoint(float x, float y) {
+    HDC hDC = GetDC(0);
+    float dpi = (GetDeviceCaps(hDC, LOGPIXELSX) + GetDeviceCaps(hDC, LOGPIXELSY)) / 2.0f;
+    ReleaseDC(0, hDC);
+    float sf = dpi / 96;
+    long lx = lroundf(x * sf);
+    long ly = lroundf(y * sf);
+    return {lx, ly};
+}
+
+inline DWORD getMouseFlags(MouseEvType t) {
+    DWORD flags = MOUSEEVENTF_ABSOLUTE;
+    switch (t) {
+        case MouseEvType::MOVE:
+            flags |= MOUSEEVENTF_MOVE;
+            break;
+        case MouseEvType::LEFT_UP:
+            flags |= MOUSEEVENTF_LEFTUP;
+            break;
+        case MouseEvType::LEFT_DOWN:
+            flags |= MOUSEEVENTF_LEFTDOWN;
+            break;
+        case MouseEvType::RIGHT_UP:
+            flags |= MOUSEEVENTF_RIGHTUP;
+            break;
+        case MouseEvType::RIGHT_DOWN:
+            flags |= MOUSEEVENTF_RIGHTDOWN;
+            break;
+    }
+    return flags;
+}
+
+inline WORD getVK(uint16_t keyCode) {
     auto ch = getKeyName(keyCode);
     WORD vk = 0;
     if (ch.length() == 1) {
         vk = VkKeyScanExA(ch[0], GetKeyboardLayout(0));
     } else if (ch == "Space") {
         vk = VK_SPACE;
+    } else if (ch == "Return") {
+        vk = VK_RETURN;
     } else if (ch == "Backspace") {
         vk = VK_BACK;
     } else if (ch == "Escape") {
@@ -239,35 +322,47 @@ void keyEvent(uint16_t keyCode, uint64_t flags, bool keyDown) {
     } else if (ch == "F20") {
         vk = VK_F20;
     }
+    return vk;
+}
+#endif
 
-    // modifiers down
-    if (keyDown) {
-        if ((flags & VK_SHIFT) == VK_SHIFT) {
-            sendKey(VK_SHIFT, true);
-        }
-        if ((flags & VK_CONTROL) == VK_CONTROL) {
-            sendKey(VK_CONTROL, true);
-        }
-        if ((flags & VK_MENU) == VK_MENU) {
-            sendKey(VK_MENU, true);
-        }
+void mouseEvent(MouseEvType t, float x, float y, uint64_t flags) {
+#if defined(JUCE_MAC)
+    auto bt = toMouseButtonType(t);
+    CGPoint loc = CGPointMake(x, y);
+    mouseEventReal(bt.first, bt.second, loc, flags);
+#elif defined(JUCE_WINDOWS)
+    auto pos = getScaledPoint(x, y);
+    auto mouseFlags = getMouseFlags(t);
+    mouseEventReal(pos, mouseFlags, flags);
+#endif
+}
+
+void mouseScrollEvent(float x, float y, float deltaX, float deltaY, bool isSmooth) {
+#if defined(JUCE_MAC)
+    ignoreUnused(x);
+    ignoreUnused(y);
+
+    if (isSmooth) {
+        const float scale = 0.5f / 256.0f;
+        mouseScrollEventReal(deltaX / scale, deltaY / scale);
+    } else {
+        const float scale = 10.0f / 256.0f;
+        mouseScrollEventReal(deltaX / scale, deltaY / scale);
     }
+#elif defined(JUCE_WINDOWS)
+    ignoreUnused(isSmooth);
 
-    // send key
-    sendKey(vk, keyDown);
+    auto pos = getScaledPoint(x, y);
+    mouseScrollEventReal(pos, lround(deltaX * 512), lround(deltaY * 512));
+#endif
+}
 
-    // modifiers up
-    if (!keyDown) {
-        if ((flags & VK_SHIFT) == VK_SHIFT) {
-            sendKey(VK_SHIFT, false);
-        }
-        if ((flags & VK_CONTROL) == VK_CONTROL) {
-            sendKey(VK_CONTROL, false);
-        }
-        if ((flags & VK_MENU) == VK_MENU) {
-            sendKey(VK_MENU, false);
-        }
-    }
+void keyEvent(uint16_t keyCode, uint64_t flags, bool keyDown) {
+#if defined(JUCE_MAC)
+    keyEventReal(keyCode, flags, keyDown);
+#elif defined(JUCE_WINDOWS)
+    keyEventReal(getVK(keyCode), flags, keyDown);
 #endif
 }
 
