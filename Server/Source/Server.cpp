@@ -41,10 +41,12 @@ void Server::loadConfig() {
         if (j.find("NAME") != j.end()) {
             m_name = j["NAME"].get<std::string>();
         }
+#ifdef JUCE_MAC
         if (j.find("AU") != j.end()) {
             m_enableAU = j["AU"].get<bool>();
             logln("AudioUnit support " << (m_enableAU ? "enabled" : "disabled"));
         }
+#endif
         if (j.find("VST") != j.end()) {
             m_enableVST3 = j["VST"].get<bool>();
             logln("VST3 support " << (m_enableVST3 ? "enabled" : "disabled"));
@@ -122,7 +124,9 @@ void Server::saveConfig() {
     json j;
     j["ID"] = m_id;
     j["NAME"] = m_name.toStdString();
+#ifdef JUCE_MAC
     j["AU"] = m_enableAU;
+#endif
     j["VST"] = m_enableVST3;
     j["VST3Folders"] = json::array();
     for (auto& f : m_vst3Folders) {
