@@ -78,7 +78,7 @@ void Worker::run() {
         String list;
         for (auto& plugin : pluginList.getTypes()) {
             if ((plugin.numInputChannels > 0 && cfg.channelsIn > 0) ||
-                (plugin.numInputChannels == 0 && cfg.channelsIn == 0)) {
+                (plugin.numInputChannels == 0 && cfg.channelsIn == 0) || (plugin.isInstrument && cfg.channelsIn == 0)) {
                 list += getStringFrom(plugin) + "\n";
             }
         }

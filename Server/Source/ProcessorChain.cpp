@@ -170,6 +170,20 @@ bool ProcessorChain::setProcessorBusesLayout(std::shared_ptr<AudioPluginInstance
             logln(extraInChannels << " extra input(s), " << extraOutChannels << " extra output(s)");
             return true;
         }
+        // still no luck, it could be an instrument plugin with audio inputs (instrument/fx combo),
+        // try adding a main bus
+        int addedMainChannels = 0;
+        if (procLayout.getMainInputChannels() > 0 && layout.getMainInputChannels() == 0) {
+            auto bus = procLayout.getMainInputChannelSet();
+            layout.inputBuses.add(bus);
+            addedMainChannels = procLayout.getMainInputChannels();
+        }
+        if (proc->checkBusesLayoutSupported(layout) && proc->setBusesLayout(layout)) {
+            m_extraChannels = jmax(m_extraChannels, extraInChannels, extraOutChannels);
+            logln("added " << addedMainChannels << " main channel(s), " << extraInChannels << " extra input(s), "
+                           << extraOutChannels << " extra output(s)");
+            return true;
+        }
     }
     return false;
 }
