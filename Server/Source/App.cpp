@@ -50,12 +50,6 @@ void App::initialise(const String& commandLineParameters) {
         case SERVER:
             break;
     }
-#ifdef JUCE_WINDOWS
-    auto dumpPath = FileLogger::getSystemLogFileFolder().getFullPathName();
-    auto appName = getApplicationName();
-    MiniDump::initialize(dumpPath.toWideCharPointer(), appName.toWideCharPointer(), logName.toWideCharPointer(),
-                         AUDIOGRIDDER_VERSIONW, false);
-#endif
     m_logger = FileLogger::createDateStampedLogger(getApplicationName(), logName, ".log", "");
     Logger::setCurrentLogger(m_logger);
     logln("commandline: " << commandLineParameters);
@@ -82,7 +76,14 @@ void App::initialise(const String& commandLineParameters) {
                 quit();
             }
             break;
-        case SERVER:
+        case SERVER: {
+#ifdef JUCE_WINDOWS
+            auto dumpPath = FileLogger::getSystemLogFileFolder().getFullPathName();
+            auto appName = getApplicationName();
+            MiniDump::initialize(dumpPath.toWideCharPointer(), appName.toWideCharPointer(), logName.toWideCharPointer(),
+                                 AUDIOGRIDDER_VERSIONW, false);
+#endif
+
             showSplashWindow();
             setSplashInfo("Starting server...");
             m_menuWindow = std::make_unique<MenuBarWindow>(this);
@@ -96,6 +97,7 @@ void App::initialise(const String& commandLineParameters) {
             m_server = std::make_unique<Server>();
             m_server->startThread();
             break;
+        }
         case MASTER:
 #ifdef JUCE_MAC
             Process::setDockIconVisible(false);
