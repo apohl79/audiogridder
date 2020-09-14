@@ -142,8 +142,14 @@ void ScreenRecorder::start(Rectangle<int> rect, CaptureCallback fn) {
 void ScreenRecorder::stop() {
     m_capture = false;
     if (nullptr != m_thread) {
-        if (m_threadRunning && m_thread->joinable()) {
+        while (m_threadRunning) {
+            Thread::sleep(5);
+        }
+        if (m_thread->joinable()) {
             m_thread->join();
+        } else {
+            logln("error: thread is not joinable");
+            m_thread->detach();
         }
         m_thread.reset();
     }
@@ -157,6 +163,7 @@ void ScreenRecorder::resume(Rectangle<int> rect) {
     }
     m_capture = true;
     if (nullptr != m_thread) {
+        logln("error: detaching thread in resume()");
         m_thread->detach();
     }
     m_thread = std::make_unique<std::thread>([this, rect] {
