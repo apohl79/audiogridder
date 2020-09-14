@@ -173,11 +173,11 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
         }
 
         ~ProcessorWindow() override {
+            stopCapturing();
             if (m_editor != nullptr) {
                 delete m_editor;
                 m_editor = nullptr;
             }
-            m_screenRec.stop();
         }
 
         BorderSize<int> getBorderThickness() override { return {}; }
@@ -185,11 +185,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
         void forgetEditor() {
             // Allow a processor to delete his editor, so we should not delete it again
             m_editor = nullptr;
-            if (m_callbackNative) {
-                stopTimer();
-            } else {
-                m_screenRec.stop();
-            }
+            stopCapturing();
         }
 
         Rectangle<int> getScreenCaptureRect() {
@@ -217,9 +213,24 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
             }
         }
 
+        void stopCapturing() {
+            if (m_callbackNative) {
+                stopTimer();
+            } else {
+                m_screenRec.stop();
+            }
+        }
+
         void resized() override {
             ResizableWindow::resized();
             updateScreenCaptureArea();
+        }
+
+        void setVisible(bool b) override {
+            if (!b) {
+                stopCapturing();
+            }
+            Component::setVisible(b);
         }
 
       private:
