@@ -292,7 +292,6 @@ void Client::close() {
     }
     m_ready = false;
     dbglock lock(*this, 10);
-    m_pluginScreenUpdateCallback = nullptr;
     m_plugins.clear();
     if (nullptr != m_screen_socket && m_screen_socket->isConnected()) {
         m_screen_socket->close();
