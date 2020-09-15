@@ -5,7 +5,7 @@
               companyEmail="audiogridder@e47.org" pluginFormats="buildAU,buildVST,buildVST3"
               pluginManufacturerCode="XE47" pluginCode="E402" headerPath="../../../Source&#10;../../../../Common/Source&#10;"
               pluginName="AGridder" pluginVST3Category="Instrument,Network"
-              version="1.0.0" pluginCharacteristicsValue="pluginIsSynth,pluginProducesMidiOut,pluginWantsMidiIn"
+              version="1.0.0" pluginCharacteristicsValue="pluginIsMidiEffectPlugin,pluginIsSynth,pluginProducesMidiOut,pluginWantsMidiIn"
               displaySplashScreen="1" jucerFormatVersion="1">
   <MAINGROUP id="tTbkq6" name="AudioGridderInst">
     <GROUP id="{3368243C-E955-A248-6B2F-5609CABD8F4F}" name="Common">
@@ -68,7 +68,7 @@
   <EXPORTFORMATS>
     <XCODE_MAC targetFolder="Builds/MacOSX" aaxFolder="../../AAX_SDK_2p3p2"
                externalLibraries="avdevice&#10;avcodec&#10;avformat&#10;avfilter&#10;avutil&#10;swscale&#10;swresample&#10;webp&#10;webpmux"
-               extraFrameworks="AVFoundation,CoreMedia,VideoToolbox">
+               extraFrameworks="AVFoundation,CoreMedia,VideoToolbox" iosDevelopmentTeamID="62QZB3NCZR">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" headerPath="/usr/local/include&#10;$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg"
                        recommendedWarnings="LLVM" libraryPath="$(HOME)/audio/FFmpeg/inst-osx-dbg/lib"

@@ -82,7 +82,7 @@
   <EXPORTFORMATS>
     <XCODE_MAC targetFolder="Builds/MacOSX" smallIcon="TxAv0c" bigIcon="TxAv0c"
                externalLibraries="avdevice&#10;avcodec&#10;avformat&#10;avfilter&#10;avutil&#10;swscale&#10;swresample&#10;webp&#10;webpmux"
-               extraFrameworks="AVFoundation,CoreMedia,VideoToolbox">
+               extraFrameworks="AVFoundation,CoreMedia,VideoToolbox" iosDevelopmentTeamID="62QZB3NCZR">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" osxCompatibility="10.8 SDK" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
                        recommendedWarnings="LLVM" headerPath="$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg"
@@ -108,7 +108,8 @@
       </MODULEPATHS>
     </XCODE_MAC>
     <XCODE_MAC targetFolder="Builds/MacOSX10.7" externalLibraries="avdevice&#10;avcodec&#10;avformat&#10;avfilter&#10;avutil&#10;swscale&#10;swresample&#10;webp&#10;webpmux"
-               smallIcon="TxAv0c" bigIcon="TxAv0c" extraFrameworks="AVFoundation,CoreMedia,VideoToolbox">
+               smallIcon="TxAv0c" bigIcon="TxAv0c" extraFrameworks="AVFoundation,CoreMedia,VideoToolbox"
+               iosDevelopmentTeamID="62QZB3NCZR">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" headerPath="$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg"
                        libraryPath="$(HOME)/audio/FFmpeg/inst-osx-10.7/lib" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
