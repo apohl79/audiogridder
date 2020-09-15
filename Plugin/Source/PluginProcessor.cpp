@@ -191,6 +191,14 @@ bool AudioGridderAudioProcessor::producesMidi() const {
 #endif
 }
 
+bool AudioGridderAudioProcessor::isMidiEffect() const {
+#if JucePlugin_IsMidiEffect
+    return true;
+#else
+    return false;
+#endif
+}
+
 double AudioGridderAudioProcessor::getTailLengthSeconds() const { return 0.0; }
 
 bool AudioGridderAudioProcessor::supportsDoublePrecisionProcessing() const { return true; }

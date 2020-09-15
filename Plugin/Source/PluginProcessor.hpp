@@ -42,7 +42,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
 
     bool acceptsMidi() const override;
     bool producesMidi() const override;
-    bool isMidiEffect() const override { return false; }
+    bool isMidiEffect() const override;
     double getTailLengthSeconds() const override;
     bool supportsDoublePrecisionProcessing() const override;
 
