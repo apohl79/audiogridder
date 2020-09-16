@@ -29,14 +29,15 @@ void App::initialise(const String& commandLineParameters) {
     enum Modes { SCAN, MASTER, SERVER };
     Modes mode = MASTER;
     String fileToScan = "";
+    int srvid = -1;
     for (int i = 0; i < args.size(); i++) {
         if (!args[i].compare("-scan") && args.size() >= i + 2) {
             fileToScan = args[i + 1];
             mode = SCAN;
-            break;
         } else if (!args[i].compare("-server")) {
             mode = SERVER;
-            break;
+        } else if (!args[i].compare("-id")) {
+            srvid = args[i + 1].getIntValue();
         }
     }
     String logName = "AudioGridderServer_";
@@ -94,7 +95,11 @@ void App::initialise(const String& commandLineParameters) {
                     "AudioGridder needs the Accessibility permission to remote control plugins.", "OK");
             }
 #endif
-            m_server = std::make_unique<Server>();
+            json opts;
+            if (srvid > -1) {
+                opts["ID"] = srvid;
+            }
+            m_server = std::make_unique<Server>(opts);
             m_server->startThread();
             break;
         }
@@ -102,11 +107,15 @@ void App::initialise(const String& commandLineParameters) {
 #ifdef JUCE_MAC
             Process::setDockIconVisible(false);
 #endif
-            m_child = std::make_unique<std::thread>([this] {
+            m_child = std::make_unique<std::thread>([this, srvid] {
                 ChildProcess proc;
                 StringArray proc_args;
                 proc_args.add(File::getSpecialLocation(File::currentExecutableFile).getFullPathName());
                 proc_args.add("-server");
+                if (srvid > -1) {
+                    proc_args.add("-id");
+                    proc_args.add(String(srvid));
+                }
                 uint32 ec = 0;
                 bool done = false;
                 do {
@@ -182,10 +191,14 @@ void App::restartServer(bool rescan) {
         logln("running restart thread");
 
         // leave message thread context
+        int id = m_server->getId();
         m_server->shutdown();
         m_server->waitForThreadToExit(-1);
         m_server.reset();
-        json opts = {{"ScanForPlugins", rescan}};
+        json opts = {
+            {"ID", id},
+            {"ScanForPlugins", rescan}
+        };
         m_server = std::make_unique<Server>(opts);
         m_server->startThread();
     }).detach();

@@ -153,7 +153,12 @@ void Server::saveConfig() {
     fos.writeText(j.dump(4), false, false, "\n");
 }
 
-int Server::getId() const { return getOpt("ID", m_id); }
+int Server::getId(bool ignoreOpts) const {
+    if (ignoreOpts) {
+        return m_id;
+    }
+    return getOpt("ID", m_id);
+}
 
 void Server::loadKnownPluginList() { loadKnownPluginList(m_pluginlist); }
 

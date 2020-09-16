@@ -29,7 +29,7 @@ class Server : public Thread, public LogTag {
     void shutdown();
     void loadConfig();
     void saveConfig();
-    int getId() const;
+    int getId(bool ignoreOpts = false) const;
     void setId(int i) { m_id = i; }
     const String& getName() const { return m_name; }
     void setName(const String& name);

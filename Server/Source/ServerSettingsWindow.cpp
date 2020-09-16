@@ -79,7 +79,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_components.push_back(std::move(label));
 
     String id;
-    id << m_app->getServer().getId();
+    id << m_app->getServer().getId(true);
     m_idText.setText(id);
     m_idText.setBounds(getFieldBounds(row));
     addChildAndSetID(&m_idText, "id");
