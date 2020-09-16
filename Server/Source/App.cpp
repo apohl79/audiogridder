@@ -195,10 +195,13 @@ void App::restartServer(bool rescan) {
         m_server->shutdown();
         m_server->waitForThreadToExit(-1);
         m_server.reset();
-        json opts = {
-            {"ID", id},
-            {"ScanForPlugins", rescan}
-        };
+        json opts;
+        opts["ID"] = id;
+        if (rescan) {
+            opts["ScanForPlugins"] = true;
+        } else {
+            opts["NoScanForPlugins"] = true;
+        }
         m_server = std::make_unique<Server>(opts);
         m_server->startThread();
     }).detach();

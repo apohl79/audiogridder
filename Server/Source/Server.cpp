@@ -375,7 +375,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
 }
 
 void Server::run() {
-    if (m_scanForPlugins || getOpt("ScanForPlugins", false)) {
+    if ((m_scanForPlugins || getOpt("ScanForPlugins", false)) && !getOpt("NoScanForPlugins", false)) {
         scanForPlugins();
     } else {
         loadKnownPluginList();
