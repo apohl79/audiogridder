@@ -168,7 +168,7 @@ void App::shutdown() {
     setApplicationReturnValue(0);
 }
 
-void App::restartServer() {
+void App::restartServer(bool rescan) {
     logln("restarting server...");
 
     hideEditor();
@@ -178,14 +178,15 @@ void App::restartServer() {
     showSplashWindow();
     setSplashInfo("Restarting server...");
 
-    std::thread([this] {
+    std::thread([this, rescan] {
         logln("running restart thread");
 
         // leave message thread context
         m_server->shutdown();
         m_server->waitForThreadToExit(-1);
         m_server.reset();
-        m_server = std::make_unique<Server>();
+        json opts = {{"ScanForPlugins", rescan}};
+        m_server = std::make_unique<Server>(opts);
         m_server->startThread();
     }).detach();
 }

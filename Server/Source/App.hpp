@@ -40,7 +40,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     const KnownPluginList& getPluginList();
     Server& getServer() { return *m_server; }
 
-    void restartServer();
+    void restartServer(bool rescan = false);
 
     void showEditor(std::shared_ptr<AGProcessor> proc, Thread::ThreadID tid, WindowCaptureCallbackNative func);
     void showEditor(std::shared_ptr<AGProcessor> proc, Thread::ThreadID tid, WindowCaptureCallbackFFmpeg func);
@@ -117,12 +117,12 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
             menu.addItem("Server Settings",
                          [this] { m_srvSettingsWindow = std::make_unique<ServerSettingsWindow>(this); });
             menu.addSeparator();
-            menu.addItem("Force full Rescan", [this] {
+            menu.addItem("Rescan", [this] { restartServer(true); });
+            menu.addItem("Wipe Cache & Rescan", [this] {
                 m_server->getPluginList().clear();
                 m_server->saveKnownPluginList();
-                restartServer();
+                restartServer(true);
             });
-            menu.addItem("Restart Server", [this] { restartServer(); });
         }
         return menu;
     }

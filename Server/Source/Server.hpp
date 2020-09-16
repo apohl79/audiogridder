@@ -16,17 +16,20 @@
 #include "Defaults.hpp"
 #include "ProcessorChain.hpp"
 #include "Utils.hpp"
+#include "json.hpp"
 
 namespace e47 {
 
+using json = nlohmann::json;
+
 class Server : public Thread, public LogTag {
   public:
-    Server();
+    Server(json opts = {});
     virtual ~Server();
     void shutdown();
     void loadConfig();
     void saveConfig();
-    int getId() const { return m_id; }
+    int getId() const;
     void setId(int i) { m_id = i; }
     const String& getName() const { return m_name; }
     void setName(const String& name);
@@ -48,6 +51,8 @@ class Server : public Thread, public LogTag {
     void setScreenCapturingFFmpeg(bool b) { m_screenCapturingFFmpeg = b; }
     bool getScreenCapturingOff() const { return m_screenCapturingOff; }
     void setScreenCapturingOff(bool b) { m_screenCapturingOff = b; }
+    bool getScanForPlugins() const { return m_scanForPlugins; }
+    void setScanForPlugins(bool b) { m_scanForPlugins = b; }
     void run();
     const KnownPluginList& getPluginList() const { return m_pluginlist; }
     KnownPluginList& getPluginList() { return m_pluginlist; }
@@ -60,6 +65,8 @@ class Server : public Thread, public LogTag {
     static bool scanPlugin(const String& id, const String& format);
 
   private:
+    json m_opts;
+
     String m_host;
     int m_port = DEFAULT_SERVER_PORT;
     int m_id = 0;
@@ -78,6 +85,7 @@ class Server : public Thread, public LogTag {
     bool m_screenCapturingOff = false;
     StringArray m_vst3Folders;
     StringArray m_vst2Folders;
+    bool m_scanForPlugins = true;
 
     void scanNextPlugin(const String& id, const String& fmt);
     void scanForPlugins();
@@ -86,6 +94,16 @@ class Server : public Thread, public LogTag {
     void loadKnownPluginList();
     static void loadKnownPluginList(KnownPluginList& plist);
     static void saveKnownPluginList(KnownPluginList& plist);
+
+    inline bool hasOpt(const std::string& name) const { return m_opts.find(name) != m_opts.end(); }
+
+    template <typename T>
+    inline T getOpt(const std::string& name, T def) const {
+        if (!hasOpt(name)) {
+            return def;
+        }
+        return m_opts[name].get<T>();
+    }
 };
 
 }  // namespace e47

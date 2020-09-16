@@ -246,6 +246,18 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 
     row++;
 
+    label = std::make_unique<Label>();
+    label->setText("Scan for Plugins at Startup:", NotificationType::dontSendNotification);
+    label->setBounds(getLabelBounds(row));
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
+
+    m_scanForPlugins.setBounds(getCheckBoxBounds(row));
+    m_scanForPlugins.setToggleState(m_app->getServer().getScanForPlugins(), NotificationType::dontSendNotification);
+    addChildAndSetID(&m_scanForPlugins, "scan");
+
+    row++;
+
     totalHeight += row * rowHeight;
 
     m_saveButton.setButtonText("Save");
@@ -258,6 +270,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
         appCpy->getServer().setEnableAU(m_auSupport.getToggleState());
         appCpy->getServer().setEnableVST3(m_vst3Support.getToggleState());
         appCpy->getServer().setEnableVST2(m_vst2Support.getToggleState());
+        appCpy->getServer().setScanForPlugins(m_scanForPlugins.getToggleState());
         switch (m_screenCapturingMode.getSelectedId()) {
             case 1:
                 appCpy->getServer().setScreenCapturingFFmpeg(true);

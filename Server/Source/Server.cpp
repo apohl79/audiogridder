@@ -10,7 +10,6 @@
 #endif
 
 #include "Server.hpp"
-#include "json.hpp"
 #include "Version.hpp"
 #include "App.hpp"
 #include "Metrics.hpp"
@@ -19,9 +18,7 @@
 
 namespace e47 {
 
-using json = nlohmann::json;
-
-Server::Server() : Thread("Server"), LogTag("server") {
+Server::Server(json opts) : Thread("Server"), LogTag("server"), m_opts(opts) {
     logln("starting server (version: " << AUDIOGRIDDER_VERSION << ")...");
     File runFile(SERVER_RUN_FILE);
     runFile.create();
@@ -106,6 +103,9 @@ void Server::loadConfig() {
                 m_pluginexclude.insert(s.get<std::string>());
             }
         }
+        if (j.find("ScanForPlugins") != j.end()) {
+            m_scanForPlugins = j["ScanForPlugins"].get<bool>();
+        }
     }
     File deadmanfile(DEAD_MANS_FILE);
     if (deadmanfile.exists()) {
@@ -145,12 +145,15 @@ void Server::saveConfig() {
     for (auto& p : m_pluginexclude) {
         j["ExcludePlugins"].push_back(p.toStdString());
     }
+    j["ScanForPlugins"] = m_scanForPlugins;
 
     File cfg(SERVER_CONFIG_FILE);
     cfg.deleteFile();
     FileOutputStream fos(cfg);
     fos.writeText(j.dump(4), false, false, "\n");
 }
+
+int Server::getId() const { return getOpt("ID", m_id); }
 
 void Server::loadKnownPluginList() { loadKnownPluginList(m_pluginlist); }
 
@@ -367,7 +370,12 @@ void Server::scanForPlugins(const std::vector<String>& include) {
 }
 
 void Server::run() {
-    scanForPlugins();
+    if (m_scanForPlugins || getOpt("ScanForPlugins", false)) {
+        scanForPlugins();
+    } else {
+        loadKnownPluginList();
+        m_pluginlist.sort(KnownPluginList::sortAlphabetically, true);
+    }
     saveConfig();
     saveKnownPluginList();
 
@@ -377,16 +385,16 @@ void Server::run() {
     setsockopt(m_masterSocket.getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
 #endif
 
-    ServiceResponder::initialize(m_port + m_id, m_id, m_name);
+    ServiceResponder::initialize(m_port + getId(), getId(), m_name);
 
     if (m_name.isEmpty()) {
         m_name = ServiceResponder::getHostName();
         saveConfig();
     }
 
-    logln("creating listener " << (m_host.length() == 0 ? "*" : m_host) << ":" << (m_port + m_id));
-    if (m_masterSocket.createListener(m_port + m_id, m_host)) {
-        logln("server started: ID=" << m_id << ", PORT=" << m_port + m_id << ", NAME=" << m_name);
+    logln("creating listener " << (m_host.length() == 0 ? "*" : m_host) << ":" << (m_port + getId()));
+    if (m_masterSocket.createListener(m_port + getId(), m_host)) {
+        logln("server started: ID=" << getId() << ", PORT=" << m_port + getId() << ", NAME=" << m_name);
         while (!currentThreadShouldExit()) {
             auto* clnt = m_masterSocket.waitForNextConnection();
             if (nullptr != clnt) {
