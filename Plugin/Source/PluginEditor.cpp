@@ -180,32 +180,28 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
         if (recents.size() > 0) {
             m.addSeparator();
         }
-        // create type menu
-        std::map<String, PopupMenu> typeMenus;
+        // ceate menu structure: type -> category -> company -> plugin
+        std::map<String, std::map<String, std::map<String, std::map<String, ServerPlugin>>>> menuMap;
         for (const auto& type : m_processor.getPluginTypes()) {
-            PopupMenu& sub = typeMenus[type];
-            std::map<String, PopupMenu> companyMenus;
             for (const auto& plug : m_processor.getPlugins(type)) {
-                auto& menu = companyMenus[plug.getCompany()];
-                menu.addItem(plug.getName(), [addFn, plug] { addFn(plug); });
-            }
-            for (auto& company : companyMenus) {
-                sub.addSubMenu(company.first, company.second);
+                menuMap[type][plug.getCategory()][plug.getCompany()][plug.getName()] = plug;
             }
         }
-        if (typeMenus.size() > 1) {
-            for (auto& sub : typeMenus) {
-                m.addSubMenu(sub.first, sub.second);
-            }
-        } else if (typeMenus.size() > 0) {
-            // skip the type menu if there is only one type
-            for (auto& tm : typeMenus) {
-                PopupMenu::MenuItemIterator it(tm.second);
-                while (it.next()) {
-                    auto& item = it.getItem();
-                    m.addSubMenu(item.text, *item.subMenu);
+        for (auto& type : menuMap) {
+            PopupMenu typeMenu;
+            for (auto& category : type.second) {
+                PopupMenu categoryMenu;
+                for (auto& company : category.second) {
+                    PopupMenu companyMenu;
+                    for (auto& pair : company.second) {
+                        auto& plug = pair.second;
+                        companyMenu.addItem(plug.getName(), [addFn, plug] { addFn(plug); });
+                    }
+                    categoryMenu.addSubMenu(company.first, companyMenu);
                 }
+                typeMenu.addSubMenu(category.first, categoryMenu);
             }
+            m.addSubMenu(type.first, typeMenu);
         }
         m.showAt(button);
     } else {
