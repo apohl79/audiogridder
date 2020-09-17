@@ -247,6 +247,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
             setContentNonOwned(m_editor, true);
             setTitleBarHeight(30);
             setVisible(true);
+            setAlwaysOnTop(true);
             if (!getApp()->getServer().getScreenCapturingOff()) {
                 if (m_callbackNative) {
                     startTimer(50);
