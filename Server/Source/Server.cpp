@@ -356,7 +356,14 @@ void Server::scanForPlugins(const std::vector<String>& include) {
             if ((nullptr == plugindesc || fmt->pluginNeedsRescanning(*plugindesc)) &&
                 !m_pluginlist.getBlacklistedFiles().contains(fileOrId) && !shouldExclude(name, include)) {
                 logln("  scanning: " << name);
-                getApp()->setSplashInfo(String("Scanning plugin ") + name + "...");
+                String splashName = name;
+                if (fmt->getName().compare("AudioUnit")) {
+                    File f(name);
+                    if (f.exists()) {
+                        splashName = f.getFileName();
+                    }
+                }
+                getApp()->setSplashInfo(String("Scanning ") + fmt->getName() + ": " + splashName + " ...");
                 scanNextPlugin(fileOrId, fmt->getName());
             } else {
                 logln("  (skipping: " << name << ")");
