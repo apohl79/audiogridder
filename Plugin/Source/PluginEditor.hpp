@@ -25,7 +25,7 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     void buttonClicked(Button* button) override;
     void focusOfChildComponentChanged(FocusChangeType cause) override;
 
-    void mouseUp(const MouseEvent& event) override;  // server icon
+    void mouseUp(const MouseEvent& event) override;
 
     void setConnected(bool connected);
 
@@ -39,7 +39,7 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     std::vector<std::unique_ptr<PluginButton>> m_pluginButtons;
     PluginButton m_newPluginButton;
     ImageComponent m_pluginScreen;
-    ImageComponent m_srvIcon;
+    ImageComponent m_srvIcon, m_settingsIcon;
     Label m_srvLabel, m_versionLabel;
     bool m_connected = false;
 
@@ -57,6 +57,13 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     void disableStButton(TextButton* b);
     void hilightStButton(TextButton* b);
     bool isHilightedStButton(TextButton* b);
+
+    struct MenuLevel {
+        std::unique_ptr<std::map<String, ServerPlugin>> entryMap;
+        std::unique_ptr<std::map<String, MenuLevel>> subMap;
+    };
+
+    PopupMenu createPluginMenu(MenuLevel& level, std::function<void(const ServerPlugin& plug)> addFn);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioGridderAudioProcessorEditor)
 };

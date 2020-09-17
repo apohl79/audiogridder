@@ -7,12 +7,12 @@
   the "//[xyz]" and "//[/xyz]" sections will be retained when the file is loaded
   and re-saved.
 
-  Created with Projucer version: 5.4.7
+  Created with Projucer version: 6.0.1
 
   ------------------------------------------------------------------------------
 
   The Projucer is part of the JUCE library.
-  Copyright (c) 2017 - ROLI Ltd.
+  Copyright (c) 2020 - Raw Material Software Limited.
 
   ==============================================================================
 */
@@ -48,11 +48,11 @@ Images::~Images() {
 }
 
 //==============================================================================
-void Images::paint(Graphics& g) {
+void Images::paint(juce::Graphics& g) {
     //[UserPrePaint] Add your own custom painting code here..
     //[/UserPrePaint]
 
-    g.fillAll(Colour(0xff323e44));
+    g.fillAll(juce::Colour(0xff323e44));
 
     //[UserPaint] Add your own custom painting code here..
     //[/UserPaint]
@@ -285,6 +285,23 @@ static const unsigned char resource_Images_server_png[] = {
 
 const char* Images::server_png = (const char*)resource_Images_server_png;
 const int Images::server_pngSize = 4317;
+
+// JUCER_RESOURCE: settings_png, 243, "../../settings.png"
+static const unsigned char resource_Images_settings_png[] = {
+    137, 80,  78,  71,  13,  10,  26,  10,  0,   0,   0,   13,  73,  72,  68,  82,  0,   0,   0,   24,  0,   0,   0,
+    24,  8,   6,   0,   0,   0,   224, 119, 61,  248, 0,   0,   0,   6,   98,  75,  71,  68,  0,   255, 0,   255, 0,
+    255, 160, 189, 167, 147, 0,   0,   0,   9,   112, 72,  89,  115, 0,   0,   13,  215, 0,   0,   13,  215, 1,   66,
+    40,  155, 120, 0,   0,   0,   7,   116, 73,  77,  69,  7,   228, 9,   17,  10,  27,  13,  126, 164, 147, 78,  0,
+    0,   0,   128, 73,  68,  65,  84,  72,  199, 237, 150, 225, 10,  128, 32,  12,  132, 111, 209, 99,  213, 211, 207,
+    247, 186, 254, 40,  132, 101, 115, 133, 146, 209, 7,   251, 33,  167, 142, 221, 134, 40,  36,  209, 146, 9,   141,
+    201, 19,  104, 140, 18,  110, 93,  50,  139, 210, 66,  10,  23,  184, 245, 238, 22,  125, 51,  129, 70,  111, 153,
+    121, 77,  163, 225, 125, 42,  240, 78,  145, 197, 225, 252, 156, 109, 8,   173, 43,  168, 233, 7,   0,   172, 119,
+    43,  176, 88,  12,  253, 232, 0,   73,  101, 25,  37,  137, 93,  36,  80,  27,  175, 155, 162, 51,  93,  47,  172,
+    11,  67,  84,  240, 191, 166, 207, 240, 62,  21,  110, 93,  134, 255, 85,  108, 24,  12,  130, 54,  197, 92,  203,
+    81,  0,   0,   0,   0,   73,  69,  78,  68,  174, 66,  96,  130, 0,   0};
+
+const char* Images::settings_png = (const char*)resource_Images_settings_png;
+const int Images::settings_pngSize = 243;
 
 //[EndFile] You can add extra defines here...
 //[/EndFile]

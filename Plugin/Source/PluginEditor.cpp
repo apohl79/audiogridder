@@ -29,12 +29,18 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
     m_srvIcon.setBounds(5, 5, 20, 20);
     m_srvIcon.addMouseListener(this, true);
 
+    addAndMakeVisible(m_settingsIcon);
+    m_settingsIcon.setImage(ImageCache::getFromMemory(Images::settings_png, Images::settings_pngSize));
+    m_settingsIcon.setAlpha(0.5);
+    m_settingsIcon.setBounds(175, 5, 20, 20);
+    m_settingsIcon.addMouseListener(this, true);
+
     addAndMakeVisible(m_srvLabel);
     m_srvLabel.setText("not connected", NotificationType::dontSendNotification);
 
     setConnected(m_processor.getClient().isReadyLockFree());
 
-    m_srvLabel.setBounds(30, 5, 170, 20);
+    m_srvLabel.setBounds(30, 5, 140, 20);
     auto font = m_srvLabel.getFont();
     font.setHeight(font.getHeight() - 2);
     m_srvLabel.setFont(font);
@@ -180,28 +186,37 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
         if (recents.size() > 0) {
             m.addSeparator();
         }
-        // ceate menu structure: type -> category -> company -> plugin
-        std::map<String, std::map<String, std::map<String, std::map<String, ServerPlugin>>>> menuMap;
+        // ceate menu structure: type -> [category] -> [company] -> plugin
+        std::map<String, MenuLevel> menuMap;
         for (const auto& type : m_processor.getPluginTypes()) {
             for (const auto& plug : m_processor.getPlugins(type)) {
-                menuMap[type][plug.getCategory()][plug.getCompany()][plug.getName()] = plug;
+                auto& typeEntry = menuMap[type];
+                if (nullptr == typeEntry.subMap) {
+                    typeEntry.subMap = std::make_unique<std::map<String, MenuLevel>>();
+                }
+                auto* level = &typeEntry;
+                if (m_processor.getMenuShowCategory()) {
+                    if (nullptr == level->subMap) {
+                        level->subMap = std::make_unique<std::map<String, MenuLevel>>();
+                    }
+                    auto& entry = (*level->subMap)[plug.getCategory()];
+                    level = &entry;
+                }
+                if (m_processor.getMenuShowCompany()) {
+                    if (nullptr == level->subMap) {
+                        level->subMap = std::make_unique<std::map<String, MenuLevel>>();
+                    }
+                    auto& entry = (*level->subMap)[plug.getCompany()];
+                    level = &entry;
+                }
+                if (nullptr == level->entryMap) {
+                    level->entryMap = std::make_unique<std::map<String, ServerPlugin>>();
+                }
+                (*level->entryMap)[plug.getName()] = plug;
             }
         }
         for (auto& type : menuMap) {
-            PopupMenu typeMenu;
-            for (auto& category : type.second) {
-                PopupMenu categoryMenu;
-                for (auto& company : category.second) {
-                    PopupMenu companyMenu;
-                    for (auto& pair : company.second) {
-                        auto& plug = pair.second;
-                        companyMenu.addItem(plug.getName(), [addFn, plug] { addFn(plug); });
-                    }
-                    categoryMenu.addSubMenu(company.first, companyMenu);
-                }
-                typeMenu.addSubMenu(category.first, categoryMenu);
-            }
-            m.addSubMenu(type.first, typeMenu);
+            m.addSubMenu(type.first, createPluginMenu(type.second, addFn));
         }
         m.showAt(button);
     } else {
@@ -460,97 +475,108 @@ void AudioGridderAudioProcessorEditor::setConnected(bool connected) {
 }
 
 void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
-    if (!m_srvIcon.contains(event.getMouseDownPosition())) {
-        return;
-    }
-    PopupMenu m;
-    m.addSectionHeader("Buffering");
-    PopupMenu bufMenu;
-    int rate = as<int>(lround(m_processor.getSampleRate()));
-    int iobuf = m_processor.getBlockSize();
-    auto getName = [rate, iobuf](int blocks) -> String {
-        String n;
-        n << blocks << " Blocks (+" << blocks * iobuf * 1000 / rate << "ms)";
-        return n;
-    };
-    bufMenu.addItem("Disabled (+0ms)", true, m_processor.getClient().NUM_OF_BUFFERS == 0,
-                    [this] { m_processor.saveConfig(0); });
-    bufMenu.addItem(getName(2), true, m_processor.getClient().NUM_OF_BUFFERS == 2,
-                    [this] { m_processor.saveConfig(2); });
-    bufMenu.addItem(getName(4), true, m_processor.getClient().NUM_OF_BUFFERS == 4,
-                    [this] { m_processor.saveConfig(4); });
-    bufMenu.addItem(getName(8), true, m_processor.getClient().NUM_OF_BUFFERS == 8,
-                    [this] { m_processor.saveConfig(8); });
-    bufMenu.addItem(getName(12), true, m_processor.getClient().NUM_OF_BUFFERS == 12,
-                    [this] { m_processor.saveConfig(12); });
-    bufMenu.addItem(getName(16), true, m_processor.getClient().NUM_OF_BUFFERS == 16,
-                    [this] { m_processor.saveConfig(16); });
-    bufMenu.addItem(getName(20), true, m_processor.getClient().NUM_OF_BUFFERS == 20,
-                    [this] { m_processor.saveConfig(20); });
-    bufMenu.addItem(getName(24), true, m_processor.getClient().NUM_OF_BUFFERS == 24,
-                    [this] { m_processor.saveConfig(24); });
-    bufMenu.addItem(getName(28), true, m_processor.getClient().NUM_OF_BUFFERS == 28,
-                    [this] { m_processor.saveConfig(28); });
-    bufMenu.addItem(getName(30), true, m_processor.getClient().NUM_OF_BUFFERS == 30,
-                    [this] { m_processor.saveConfig(30); });
-    m.addSubMenu("Buffer Size", bufMenu);
-    m.addSectionHeader("Servers");
-    auto& servers = m_processor.getServers();
-    auto active = m_processor.getActiveServerHost();
-    for (auto s : servers) {
-        if (s == active) {
-            PopupMenu srvMenu;
-            srvMenu.addItem("Rescan", [this] { m_processor.getClient().rescan(); });
-            srvMenu.addItem("Wipe Cache & Rescan", [this] { m_processor.getClient().rescan(true); });
-            srvMenu.addItem("Reconnect", [this] { m_processor.getClient().reconnect(); });
-            m.addSubMenu(s, srvMenu, true, nullptr, true, 0);
-        } else {
-            PopupMenu srvMenu;
-            srvMenu.addItem("Connect", [this, s] {
-                m_processor.setActiveServer(s);
-                m_processor.saveConfig();
-            });
-            srvMenu.addItem("Remove", [this, s] {
-                m_processor.delServer(s);
-                m_processor.saveConfig();
-            });
-            m.addSubMenu(s, srvMenu);
-        }
-    }
-    auto serversMDNS = m_processor.getServersMDNS();
-    if (serversMDNS.size() > 0) {
-        for (auto s : serversMDNS) {
-            if (servers.contains(s.getHostAndID())) {
-                continue;
-            }
-            if (s.getHostAndID() == active) {
+    if (event.eventComponent == &m_srvIcon) {
+        PopupMenu m;
+        m.addSectionHeader("Buffering");
+        PopupMenu bufMenu;
+        int rate = as<int>(lround(m_processor.getSampleRate()));
+        int iobuf = m_processor.getBlockSize();
+        auto getName = [rate, iobuf](int blocks) -> String {
+            String n;
+            n << blocks << " Blocks (+" << blocks * iobuf * 1000 / rate << "ms)";
+            return n;
+        };
+        bufMenu.addItem("Disabled (+0ms)", true, m_processor.getClient().NUM_OF_BUFFERS == 0,
+                        [this] { m_processor.saveConfig(0); });
+        bufMenu.addItem(getName(2), true, m_processor.getClient().NUM_OF_BUFFERS == 2,
+                        [this] { m_processor.saveConfig(2); });
+        bufMenu.addItem(getName(4), true, m_processor.getClient().NUM_OF_BUFFERS == 4,
+                        [this] { m_processor.saveConfig(4); });
+        bufMenu.addItem(getName(8), true, m_processor.getClient().NUM_OF_BUFFERS == 8,
+                        [this] { m_processor.saveConfig(8); });
+        bufMenu.addItem(getName(12), true, m_processor.getClient().NUM_OF_BUFFERS == 12,
+                        [this] { m_processor.saveConfig(12); });
+        bufMenu.addItem(getName(16), true, m_processor.getClient().NUM_OF_BUFFERS == 16,
+                        [this] { m_processor.saveConfig(16); });
+        bufMenu.addItem(getName(20), true, m_processor.getClient().NUM_OF_BUFFERS == 20,
+                        [this] { m_processor.saveConfig(20); });
+        bufMenu.addItem(getName(24), true, m_processor.getClient().NUM_OF_BUFFERS == 24,
+                        [this] { m_processor.saveConfig(24); });
+        bufMenu.addItem(getName(28), true, m_processor.getClient().NUM_OF_BUFFERS == 28,
+                        [this] { m_processor.saveConfig(28); });
+        bufMenu.addItem(getName(30), true, m_processor.getClient().NUM_OF_BUFFERS == 30,
+                        [this] { m_processor.saveConfig(30); });
+        m.addSubMenu("Buffer Size", bufMenu);
+        m.addSectionHeader("Servers");
+        auto& servers = m_processor.getServers();
+        auto active = m_processor.getActiveServerHost();
+        for (auto s : servers) {
+            if (s == active) {
                 PopupMenu srvMenu;
                 srvMenu.addItem("Rescan", [this] { m_processor.getClient().rescan(); });
                 srvMenu.addItem("Wipe Cache & Rescan", [this] { m_processor.getClient().rescan(true); });
                 srvMenu.addItem("Reconnect", [this] { m_processor.getClient().reconnect(); });
-                m.addSubMenu(s.getNameAndID(), srvMenu, true, nullptr, true, 0);
+                m.addSubMenu(s, srvMenu, true, nullptr, true, 0);
             } else {
                 PopupMenu srvMenu;
                 srvMenu.addItem("Connect", [this, s] {
                     m_processor.setActiveServer(s);
                     m_processor.saveConfig();
                 });
-                m.addSubMenu(s.getNameAndID(), srvMenu);
+                srvMenu.addItem("Remove", [this, s] {
+                    m_processor.delServer(s);
+                    m_processor.saveConfig();
+                });
+                m.addSubMenu(s, srvMenu);
             }
         }
-    }
-    m.addSeparator();
-    m.addItem("Add", [this] {
-        auto w = new NewServerWindow(as<float>(getScreenX() + 2), as<float>(getScreenY() + 30));
-        w->onOk([this](String server) {
-            m_processor.addServer(server);
-            m_processor.setActiveServer(server);
+        auto serversMDNS = m_processor.getServersMDNS();
+        if (serversMDNS.size() > 0) {
+            for (auto s : serversMDNS) {
+                if (servers.contains(s.getHostAndID())) {
+                    continue;
+                }
+                if (s.getHostAndID() == active) {
+                    PopupMenu srvMenu;
+                    srvMenu.addItem("Rescan", [this] { m_processor.getClient().rescan(); });
+                    srvMenu.addItem("Wipe Cache & Rescan", [this] { m_processor.getClient().rescan(true); });
+                    srvMenu.addItem("Reconnect", [this] { m_processor.getClient().reconnect(); });
+                    m.addSubMenu(s.getNameAndID(), srvMenu, true, nullptr, true, 0);
+                } else {
+                    PopupMenu srvMenu;
+                    srvMenu.addItem("Connect", [this, s] {
+                        m_processor.setActiveServer(s);
+                        m_processor.saveConfig();
+                    });
+                    m.addSubMenu(s.getNameAndID(), srvMenu);
+                }
+            }
+        }
+        m.addSeparator();
+        m.addItem("Add", [this] {
+            auto w = new NewServerWindow(as<float>(getScreenX() + 2), as<float>(getScreenY() + 30));
+            w->onOk([this](String server) {
+                m_processor.addServer(server);
+                m_processor.setActiveServer(server);
+                m_processor.saveConfig();
+            });
+            w->setAlwaysOnTop(true);
+            w->runModalLoop();
+        });
+        m.showAt(&m_srvIcon);
+    } else if (event.eventComponent == &m_settingsIcon) {
+        PopupMenu m;
+        m.addSectionHeader("Settings");
+        m.addItem("Show Category Menu", true, m_processor.getMenuShowCategory(), [this] {
+            m_processor.setMenuShowCategory(!m_processor.getMenuShowCategory());
             m_processor.saveConfig();
         });
-        w->setAlwaysOnTop(true);
-        w->runModalLoop();
-    });
-    m.showAt(&m_srvIcon);
+        m.addItem("Show Company Menu", true, m_processor.getMenuShowCompany(), [this] {
+            m_processor.setMenuShowCompany(!m_processor.getMenuShowCompany());
+            m_processor.saveConfig();
+        });
+        m.showAt(&m_settingsIcon);
+    }
 }
 
 void AudioGridderAudioProcessorEditor::initStButtons() {
@@ -577,3 +603,20 @@ void AudioGridderAudioProcessorEditor::hilightStButton(TextButton* b) {
 }
 
 bool AudioGridderAudioProcessorEditor::isHilightedStButton(TextButton* b) { return b == m_hilightedStButton; }
+
+PopupMenu AudioGridderAudioProcessorEditor::createPluginMenu(MenuLevel& level,
+                                                             std::function<void(const ServerPlugin& plug)> addFn) {
+    PopupMenu m;
+    if (nullptr != level.entryMap) {
+        for (auto& pair : *level.entryMap) {
+            auto& plug = pair.second;
+            m.addItem(pair.first, [addFn, plug] { addFn(plug); });
+        }
+    }
+    if (nullptr != level.subMap) {
+        for (auto& pair : *level.subMap) {
+            m.addSubMenu(pair.first, createPluginMenu(pair.second, addFn));
+        }
+    }
+    return m;
+}

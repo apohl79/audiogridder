@@ -97,6 +97,12 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
             if (j.find("NumberOfAutomationSlots") != j.end()) {
                 m_numberOfAutomationSlots = j["NumberOfAutomationSlots"].get<int>();
             }
+            if (j.find("MenuShowCategory") != j.end()) {
+                m_menuShowCategory = j["MenuShowCategory"].get<bool>();
+            }
+            if (j.find("MenuShowCompany") != j.end()) {
+                m_menuShowCompany = j["MenuShowCompany"].get<bool>();
+            }
         }
     } catch (json::parse_error& e) {
         logln("parsing config failed: " << e.what());
@@ -171,6 +177,28 @@ AudioGridderAudioProcessor::~AudioGridderAudioProcessor() {
     TimeStatistics::cleanup();
     ServiceReceiver::cleanup();
     AGLogger::cleanup();
+}
+
+void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
+    auto jservers = json::array();
+    for (auto& srv : m_servers) {
+        jservers.push_back(srv.toStdString());
+    }
+    if (numOfBuffers < 0) {
+        numOfBuffers = m_client->NUM_OF_BUFFERS;
+    }
+    json jcfg;
+    jcfg["_comment_"] = "PLEASE DO NOT CHANGE THIS FILE WHILE YOUR DAW IS RUNNING AND HAS AUDIOGRIDDER PLUGINS LOADED";
+    jcfg["Servers"] = jservers;
+    jcfg["LastServer"] = m_client->getServerHostAndID().toStdString();
+    jcfg["NumberOfBuffers"] = numOfBuffers;
+    jcfg["NumberOfAutomationSlots"] = m_numberOfAutomationSlots;
+    jcfg["MenuShowCategory"] = m_menuShowCategory;
+    jcfg["MenuShowCompany"] = m_menuShowCompany;
+    File cfg(PLUGIN_CONFIG_FILE);
+    cfg.deleteFile();
+    FileOutputStream fos(cfg);
+    fos.writeText(jcfg.dump(4), false, false, "\n");
 }
 
 const String AudioGridderAudioProcessor::getName() const { return JucePlugin_Name; }
@@ -390,26 +418,6 @@ void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData) {
     destData.append(dump.data(), dump.length());
 
     saveConfig();
-}
-
-void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
-    auto jservers = json::array();
-    for (auto& srv : m_servers) {
-        jservers.push_back(srv.toStdString());
-    }
-    if (numOfBuffers < 0) {
-        numOfBuffers = m_client->NUM_OF_BUFFERS;
-    }
-    json jcfg;
-    jcfg["_comment_"] = "PLEASE DO NOT CHANGE THIS FILE WHILE YOUR DAW IS RUNNING AND HAS AUDIOGRIDDER PLUGINS LOADED";
-    jcfg["Servers"] = jservers;
-    jcfg["LastServer"] = m_client->getServerHostAndID().toStdString();
-    jcfg["NumberOfBuffers"] = numOfBuffers;
-    jcfg["NumberOfAutomationSlots"] = m_numberOfAutomationSlots;
-    File cfg(PLUGIN_CONFIG_FILE);
-    cfg.deleteFile();
-    FileOutputStream fos(cfg);
-    fos.writeText(jcfg.dump(4), false, false, "\n");
 }
 
 void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {

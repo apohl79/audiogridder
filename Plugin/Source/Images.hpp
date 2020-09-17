@@ -48,6 +48,9 @@ class Images : public Component {
     static const char* server_png;
     static const int server_pngSize;
 
+    static const char* settings_png;
+    static const int settings_pngSize;
+
   private:
     //[UserVariables]   -- You can add your own custom variables in this section.
     //[/UserVariables]

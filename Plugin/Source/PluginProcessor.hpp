@@ -98,6 +98,11 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
     void restoreSettingsB();
     void resetSettingsAB();
 
+    bool getMenuShowCategory() const { return m_menuShowCategory; }
+    void setMenuShowCategory(bool b) { m_menuShowCategory = b; }
+    bool getMenuShowCompany() const { return m_menuShowCompany; }
+    void setMenuShowCompany(bool b) { m_menuShowCompany = b; }
+
     auto& getServers() const { return m_servers; }
     void addServer(const String& s) { m_servers.add(s); }
     void delServer(const String& s);
@@ -110,8 +115,8 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
         return e47::as<int>(lround(m_client->NUM_OF_BUFFERS * getBlockSize() * 1000 / getSampleRate()));
     }
 
-    // It looks like most hosts do not support dynamic parameter creation or changes to existing parameters. Just the
-    // name can be updated. So we create slots at the start.
+    // It looks like most hosts do not support dynamic parameter creation or changes to existing parameters. Logic at
+    // least allows for the name to be updated. So we create slots at the start.
     class Parameter : public AudioProcessorParameter {
       public:
         Parameter(AudioGridderAudioProcessor& processor, int slot) : m_processor(processor), m_slotId(slot) {}
@@ -158,6 +163,9 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
     std::mutex m_bypassBufferMtx;
 
     String m_settingsA, m_settingsB;
+
+    bool m_menuShowCategory = true;
+    bool m_menuShowCompany = true;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioGridderAudioProcessor)
 };
