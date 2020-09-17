@@ -21,7 +21,7 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
 
     void paint(Graphics&) override;
     void resized() override;
-    void buttonClicked(Button* button, const ModifierKeys& modifiers) override;
+    void buttonClicked(Button* button, const ModifierKeys& modifiers, PluginButton::AreaType area) override;
     void buttonClicked(Button* button) override;
     void focusOfChildComponentChanged(FocusChangeType cause) override;
 
@@ -48,8 +48,8 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     int m_currentActiveAB = -1;
     TextButton* m_hilightedStButton = nullptr;
 
-    Button* addPluginButton(const String& id, const String& name);
-    std::vector<Button*> getPluginButtons(const String& id);
+    PluginButton* addPluginButton(const String& id, const String& name);
+    std::vector<PluginButton*> getPluginButtons(const String& id);
     int getPluginIndex(const String& name);
 
     void initStButtons();

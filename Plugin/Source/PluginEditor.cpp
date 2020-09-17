@@ -157,7 +157,8 @@ void AudioGridderAudioProcessorEditor::resized() {
     m_versionLabel.setBounds(0, windowHeight - 11, m_versionLabel.getWidth(), m_versionLabel.getHeight());
 }
 
-void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const ModifierKeys& modifiers) {
+void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const ModifierKeys& modifiers,
+                                                     PluginButton::AreaType area) {
     if (!button->getName().compare("newPlug")) {
         auto addFn = [this](const ServerPlugin& plug) {
             if (m_processor.loadPlugin(plug.getId(), plug.getName())) {
@@ -210,7 +211,6 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
     } else {
         int idx = getPluginIndex(button->getName());
         int active = m_processor.getActivePlugin();
-        PluginButton::AreaType area = m_pluginButtons[as<size_t>(idx)]->getAreaType();
         auto editFn = [this, idx, active] {
             if (m_processor.isBypassed(idx)) {
                 return;
@@ -395,7 +395,7 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button) {
     }
 }
 
-Button* AudioGridderAudioProcessorEditor::addPluginButton(const String& id, const String& name) {
+PluginButton* AudioGridderAudioProcessorEditor::addPluginButton(const String& id, const String& name) {
     int num = 0;
     for (auto& plug : m_pluginButtons) {
         if (!id.compare(plug->getPluginId())) {
@@ -414,8 +414,8 @@ Button* AudioGridderAudioProcessorEditor::addPluginButton(const String& id, cons
     return ret;
 }
 
-std::vector<Button*> AudioGridderAudioProcessorEditor::getPluginButtons(const String& id) {
-    std::vector<Button*> ret;
+std::vector<PluginButton*> AudioGridderAudioProcessorEditor::getPluginButtons(const String& id) {
+    std::vector<PluginButton*> ret;
     for (auto& b : m_pluginButtons) {
         if (b->getPluginId() == id) {
             ret.push_back(b.get());

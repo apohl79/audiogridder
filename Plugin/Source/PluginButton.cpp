@@ -95,8 +95,9 @@ void PluginButton::paintButton(Graphics& g, bool shouldDrawButtonAsHighlighted, 
 }
 
 void PluginButton::clicked(const ModifierKeys& modifiers) {
-    if (m_listener != nullptr) {
-        m_listener->buttonClicked(this, modifiers);
+    auto area = getAreaType();
+    if (m_listener != nullptr && (m_enabled || area == PluginButton::DELETE)) {
+        m_listener->buttonClicked(this, modifiers, area);
     }
 }
 
@@ -125,19 +126,24 @@ void PluginButton::mouseUp(const MouseEvent& event) {
     Button::mouseUp(event);
 }
 
+void PluginButton::mouseMove(const MouseEvent& event) {
+    m_lastMousePosition = event.getPosition();
+    Button::mouseMove(event);
+}
+
 PluginButton::AreaType PluginButton::getAreaType() const {
     if (!m_withExtraButtons) {
         return PluginButton::MAIN;
     }
-    if (m_bypassArea.contains(m_lastMousePosition)) {
+    if (isWithinArea(m_bypassArea, m_lastMousePosition)) {
         return PluginButton::BYPASS;
 #if !JucePlugin_IsSynth
-    } else if (m_moveUpArea.contains(m_lastMousePosition)) {
+    } else if (isWithinArea(m_moveUpArea, m_lastMousePosition)) {
         return PluginButton::MOVE_UP;
-    } else if (m_moveDownArea.contains(m_lastMousePosition)) {
+    } else if (isWithinArea(m_moveDownArea, m_lastMousePosition)) {
         return PluginButton::MOVE_DOWN;
 #endif
-    } else if (m_deleteArea.contains(m_lastMousePosition)) {
+    } else if (isWithinArea(m_deleteArea, m_lastMousePosition)) {
         return PluginButton::DELETE;
     }
     return PluginButton::MAIN;
