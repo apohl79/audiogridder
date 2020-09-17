@@ -500,6 +500,8 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
     for (auto s : servers) {
         if (s == active) {
             PopupMenu srvMenu;
+            srvMenu.addItem("Rescan", [this] { m_processor.getClient().rescan(); });
+            srvMenu.addItem("Wipe Cache & Rescan", [this] { m_processor.getClient().rescan(true); });
             srvMenu.addItem("Reconnect", [this] { m_processor.getClient().reconnect(); });
             m.addSubMenu(s, srvMenu, true, nullptr, true, 0);
         } else {
@@ -523,6 +525,8 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
             }
             if (s.getHostAndID() == active) {
                 PopupMenu srvMenu;
+                srvMenu.addItem("Rescan", [this] { m_processor.getClient().rescan(); });
+                srvMenu.addItem("Wipe Cache & Rescan", [this] { m_processor.getClient().rescan(true); });
                 srvMenu.addItem("Reconnect", [this] { m_processor.getClient().reconnect(); });
                 m.addSubMenu(s.getNameAndID(), srvMenu, true, nullptr, true, 0);
             } else {

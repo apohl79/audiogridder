@@ -802,6 +802,13 @@ void Client::updateScreenCaptureArea(int val) {
     msg.send(m_cmd_socket.get());
 }
 
+void Client::rescan(bool wipe) {
+    Message<Rescan> msg;
+    PLD(msg).setNumber(wipe ? 1 : 0);
+    dbglock lock(*this, 26);
+    msg.send(m_cmd_socket.get());
+}
+
 StreamingSocket* Client::accept(StreamingSocket& sock) const {
     StreamingSocket* clnt = nullptr;
     int retry = 100;

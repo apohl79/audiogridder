@@ -149,6 +149,9 @@ void Worker::run() {
                     case UpdateScreenCaptureArea::Type:
                         handleMessage(Message<Any>::convert<UpdateScreenCaptureArea>(msg));
                         break;
+                    case Rescan::Type:
+                        handleMessage(Message<Any>::convert<Rescan>(msg));
+                        break;
                     default:
                         logln("unknown message type " << msg->getType());
                 }
@@ -417,6 +420,17 @@ void Worker::handleMessage(std::shared_ptr<Message<GetParameterValue>> msg) {
 
 void Worker::handleMessage(std::shared_ptr<Message<UpdateScreenCaptureArea>> msg) {
     getApp()->updateScreenCaptureArea(pPLD(msg).getNumber());
+}
+
+void Worker::handleMessage(std::shared_ptr<Message<Rescan>> msg) {
+    bool wipe = pPLD(msg).getNumber() == 1;
+    MessageManager::callAsync([wipe] {
+        if (wipe) {
+            getApp()->getServer().getPluginList().clear();
+            getApp()->getServer().saveKnownPluginList();
+        }
+        getApp()->restartServer(true);
+    });
 }
 
 }  // namespace e47

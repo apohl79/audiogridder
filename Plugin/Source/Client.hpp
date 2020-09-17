@@ -172,6 +172,8 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
 
     void updateScreenCaptureArea(int val);
 
+    void rescan(bool wipe = false);
+
     // MouseListener
     void mouseMove(const MouseEvent& event) override;
     void mouseEnter(const MouseEvent& event) override;

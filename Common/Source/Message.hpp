@@ -709,6 +709,12 @@ class UpdateScreenCaptureArea : public NumberPayload {
     UpdateScreenCaptureArea() : NumberPayload(Type) {}
 };
 
+class Rescan : public NumberPayload {
+  public:
+    static constexpr int Type = __COUNTER__;
+    Rescan() : NumberPayload(Type) {}
+};
+
 template <typename T>
 class Message {
   public:
