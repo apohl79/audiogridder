@@ -35,6 +35,10 @@
             file="../Source/AudioStreamer.hpp"/>
       <FILE id="voq3fe" name="Client.cpp" compile="1" resource="0" file="../Source/Client.cpp"/>
       <FILE id="DVEYaG" name="Client.hpp" compile="0" resource="0" file="../Source/Client.hpp"/>
+      <FILE id="UWmkMQ" name="GenericEditor.cpp" compile="1" resource="0"
+            file="../Source/GenericEditor.cpp"/>
+      <FILE id="qnXlki" name="GenericEditor.hpp" compile="0" resource="0"
+            file="../Source/GenericEditor.hpp"/>
       <FILE id="zdADmQ" name="ImageReader.cpp" compile="1" resource="0" file="../Source/ImageReader.cpp"/>
       <FILE id="jsRCkN" name="ImageReader.hpp" compile="0" resource="0" file="../Source/ImageReader.hpp"/>
       <FILE id="MM6aeB" name="Images.cpp" compile="1" resource="0" file="../Source/Images.cpp"/>

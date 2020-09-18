@@ -21,8 +21,6 @@
 #include <signal.h>
 #endif
 
-using json = nlohmann::json;
-
 using namespace e47;
 
 AudioGridderAudioProcessor::AudioGridderAudioProcessor()
@@ -102,6 +100,9 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
             }
             if (j.find("MenuShowCompany") != j.end()) {
                 m_menuShowCompany = j["MenuShowCompany"].get<bool>();
+            }
+            if (j.find("GenericEditor") != j.end()) {
+                m_genericEditor = j["GenericEditor"].get<bool>();
             }
         }
     } catch (json::parse_error& e) {
@@ -195,6 +196,7 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
     jcfg["NumberOfAutomationSlots"] = m_numberOfAutomationSlots;
     jcfg["MenuShowCategory"] = m_menuShowCategory;
     jcfg["MenuShowCompany"] = m_menuShowCompany;
+    jcfg["GenericEditor"] = m_genericEditor;
     File cfg(PLUGIN_CONFIG_FILE);
     cfg.deleteFile();
     FileOutputStream fos(cfg);
@@ -536,7 +538,9 @@ void AudioGridderAudioProcessor::unloadPlugin(int idx) {
 
 void AudioGridderAudioProcessor::editPlugin(int idx) {
     logln("edit plugin " << idx);
-    m_client->editPlugin(idx);
+    if (!m_genericEditor) {
+        m_client->editPlugin(idx);
+    }
     m_activePlugin = idx;
 }
 
@@ -635,6 +639,21 @@ void AudioGridderAudioProcessor::disableParamAutomation(int idx, int paramIdx) {
     pparam->reset();
     updateHostDisplay();
     param.automationSlot = -1;
+}
+
+void AudioGridderAudioProcessor::getAllParameterValues(int idx) {
+    logln("reading all parameter values for plugin " << idx);
+    auto& params = m_loadedPlugins[as<size_t>(idx)].params;
+    for (auto& res : m_client->getAllParameterValues(idx, params.size())) {
+        if (res.idx > -1 && res.idx < params.size()) {
+            auto& param = params.getReference(res.idx);
+            if (param.idx == res.idx) {
+                param.currentValue = (float)res.value;
+            } else {
+                logln("error: index mismatch in getAllParameterValues");
+            }
+        }
+    }
 }
 
 void AudioGridderAudioProcessor::delServer(const String& s) {

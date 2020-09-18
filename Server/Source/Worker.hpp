@@ -44,6 +44,7 @@ class Worker : public Thread, public LogTag {
     void handleMessage(std::shared_ptr<Message<Preset>> msg);
     void handleMessage(std::shared_ptr<Message<ParameterValue>> msg);
     void handleMessage(std::shared_ptr<Message<GetParameterValue>> msg);
+    void handleMessage(std::shared_ptr<Message<GetAllParameterValues>> msg);
     void handleMessage(std::shared_ptr<Message<UpdateScreenCaptureArea>> msg);
     void handleMessage(std::shared_ptr<Message<Rescan>> msg);
 

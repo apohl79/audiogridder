@@ -10,6 +10,7 @@
 #include <JuceHeader.h>
 #include "PluginButton.hpp"
 #include "PluginProcessor.hpp"
+#include "GenericEditor.hpp"
 #include "Utils.hpp"
 
 class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
@@ -39,6 +40,8 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     std::vector<std::unique_ptr<PluginButton>> m_pluginButtons;
     PluginButton m_newPluginButton;
     ImageComponent m_pluginScreen;
+    GenericEditor m_genericEditor;
+    Viewport m_genericEditorView;
     ImageComponent m_srvIcon, m_settingsIcon;
     Label m_srvLabel, m_versionLabel;
     bool m_connected = false;
@@ -64,6 +67,8 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     };
 
     PopupMenu createPluginMenu(MenuLevel& level, std::function<void(const ServerPlugin& plug)> addFn);
+
+    void editPlugin(int idx = -1);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioGridderAudioProcessorEditor)
 };

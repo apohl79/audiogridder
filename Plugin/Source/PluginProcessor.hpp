@@ -73,7 +73,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
     };
 
     auto& getLoadedPlugins() const { return m_loadedPlugins; }
-    const LoadedPlugin& getLoadedPlugin(int idx) const {
+    LoadedPlugin& getLoadedPlugin(int idx) {
         return idx > -1 ? m_loadedPlugins[e47::as<size_t>(idx)] : m_unusedDummyPlugin;
     }
     bool loadPlugin(const String& id, const String& name);
@@ -87,6 +87,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
     void exchangePlugins(int idxA, int idxB);
     bool enableParamAutomation(int idx, int paramIdx, int slot = -1);
     void disableParamAutomation(int idx, int paramIdx);
+    void getAllParameterValues(int idx);
     void increaseSCArea();
     void decreaseSCArea();
 
@@ -102,6 +103,8 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
     void setMenuShowCategory(bool b) { m_menuShowCategory = b; }
     bool getMenuShowCompany() const { return m_menuShowCompany; }
     void setMenuShowCompany(bool b) { m_menuShowCompany = b; }
+    bool getGenericEditor() const { return m_genericEditor; }
+    void setGenericEditor(bool b) { m_genericEditor = b; }
 
     auto& getServers() const { return m_servers; }
     void addServer(const String& s) { m_servers.add(s); }
@@ -166,6 +169,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
 
     bool m_menuShowCategory = true;
     bool m_menuShowCompany = true;
+    bool m_genericEditor = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioGridderAudioProcessor)
 };

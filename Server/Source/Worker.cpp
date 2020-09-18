@@ -146,6 +146,9 @@ void Worker::run() {
                     case GetParameterValue::Type:
                         handleMessage(Message<Any>::convert<GetParameterValue>(msg));
                         break;
+                    case GetAllParameterValues::Type:
+                        handleMessage(Message<Any>::convert<GetAllParameterValues>(msg));
+                        break;
                     case UpdateScreenCaptureArea::Type:
                         handleMessage(Message<Any>::convert<UpdateScreenCaptureArea>(msg));
                         break;
@@ -222,11 +225,34 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     logln("sending parameters...");
     json jparams = json::array();
     for (auto& param : proc->getParameters()) {
-        json jparam = {{"idx", param->getParameterIndex()},        {"name", param->getName(32).toStdString()},
-                       {"defaultValue", param->getDefaultValue()}, {"category", param->getCategory()},
-                       {"label", param->getLabel().toStdString()}, {"numSteps", param->getNumSteps()},
-                       {"isBoolean", param->isBoolean()},          {"isDiscrete", param->isDiscrete()},
-                       {"isMeta", param->isMetaParameter()},       {"isOrientInv", param->isOrientationInverted()}};
+        json jparam = {{"idx", param->getParameterIndex()},
+                       {"name", param->getName(32).toStdString()},
+                       {"defaultValue", param->getDefaultValue()},
+                       {"currentValue", param->getValue()},
+                       {"category", param->getCategory()},
+                       {"label", param->getLabel().toStdString()},
+                       {"numSteps", param->getNumSteps()},
+                       {"isBoolean", param->isBoolean()},
+                       {"isDiscrete", param->isDiscrete()},
+                       {"isMeta", param->isMetaParameter()},
+                       {"isOrientInv", param->isOrientationInverted()},
+                       {"minValue", param->getText(0.0f, 20).toStdString()},
+                       {"maxValue", param->getText(1.0f, 20).toStdString()}};
+        jparam["allValues"] = json::array();
+        for (auto& val : param->getAllValueStrings()) {
+            jparam["allValues"].push_back(val.toStdString());
+        }
+        if (jparam["allValues"].size() == 0 && param->isDiscrete() && param->getNumSteps() < 64) {
+            // try filling values manually
+            float step = 1.0f / (param->getNumSteps() - 1);
+            for (int i = 0; i < param->getNumSteps(); i++) {
+                auto val = param->getText(step * i, 32);
+                if (val.isEmpty()) {
+                    break;
+                }
+                jparam["allValues"].push_back(val.toStdString());
+            }
+        }
         jparams.push_back(jparam);
     }
     Message<Parameters> msgParams;
@@ -416,6 +442,19 @@ void Worker::handleMessage(std::shared_ptr<Message<GetParameterValue>> msg) {
     DATA(ret)->paramIdx = pDATA(msg)->paramIdx;
     DATA(ret)->value = m_audio.getParameterValue(pDATA(msg)->idx, pDATA(msg)->paramIdx);
     ret.send(m_client.get());
+}
+
+void Worker::handleMessage(std::shared_ptr<Message<GetAllParameterValues>> msg) {
+    auto p = m_audio.getProcessor(pPLD(msg).getNumber())->getPlugin();
+    if (nullptr != p) {
+        for (auto* param : p->getParameters()) {
+            Message<ParameterValue> ret;
+            DATA(ret)->idx = pPLD(msg).getNumber();
+            DATA(ret)->paramIdx = param->getParameterIndex();
+            DATA(ret)->value = param->getValue();
+            ret.send(m_client.get());
+        }
+    }
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<UpdateScreenCaptureArea>> msg) {

@@ -31,7 +31,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     struct Parameter {
         int idx = -1;
         String name;
-        float defaultValue = 0;
+        float defaultValue = 0.0f;
         AudioProcessorParameter::Category category = AudioProcessorParameter::genericParameter;
         String label;
         int numSteps = 0x7fffffff;
@@ -39,8 +39,12 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
         bool isDiscrete = false;
         bool isMeta = false;
         bool isOrientInv = false;
+        StringArray allValues;
 
         int automationSlot = -1;
+        float currentValue = 0.0f;
+
+        NormalisableRange<double> range;
 
         static Parameter fromJson(const json& j) {
             Parameter p;
@@ -54,8 +58,45 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
             p.isDiscrete = j["isDiscrete"].get<bool>();
             p.isMeta = j["isMeta"].get<bool>();
             p.isOrientInv = j["isOrientInv"].get<bool>();
+            String val;
+            if (j.find("minValue") != j.end()) {
+                val = j["minValue"].get<std::string>();
+                if (val.containsOnly("0123456789-.")) {
+                    p.range.start = val.getFloatValue();
+                }
+            }
+            if (j.find("maxValue") != j.end()) {
+                val = j["maxValue"].get<std::string>();
+                if (val.containsOnly("0123456789-.")) {
+                    p.range.end = val.getFloatValue();
+                }
+            }
+            if (p.range.start >= p.range.end) {
+                p.range.start = 0.0;
+                p.range.end = 1.0;
+            }
+            if (j.find("allValues") != j.end()) {
+                for (auto& s : j["allValues"]) {
+                    p.allValues.add(s.get<std::string>());
+                }
+            }
+            if (p.allValues.size() > 2) {
+                p.range.start = 0.0f;
+                p.range.end = p.allValues.size() - 1;
+                p.range.interval = 1.0 / p.allValues.size();
+            } else if (p.isDiscrete) {
+                p.range.interval = 1.0 / p.numSteps;
+                if (p.numSteps == 2) {
+                    p.isBoolean = true;
+                }
+            }
             if (j.find("automationSlot") != j.end()) {
                 p.automationSlot = j["automationSlot"].get<int>();
+            }
+            if (j.find("currentValue") != j.end()) {
+                p.currentValue = j["currentValue"].get<float>();
+            } else {
+                p.currentValue = p.defaultValue;
             }
             return p;
         }
@@ -64,6 +105,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
             json j = {{"idx", idx},
                       {"name", name.toStdString()},
                       {"defaultValue", defaultValue},
+                      {"currentValue", currentValue},
                       {"category", category},
                       {"label", label.toStdString()},
                       {"numSteps", numSteps},
@@ -71,9 +113,19 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
                       {"isDiscrete", isDiscrete},
                       {"isMeta", isMeta},
                       {"isOrientInv", isOrientInv},
+                      {"minValue", String(range.start).toStdString()},
+                      {"maxValue", String(range.end).toStdString()},
                       {"automationSlot", automationSlot}};
+            j["allValues"] = json::array();
+            for (auto& s : allValues) {
+                j["allValues"].push_back(s.toStdString());
+            }
             return j;
         }
+
+        float getValue() const { return (float)range.convertFrom0to1(currentValue); }
+
+        void setValue(float val) { currentValue = (float)range.convertTo0to1(val); }
     };
 
     int NUM_OF_BUFFERS = DEFAULT_NUM_OF_BUFFERS;
@@ -169,6 +221,13 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
 
     float getParameterValue(int idx, int paramIdx);
     void setParameterValue(int idx, int paramIdx, float val);
+
+    struct ParameterResult {
+        int idx;
+        float value;
+    };
+
+    Array<ParameterResult> getAllParameterValues(int idx, int count);
 
     void updateScreenCaptureArea(int val);
 

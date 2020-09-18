@@ -15,13 +15,17 @@
 using namespace e47;
 
 AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderAudioProcessor& p)
-    : AudioProcessorEditor(&p), m_processor(p), m_newPluginButton("", "newPlug", false) {
+    : AudioProcessorEditor(&p), m_processor(p), m_newPluginButton("", "newPlug", false), m_genericEditor(p) {
     auto& lf = getLookAndFeel();
     lf.setUsingNativeAlertWindows(true);
     lf.setColour(ResizableWindow::backgroundColourId, Colour(DEFAULT_BG_COLOR));
     lf.setColour(PopupMenu::backgroundColourId, Colour(DEFAULT_BG_COLOR));
     lf.setColour(TextEditor::backgroundColourId, Colour(DEFAULT_BUTTON_COLOR));
     lf.setColour(TextButton::buttonColourId, Colour(DEFAULT_BUTTON_COLOR));
+    lf.setColour(ComboBox::backgroundColourId, Colour(DEFAULT_BUTTON_COLOR));
+    lf.setColour(Slider::thumbColourId, Colour(DEFAULT_SLIDERTHUMB_COLOR));
+    lf.setColour(Slider::trackColourId, Colour(DEFAULT_SLIDERTRACK_COLOR));
+    lf.setColour(Slider::backgroundColourId, Colour(DEFAULT_SLIDERBG_COLOR));
 
     addAndMakeVisible(m_srvIcon);
     m_srvIcon.setImage(ImageCache::getFromMemory(Images::server_png, Images::server_pngSize));
@@ -56,11 +60,19 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
     addAndMakeVisible(m_newPluginButton);
     m_newPluginButton.setButtonText("+");
     m_newPluginButton.setOnClickWithModListener(this);
-    addAndMakeVisible(m_pluginScreen);
+
+    addChildComponent(m_pluginScreen);
     m_pluginScreen.setBounds(200, SCREENTOOLS_HEIGHT + SCREENTOOLS_MARGIN * 2, 1, 1);
     m_pluginScreen.setWantsKeyboardFocus(true);
     m_pluginScreen.addMouseListener(&m_processor.getClient(), true);
     m_pluginScreen.addKeyListener(&m_processor.getClient());
+    m_pluginScreen.setVisible(false);
+
+    addChildComponent(m_genericEditorView);
+    m_genericEditorView.setBounds(200, SCREENTOOLS_HEIGHT + SCREENTOOLS_MARGIN * 2, 100, 200);
+    m_genericEditor.setBounds(200, SCREENTOOLS_HEIGHT + SCREENTOOLS_MARGIN * 2, 100, 200);
+    m_genericEditorView.setViewedComponent(&m_genericEditor, false);
+    m_genericEditorView.setVisible(false);
 
     int idx = 0;
     for (auto& plug : m_processor.getLoadedPlugins()) {
@@ -142,13 +154,34 @@ void AudioGridderAudioProcessorEditor::resized() {
     int leftBarWidth = 200;
     int windowWidth = leftBarWidth;
     if (m_processor.getActivePlugin() != -1) {
-        int screenHeight = m_pluginScreen.getHeight() + SCREENTOOLS_HEIGHT;
-        windowHeight = jmax(windowHeight, screenHeight);
-        windowWidth += m_pluginScreen.getWidth();
-        m_stMinus.setBounds(windowWidth - SCREENTOOLS_HEIGHT - SCREENTOOLS_MARGIN * 2, SCREENTOOLS_MARGIN,
-                            SCREENTOOLS_HEIGHT, SCREENTOOLS_HEIGHT);
-        m_stPlus.setBounds(windowWidth - SCREENTOOLS_HEIGHT * 2 - SCREENTOOLS_MARGIN * 3, SCREENTOOLS_MARGIN,
-                           SCREENTOOLS_HEIGHT, SCREENTOOLS_HEIGHT);
+        if (m_processor.getGenericEditor()) {
+            m_genericEditorView.setVisible(true);
+            m_pluginScreen.setVisible(false);
+            m_stMinus.setVisible(false);
+            m_stPlus.setVisible(false);
+            int screenHeight = m_genericEditor.getHeight() + SCREENTOOLS_HEIGHT;
+            bool showScrollBar = false;
+            if (screenHeight > 600) {
+                screenHeight = 600;
+                showScrollBar = true;
+            }
+            m_genericEditorView.setSize(m_genericEditor.getWidth(), screenHeight - SCREENTOOLS_HEIGHT);
+            m_genericEditorView.setScrollBarsShown(showScrollBar, false);
+            windowHeight = jmax(windowHeight, screenHeight);
+            windowWidth += m_genericEditor.getWidth();
+        } else {
+            m_genericEditorView.setVisible(false);
+            m_pluginScreen.setVisible(true);
+            m_stMinus.setVisible(true);
+            m_stPlus.setVisible(true);
+            int screenHeight = m_pluginScreen.getHeight() + SCREENTOOLS_HEIGHT;
+            windowHeight = jmax(windowHeight, screenHeight);
+            windowWidth += m_pluginScreen.getWidth();
+            m_stMinus.setBounds(windowWidth - SCREENTOOLS_HEIGHT - SCREENTOOLS_MARGIN * 2, SCREENTOOLS_MARGIN,
+                                SCREENTOOLS_HEIGHT, SCREENTOOLS_HEIGHT);
+            m_stPlus.setBounds(windowWidth - SCREENTOOLS_HEIGHT * 2 - SCREENTOOLS_MARGIN * 3, SCREENTOOLS_MARGIN,
+                               SCREENTOOLS_HEIGHT, SCREENTOOLS_HEIGHT);
+        }
         m_stA.setBounds(leftBarWidth + SCREENTOOLS_MARGIN, SCREENTOOLS_MARGIN, SCREENTOOLS_AB_WIDTH,
                         SCREENTOOLS_HEIGHT);
         m_stB.setBounds(leftBarWidth + SCREENTOOLS_MARGIN + SCREENTOOLS_AB_WIDTH, SCREENTOOLS_MARGIN,
@@ -222,42 +255,7 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
     } else {
         int idx = getPluginIndex(button->getName());
         int active = m_processor.getActivePlugin();
-        auto editFn = [this, idx, active] {
-            if (m_processor.isBypassed(idx)) {
-                return;
-            }
-            m_processor.editPlugin(idx);
-            m_pluginButtons[as<size_t>(idx)]->setActive(true);
-            m_pluginButtons[as<size_t>(idx)]->setColour(PluginButton::textColourOffId, Colours::yellow);
-            auto* p_processor = &m_processor;
-            m_processor.getClient().setPluginScreenUpdateCallback(
-                [this, idx, p_processor](std::shared_ptr<Image> img, int width, int height) {
-                    if (nullptr != img) {
-                        MessageManager::callAsync([this, p_processor, img, width, height] {
-                            auto p = dynamic_cast<AudioGridderAudioProcessorEditor*>(p_processor->getActiveEditor());
-                            if (this == p) {  // make sure the editor hasn't been closed
-                                m_pluginScreen.setSize(width, height);
-                                m_pluginScreen.setImage(img->createCopy());
-                                resized();
-                            }
-                        });
-                    } else {
-                        MessageManager::callAsync([this, idx, p_processor] {
-                            auto p = dynamic_cast<AudioGridderAudioProcessorEditor*>(p_processor->getActiveEditor());
-                            if (this == p && m_pluginButtons.size() > as<size_t>(idx)) {
-                                m_processor.hidePlugin(false);
-                                m_pluginButtons[as<size_t>(idx)]->setActive(false);
-                                resized();
-                            }
-                        });
-                    }
-                });
-            if (active > -1 && as<size_t>(active) < m_pluginButtons.size()) {
-                m_pluginButtons[as<size_t>(active)]->setActive(false);
-                m_pluginButtons[as<size_t>(active)]->setColour(PluginButton::textColourOffId, Colours::white);
-                resized();
-            }
-        };
+        auto editFn = [this, idx] { editPlugin(idx); };
         auto hideFn = [this, idx](int i = -1) {
             m_processor.hidePlugin();
             size_t index = i > -1 ? as<size_t>(i) : as<size_t>(idx);
@@ -566,12 +564,18 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
         m.showAt(&m_srvIcon);
     } else if (event.eventComponent == &m_settingsIcon) {
         PopupMenu m;
-        m.addSectionHeader("Settings");
-        m.addItem("Show Category Menu", true, m_processor.getMenuShowCategory(), [this] {
+        m.addSectionHeader("Editor");
+        m.addItem("Generic Editor", true, m_processor.getGenericEditor(), [this] {
+            m_processor.setGenericEditor(!m_processor.getGenericEditor());
+            m_processor.saveConfig();
+            editPlugin();
+        });
+        m.addSectionHeader("Plugin Menu");
+        m.addItem("Show Category", true, m_processor.getMenuShowCategory(), [this] {
             m_processor.setMenuShowCategory(!m_processor.getMenuShowCategory());
             m_processor.saveConfig();
         });
-        m.addItem("Show Company Menu", true, m_processor.getMenuShowCompany(), [this] {
+        m.addItem("Show Company", true, m_processor.getMenuShowCompany(), [this] {
             m_processor.setMenuShowCompany(!m_processor.getMenuShowCompany());
             m_processor.saveConfig();
         });
@@ -619,4 +623,53 @@ PopupMenu AudioGridderAudioProcessorEditor::createPluginMenu(MenuLevel& level,
         }
     }
     return m;
+}
+
+void AudioGridderAudioProcessorEditor::editPlugin(int idx) {
+    int active = m_processor.getActivePlugin();
+    if (idx == -1) {
+        idx = active;
+    }
+    if (idx < 0 || m_processor.isBypassed(idx)) {
+        return;
+    }
+    m_pluginButtons[as<size_t>(idx)]->setActive(true);
+    m_pluginButtons[as<size_t>(idx)]->setColour(PluginButton::textColourOffId, Colours::yellow);
+    m_processor.editPlugin(idx);
+    if (m_processor.getGenericEditor()) {
+        m_genericEditor.resized();
+        resized();
+        if (active > -1) {
+            m_processor.getClient().hidePlugin();
+        }
+    } else {
+        auto* p_processor = &m_processor;
+        m_processor.getClient().setPluginScreenUpdateCallback(
+            [this, idx, p_processor](std::shared_ptr<Image> img, int width, int height) {
+                if (nullptr != img) {
+                    MessageManager::callAsync([this, p_processor, img, width, height] {
+                        auto p = dynamic_cast<AudioGridderAudioProcessorEditor*>(p_processor->getActiveEditor());
+                        if (this == p) {  // make sure the editor hasn't been closed
+                            m_pluginScreen.setSize(width, height);
+                            m_pluginScreen.setImage(img->createCopy());
+                            resized();
+                        }
+                    });
+                } else {
+                    MessageManager::callAsync([this, idx, p_processor] {
+                        auto p = dynamic_cast<AudioGridderAudioProcessorEditor*>(p_processor->getActiveEditor());
+                        if (this == p && m_pluginButtons.size() > as<size_t>(idx)) {
+                            m_processor.hidePlugin(false);
+                            m_pluginButtons[as<size_t>(idx)]->setActive(false);
+                            resized();
+                        }
+                    });
+                }
+            });
+    }
+    if (active > -1 && idx != active && as<size_t>(active) < m_pluginButtons.size()) {
+        m_pluginButtons[as<size_t>(active)]->setActive(false);
+        m_pluginButtons[as<size_t>(active)]->setColour(PluginButton::textColourOffId, Colours::white);
+        resized();
+    }
 }

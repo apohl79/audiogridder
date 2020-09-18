@@ -578,6 +578,27 @@ void Client::setParameterValue(int idx, int paramIdx, float val) {
     msg.send(m_cmd_socket.get());
 }
 
+Array<Client::ParameterResult> Client::getAllParameterValues(int idx, int count) {
+    if (!isReadyLockFree()) {
+        return {};
+    };
+    Message<GetAllParameterValues> msg;
+    PLD(msg).setNumber(idx);
+    dbglock lock(*this, 30);
+    msg.send(m_cmd_socket.get());
+    Array<Client::ParameterResult> ret;
+    for (int i = 0; i < count; i++) {
+        Message<ParameterValue> msgVal;
+        MessageHelper::Error err;
+        if (msgVal.read(m_cmd_socket.get(), &err)) {
+            if (idx == DATA(msgVal)->idx) {
+                ret.add({DATA(msgVal)->paramIdx, DATA(msgVal)->value});
+            }
+        }
+    }
+    return ret;
+}
+
 void Client::ScreenReceiver::run() {
     using MsgType = Message<ScreenCapture>;
     MsgType msg;

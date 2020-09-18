@@ -686,6 +686,12 @@ class GetParameterValue : public DataPayload<getparametervalue_t> {
     GetParameterValue() : DataPayload<getparametervalue_t>(Type) {}
 };
 
+class GetAllParameterValues : public NumberPayload {
+  public:
+    static constexpr int Type = __COUNTER__;
+    GetAllParameterValues() : NumberPayload(Type) {}
+};
+
 class Presets : public StringPayload {
   public:
     static constexpr int Type = __COUNTER__;
