@@ -3,8 +3,6 @@
  * Licensed under MIT (https://github.com/apohl79/audiogridder/blob/master/COPYING)
  *
  * Author: Andreas Pohl
- *
- * Based on https://github.com/mjansson/mdns
  */
 
 #pragma once
