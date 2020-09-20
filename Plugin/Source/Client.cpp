@@ -42,12 +42,16 @@ void Client::run() {
                         NUM_OF_BUFFERS = newNum;
                         reconnect();
                     }
-                } else if (j.find("LoadPluginTimeout") != j.end()) {
+                }
+                if (j.find("LoadPluginTimeout") != j.end()) {
                     int newNum = j["LoadPluginTimeout"].get<int>();
                     if (LOAD_PLUGIN_TIMEOUT != newNum) {
                         logln("timeout for leading a plugin changed from " << LOAD_PLUGIN_TIMEOUT << " to " << newNum);
                         LOAD_PLUGIN_TIMEOUT = newNum;
                     }
+                }
+                if (j.find("GenericEditor") != j.end()) {
+                    m_processor->setGenericEditor(j["GenericEditor"].get<bool>());
                 }
             }
         } catch (json::parse_error& e) {
