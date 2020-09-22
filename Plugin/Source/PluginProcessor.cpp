@@ -52,7 +52,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
 
     AGLogger::initialize(appName, logName);
     TimeStatistics::initialize();
-    ServiceReceiver::initialize([this] {
+    ServiceReceiver::initialize(m_instId.hash(), [this] {
         MessageManager::callAsync([this] {
             auto* editor = getActiveEditor();
             if (editor != nullptr) {
@@ -176,7 +176,7 @@ AudioGridderAudioProcessor::~AudioGridderAudioProcessor() {
     waitForThreadAndLog(m_client.get(), m_client.get());
     logln("plugin unloaded");
     TimeStatistics::cleanup();
-    ServiceReceiver::cleanup();
+    ServiceReceiver::cleanup(m_instId.hash());
     AGLogger::cleanup();
 }
 

@@ -27,9 +27,9 @@ class ServiceReceiver : public Thread, public LogTag {
                      uint16_t rtype, uint16_t rclass, uint32_t ttl, const void* data, size_t size, size_t name_offset,
                      size_t name_length, size_t record_offset, size_t record_length, void* user_data);
 
-    static void initialize(std::function<void()> fn = nullptr);
+    static void initialize(uint64 id, std::function<void()> fn = nullptr);
     static std::shared_ptr<ServiceReceiver> getInstance();
-    static void cleanup();
+    static void cleanup(uint64 id);
 
     static Array<ServerString> getServers();
     static String hostToName(const String& host);
@@ -49,7 +49,7 @@ class ServiceReceiver : public Thread, public LogTag {
     Array<ServerString> m_servers;
     std::mutex m_serverMtx;
 
-    std::function<void()> m_updateFn;
+    HashMap<uint64, std::function<void()>> m_updateFn;
 
     Array<ServerString> getServersReal();
 };

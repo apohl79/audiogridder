@@ -152,6 +152,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
     };
 
   private:
+    Uuid m_instId;
     std::unique_ptr<e47::Client> m_client;
     std::vector<LoadedPlugin> m_loadedPlugins;
     int m_activePlugin = -1;

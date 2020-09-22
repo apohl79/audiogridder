@@ -89,8 +89,10 @@ void ServiceReceiver::run() {
             for (auto& s : m_servers) {
                 logln("  " << s.toString());
             }
-            if (m_updateFn != nullptr) {
-                m_updateFn();
+            m_serverMtx.unlock();
+            std::lock_guard<std::mutex> instLock(m_instMtx);
+            for (auto fn: m_updateFn) {
+                fn();
             }
         }
     }
@@ -143,19 +145,20 @@ int ServiceReceiver::handleRecord(int /*sock*/, const struct sockaddr* from, siz
     return 0;
 }
 
-void ServiceReceiver::initialize(std::function<void()> fn) {
+void ServiceReceiver::initialize(uint64 id, std::function<void()> fn) {
     std::lock_guard<std::mutex> lock(m_instMtx);
     if (nullptr == m_inst) {
         m_inst = std::make_shared<ServiceReceiver>();
-        m_inst->m_updateFn = fn;
     }
+    m_inst->m_updateFn[id] = fn;
     m_instRefCount++;
 }
 
 std::shared_ptr<ServiceReceiver> ServiceReceiver::getInstance() { return m_inst; }
 
-void ServiceReceiver::cleanup() {
+void ServiceReceiver::cleanup(uint64 id) {
     std::lock_guard<std::mutex> lock(m_instMtx);
+    m_inst->m_updateFn.remove(id);
     m_instRefCount--;
     if (m_instRefCount == 0) {
         m_inst->signalThreadShouldExit();
