@@ -11,15 +11,21 @@
 
 #ifdef JUCE_WINDOWS
 #include "MiniDump.hpp"
+#include <stdlib.h>
+#include <tchar.h>
 #endif
 
-#ifdef JUCE_MAC
 #include <signal.h>
-#endif
 
 namespace e47 {
 
 App::App() : LogTag("app") {}
+
+#ifdef JUCE_WINDOWS
+void abortHandler(int signal) {
+    RaiseException(0, 0, 0, NULL);
+}
+#endif
 
 void App::initialise(const String& commandLineParameters) {
 #ifdef JUCE_MAC
@@ -79,6 +85,7 @@ void App::initialise(const String& commandLineParameters) {
             break;
         case SERVER: {
 #ifdef JUCE_WINDOWS
+            signal(SIGABRT, abortHandler);
             auto dumpPath = FileLogger::getSystemLogFileFolder().getFullPathName();
             auto appName = getApplicationName();
             MiniDump::initialize(dumpPath.toWideCharPointer(), appName.toWideCharPointer(), logName.toWideCharPointer(),
