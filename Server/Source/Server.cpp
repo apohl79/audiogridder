@@ -273,7 +273,7 @@ bool Server::scanPlugin(const String& id, const String& format) {
     }
     KnownPluginList plist;
     loadKnownPluginList(plist);
-    auto getLogTag = [] { return "server"; };
+    setLogTagStatic("server");
     logln("scanning id=" << id << " fmt=" << format);
     bool success = true;
     PluginDirectoryScanner scanner(plist, *fmt, {}, true, File(DEAD_MANS_FILE));

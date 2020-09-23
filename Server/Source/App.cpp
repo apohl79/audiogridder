@@ -52,7 +52,8 @@ void App::initialise(const String& commandLineParameters) {
             logName << "Master_";
             break;
         case SCAN:
-            logName << "Scan_";
+            logName << "Scan_" << fileToScan << "_";
+            logName = logName.replaceCharacters(":/\\|", "----");
             break;
         case SERVER:
             break;
