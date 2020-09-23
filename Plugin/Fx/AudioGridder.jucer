@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT id="JM1hGs" name="AudioGridder" projectType="audioplug" companyName="e47"
-              companyCopyright="2020 Andreas Pohl" companyWebsite="https://www.e47.org"
+              companyCopyright="2020 Andreas Pohl" companyWebsite="https://www.audiogridder.com"
               companyEmail="audiogridder@e47.org" pluginFormats="buildAU,buildVST,buildVST3"
               pluginManufacturerCode="XE47" pluginCode="Ueiz" headerPath="../../../Source&#10;../../../../Common/Source&#10;"
               pluginName="AGridder" pluginVST3Category="Network" version="1.0.0"

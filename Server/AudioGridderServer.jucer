@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT id="WnSnfL" name="AudioGridderServer" projectType="guiapp" companyName="e47"
-              companyCopyright="2020 Andreas Pohl" companyWebsite="https://www.e47.org"
+              companyCopyright="2020 Andreas Pohl" companyWebsite="https://www.audiogridder.com"
               companyEmail="audiogridder@e47.org" version="1.0.0" defines="AG_SERVER"
               headerPath="../../Source&#10;../../../Common/Source" displaySplashScreen="1"
               jucerFormatVersion="1">
