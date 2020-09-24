@@ -60,12 +60,30 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
             : DocumentWindow(ProjectInfo::projectName, Colours::lightgrey, DocumentWindow::closeButton), m_app(app) {
             PopupMenu m;
             m.addItem("About AudioGridder", [app] {
-                app->showSplashWindow([app] { app->hideSplashWindow(); });
-                String info = "Copyright (c) 2020 by Andreas Pohl, MIT license";
+                app->showSplashWindow([app](bool isInfo) {
+                    if (isInfo) {
+                        URL("https://audiogridder.com").launchInDefaultBrowser();
+                    }
+                    app->hideSplashWindow();
+                });
+                String info = "Copyright (c) 2020 by Andreas Pohl, https://audiogridder.com (MIT license)";
                 app->setSplashInfo(info);
             });
-            setIconImage(ImageCache::getFromMemory(Images::servertraywin_png, Images::servertraywin_pngSize),
-                         ImageCache::getFromMemory(Images::servertraymac_png, Images::servertraymac_pngSize));
+            const char* logoNoMac = Images::logowintray_png;
+            int logoNoMacSize = Images::logowintray_pngSize;
+#ifdef JUCE_WINDOWS
+            bool lightTheme =
+                WindowsRegistry::getValue(
+                    "HKEY_CURRENT_"
+                    "USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize\\SystemUsesLightTheme",
+                    "1") == "1";
+            if (lightTheme) {
+                logoNoMac = Images::logowintraylight_png;
+                logoNoMacSize = Images::logowintraylight_pngSize;
+            }
+#endif
+            setIconImage(ImageCache::getFromMemory(logoNoMac, logoNoMacSize),
+                         ImageCache::getFromMemory(Images::logo_png, Images::logo_pngSize));
 #ifdef JUCE_MAC
             setMacMainMenu(app, &m);
 #endif
@@ -87,8 +105,13 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
             auto menu = m_app->getMenuForIndex(0, "Tray");
             menu.addSeparator();
             menu.addItem("About AudioGridder", [this] {
-                m_app->showSplashWindow([this] { m_app->hideSplashWindow(); });
-                String info = "Copyright (c) 2020 by Andreas Pohl, MIT license";
+                m_app->showSplashWindow([this](bool isInfo) {
+                    if (isInfo) {
+                        URL("https://audiogridder.com").launchInDefaultBrowser();
+                    }
+                    m_app->hideSplashWindow();
+                });
+                String info = "Copyright (c) 2020 by Andreas Pohl, https://audiogridder.com (MIT license)";
                 m_app->setSplashInfo(info);
             });
             menu.addItem("Quit", [this] { m_app->systemRequestedQuit(); });
@@ -132,7 +155,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     void hidePluginList() { m_pluginListWindow.reset(); }
     void hideServerSettings() { m_srvSettingsWindow.reset(); }
 
-    void showSplashWindow(std::function<void()> onClick = nullptr) {
+    void showSplashWindow(std::function<void(bool)> onClick = nullptr) {
         m_splashWindow = std::make_unique<SplashWindow>();
         if (onClick) {
             m_splashWindow->onClick = onClick;

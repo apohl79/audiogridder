@@ -91,7 +91,7 @@ void ServiceReceiver::run() {
             }
             m_serverMtx.unlock();
             std::lock_guard<std::mutex> instLock(m_instMtx);
-            for (auto fn: m_updateFn) {
+            for (auto fn : m_updateFn) {
                 fn();
             }
         }

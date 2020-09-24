@@ -41,7 +41,7 @@ void GenericEditor::resized() {
     for (int i = 0; i < plugin.params.size(); i++) {
         auto& param = plugin.params.getReference(i);
         if (param.category > AudioProcessorParameter::genericParameter) {
-            continue; // Parameters like meters are not supported for now.
+            continue;  // Parameters like meters are not supported for now.
         }
 
         auto lbl = std::make_unique<Label>("lbl", param.name);

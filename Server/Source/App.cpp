@@ -22,9 +22,7 @@ namespace e47 {
 App::App() : LogTag("app") {}
 
 #ifdef JUCE_WINDOWS
-void abortHandler(int signal) {
-    RaiseException(0, 0, 0, NULL);
-}
+void abortHandler(int signal) { RaiseException(0, 0, 0, NULL); }
 #endif
 
 void App::initialise(const String& commandLineParameters) {

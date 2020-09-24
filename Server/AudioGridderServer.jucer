@@ -7,7 +7,9 @@
               jucerFormatVersion="1">
   <MAINGROUP id="UHvWdw" name="AudioGridderServer">
     <GROUP id="{8F99D8B9-9047-FC76-4952-10CB146DAED4}" name="Resources">
-      <FILE id="TxAv0c" name="server.png" compile="0" resource="1" file="Resources/server.png"/>
+      <FILE id="Az5gWg" name="icon.png" compile="0" resource="1" file="Resources/icon.png"/>
+      <FILE id="wEhkZU" name="icon16.png" compile="0" resource="1" file="Resources/icon16.png"/>
+      <FILE id="BFf7Mr" name="icon64.png" compile="0" resource="1" file="Resources/icon64.png"/>
     </GROUP>
     <GROUP id="{385AE6BC-8F0F-5D7D-102A-4D9FCF6538EC}" name="Common">
       <FILE id="nNSIIt" name="Defaults.hpp" compile="0" resource="0" file="../Common/Source/Defaults.hpp"/>
@@ -80,7 +82,7 @@
     </GROUP>
   </MAINGROUP>
   <EXPORTFORMATS>
-    <XCODE_MAC targetFolder="Builds/MacOSX" smallIcon="TxAv0c" bigIcon="TxAv0c"
+    <XCODE_MAC targetFolder="Builds/MacOSX" smallIcon="Az5gWg" bigIcon="Az5gWg"
                externalLibraries="avdevice&#10;avcodec&#10;avformat&#10;avfilter&#10;avutil&#10;swscale&#10;swresample&#10;webp&#10;webpmux"
                extraFrameworks="AVFoundation,CoreMedia,VideoToolbox" iosDevelopmentTeamID="62QZB3NCZR">
       <CONFIGURATIONS>
@@ -108,7 +110,7 @@
       </MODULEPATHS>
     </XCODE_MAC>
     <XCODE_MAC targetFolder="Builds/MacOSX10.7" externalLibraries="avdevice&#10;avcodec&#10;avformat&#10;avfilter&#10;avutil&#10;swscale&#10;swresample&#10;webp&#10;webpmux"
-               smallIcon="TxAv0c" bigIcon="TxAv0c" extraFrameworks="AVFoundation,CoreMedia,VideoToolbox"
+               smallIcon="Az5gWg" bigIcon="Az5gWg" extraFrameworks="AVFoundation,CoreMedia,VideoToolbox"
                iosDevelopmentTeamID="62QZB3NCZR">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" headerPath="$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg"
@@ -133,7 +135,7 @@
         <MODULEPATH id="juce_audio_basics"/>
       </MODULEPATHS>
     </XCODE_MAC>
-    <VS2019 targetFolder="Builds/VisualStudio2019" smallIcon="TxAv0c" bigIcon="TxAv0c"
+    <VS2019 targetFolder="Builds/VisualStudio2019" smallIcon="wEhkZU" bigIcon="BFf7Mr"
             externalLibraries="libavdevice.lib&#10;libavcodec.lib&#10;libavformat.lib&#10;libavfilter.lib&#10;libavutil.lib&#10;libswscale.lib&#10;libswresample.lib&#10;libwebp.lib&#10;libwebpmux.lib&#10;">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" defines="JUCE_WINDOWS&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
