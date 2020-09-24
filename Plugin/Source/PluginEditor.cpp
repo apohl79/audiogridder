@@ -272,7 +272,7 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
             m_processor.unbypassPlugin(idx);
             button->setButtonText(m_processor.getLoadedPlugin(idx).name);
             if (idx == active) {
-                button->setColour(PluginButton::textColourOffId, Colours::yellow);
+                button->setColour(PluginButton::textColourOffId, Colour(DEFAULT_ACTIVE_COLOR));
             } else {
                 button->setColour(PluginButton::textColourOffId, Colours::white);
             }
@@ -601,8 +601,8 @@ void AudioGridderAudioProcessorEditor::disableStButton(TextButton* b) {
 }
 
 void AudioGridderAudioProcessorEditor::hilightStButton(TextButton* b) {
-    b->setColour(PluginButton::textColourOffId, Colours::yellow);
-    b->setColour(ComboBox::outlineColourId, Colours::yellow);
+    b->setColour(PluginButton::textColourOffId, Colour(DEFAULT_ACTIVE_COLOR));
+    b->setColour(ComboBox::outlineColourId, Colour(DEFAULT_ACTIVE_COLOR));
     m_hilightedStButton = b;
 }
 
@@ -634,7 +634,7 @@ void AudioGridderAudioProcessorEditor::editPlugin(int idx) {
         return;
     }
     m_pluginButtons[as<size_t>(idx)]->setActive(true);
-    m_pluginButtons[as<size_t>(idx)]->setColour(PluginButton::textColourOffId, Colours::yellow);
+    m_pluginButtons[as<size_t>(idx)]->setColour(PluginButton::textColourOffId, Colour(DEFAULT_ACTIVE_COLOR));
     m_processor.editPlugin(idx);
     if (m_processor.getGenericEditor()) {
         m_genericEditor.resized();

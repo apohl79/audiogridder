@@ -123,11 +123,9 @@ int mDNSConnector::openClientSockets(int maxSockets, int port) {
         if (ifa->ifa_addr->sa_family == AF_INET) {
             struct sockaddr_in* saddr = reinterpret_cast<struct sockaddr_in*>(ifa->ifa_addr);
             if (saddr->sin_addr.s_addr != htonl(INADDR_LOOPBACK)) {
-                int log_addr = 0;
                 if (first_ipv4) {
                     m_addr4 = saddr->sin_addr.s_addr;
                     first_ipv4 = 0;
-                    log_addr = 1;
                 }
                 m_hasIPv4 = true;
                 if (m_sockets.size() < maxSockets) {
@@ -135,9 +133,7 @@ int mDNSConnector::openClientSockets(int maxSockets, int port) {
                     int sock = mdns_socket_open_ipv4(saddr);
                     if (sock >= 0) {
                         m_sockets.add(sock);
-                        log_addr = 1;
-                    } else {
-                        log_addr = 0;
+                        logln("opened socket for " << ipv4ToString(saddr, sizeof(sockaddr_in)));
                     }
                 }
             }
@@ -147,11 +143,9 @@ int mDNSConnector::openClientSockets(int maxSockets, int port) {
             static const unsigned char localhost_mapped[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 0x7f, 0, 0, 1};
             if (memcmp(saddr->sin6_addr.s6_addr, localhost, 16) &&
                 memcmp(saddr->sin6_addr.s6_addr, localhost_mapped, 16)) {
-                int log_addr = 0;
                 if (first_ipv6) {
                     memcpy(m_addr6, &saddr->sin6_addr, 16);
                     first_ipv6 = 0;
-                    log_addr = 1;
                 }
                 m_hasIPv6 = true;
                 if (m_sockets.size() < maxSockets) {
@@ -159,9 +153,7 @@ int mDNSConnector::openClientSockets(int maxSockets, int port) {
                     int sock = mdns_socket_open_ipv6(saddr);
                     if (sock >= 0) {
                         m_sockets.add(sock);
-                        log_addr = 1;
-                    } else {
-                        log_addr = 0;
+                        logln("opened socket for " << ipv6ToString(saddr, sizeof(sockaddr_in6)));
                     }
                 }
             }
@@ -181,7 +173,7 @@ int mDNSConnector::openServiceSockets(int maxSockets) {
     // but not open the actual sockets
     openClientSockets(0, 0);
 
-    if (m_sockets.size() < maxSockets) {
+    if (m_hasIPv4 && m_sockets.size() < maxSockets) {
         struct sockaddr_in sock_addr;
         memset(&sock_addr, 0, sizeof(struct sockaddr_in));
         sock_addr.sin_family = AF_INET;
@@ -197,10 +189,11 @@ int mDNSConnector::openServiceSockets(int maxSockets) {
         int sock = mdns_socket_open_ipv4(&sock_addr);
         if (sock >= 0) {
             m_sockets.add(sock);
+            logln("opened socket for " << ipv4ToString(&sock_addr, sizeof(sockaddr_in)));
         }
     }
 
-    if (m_sockets.size() < maxSockets) {
+    if (m_hasIPv6 && m_sockets.size() < maxSockets) {
         struct sockaddr_in6 sock_addr;
         memset(&sock_addr, 0, sizeof(struct sockaddr_in6));
         sock_addr.sin6_family = AF_INET6;
@@ -212,6 +205,7 @@ int mDNSConnector::openServiceSockets(int maxSockets) {
         int sock = mdns_socket_open_ipv6(&sock_addr);
         if (sock >= 0) {
             m_sockets.add(sock);
+            logln("opened socket for " << ipv6ToString(&sock_addr, sizeof(sockaddr_in6)));
         }
     }
 

@@ -94,7 +94,9 @@ void GenericEditor::resized() {
             m_components.add(std::move(c));
 
             String rangeInfo;
-            if (!param.isBoolean) {
+            if (param.isBoolean) {
+                rangeInfo << "off-on";
+            } else {
                 rangeInfo << String(param.range.start, 0) << "-" << String(param.range.end, 0);
             }
             lbl = std::make_unique<Label>("lbl", rangeInfo);
