@@ -47,9 +47,10 @@ class Images : public Component {
     // Binary resources:
     static const char* server_png;
     static const int server_pngSize;
-
     static const char* settings_png;
     static const int settings_pngSize;
+    static const char* logo_png;
+    static const int logo_pngSize;
 
   private:
     //[UserVariables]   -- You can add your own custom variables in this section.

@@ -49,11 +49,16 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
     font.setHeight(font.getHeight() - 2);
     m_srvLabel.setFont(font);
 
+    addAndMakeVisible(m_logo);
+    m_logo.setImage(ImageCache::getFromMemory(Images::logo_png, Images::logo_pngSize));
+    m_logo.setBounds(0, 89, 16, 16);
+    m_logo.setAlpha(0.3f);
+
     addAndMakeVisible(m_versionLabel);
-    String v = "Version ";
+    String v = "";
     v << AUDIOGRIDDER_VERSION;
     m_versionLabel.setText(v, NotificationType::dontSendNotification);
-    m_versionLabel.setBounds(0, 89, 190, 10);
+    m_versionLabel.setBounds(16, 89, 190, 10);
     m_versionLabel.setFont(Font(10, Font::plain));
     m_versionLabel.setAlpha(0.4f);
 
@@ -141,6 +146,7 @@ void AudioGridderAudioProcessorEditor::paint(Graphics& g) {
 void AudioGridderAudioProcessorEditor::resized() {
     int buttonWidth = 197;
     int buttonHeight = 20;
+    int logoHeight = m_logo.getHeight();
     int num = 0;
     int top = 30;
     for (auto& b : m_pluginButtons) {
@@ -149,7 +155,7 @@ void AudioGridderAudioProcessorEditor::resized() {
         num++;
     }
     m_newPluginButton.setBounds(1, top, buttonWidth, buttonHeight);
-    top += buttonHeight + 13;
+    top += buttonHeight + logoHeight + 6;
     int windowHeight = jmax(100, top);
     int leftBarWidth = 200;
     int windowWidth = leftBarWidth;
@@ -193,7 +199,8 @@ void AudioGridderAudioProcessorEditor::resized() {
     if (getWidth() != windowWidth || getHeight() != windowHeight) {
         setSize(windowWidth, windowHeight);
     }
-    m_versionLabel.setBounds(0, windowHeight - 11, m_versionLabel.getWidth(), m_versionLabel.getHeight());
+    m_logo.setBounds(3, windowHeight - logoHeight - 3, m_logo.getWidth(), m_logo.getHeight());
+    m_versionLabel.setBounds(logoHeight + 3, windowHeight - 15, m_versionLabel.getWidth(), m_versionLabel.getHeight());
 }
 
 void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const ModifierKeys& modifiers,

@@ -44,6 +44,7 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     Viewport m_genericEditorView;
     ImageComponent m_srvIcon, m_settingsIcon;
     Label m_srvLabel, m_versionLabel;
+    ImageComponent m_logo;
     bool m_connected = false;
 
     // screen tools
