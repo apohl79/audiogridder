@@ -13,6 +13,9 @@
 #include "Client.hpp"
 #include "NumberConversion.hpp"
 #include "Utils.hpp"
+#include "json.hpp"
+
+using json = nlohmann::json;
 
 class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDelegate {
   public:
@@ -55,6 +58,8 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
     void getStateInformation(MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
+    void loadConfig();
+    void loadConfig(const json& j, bool isUpdate = false);
     void saveConfig(int numOfBuffers = -1);
 
     e47::Client& getClient() { return *m_client; }
@@ -157,6 +162,8 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
     std::vector<LoadedPlugin> m_loadedPlugins;
     int m_activePlugin = -1;
     StringArray m_servers;
+    String m_activeServerFromCfg;
+    int m_activeServerLegacyFromCfg;
 
     int m_numberOfAutomationSlots = 16;
     LoadedPlugin m_unusedDummyPlugin;

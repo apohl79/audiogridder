@@ -7,7 +7,6 @@
 
 #include "PluginProcessor.hpp"
 #include "PluginEditor.hpp"
-#include "json.hpp"
 #include "Logger.hpp"
 #include "Metrics.hpp"
 #include "ServiceReceiver.hpp"
@@ -67,47 +66,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
 
     updateLatency(0);
 
-    String activeServer;
-    int activeServerLegacyCfg = -1;
-
-    File cfg(PLUGIN_CONFIG_FILE);
-    try {
-        if (cfg.exists()) {
-            FileInputStream fis(cfg);
-            json j = json::parse(fis.readEntireStreamAsString().toStdString());
-            if (j.find("Servers") != j.end()) {
-                for (auto& srv : j["Servers"]) {
-                    m_servers.add(srv.get<std::string>());
-                }
-            }
-            if (j.find("LastServer") != j.end()) {
-                activeServer = j["LastServer"].get<std::string>();
-            }
-            if (j.find("Last") != j.end()) {
-                activeServerLegacyCfg = j["Last"].get<int>();
-            }
-            if (j.find("NumberOfBuffers") != j.end()) {
-                m_client->NUM_OF_BUFFERS = j["NumberOfBuffers"].get<int>();
-            }
-            if (j.find("LoadPluginTimeout") != j.end()) {
-                m_client->LOAD_PLUGIN_TIMEOUT = j["LoadPluginTimeout"].get<int>();
-            }
-            if (j.find("NumberOfAutomationSlots") != j.end()) {
-                m_numberOfAutomationSlots = j["NumberOfAutomationSlots"].get<int>();
-            }
-            if (j.find("MenuShowCategory") != j.end()) {
-                m_menuShowCategory = j["MenuShowCategory"].get<bool>();
-            }
-            if (j.find("MenuShowCompany") != j.end()) {
-                m_menuShowCompany = j["MenuShowCompany"].get<bool>();
-            }
-            if (j.find("GenericEditor") != j.end()) {
-                m_genericEditor = j["GenericEditor"].get<bool>();
-            }
-        }
-    } catch (json::parse_error& e) {
-        logln("parsing config failed: " << e.what());
-    }
+    loadConfig();
 
     m_unusedParam.name = "(unassigned)";
     m_unusedDummyPlugin.name = "(unused)";
@@ -161,10 +120,10 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
             }
         });
     });
-    if (activeServer.isNotEmpty()) {
-        m_client->setServer(activeServer);
-    } else if (activeServerLegacyCfg > -1 && activeServerLegacyCfg < m_servers.size()) {
-        m_client->setServer(m_servers[activeServerLegacyCfg]);
+    if (m_activeServerFromCfg.isNotEmpty()) {
+        m_client->setServer(m_activeServerFromCfg);
+    } else if (m_activeServerLegacyFromCfg > -1 && m_activeServerLegacyFromCfg < m_servers.size()) {
+        m_client->setServer(m_servers[m_activeServerLegacyFromCfg]);
     }
 
     m_client->startThread();
@@ -178,6 +137,51 @@ AudioGridderAudioProcessor::~AudioGridderAudioProcessor() {
     TimeStatistics::cleanup();
     ServiceReceiver::cleanup(m_instId.hash());
     AGLogger::cleanup();
+}
+
+void AudioGridderAudioProcessor::loadConfig() {
+    File cfg(PLUGIN_CONFIG_FILE);
+    try {
+        if (cfg.exists()) {
+            FileInputStream fis(cfg);
+            json j = json::parse(fis.readEntireStreamAsString().toStdString());
+            loadConfig(j);
+        }
+    } catch (json::parse_error& e) {
+        logln("parsing config failed: " << e.what());
+    }
+}
+
+void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
+    if (j.find("Servers") != j.end() && !isUpdate) {
+        for (auto& srv : j["Servers"]) {
+            m_servers.add(srv.get<std::string>());
+        }
+    }
+    if (j.find("LastServer") != j.end() && !isUpdate) {
+        m_activeServerFromCfg = j["LastServer"].get<std::string>();
+    }
+    if (j.find("Last") != j.end() && !isUpdate) {
+        m_activeServerLegacyFromCfg = j["Last"].get<int>();
+    }
+    if (j.find("NumberOfBuffers") != j.end() && !isUpdate) {
+        m_client->NUM_OF_BUFFERS = j["NumberOfBuffers"].get<int>();
+    }
+    if (j.find("LoadPluginTimeout") != j.end() && !isUpdate) {
+        m_client->LOAD_PLUGIN_TIMEOUT = j["LoadPluginTimeout"].get<int>();
+    }
+    if (j.find("NumberOfAutomationSlots") != j.end()) {
+        m_numberOfAutomationSlots = j["NumberOfAutomationSlots"].get<int>();
+    }
+    if (j.find("MenuShowCategory") != j.end()) {
+        m_menuShowCategory = j["MenuShowCategory"].get<bool>();
+    }
+    if (j.find("MenuShowCompany") != j.end()) {
+        m_menuShowCompany = j["MenuShowCompany"].get<bool>();
+    }
+    if (j.find("GenericEditor") != j.end()) {
+        m_genericEditor = j["GenericEditor"].get<bool>();
+    }
 }
 
 void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {

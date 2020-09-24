@@ -12,9 +12,9 @@
 #include "NumberConversion.hpp"
 #include "json.hpp"
 
-namespace e47 {
-
 using json = nlohmann::json;
+
+namespace e47 {
 
 /*
  * Core I/O functions

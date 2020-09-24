@@ -50,9 +50,7 @@ void Client::run() {
                         LOAD_PLUGIN_TIMEOUT = newNum;
                     }
                 }
-                if (j.find("GenericEditor") != j.end()) {
-                    m_processor->setGenericEditor(j["GenericEditor"].get<bool>());
-                }
+                m_processor->loadConfig(j, true);
             }
         } catch (json::parse_error& e) {
             logln("parsing config failed: " << e.what());
