@@ -31,7 +31,7 @@ class ServiceReceiver : public Thread, public LogTag {
     static std::shared_ptr<ServiceReceiver> getInstance();
     static void cleanup(uint64 id);
 
-    static Array<ServerString> getServers();
+    static Array<ServerInfo> getServers();
     static String hostToName(const String& host);
 
   private:
@@ -41,17 +41,18 @@ class ServiceReceiver : public Thread, public LogTag {
 
     char m_entryBuffer[256];
     mdns_record_txt_t m_txtBuffer[128];
-    String m_curId;
+    int m_curId;
     int m_curPort;
     String m_curName;
-    Array<ServerString> m_currentResult;
+    float m_curLoad;
+    Array<ServerInfo> m_currentResult;
 
-    Array<ServerString> m_servers;
+    Array<ServerInfo> m_servers;
     std::mutex m_serverMtx;
 
     HashMap<uint64, std::function<void()>> m_updateFn;
 
-    Array<ServerString> getServersReal();
+    Array<ServerInfo> getServersReal();
 };
 
 }  // namespace e47

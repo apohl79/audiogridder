@@ -419,6 +419,13 @@ class NumberPayload : public DataPayload<int> {
     int getNumber() const { return *data; }
 };
 
+class FloatPayload : public DataPayload<float> {
+  public:
+    FloatPayload(int type) : DataPayload<float>(type) {}
+    void setFloat(float n) { *data = n; }
+    float getFloat() const { return *data; }
+};
+
 class StringPayload : public Payload {
   public:
     int* size;
@@ -719,6 +726,12 @@ class Rescan : public NumberPayload {
   public:
     static constexpr int Type = __COUNTER__;
     Rescan() : NumberPayload(Type) {}
+};
+
+class CPULoad : public FloatPayload {
+  public:
+    static constexpr int Type = __COUNTER__;
+    CPULoad() : FloatPayload(Type) {}
 };
 
 template <typename T>

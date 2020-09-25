@@ -47,6 +47,7 @@ class Worker : public Thread, public LogTag {
     void handleMessage(std::shared_ptr<Message<GetAllParameterValues>> msg);
     void handleMessage(std::shared_ptr<Message<UpdateScreenCaptureArea>> msg);
     void handleMessage(std::shared_ptr<Message<Rescan>> msg);
+    void handleMessage(std::shared_ptr<Message<CPULoad>> msg);
 
   private:
     std::unique_ptr<StreamingSocket> m_client;

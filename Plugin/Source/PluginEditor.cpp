@@ -62,9 +62,20 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
     m_versionLabel.setFont(Font(10, Font::plain));
     m_versionLabel.setAlpha(0.4f);
 
+    addAndMakeVisible(m_cpuIcon);
+    m_cpuIcon.setImage(ImageCache::getFromMemory(Images::cpu_png, Images::cpu_pngSize));
+    m_cpuIcon.setBounds(200 - 45, 89, 16, 16);
+    m_cpuIcon.setAlpha(0.6f);
+
     addAndMakeVisible(m_newPluginButton);
     m_newPluginButton.setButtonText("+");
     m_newPluginButton.setOnClickWithModListener(this);
+
+    addAndMakeVisible(m_cpuLabel);
+    m_cpuLabel.setBounds(200 - 45 + 16 - 2, 89, 50, 10);
+    m_cpuLabel.setFont(Font(10, Font::plain));
+    m_cpuLabel.setAlpha(0.6f);
+    setCPULoad(m_processor.getClient().getCPULoad());
 
     addChildComponent(m_pluginScreen);
     m_pluginScreen.setBounds(200, SCREENTOOLS_HEIGHT + SCREENTOOLS_MARGIN * 2, 1, 1);
@@ -201,6 +212,8 @@ void AudioGridderAudioProcessorEditor::resized() {
     }
     m_logo.setBounds(3, windowHeight - logoHeight - 3, m_logo.getWidth(), m_logo.getHeight());
     m_versionLabel.setBounds(logoHeight + 3, windowHeight - 15, m_versionLabel.getWidth(), m_versionLabel.getHeight());
+    m_cpuIcon.setBounds(200 - 45, windowHeight - logoHeight - 3, m_cpuIcon.getWidth(), m_cpuIcon.getHeight());
+    m_cpuLabel.setBounds(200 - 45 + logoHeight - 2, windowHeight - 15, m_cpuLabel.getWidth(), m_cpuLabel.getHeight());
 }
 
 void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const ModifierKeys& modifiers,
@@ -479,6 +492,19 @@ void AudioGridderAudioProcessorEditor::setConnected(bool connected) {
     }
 }
 
+void AudioGridderAudioProcessorEditor::setCPULoad(float load) {
+    m_cpuLabel.setText(String(lround(load)) + "%", NotificationType::sendNotificationAsync);
+    uint32 col;
+    if (load < 50.0f) {
+        col = DEFAULT_CPU_LOW_COLOR;
+    } else if (load < 90.0f) {
+        col = DEFAULT_CPU_MEDIUM_COLOR;
+    } else {
+        col = DEFAULT_CPU_HIGH_COLOR;
+    }
+    m_cpuLabel.setColour(Label::textColourId, Colour(col));
+}
+
 void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
     if (event.eventComponent == &m_srvIcon) {
         PopupMenu m;
@@ -541,19 +567,21 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
                 if (servers.contains(s.getHostAndID())) {
                     continue;
                 }
+                String name = s.getNameAndID();
+                name << " [load: " << lround(s.getLoad()) << "%]";
                 if (s.getHostAndID() == active) {
                     PopupMenu srvMenu;
                     srvMenu.addItem("Rescan", [this] { m_processor.getClient().rescan(); });
                     srvMenu.addItem("Wipe Cache & Rescan", [this] { m_processor.getClient().rescan(true); });
                     srvMenu.addItem("Reconnect", [this] { m_processor.getClient().reconnect(); });
-                    m.addSubMenu(s.getNameAndID(), srvMenu, true, nullptr, true, 0);
+                    m.addSubMenu(name, srvMenu, true, nullptr, true, 0);
                 } else {
                     PopupMenu srvMenu;
                     srvMenu.addItem("Connect", [this, s] {
                         m_processor.setActiveServer(s);
                         m_processor.saveConfig();
                     });
-                    m.addSubMenu(s.getNameAndID(), srvMenu);
+                    m.addSubMenu(name, srvMenu);
                 }
             }
         }

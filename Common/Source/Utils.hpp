@@ -109,11 +109,15 @@ static inline void waitForThreadAndLog(LogTag* tag, Thread* t, int millisUntilWa
     }
 }
 
-class ServerString {
+class ServerInfo {
   public:
-    ServerString() { refresh(); }
+    ServerInfo() {
+        m_id = 0;
+        m_load = 0.0f;
+        refresh();
+    }
 
-    ServerString(const String& s) {
+    ServerInfo(const String& s) {
         auto hostParts = StringArray::fromTokens(s, ":", "");
         if (hostParts.size() > 1) {
             m_host = hostParts[0];
@@ -125,22 +129,28 @@ class ServerString {
             m_host = s;
             m_id = 0;
         }
+        m_load = 0.0f;
         refresh();
     }
 
-    ServerString(const String& host, const String& name, int id) : m_host(host), m_name(name), m_id(id) { refresh(); }
-
-    ServerString(const ServerString& other) : m_host(other.m_host), m_name(other.m_name), m_id(other.m_id) {
+    ServerInfo(const String& host, const String& name, int id, float load)
+        : m_host(host), m_name(name), m_id(id), m_load(load) {
         refresh();
     }
 
-    bool operator==(const ServerString& other) const {
+    ServerInfo(const ServerInfo& other)
+        : m_host(other.m_host), m_name(other.m_name), m_id(other.m_id), m_load(other.m_load) {
+        refresh();
+    }
+
+    bool operator==(const ServerInfo& other) const {
         return m_host == other.m_host && m_name == other.m_name && m_id == other.m_id;
     }
 
     const String& getHost() const { return m_host; }
     const String& getName() const { return m_name; }
     int getID() const { return m_id; }
+    float getLoad() const { return m_load; }
 
     String getHostAndID() const {
         String ret = m_host;
@@ -162,7 +172,11 @@ class ServerString {
         String ret = "Server(";
         ret << "name=" << m_name << ", ";
         ret << "host=" << m_host << ", ";
-        ret << "id=" << m_id << ")";
+        ret << "id=" << m_id;
+        if (m_load > 0.0f) {
+            ret << ", load=" << m_load;
+        }
+        ret << ")";
         return ret;
     }
 
@@ -173,11 +187,18 @@ class ServerString {
     }
 
     Time getUpdated() const { return m_updated; }
+
     void refresh() { m_updated = Time::getCurrentTime(); }
+
+    void refresh(float load) {
+        refresh();
+        m_load = load;
+    }
 
   private:
     String m_host, m_name;
     int m_id;
+    float m_load;
     Time m_updated;
 };
 

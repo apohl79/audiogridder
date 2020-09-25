@@ -9,6 +9,10 @@
 
 #include "ServiceResponder.hpp"
 #include "Defaults.hpp"
+#include "CPUInfo.hpp"
+#include "json.hpp"
+
+using json = nlohmann::json;
 
 namespace e47 {
 std::unique_ptr<ServiceResponder> ServiceResponder::m_inst;
@@ -85,8 +89,11 @@ int ServiceResponder::handleRecord(int sock, const struct sockaddr* from, size_t
             if (!unicast) {
                 addrlen = 0;
             }
-            String txtRecord = "ID=";
-            txtRecord << m_id;
+            json j;
+            j["ID"] = m_id;
+            j["LOAD"] = CPUInfo::getUsage();
+            String txtRecord;
+            txtRecord << "INFO=" << j.dump();
             mdns_query_answer(sock, from, addrlen, m_sendBuffer, sizeof(m_sendBuffer), query_id,
                               MDNS_SERVICE_NAME.getCharPointer(), (size_t)MDNS_SERVICE_NAME.length(),
                               m_hostname.getCharPointer(), (size_t)m_hostname.length(), m_connector.getAddr4(),

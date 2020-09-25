@@ -15,6 +15,7 @@
 #include "Metrics.hpp"
 #include "ServiceResponder.hpp"
 #include "ScreenRecorder.hpp"
+#include "CPUInfo.hpp"
 
 namespace e47 {
 
@@ -24,6 +25,7 @@ Server::Server(json opts) : Thread("Server"), LogTag("server"), m_opts(opts) {
     runFile.create();
     loadConfig();
     TimeStatistics::initialize();
+    CPUInfo::initialize();
 }
 
 void Server::loadConfig() {
@@ -186,6 +188,7 @@ Server::~Server() {
     m_pluginlist.clear();
     TimeStatistics::cleanup();
     ServiceResponder::cleanup();
+    CPUInfo::cleanup();
     logln("server terminated");
     File runFile(SERVER_RUN_FILE);
     runFile.deleteFile();

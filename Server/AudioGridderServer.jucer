@@ -38,6 +38,8 @@
       <FILE id="jaoo5q" name="App.hpp" compile="0" resource="0" file="Source/App.hpp"/>
       <FILE id="YxNmm4" name="AudioWorker.cpp" compile="1" resource="0" file="Source/AudioWorker.cpp"/>
       <FILE id="SVahV1" name="AudioWorker.hpp" compile="0" resource="0" file="Source/AudioWorker.hpp"/>
+      <FILE id="SSv69U" name="CPUInfo.cpp" compile="1" resource="0" file="Source/CPUInfo.cpp"/>
+      <FILE id="Qy6Y8y" name="CPUInfo.hpp" compile="0" resource="0" file="Source/CPUInfo.hpp"/>
       <FILE id="a2CnKT" name="Images.cpp" compile="1" resource="0" file="Source/Images.cpp"/>
       <FILE id="AfCHJU" name="Images.hpp" compile="0" resource="0" file="Source/Images.hpp"/>
       <FILE id="tC3soa" name="KeyAndMouse.cpp" compile="1" resource="0" file="Source/KeyAndMouse.cpp"/>

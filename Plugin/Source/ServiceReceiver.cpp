@@ -10,12 +10,15 @@
 #include "ServiceReceiver.hpp"
 #include "Defaults.hpp"
 #include "mDNSConnector.hpp"
+#include "json.hpp"
 
 #ifdef JUCE_WINDOWS
 #include <Winsock2.h>
 #else
 #include <netdb.h>
 #endif
+
+using json = nlohmann::json;
 
 namespace e47 {
 
@@ -53,7 +56,7 @@ void ServiceReceiver::run() {
         } while (timeout > Time::currentTimeMillis());
 
         struct SortSrvByName {
-            static int compareElements(const ServerString& lhs, const ServerString& rhs) {
+            static int compareElements(const ServerInfo& lhs, const ServerInfo& rhs) {
                 return lhs.getNameAndID().compare(rhs.getNameAndID());
             }
         };
@@ -67,7 +70,7 @@ void ServiceReceiver::run() {
             bool exists = false;
             for (auto& s2 : m_servers) {
                 if (s1 == s2) {
-                    s2.refresh();
+                    s2.refresh(s1.getLoad());
                     exists = true;
                     break;
                 }
@@ -130,9 +133,22 @@ int ServiceReceiver::handleRecord(int /*sock*/, const struct sockaddr* from, siz
                                                   sizeof(m_txtBuffer) / sizeof(mdns_record_txt_t));
             for (size_t itxt = 0; itxt < parsed; ++itxt) {
                 auto key = MDNS_TO_JUCE_STRING(m_txtBuffer[itxt].key);
-                if (m_txtBuffer[itxt].value.length && key == "ID") {
-                    m_curId = MDNS_TO_JUCE_STRING(m_txtBuffer[itxt].value);
-                    complete = true;
+                if (m_txtBuffer[itxt].value.length) {
+                    if (key == "ID") {
+                        m_curId = MDNS_TO_JUCE_STRING(m_txtBuffer[itxt].value).getIntValue();
+                        complete = true;
+                    } else if (key == "INFO") {
+                        json j = json::parse(MDNS_TO_JUCE_STRING(m_txtBuffer[itxt].value).toStdString());
+                        m_curId = 0;
+                        if (j.find("ID") != j.end()) {
+                            m_curId = j["ID"].get<int>();
+                        }
+                        m_curLoad = 0.0f;
+                        if (j.find("LOAD") != j.end()) {
+                            m_curLoad = j["LOAD"].get<float>();
+                        }
+                        complete = true;
+                    }
                 }
             }
             break;
@@ -140,7 +156,7 @@ int ServiceReceiver::handleRecord(int /*sock*/, const struct sockaddr* from, siz
     }
     if (complete) {
         auto host = mDNSConnector::ipToString(from, addrlen, true);
-        m_currentResult.add(ServerString(host, m_curName, m_curId.getIntValue()));
+        m_currentResult.add(ServerInfo(host, m_curName, m_curId, m_curLoad));
     }
     return 0;
 }
@@ -166,7 +182,7 @@ void ServiceReceiver::cleanup(uint64 id) {
     }
 }
 
-Array<ServerString> ServiceReceiver::getServers() {
+Array<ServerInfo> ServiceReceiver::getServers() {
     auto inst = getInstance();
     if (nullptr != inst) {
         return inst->getServersReal();
@@ -174,7 +190,7 @@ Array<ServerString> ServiceReceiver::getServers() {
     return {};
 }
 
-Array<ServerString> ServiceReceiver::getServersReal() {
+Array<ServerInfo> ServiceReceiver::getServersReal() {
     std::lock_guard<std::mutex> lock(m_serverMtx);
     return m_servers;
 }

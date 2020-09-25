@@ -29,6 +29,7 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     void mouseUp(const MouseEvent& event) override;
 
     void setConnected(bool connected);
+    void setCPULoad(float load);
 
   private:
     AudioGridderAudioProcessor& m_processor;
@@ -42,8 +43,8 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     ImageComponent m_pluginScreen;
     GenericEditor m_genericEditor;
     Viewport m_genericEditorView;
-    ImageComponent m_srvIcon, m_settingsIcon;
-    Label m_srvLabel, m_versionLabel;
+    ImageComponent m_srvIcon, m_settingsIcon, m_cpuIcon;
+    Label m_srvLabel, m_versionLabel, m_cpuLabel;
     ImageComponent m_logo;
     bool m_connected = false;
 

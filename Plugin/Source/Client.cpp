@@ -78,6 +78,9 @@ void Client::run() {
             }
             lastState = newState;
         }
+        if (isReadyLockFree()) {
+            updateCPULoad();
+        }
         int sleepfor = 20;
         while (!currentThreadShouldExit() && sleepfor-- > 0) {
             Thread::sleep(50);
@@ -86,7 +89,7 @@ void Client::run() {
     logln("client loop terminated");
 }
 
-void Client::setServer(const ServerString& srv) {
+void Client::setServer(const ServerInfo& srv) {
     logln("setting server to " << srv.toString());
     String currHost = getServerHostAndID();
     std::lock_guard<std::mutex> lock(m_srvMtx);
@@ -122,24 +125,24 @@ int Client::getServerPort() {
 }
 
 void Client::setPluginScreenUpdateCallback(ScreenUpdateCallback fn) {
-    dbglock lock(*this, 5);
+    dbglock lock(*this, SETPLUGINSCREENUPDATECALLBACK);
     m_pluginScreenUpdateCallback = fn;
 }
 
 void Client::setOnConnectCallback(OnConnectCallback fn) {
-    dbglock lock(*this, 6);
+    dbglock lock(*this, SETONCONNECTCALLBACK);
     m_onConnectCallback = fn;
 }
 
 void Client::setOnCloseCallback(OnCloseCallback fn) {
-    dbglock lock(*this, 7);
+    dbglock lock(*this, SETONCLOSECALLBACK);
     m_onCloseCallback = fn;
 }
 
 void Client::init(int channelsIn, int channelsOut, double rate, int samplesPerBlock, bool doublePrecission) {
     logln("init: channelsIn=" << channelsIn << " channelsOut=" << channelsOut << " rate=" << rate << " samplesPerBlock="
                               << samplesPerBlock << " doublePrecission=" << as<int>(doublePrecission));
-    dbglock lock(*this, 8);
+    dbglock lock(*this, INIT1);
     if (!m_ready || m_channelsIn != channelsIn || m_channelsOut != channelsOut || m_rate != rate ||
         m_samplesPerBlock != samplesPerBlock || m_doublePrecission != doublePrecission) {
         m_channelsIn = channelsIn;
@@ -163,7 +166,7 @@ void Client::init() {
         id = m_srvId;
         port = m_srvPort + m_srvId;
     }
-    dbglock lock(*this, 9);
+    dbglock lock(*this, INIT2);
     m_error = true;
     if (m_channelsOut == 0 || m_rate == 0.0 || m_samplesPerBlock == 0) {
         return;
@@ -293,7 +296,7 @@ void Client::close() {
         logln("closing");
     }
     m_ready = false;
-    dbglock lock(*this, 10);
+    dbglock lock(*this, CLOSE);
     m_plugins.clear();
     if (nullptr != m_screen_socket && m_screen_socket->isConnected()) {
         m_screen_socket->close();
@@ -352,7 +355,7 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
     MessageHelper::Error err;
     Message<AddPlugin> msg;
     PLD(msg).setString(id);
-    dbglock lock(*this, 11);
+    dbglock lock(*this, ADDPLUGIN);
     if (msg.send(m_cmd_socket.get())) {
         auto result = MessageFactory::getResult(m_cmd_socket.get(), LOAD_PLUGIN_TIMEOUT, &err);
         if (nullptr == result) {
@@ -408,7 +411,7 @@ void Client::delPlugin(int idx) {
     };
     Message<DelPlugin> msg;
     PLD(msg).setNumber(idx);
-    dbglock lock(*this, 12);
+    dbglock lock(*this, DELPLUGIN);
     msg.send(m_cmd_socket.get());
     auto result = MessageFactory::getResult(m_cmd_socket.get());
     if (nullptr != result && result->getReturnCode() > -1) {
@@ -422,7 +425,7 @@ void Client::editPlugin(int idx) {
     };
     Message<EditPlugin> msg;
     PLD(msg).setNumber(idx);
-    dbglock lock(*this, 13);
+    dbglock lock(*this, EDITPLUGIN);
     msg.send(m_cmd_socket.get());
 }
 
@@ -431,7 +434,7 @@ void Client::hidePlugin() {
         return;
     };
     Message<HidePlugin> msg;
-    dbglock lock(*this, 14);
+    dbglock lock(*this, HIDEPLUGIN);
     msg.send(m_cmd_socket.get());
 }
 
@@ -442,7 +445,7 @@ MemoryBlock Client::getPluginSettings(int idx) {
     };
     Message<GetPluginSettings> msg;
     PLD(msg).setNumber(idx);
-    dbglock lock(*this, 15);
+    dbglock lock(*this, GETPLUGINSETTINGS);
     if (!msg.send(m_cmd_socket.get())) {
         m_error = true;
     } else {
@@ -463,7 +466,7 @@ MemoryBlock Client::getPluginSettings(int idx) {
 void Client::setPluginSettings(int idx, String settings) {
     Message<SetPluginSettings> msg;
     PLD(msg).setNumber(idx);
-    dbglock lock(*this, 30);
+    dbglock lock(*this, SETPLUGINSETTINGS);
     if (!msg.send(m_cmd_socket.get())) {
         m_error = true;
     } else {
@@ -486,7 +489,7 @@ void Client::bypassPlugin(int idx) {
     };
     Message<BypassPlugin> msg;
     PLD(msg).setNumber(idx);
-    dbglock lock(*this, 16);
+    dbglock lock(*this, BYPASSPLUGIN);
     msg.send(m_cmd_socket.get());
 }
 
@@ -496,7 +499,7 @@ void Client::unbypassPlugin(int idx) {
     };
     Message<UnbypassPlugin> msg;
     PLD(msg).setNumber(idx);
-    dbglock lock(*this, 17);
+    dbglock lock(*this, UNBYPASSPLUGIN);
     msg.send(m_cmd_socket.get());
 }
 
@@ -507,7 +510,7 @@ void Client::exchangePlugins(int idxA, int idxB) {
     Message<ExchangePlugins> msg;
     DATA(msg)->idxA = idxA;
     DATA(msg)->idxB = idxB;
-    dbglock lock(*this, 18);
+    dbglock lock(*this, EXCHANGEPLUGINS);
     msg.send(m_cmd_socket.get());
 }
 
@@ -518,7 +521,7 @@ std::vector<ServerPlugin> Client::getRecents() {
     };
     Message<RecentsList> msg;
     MessageHelper::Error err;
-    dbglock lock(*this, 19);
+    dbglock lock(*this, GETRECENTS);
     msg.send(m_cmd_socket.get());
     if (msg.read(m_cmd_socket.get(), &err, 5000)) {
         String listChunk(PLD(msg).str, as<size_t>(*PLD(msg).size));
@@ -542,7 +545,7 @@ void Client::setPreset(int idx, int preset) {
     Message<Preset> msg;
     DATA(msg)->idx = idx;
     DATA(msg)->preset = preset;
-    dbglock lock(*this, 20);
+    dbglock lock(*this, SETPRESET);
     msg.send(m_cmd_socket.get());
 }
 
@@ -553,7 +556,7 @@ float Client::getParameterValue(int idx, int paramIdx) {
     Message<GetParameterValue> msg;
     DATA(msg)->idx = idx;
     DATA(msg)->paramIdx = paramIdx;
-    dbglock lock(*this, 21);
+    dbglock lock(*this, GETPARAMETERVALUE);
     msg.send(m_cmd_socket.get());
     Message<ParameterValue> ret;
     MessageHelper::Error err;
@@ -576,7 +579,7 @@ void Client::setParameterValue(int idx, int paramIdx, float val) {
     DATA(msg)->idx = idx;
     DATA(msg)->paramIdx = paramIdx;
     DATA(msg)->value = val;
-    dbglock lock(*this, 22);
+    dbglock lock(*this, SETPARAMETERVALUE);
     msg.send(m_cmd_socket.get());
 }
 
@@ -586,7 +589,7 @@ Array<Client::ParameterResult> Client::getAllParameterValues(int idx, int count)
     };
     Message<GetAllParameterValues> msg;
     PLD(msg).setNumber(idx);
-    dbglock lock(*this, 30);
+    dbglock lock(*this, GETALLPARAMETERVALUES);
     msg.send(m_cmd_socket.get());
     Array<Client::ParameterResult> ret;
     for (int i = 0; i < count; i++) {
@@ -713,7 +716,7 @@ void Client::sendMouseEvent(MouseEvType ev, Point<float> p, bool isShiftDown, bo
         DATA(msg)->deltaY = 0;
         DATA(msg)->isSmooth = false;
     }
-    dbglock lock(*this, 23);
+    dbglock lock(*this, SENDMOUSEEVENT);
     msg.send(m_cmd_socket.get());
 }
 
@@ -812,7 +815,7 @@ bool Client::keyPressed(const KeyPress& kp, Component* /* originatingComponent *
     Message<Key> msg;
     PLD(msg).setData(reinterpret_cast<const char*>(keysToPress.data()),
                      static_cast<int>(keysToPress.size() * sizeof(uint16_t)));
-    dbglock lock(*this, 24);
+    dbglock lock(*this, KEYPRESSED);
     msg.send(m_cmd_socket.get());
 
     return consumed;
@@ -821,15 +824,24 @@ bool Client::keyPressed(const KeyPress& kp, Component* /* originatingComponent *
 void Client::updateScreenCaptureArea(int val) {
     Message<UpdateScreenCaptureArea> msg;
     PLD(msg).setNumber(val);
-    dbglock lock(*this, 25);
+    dbglock lock(*this, UPDATESCREENCAPTUREAREA);
     msg.send(m_cmd_socket.get());
 }
 
 void Client::rescan(bool wipe) {
     Message<Rescan> msg;
     PLD(msg).setNumber(wipe ? 1 : 0);
-    dbglock lock(*this, 26);
+    dbglock lock(*this, RESCAN);
     msg.send(m_cmd_socket.get());
+}
+
+void Client::updateCPULoad() {
+    Message<CPULoad> msg;
+    dbglock lock(*this, UPDATECPULOAD);
+    msg.send(m_cmd_socket.get());
+    msg.read(m_cmd_socket.get());
+    m_srvLoad = PLD(msg).getFloat();
+    m_processor->setCPULoad(m_srvLoad);
 }
 
 StreamingSocket* Client::accept(StreamingSocket& sock) const {

@@ -10,6 +10,7 @@
 #include "Defaults.hpp"
 #include "NumberConversion.hpp"
 #include "App.hpp"
+#include "CPUInfo.hpp"
 
 #ifdef JUCE_MAC
 #include <sys/socket.h>
@@ -154,6 +155,9 @@ void Worker::run() {
                         break;
                     case Rescan::Type:
                         handleMessage(Message<Any>::convert<Rescan>(msg));
+                        break;
+                    case CPULoad::Type:
+                        handleMessage(Message<Any>::convert<CPULoad>(msg));
                         break;
                     default:
                         logln("unknown message type " << msg->getType());
@@ -470,6 +474,11 @@ void Worker::handleMessage(std::shared_ptr<Message<Rescan>> msg) {
         }
         getApp()->restartServer(true);
     });
+}
+
+void Worker::handleMessage(std::shared_ptr<Message<CPULoad>> msg) {
+    pPLD(msg).setFloat(CPUInfo::getUsage());
+    msg->send(m_client.get());
 }
 
 }  // namespace e47

@@ -116,8 +116,9 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
     void delServer(const String& s);
     String getActiveServerHost() const { return m_client->getServerHostAndID(); }
     String getActiveServerName() const;
-    void setActiveServer(const e47::ServerString& s);
-    Array<e47::ServerString> getServersMDNS();
+    void setActiveServer(const e47::ServerInfo& s);
+    Array<e47::ServerInfo> getServersMDNS();
+    void setCPULoad(float load);
 
     int getLatencyMillis() const {
         return e47::as<int>(lround(m_client->NUM_OF_BUFFERS * getBlockSize() * 1000 / getSampleRate()));

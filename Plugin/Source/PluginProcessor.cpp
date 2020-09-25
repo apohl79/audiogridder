@@ -718,7 +718,7 @@ void AudioGridderAudioProcessor::resetSettingsAB() {
     m_settingsB = "";
 }
 
-void AudioGridderAudioProcessor::setActiveServer(const ServerString& s) { m_client->setServer(s); }
+void AudioGridderAudioProcessor::setActiveServer(const ServerInfo& s) { m_client->setServer(s); }
 
 String AudioGridderAudioProcessor::getActiveServerName() const {
     String ret = ServiceReceiver::hostToName(m_client->getServerHost());
@@ -729,7 +729,16 @@ String AudioGridderAudioProcessor::getActiveServerName() const {
     return ret;
 }
 
-Array<ServerString> AudioGridderAudioProcessor::getServersMDNS() { return ServiceReceiver::getServers(); }
+Array<ServerInfo> AudioGridderAudioProcessor::getServersMDNS() { return ServiceReceiver::getServers(); }
+
+void AudioGridderAudioProcessor::setCPULoad(float load) {
+    MessageManager::callAsync([this, load] {
+        auto* editor = getActiveEditor();
+        if (editor != nullptr) {
+            dynamic_cast<AudioGridderAudioProcessorEditor*>(editor)->setCPULoad(load);
+        }
+    });
+}
 
 float AudioGridderAudioProcessor::Parameter::getValue() const {
     if (m_idx > -1 && m_paramIdx > -1) {

@@ -133,7 +133,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
 
     void run() override;
 
-    void setServer(const ServerString& srv);
+    void setServer(const ServerInfo& srv);
     String getServerHost();
     String getServerHostAndID();
     int getServerPort();
@@ -151,14 +151,43 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     void reconnect() { m_needsReconnect = true; }
     void close();
 
+    enum DbgLockID {
+        NOLOCK,
+        SETPLUGINSCREENUPDATECALLBACK,
+        SETONCONNECTCALLBACK,
+        SETONCLOSECALLBACK,
+        INIT1,
+        INIT2,
+        CLOSE,
+        ADDPLUGIN,
+        DELPLUGIN,
+        EDITPLUGIN,
+        HIDEPLUGIN,
+        GETPLUGINSETTINGS,
+        SETPLUGINSETTINGS,
+        BYPASSPLUGIN,
+        UNBYPASSPLUGIN,
+        EXCHANGEPLUGINS,
+        GETRECENTS,
+        SETPRESET,
+        GETPARAMETERVALUE,
+        SETPARAMETERVALUE,
+        GETALLPARAMETERVALUES,
+        SENDMOUSEEVENT,
+        KEYPRESSED,
+        UPDATESCREENCAPTUREAREA,
+        RESCAN,
+        UPDATECPULOAD
+    };
+
     struct dbglock {
         Client& client;
-        dbglock(Client& c, int id) : client(c) {
+        dbglock(Client& c, DbgLockID id) : client(c) {
             client.m_clientMtx.lock();
             client.m_clientMtxId = id;
         }
         ~dbglock() {
-            client.m_clientMtxId = 0;
+            client.m_clientMtxId = NOLOCK;
             client.m_clientMtx.unlock();
         }
     };
@@ -233,6 +262,9 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
 
     void rescan(bool wipe = false);
 
+    void updateCPULoad();
+    float getCPULoad() const { return m_srvLoad; }
+
     // MouseListener
     void mouseMove(const MouseEvent& event) override;
     void mouseEnter(const MouseEvent& event) override;
@@ -255,6 +287,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     String m_srvHost = "";
     int m_srvPort = DEFAULT_SERVER_PORT;
     int m_srvId = 0;
+    float m_srvLoad = 0.0f;
     bool m_needsReconnect = false;
     int m_channelsIn = 0;
     int m_channelsOut = 0;
