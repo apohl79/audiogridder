@@ -3,7 +3,7 @@
 <JUCERPROJECT id="JM1hGs" name="AudioGridderInst" projectType="audioplug" companyName="e47"
               companyCopyright="2020 Andreas Pohl" companyWebsite="https://www.audiogridder.com"
               companyEmail="audiogridder@e47.org" pluginFormats="buildAU,buildVST,buildVST3"
-              pluginManufacturerCode="XE47" pluginCode="Znmo" headerPath="../../../Source&#10;../../../../Common/Source&#10;"
+              pluginManufacturerCode="XE47" pluginCode="E402" headerPath="../../../Source&#10;../../../../Common/Source&#10;"
               pluginName="AGridder" pluginVST3Category="Instrument,Network"
               version="1.0.0" pluginCharacteristicsValue="pluginIsMidiEffectPlugin,pluginIsSynth,pluginProducesMidiOut,pluginWantsMidiIn"
               displaySplashScreen="1" jucerFormatVersion="1">

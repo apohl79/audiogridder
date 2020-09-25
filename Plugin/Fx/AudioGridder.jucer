@@ -3,7 +3,7 @@
 <JUCERPROJECT id="JM1hGs" name="AudioGridder" projectType="audioplug" companyName="e47"
               companyCopyright="2020 Andreas Pohl" companyWebsite="https://www.audiogridder.com"
               companyEmail="audiogridder@e47.org" pluginFormats="buildAU,buildVST,buildVST3"
-              pluginManufacturerCode="XE47" pluginCode="Ueiz" headerPath="../../../Source&#10;../../../../Common/Source&#10;"
+              pluginManufacturerCode="XE47" pluginCode="E401" headerPath="../../../Source&#10;../../../../Common/Source&#10;"
               pluginName="AGridder" pluginVST3Category="Network" version="1.0.0"
               pluginAUMainType="'aufx'" displaySplashScreen="1" jucerFormatVersion="1"
               pluginCharacteristicsValue="pluginProducesMidiOut,pluginWantsMidiIn">
