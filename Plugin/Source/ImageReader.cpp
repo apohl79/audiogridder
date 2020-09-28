@@ -38,11 +38,28 @@ std::shared_ptr<Image> ImageReader::read(const char* data, size_t size, int widt
                 }
             }
             memcpy(m_inputPacket->data, data, size);
-            ret = avcodec_send_packet(m_inputCodecCtx, m_inputPacket);
-            if (ret < 0) {
-                logln("avcodec_send_packet failed: " << ret);
-                return nullptr;
-            }
+            do {
+                ret = avcodec_send_packet(m_inputCodecCtx, m_inputPacket);
+                if (ret < 0 && ret != AVERROR(EAGAIN)) {
+                    if (ret == AVERROR_EOF) {
+                        logln("avcodec_send_packet failed: EOF");
+                    } else if (ret == AVERROR(EINVAL)) {
+                        logln("avcodec_send_packet failed: EINVAL");
+                    } else if (ret == AVERROR(ENOMEM)) {
+                        logln("avcodec_send_packet failed: ENOMEM");
+                    } else if (ret == AVERROR_INVALIDDATA) {
+                        logln("avcodec_send_packet failed: AVERROR_INVALIDDATA");
+                    } else if (ret == AVERROR_PATCHWELCOME) {
+                        logln("avcodec_send_packet failed: AVERROR_PATCHWELCOME");
+                    } else if (ret == AVERROR_BUG) {
+                        logln("avcodec_send_packet failed: AVERROR_BUG");
+                    } else {
+                        logln("avcodec_send_packet failed: unknown code " << ret);
+                    }
+                    closeCodec();
+                    return nullptr;
+                }
+            } while (ret == AVERROR(EAGAIN));
             do {
                 ret = avcodec_receive_frame(m_inputCodecCtx, m_inputFrame);
                 if (ret >= 0) {

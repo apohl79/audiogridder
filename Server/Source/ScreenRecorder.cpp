@@ -18,11 +18,12 @@ AVFormatContext* ScreenRecorder::m_captureFmtCtx = nullptr;
 AVCodec* ScreenRecorder::m_outputCodec = nullptr;
 bool ScreenRecorder::m_initialized = false;
 
+ScreenRecorder::EncoderMode ScreenRecorder::m_encMode = ScreenRecorder::WEBP;
 const int ScreenRecorder::BASE_QUALITY = 8000;
 double ScreenRecorder::m_scale;
 int ScreenRecorder::m_quality;
 
-void ScreenRecorder::initialize() {
+void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode) {
     setLogTagStatic("screenrec");
 
     if (m_initialized) {
@@ -58,9 +59,19 @@ void ScreenRecorder::initialize() {
         return;
     }
 
-    m_outputCodec = avcodec_find_encoder_by_name("libwebp");
+    m_encMode = encMode;
+    const char* encName;
+    switch (m_encMode) {
+        case WEBP:
+            encName = "libwebp";
+            break;
+        case MJPEG:
+            encName = "mjpeg";
+            break;
+    }
+    m_outputCodec = avcodec_find_encoder_by_name(encName);
     if (nullptr == m_outputCodec) {
-        logln("unable to find output codec");
+        logln("unable to find output codec " << encName);
         return;
     }
 
@@ -202,8 +213,8 @@ bool ScreenRecorder::prepareInput() {
     AVDictionary* opts = nullptr;
 
 #ifdef JUCE_MAC
-    // This works only when building for OSX 10.8+. Thats why there is a separate 10.7 build.
-    // av_dict_set(&opts, "capture_cursor", "0", 0);
+    // This works only when building ffmpeg for OSX 10.8+. Thats why there is a separate 10.7 build.
+    // av_dict_set(&opts, "capture_cursor", "0", 0); // the default is 0 anyways, so we don't need to call this.
     av_dict_set(&opts, "pixel_format", "yuyv422", 0);
 #else
     av_dict_set(&opts, "draw_mouse", "0", 0);
@@ -303,15 +314,26 @@ bool ScreenRecorder::prepareOutput() {
         }
     }
 
-    m_outputCodecCtx->pix_fmt = AV_PIX_FMT_YUV420P;
+    if (m_encMode == MJPEG) {
+        m_outputCodecCtx->pix_fmt = AV_PIX_FMT_YUVJ420P;
+    } else {
+        m_outputCodecCtx->pix_fmt = AV_PIX_FMT_YUV420P;
+    }
     m_outputCodecCtx->time_base.num = 1;
     m_outputCodecCtx->time_base.den = 30;
     m_outputCodecCtx->width = (int)(m_captureRect.getWidth() / m_scale);
     m_outputCodecCtx->height = (int)(m_captureRect.getHeight() / m_scale);
     AVDictionary* opts = nullptr;
-    av_dict_set(&opts, "preset", "none", 0);
-    av_dict_set(&opts, "compression_level", "1", 0);
-    av_dict_set(&opts, "global_quality", String(m_quality).getCharPointer(), 0);
+    switch (m_encMode) {
+        case WEBP:
+            av_dict_set(&opts, "preset", "none", 0);
+            av_dict_set(&opts, "compression_level", "1", 0);
+            av_dict_set(&opts, "global_quality", String(m_quality).getCharPointer(), 0);
+            break;
+        case MJPEG:
+            av_dict_set(&opts, "b", "4000000", 0);
+            break;
+    }
     int ret = avcodec_open2(m_outputCodecCtx, m_outputCodec, &opts);
     if (ret < 0) {
         logln("prepareOutput: avcodec_open2 failed: " << ret);

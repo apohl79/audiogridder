@@ -12,11 +12,11 @@
 #include "ServiceReceiver.hpp"
 #include "Version.hpp"
 
-#ifdef JUCE_WINDOWS
+#if defined(JUCE_WINDOWS)
 #include "MiniDump.hpp"
 #endif
 
-#ifdef JUCE_MAC
+#if !defined(JUCE_WINDOWS)
 #include <signal.h>
 #endif
 
@@ -29,7 +29,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
 #endif
                          .withOutput("Output", AudioChannelSet::stereo(), true)) {
 
-#ifdef JUCE_MAC
+#if !defined(JUCE_WINDOWS)
     signal(SIGPIPE, SIG_IGN);
 #endif
 
@@ -43,7 +43,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     String appName = "AudioGridder" + mode;
     String logName = "AudioGridderPlugin_";
 
-#ifdef JUCE_WINDOWS
+#if defined(JUCE_WINDOWS)
     auto dumpPath = FileLogger::getSystemLogFileFolder().getFullPathName();
     MiniDump::initialize(dumpPath.toWideCharPointer(), appName.toWideCharPointer(), logName.toWideCharPointer(),
                          AUDIOGRIDDER_VERSIONW, true);
@@ -130,12 +130,14 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
 }
 
 AudioGridderAudioProcessor::~AudioGridderAudioProcessor() {
+    logln("plugin shutdown: terminating client");
     m_client->signalThreadShouldExit();
     m_client->close();
     waitForThreadAndLog(m_client.get(), m_client.get());
-    logln("plugin unloaded");
+    logln("plugin shutdown: cleaning up");
     TimeStatistics::cleanup();
     ServiceReceiver::cleanup(m_instId.hash());
+    logln("plugin unloaded");
     AGLogger::cleanup();
 }
 

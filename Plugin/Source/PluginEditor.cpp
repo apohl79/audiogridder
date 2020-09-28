@@ -486,6 +486,7 @@ void AudioGridderAudioProcessorEditor::setConnected(bool connected) {
         }
     } else {
         m_srvLabel.setText("not connected", NotificationType::dontSendNotification);
+        setCPULoad(0.0f);
         for (auto& but : m_pluginButtons) {
             but->setEnabled(false);
         }
@@ -495,7 +496,9 @@ void AudioGridderAudioProcessorEditor::setConnected(bool connected) {
 void AudioGridderAudioProcessorEditor::setCPULoad(float load) {
     m_cpuLabel.setText(String(lround(load)) + "%", NotificationType::sendNotificationAsync);
     uint32 col;
-    if (load < 50.0f) {
+    if (!m_connected) {
+        col = Colours::white.getARGB();
+    } else if (load < 50.0f) {
         col = DEFAULT_CPU_LOW_COLOR;
     } else if (load < 90.0f) {
         col = DEFAULT_CPU_MEDIUM_COLOR;

@@ -19,7 +19,7 @@ namespace e47 {
 class ServiceReceiver : public Thread, public LogTag {
   public:
     ServiceReceiver() : Thread("ServiceReceiver"), LogTag("mdns") { startThread(); }
-    ~ServiceReceiver() override { stopThread(4000); }
+    ~ServiceReceiver() override { stopThread(-1); }
 
     void run() override;
 

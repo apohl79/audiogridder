@@ -24,7 +24,7 @@ namespace e47 {
 
 std::shared_ptr<ServiceReceiver> ServiceReceiver::m_inst;
 std::mutex ServiceReceiver::m_instMtx;
-size_t ServiceReceiver::m_instRefCount;
+size_t ServiceReceiver::m_instRefCount = 0;
 
 int queryCallback(int sock, const struct sockaddr* from, size_t addrlen, mdns_entry_type_t entry, uint16_t query_id,
                   uint16_t rtype, uint16_t rclass, uint32_t ttl, const void* data, size_t size, size_t name_offset,
@@ -93,9 +93,17 @@ void ServiceReceiver::run() {
                 logln("  " << s.toString());
             }
             m_serverMtx.unlock();
-            std::lock_guard<std::mutex> instLock(m_instMtx);
-            for (auto fn : m_updateFn) {
-                fn();
+            bool locked = false;
+            while (!currentThreadShouldExit() && (locked = m_instMtx.try_lock()) == false) {
+                sleep(5);
+            }
+            if (locked) {
+                for (auto fn : m_updateFn) {
+                    fn();
+                }
+                m_instMtx.unlock();
+            } else {
+                logln("can't lock, not executing callbacks");
             }
         }
     }
@@ -166,7 +174,7 @@ void ServiceReceiver::initialize(uint64 id, std::function<void()> fn) {
     if (nullptr == m_inst) {
         m_inst = std::make_shared<ServiceReceiver>();
     }
-    m_inst->m_updateFn[id] = fn;
+    m_inst->m_updateFn.set(id, fn);
     m_instRefCount++;
 }
 

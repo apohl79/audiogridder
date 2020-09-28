@@ -14,7 +14,6 @@
 #include "App.hpp"
 #include "Metrics.hpp"
 #include "ServiceResponder.hpp"
-#include "ScreenRecorder.hpp"
 #include "CPUInfo.hpp"
 
 namespace e47 {
@@ -77,6 +76,19 @@ void Server::loadConfig() {
         if (j.find("ScreenCapturingFFmpeg") != j.end()) {
             m_screenCapturingFFmpeg = j["ScreenCapturingFFmpeg"].get<bool>();
         }
+        String encoder;
+        if (j.find("ScreenCapturingFFmpegEncoder") != j.end()) {
+            encoder = j["ScreenCapturingFFmpegEncoder"].get<std::string>();
+            if (encoder == "webp") {
+                m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
+            } else if (encoder == "mjpeg") {
+                m_screenCapturingFFmpegEncMode = ScreenRecorder::MJPEG;
+            } else {
+                logln("unknown ffmpeg encoder mode " << encoder << "! falling back to webp.");
+                m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
+                encoder = "webp";
+            }
+        }
         if (j.find("ScreenCapturingOff") != j.end()) {
             m_screenCapturingOff = j["ScreenCapturingOff"].get<bool>();
         }
@@ -84,8 +96,8 @@ void Server::loadConfig() {
         if (m_screenCapturingOff) {
             scmode = "off";
         } else if (m_screenCapturingFFmpeg) {
-            scmode = "ffmpeg";
-            MessageManager::callAsync([] { ScreenRecorder::initialize(); });
+            scmode = "ffmpeg (" + encoder + ")";
+            MessageManager::callAsync([this] { ScreenRecorder::initialize(m_screenCapturingFFmpegEncMode); });
         } else {
             scmode = "native";
         }
@@ -138,6 +150,15 @@ void Server::saveConfig() {
     j["VST2Folders"] = json::array();
     for (auto& f : m_vst2Folders) {
         j["VST2Folders"].push_back(f.toStdString());
+    }
+    j["ScreenCapturingFFmpeg"] = m_screenCapturingFFmpeg;
+    switch (m_screenCapturingFFmpegEncMode) {
+        case ScreenRecorder::WEBP:
+            j["ScreenCapturingFFmpegEncoder"] = "webp";
+            break;
+        case ScreenRecorder::MJPEG:
+            j["ScreenCapturingFFmpegEncoder"] = "mjpeg";
+            break;
     }
     j["ScreenCapturingFFmpeg"] = m_screenCapturingFFmpeg;
     j["ScreenCapturingOff"] = m_screenCapturingOff;

@@ -613,9 +613,11 @@ void Client::ScreenReceiver::run() {
             if (PLD(msg).hdr->size > 0) {
                 int width = (int)(PLD(msg).hdr->width / PLD(msg).hdr->scale);
                 int height = (int)(PLD(msg).hdr->height / PLD(msg).hdr->scale);
-                m_client->setPluginScreen(m_imgReader.read(DATA(msg), PLD(msg).hdr->size, PLD(msg).hdr->width,
-                                                           PLD(msg).hdr->height, PLD(msg).hdr->scale),
-                                          width, height);
+                auto img = m_imgReader.read(DATA(msg), PLD(msg).hdr->size, PLD(msg).hdr->width, PLD(msg).hdr->height,
+                                            PLD(msg).hdr->scale);
+                if (nullptr != img) {
+                    m_client->setPluginScreen(img, width, height);
+                }
             } else {
                 m_client->setPluginScreen(nullptr, 0, 0);
             }

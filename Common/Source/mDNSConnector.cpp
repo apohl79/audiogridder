@@ -177,13 +177,13 @@ int mDNSConnector::openServiceSockets(int maxSockets) {
         struct sockaddr_in sock_addr;
         memset(&sock_addr, 0, sizeof(struct sockaddr_in));
         sock_addr.sin_family = AF_INET;
-#ifdef JUCE_WINDOWS
+#if defined(JUCE_WINDOWS)
         sock_addr.sin_addr = in4addr_any;
 #else
         sock_addr.sin_addr.s_addr = INADDR_ANY;
 #endif
         sock_addr.sin_port = htons(MDNS_PORT);
-#ifdef JUCE_MAC
+#if defined(JUCE_MAC)
         sock_addr.sin_len = sizeof(struct sockaddr_in);
 #endif
         int sock = mdns_socket_open_ipv4(&sock_addr);
@@ -199,7 +199,7 @@ int mDNSConnector::openServiceSockets(int maxSockets) {
         sock_addr.sin6_family = AF_INET6;
         sock_addr.sin6_addr = in6addr_any;
         sock_addr.sin6_port = htons(MDNS_PORT);
-#ifdef JUCE_MAC
+#if defined(JUCE_MAC)
         sock_addr.sin6_len = sizeof(struct sockaddr_in6);
 #endif
         int sock = mdns_socket_open_ipv6(&sock_addr);

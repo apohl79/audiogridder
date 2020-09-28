@@ -173,18 +173,28 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_components.push_back(std::move(label));
 
     m_screenCapturingMode.setBounds(getWideFieldBounds(row));
-    m_screenCapturingMode.addItem("FFmpeg", 1);
-    m_screenCapturingMode.addItem("Legacy", 2);
-    m_screenCapturingMode.addItem("Disabled", 3);
+    m_screenCapturingMode.addItem("FFmpeg (webp)", 1);
+    m_screenCapturingMode.addItem("FFmpeg (mjpeg)", 2);
+    m_screenCapturingMode.addItem("Legacy", 3);
+    m_screenCapturingMode.addItem("Disabled", 4);
     int mode = 1;
     if (m_app->getServer().getScreenCapturingOff()) {
-        mode = 3;
+        mode = 4;
     } else if (!m_app->getServer().getScreenCapturingFFmpeg()) {
-        mode = 2;
+        mode = 3;
+    } else {
+        switch (m_app->getServer().getScreenCapturingFFmpegEncoder()) {
+            case ScreenRecorder::WEBP:
+                mode = 1;
+                break;
+            case ScreenRecorder::MJPEG:
+                mode = 2;
+                break;
+        }
     }
     m_screenCapturingMode.setSelectedId(mode, NotificationType::dontSendNotification);
     m_screenCapturingMode.onChange = [this] {
-        if (m_screenCapturingMode.getSelectedId() != 2) {
+        if (m_screenCapturingMode.getSelectedId() != 3) {
             m_screenDiffDetectionLbl.setAlpha(0.5);
             m_screenDiffDetection.setEnabled(false);
             m_screenDiffDetection.setAlpha(0.5);
@@ -274,13 +284,19 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
         switch (m_screenCapturingMode.getSelectedId()) {
             case 1:
                 appCpy->getServer().setScreenCapturingFFmpeg(true);
+                appCpy->getServer().setScreenCapturingFFmpegEncoder(ScreenRecorder::WEBP);
                 appCpy->getServer().setScreenCapturingOff(false);
                 break;
             case 2:
-                appCpy->getServer().setScreenCapturingFFmpeg(false);
+                appCpy->getServer().setScreenCapturingFFmpeg(true);
+                appCpy->getServer().setScreenCapturingFFmpegEncoder(ScreenRecorder::MJPEG);
                 appCpy->getServer().setScreenCapturingOff(false);
                 break;
             case 3:
+                appCpy->getServer().setScreenCapturingFFmpeg(false);
+                appCpy->getServer().setScreenCapturingOff(false);
+                break;
+            case 4:
                 appCpy->getServer().setScreenCapturingFFmpeg(false);
                 appCpy->getServer().setScreenCapturingOff(true);
                 break;

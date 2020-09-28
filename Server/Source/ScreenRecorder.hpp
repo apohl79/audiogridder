@@ -35,6 +35,8 @@ class ScreenRecorder : public LogTag {
   public:
     using CaptureCallback = std::function<void(const uint8_t* data, int size, int width, int height, double scale)>;
 
+    enum EncoderMode { WEBP, MJPEG };
+
     ScreenRecorder();
     ~ScreenRecorder();
 
@@ -44,7 +46,7 @@ class ScreenRecorder : public LogTag {
 
     bool isRecording() const { return m_capture; }
 
-    static void initialize();
+    static void initialize(EncoderMode encMode = WEBP);
 
   private:
     static String m_inputFmtName;
@@ -72,6 +74,7 @@ class ScreenRecorder : public LogTag {
     Rectangle<int> m_captureRect;
     int m_pxSize = 0;
 
+    static EncoderMode m_encMode;
     static const int BASE_QUALITY;
     static double m_scale;
     static int m_quality;

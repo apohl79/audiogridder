@@ -17,6 +17,7 @@
 #include "ProcessorChain.hpp"
 #include "Utils.hpp"
 #include "json.hpp"
+#include "ScreenRecorder.hpp"
 
 namespace e47 {
 
@@ -49,6 +50,8 @@ class Server : public Thread, public LogTag {
     void setScreenDiffDetection(bool b) { m_screenDiffDetection = b; }
     bool getScreenCapturingFFmpeg() const { return m_screenCapturingFFmpeg; }
     void setScreenCapturingFFmpeg(bool b) { m_screenCapturingFFmpeg = b; }
+    ScreenRecorder::EncoderMode getScreenCapturingFFmpegEncoder() const { return m_screenCapturingFFmpegEncMode; }
+    void setScreenCapturingFFmpegEncoder(ScreenRecorder::EncoderMode m) { m_screenCapturingFFmpegEncMode = m; }
     bool getScreenCapturingOff() const { return m_screenCapturingOff; }
     void setScreenCapturingOff(bool b) { m_screenCapturingOff = b; }
     bool getScanForPlugins() const { return m_scanForPlugins; }
@@ -83,6 +86,7 @@ class Server : public Thread, public LogTag {
     bool m_screenDiffDetection = true;
     bool m_screenCapturingFFmpeg = true;
     bool m_screenCapturingOff = false;
+    ScreenRecorder::EncoderMode m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
     StringArray m_vst3Folders;
     StringArray m_vst2Folders;
     bool m_scanForPlugins = true;

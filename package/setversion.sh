@@ -47,5 +47,6 @@ if [ "$STR_VER" != "dev-build" ]; then
     mkdir -p ../Archive/Builds/$STR_VER/win
     mkdir -p ../Archive/Builds/$STR_VER/osx
     mkdir -p ../Archive/Builds/$STR_VER/osx10.7
+    mkdir -p ../Archive/Builds/$STR_VER/linux
     sudo chmod -R g+rw ../Archive/Builds
 fi

@@ -49,13 +49,17 @@ Please find the latest binaries to download in the
 - Effect & Instrument plugins
 - Latency compensation
 - 32/64 bit float processing
-- Local control of remote plugin UI's
+- Audio over network
+- Midi over network
 - Unlimited remote effect plugin chains
+- Streaming of plugin UIs
+- Local control of remote plugin UI's
+- Generic Plugin Parameter Editor
 
 # Compatibility
 
 - Server: OSX 64bit 10.7+, Windows 7+
-- Plugin: OSX 64bit 10.11+, Windows 7+
+- Plugin: OSX 64bit 10.11+, Windows 7+, Linux 64bit
 - The server supports AudioUnit (OSX only) and VST2/VST3 plugins
 - The plugin is available as AudioUnit (OSX only) and VST2/VST3
 - Tested DAWs: Cubase 10 Pro, Logic Pro X, Reaper, Ableton Live
@@ -105,8 +109,7 @@ instances).
 
 ## Server Installation
 
-1. Install the PKG on OSX or the Setup EXE on Windows. (The installer
-includes the server and plugin binaries.)
+1. Install the PKG on OSX or the Setup EXE on Windows.
 2. **On OSX**: Grant AudioGridderServer the "Accessibility" (Mojave,
 Catalina) and "Screen Recording" (Catalina) permissions (System
 Preferences -> Security & Privacy -> Privacy Tab) - This is also
@@ -146,14 +149,16 @@ DAW at the same time.
 
 ## Plugin Installation
 
-1. Install the PKG on OSX or the Setup EXE on Windows. (The installer
-includes the server and plugin binaries.)
+1. Install the PKG on OSX or the Setup EXE on Windows. For Linux you
+have to extract the VST2/VST3 binaries into your plugin folders.
 2. Run your DAW and insert the AudioGridder plugin.
-3. Add your server endpoint(s) (IP or DNS name) by clicking the server
-icon (this needs to be done only once, as the server settings will be
-shared with new plugin instances)<br/>**Note:** Server and client have
-to be able to directly reach each other. This is because the server
-will have to connect the client at initialization time.
+3. The plugin will discover servers on the same network automatically
+via mDNS. If that does not work for you, you can add your server
+endpoint(s) (IP or DNS name) by clicking the server icon (this needs
+to be done only once, as the server settings will be shared with new
+plugin instances)<br/>**Note:** Server and client have to be able to
+directly reach each other. This is because the server will have to
+connect the client at initialization time.
 4. Add remote plugins.
 
 <p align="center">
