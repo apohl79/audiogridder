@@ -34,23 +34,28 @@ void Client::run() {
         try {
             if (cfg.exists()) {
                 FileInputStream fis(cfg);
-                json j = json::parse(fis.readEntireStreamAsString().toStdString());
-                if (j.find("NumberOfBuffers") != j.end()) {
-                    int newNum = j["NumberOfBuffers"].get<int>();
-                    if (NUM_OF_BUFFERS != newNum) {
-                        logln("number of buffers changed from " << NUM_OF_BUFFERS << " to " << newNum);
-                        NUM_OF_BUFFERS = newNum;
-                        reconnect();
+                if (fis.openedOk()) {
+                    json j = json::parse(fis.readEntireStreamAsString().toStdString());
+                    if (j.find("NumberOfBuffers") != j.end()) {
+                        int newNum = j["NumberOfBuffers"].get<int>();
+                        if (NUM_OF_BUFFERS != newNum) {
+                            logln("number of buffers changed from " << NUM_OF_BUFFERS << " to " << newNum);
+                            NUM_OF_BUFFERS = newNum;
+                            reconnect();
+                        }
                     }
-                }
-                if (j.find("LoadPluginTimeout") != j.end()) {
-                    int newNum = j["LoadPluginTimeout"].get<int>();
-                    if (LOAD_PLUGIN_TIMEOUT != newNum) {
-                        logln("timeout for leading a plugin changed from " << LOAD_PLUGIN_TIMEOUT << " to " << newNum);
-                        LOAD_PLUGIN_TIMEOUT = newNum;
+                    if (j.find("LoadPluginTimeout") != j.end()) {
+                        int newNum = j["LoadPluginTimeout"].get<int>();
+                        if (LOAD_PLUGIN_TIMEOUT != newNum) {
+                            logln("timeout for leading a plugin changed from " << LOAD_PLUGIN_TIMEOUT << " to "
+                                                                               << newNum);
+                            LOAD_PLUGIN_TIMEOUT = newNum;
+                        }
                     }
+                    m_processor->loadConfig(j, true);
+                } else {
+                    logln("failed to open config file: " << fis.getStatus().getErrorMessage());
                 }
-                m_processor->loadConfig(j, true);
             }
         } catch (json::parse_error& e) {
             logln("parsing config failed: " << e.what());
@@ -125,24 +130,24 @@ int Client::getServerPort() {
 }
 
 void Client::setPluginScreenUpdateCallback(ScreenUpdateCallback fn) {
-    dbglock lock(*this, SETPLUGINSCREENUPDATECALLBACK);
+    LockByID lock(*this, SETPLUGINSCREENUPDATECALLBACK);
     m_pluginScreenUpdateCallback = fn;
 }
 
 void Client::setOnConnectCallback(OnConnectCallback fn) {
-    dbglock lock(*this, SETONCONNECTCALLBACK);
+    LockByID lock(*this, SETONCONNECTCALLBACK);
     m_onConnectCallback = fn;
 }
 
 void Client::setOnCloseCallback(OnCloseCallback fn) {
-    dbglock lock(*this, SETONCLOSECALLBACK);
+    LockByID lock(*this, SETONCLOSECALLBACK);
     m_onCloseCallback = fn;
 }
 
 void Client::init(int channelsIn, int channelsOut, double rate, int samplesPerBlock, bool doublePrecission) {
     logln("init: channelsIn=" << channelsIn << " channelsOut=" << channelsOut << " rate=" << rate << " samplesPerBlock="
                               << samplesPerBlock << " doublePrecission=" << as<int>(doublePrecission));
-    dbglock lock(*this, INIT1);
+    LockByID lock(*this, INIT1);
     if (!m_ready || m_channelsIn != channelsIn || m_channelsOut != channelsOut || m_rate != rate ||
         m_samplesPerBlock != samplesPerBlock || m_doublePrecission != doublePrecission) {
         m_channelsIn = channelsIn;
@@ -166,7 +171,7 @@ void Client::init() {
         id = m_srvId;
         port = m_srvPort + m_srvId;
     }
-    dbglock lock(*this, INIT2);
+    LockByID lock(*this, INIT2);
     m_error = true;
     if (m_channelsOut == 0 || m_rate == 0.0 || m_samplesPerBlock == 0) {
         return;
@@ -220,14 +225,15 @@ void Client::init() {
             return;
         }
 
-        m_audio_socket = std::unique_ptr<StreamingSocket>(accept(sock));
-        if (nullptr != m_audio_socket) {
+        auto* audioSock = accept(sock);
+        if (nullptr != audioSock) {
             logln("audio connection established");
+            std::lock_guard<std::mutex> audiolck(m_audioMtx);
             if (m_doublePrecission) {
-                m_audioStreamerD.reset(new AudioStreamer<double>(this, m_audio_socket.get()));
+                m_audioStreamerD.reset(new AudioStreamer<double>(this, audioSock));
                 m_audioStreamerD->startThread(Thread::realtimeAudioPriority);
             } else {
-                m_audioStreamerF.reset(new AudioStreamer<float>(this, m_audio_socket.get()));
+                m_audioStreamerF.reset(new AudioStreamer<float>(this, audioSock));
                 m_audioStreamerF->startThread(Thread::realtimeAudioPriority);
             }
         } else {
@@ -280,7 +286,7 @@ bool Client::isReady(int timeout) {
     if (locked) {
         m_ready = !m_error && !m_needsReconnect && nullptr != m_cmd_socket && m_cmd_socket->isConnected() &&
                   m_screenWorker->isThreadRunning() && nullptr != m_screen_socket && m_screen_socket->isConnected() &&
-                  nullptr != m_audio_socket && m_audio_socket->isConnected();
+                  audioConnectionOk();
         m_clientMtx.unlock();
     } else {
         logln(getLoadedPluginsString() << ": error: isReady can't acquire lock, locked by " << m_clientMtxId);
@@ -296,7 +302,7 @@ void Client::close() {
         logln("closing");
     }
     m_ready = false;
-    dbglock lock(*this, CLOSE);
+    LockByID lock(*this, CLOSE);
     m_plugins.clear();
     if (nullptr != m_screen_socket && m_screen_socket->isConnected()) {
         m_screen_socket->close();
@@ -313,9 +319,7 @@ void Client::close() {
         }
         m_cmd_socket.reset();
     }
-    if (nullptr != m_audio_socket && m_audio_socket->isConnected()) {
-        m_audio_socket->close();
-    }
+    m_audioMtx.lock();
     if (nullptr != m_audioStreamerD && m_audioStreamerD->isThreadRunning()) {
         m_audioStreamerD->signalThreadShouldExit();
         m_audioStreamerD->waitForThreadToExit(100);
@@ -326,7 +330,7 @@ void Client::close() {
         m_audioStreamerF->waitForThreadToExit(100);
         m_audioStreamerF.reset();
     }
-    m_audio_socket.reset();
+    m_audioMtx.unlock();
 }
 
 Image Client::getPluginScreen() {
@@ -355,7 +359,7 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
     MessageHelper::Error err;
     Message<AddPlugin> msg;
     PLD(msg).setString(id);
-    dbglock lock(*this, ADDPLUGIN);
+    LockByID lock(*this, ADDPLUGIN);
     if (msg.send(m_cmd_socket.get())) {
         auto result = MessageFactory::getResult(m_cmd_socket.get(), LOAD_PLUGIN_TIMEOUT, &err);
         if (nullptr == result) {
@@ -411,7 +415,7 @@ void Client::delPlugin(int idx) {
     };
     Message<DelPlugin> msg;
     PLD(msg).setNumber(idx);
-    dbglock lock(*this, DELPLUGIN);
+    LockByID lock(*this, DELPLUGIN);
     msg.send(m_cmd_socket.get());
     auto result = MessageFactory::getResult(m_cmd_socket.get());
     if (nullptr != result && result->getReturnCode() > -1) {
@@ -425,7 +429,7 @@ void Client::editPlugin(int idx) {
     };
     Message<EditPlugin> msg;
     PLD(msg).setNumber(idx);
-    dbglock lock(*this, EDITPLUGIN);
+    LockByID lock(*this, EDITPLUGIN);
     msg.send(m_cmd_socket.get());
 }
 
@@ -434,7 +438,7 @@ void Client::hidePlugin() {
         return;
     };
     Message<HidePlugin> msg;
-    dbglock lock(*this, HIDEPLUGIN);
+    LockByID lock(*this, HIDEPLUGIN);
     msg.send(m_cmd_socket.get());
 }
 
@@ -445,7 +449,7 @@ MemoryBlock Client::getPluginSettings(int idx) {
     };
     Message<GetPluginSettings> msg;
     PLD(msg).setNumber(idx);
-    dbglock lock(*this, GETPLUGINSETTINGS);
+    LockByID lock(*this, GETPLUGINSETTINGS);
     if (!msg.send(m_cmd_socket.get())) {
         m_error = true;
     } else {
@@ -466,7 +470,7 @@ MemoryBlock Client::getPluginSettings(int idx) {
 void Client::setPluginSettings(int idx, String settings) {
     Message<SetPluginSettings> msg;
     PLD(msg).setNumber(idx);
-    dbglock lock(*this, SETPLUGINSETTINGS);
+    LockByID lock(*this, SETPLUGINSETTINGS);
     if (!msg.send(m_cmd_socket.get())) {
         m_error = true;
     } else {
@@ -489,7 +493,7 @@ void Client::bypassPlugin(int idx) {
     };
     Message<BypassPlugin> msg;
     PLD(msg).setNumber(idx);
-    dbglock lock(*this, BYPASSPLUGIN);
+    LockByID lock(*this, BYPASSPLUGIN);
     msg.send(m_cmd_socket.get());
 }
 
@@ -499,7 +503,7 @@ void Client::unbypassPlugin(int idx) {
     };
     Message<UnbypassPlugin> msg;
     PLD(msg).setNumber(idx);
-    dbglock lock(*this, UNBYPASSPLUGIN);
+    LockByID lock(*this, UNBYPASSPLUGIN);
     msg.send(m_cmd_socket.get());
 }
 
@@ -510,7 +514,7 @@ void Client::exchangePlugins(int idxA, int idxB) {
     Message<ExchangePlugins> msg;
     DATA(msg)->idxA = idxA;
     DATA(msg)->idxB = idxB;
-    dbglock lock(*this, EXCHANGEPLUGINS);
+    LockByID lock(*this, EXCHANGEPLUGINS);
     msg.send(m_cmd_socket.get());
 }
 
@@ -521,7 +525,7 @@ std::vector<ServerPlugin> Client::getRecents() {
     };
     Message<RecentsList> msg;
     MessageHelper::Error err;
-    dbglock lock(*this, GETRECENTS);
+    LockByID lock(*this, GETRECENTS);
     msg.send(m_cmd_socket.get());
     if (msg.read(m_cmd_socket.get(), &err, 5000)) {
         String listChunk(PLD(msg).str, as<size_t>(*PLD(msg).size));
@@ -545,7 +549,7 @@ void Client::setPreset(int idx, int preset) {
     Message<Preset> msg;
     DATA(msg)->idx = idx;
     DATA(msg)->preset = preset;
-    dbglock lock(*this, SETPRESET);
+    LockByID lock(*this, SETPRESET);
     msg.send(m_cmd_socket.get());
 }
 
@@ -556,7 +560,7 @@ float Client::getParameterValue(int idx, int paramIdx) {
     Message<GetParameterValue> msg;
     DATA(msg)->idx = idx;
     DATA(msg)->paramIdx = paramIdx;
-    dbglock lock(*this, GETPARAMETERVALUE);
+    LockByID lock(*this, GETPARAMETERVALUE);
     msg.send(m_cmd_socket.get());
     Message<ParameterValue> ret;
     MessageHelper::Error err;
@@ -579,7 +583,7 @@ void Client::setParameterValue(int idx, int paramIdx, float val) {
     DATA(msg)->idx = idx;
     DATA(msg)->paramIdx = paramIdx;
     DATA(msg)->value = val;
-    dbglock lock(*this, SETPARAMETERVALUE);
+    LockByID lock(*this, SETPARAMETERVALUE);
     msg.send(m_cmd_socket.get());
 }
 
@@ -589,7 +593,7 @@ Array<Client::ParameterResult> Client::getAllParameterValues(int idx, int count)
     };
     Message<GetAllParameterValues> msg;
     PLD(msg).setNumber(idx);
-    dbglock lock(*this, GETALLPARAMETERVALUES);
+    LockByID lock(*this, GETALLPARAMETERVALUES);
     msg.send(m_cmd_socket.get());
     Array<Client::ParameterResult> ret;
     for (int i = 0; i < count; i++) {
@@ -651,8 +655,6 @@ void Client::mouseDown(const MouseEvent& event) {
     } else if (event.mods.isMiddleButtonDown()) {
         sendMouseEvent(MouseEvType::OTHER_DOWN, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
                        event.mods.isAltDown());
-    } else {
-        dbgln("unhandled mouseDown event");
     }
 }
 
@@ -666,8 +668,6 @@ void Client::mouseDrag(const MouseEvent& event) {
     } else if (event.mods.isMiddleButtonDown()) {
         sendMouseEvent(MouseEvType::OTHER_DRAG, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
                        event.mods.isAltDown());
-    } else {
-        dbgln("unhandled mouseDrag event");
     }
 }
 
@@ -681,14 +681,10 @@ void Client::mouseUp(const MouseEvent& event) {
     } else if (event.mods.isMiddleButtonDown()) {
         sendMouseEvent(MouseEvType::OTHER_UP, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
                        event.mods.isAltDown());
-    } else {
-        dbgln("unhandled mouseUp event");
     }
 }
 
-void Client::mouseDoubleClick(const MouseEvent& event) {
-    dbgln("unhandled mouseDoubleClick " << event.position.x << ":" << event.position.y);
-}
+void Client::mouseDoubleClick(const MouseEvent& /*event*/) {}
 
 void Client::mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wheel) {
     if (!wheel.isInertial) {
@@ -718,7 +714,7 @@ void Client::sendMouseEvent(MouseEvType ev, Point<float> p, bool isShiftDown, bo
         DATA(msg)->deltaY = 0;
         DATA(msg)->isSmooth = false;
     }
-    dbglock lock(*this, SENDMOUSEEVENT);
+    LockByID lock(*this, SENDMOUSEEVENT);
     msg.send(m_cmd_socket.get());
 }
 
@@ -817,7 +813,7 @@ bool Client::keyPressed(const KeyPress& kp, Component* /* originatingComponent *
     Message<Key> msg;
     PLD(msg).setData(reinterpret_cast<const char*>(keysToPress.data()),
                      static_cast<int>(keysToPress.size() * sizeof(uint16_t)));
-    dbglock lock(*this, KEYPRESSED);
+    LockByID lock(*this, KEYPRESSED);
     msg.send(m_cmd_socket.get());
 
     return consumed;
@@ -826,20 +822,20 @@ bool Client::keyPressed(const KeyPress& kp, Component* /* originatingComponent *
 void Client::updateScreenCaptureArea(int val) {
     Message<UpdateScreenCaptureArea> msg;
     PLD(msg).setNumber(val);
-    dbglock lock(*this, UPDATESCREENCAPTUREAREA);
+    LockByID lock(*this, UPDATESCREENCAPTUREAREA);
     msg.send(m_cmd_socket.get());
 }
 
 void Client::rescan(bool wipe) {
     Message<Rescan> msg;
     PLD(msg).setNumber(wipe ? 1 : 0);
-    dbglock lock(*this, RESCAN);
+    LockByID lock(*this, RESCAN);
     msg.send(m_cmd_socket.get());
 }
 
 void Client::updateCPULoad() {
     Message<CPULoad> msg;
-    dbglock lock(*this, UPDATECPULOAD);
+    LockByID lock(*this, UPDATECPULOAD);
     msg.send(m_cmd_socket.get());
     msg.read(m_cmd_socket.get());
     m_srvLoad = PLD(msg).getFloat();
@@ -861,6 +857,7 @@ StreamingSocket* Client::accept(StreamingSocket& sock) const {
 }
 
 String Client::getLoadedPluginsString() {
+    LockByID lock(*this, GETLOADEDPLUGINSSTRING, false);
     String ret;
     bool first = true;
     for (auto& p : m_processor->getLoadedPlugins()) {

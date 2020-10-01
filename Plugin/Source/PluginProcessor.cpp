@@ -286,8 +286,8 @@ void AudioGridderAudioProcessor::processBlockReal(AudioBuffer<T>& buffer, MidiBu
 
     if ((buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) || midiMessages.getNumEvents() > 0) {
         if (m_client->audioLock()) {
-            m_client->send(buffer, midiMessages, posInfo);
-            m_client->read(buffer, midiMessages);
+            m_client->sendAudioMessage(buffer, midiMessages, posInfo);
+            m_client->readAudioMessage(buffer, midiMessages);
             m_client->audioUnlock();
             if (m_client->getLatencySamples() != getLatencySamples()) {
                 updateLatency(m_client->getLatencySamples());

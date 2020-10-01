@@ -128,8 +128,8 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
         void setValue(float val) { currentValue = (float)range.convertTo0to1(val); }
     };
 
-    int NUM_OF_BUFFERS = DEFAULT_NUM_OF_BUFFERS;
-    int LOAD_PLUGIN_TIMEOUT = DEFAULT_LOAD_PLUGIN_TIMEOUT;
+    std::atomic_int NUM_OF_BUFFERS{DEFAULT_NUM_OF_BUFFERS};
+    std::atomic_int LOAD_PLUGIN_TIMEOUT{DEFAULT_LOAD_PLUGIN_TIMEOUT};
 
     void run() override;
 
@@ -151,77 +151,29 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     void reconnect() { m_needsReconnect = true; }
     void close();
 
-    enum DbgLockID {
-        NOLOCK,
-        SETPLUGINSCREENUPDATECALLBACK,
-        SETONCONNECTCALLBACK,
-        SETONCLOSECALLBACK,
-        INIT1,
-        INIT2,
-        CLOSE,
-        ADDPLUGIN,
-        DELPLUGIN,
-        EDITPLUGIN,
-        HIDEPLUGIN,
-        GETPLUGINSETTINGS,
-        SETPLUGINSETTINGS,
-        BYPASSPLUGIN,
-        UNBYPASSPLUGIN,
-        EXCHANGEPLUGINS,
-        GETRECENTS,
-        SETPRESET,
-        GETPARAMETERVALUE,
-        SETPARAMETERVALUE,
-        GETALLPARAMETERVALUES,
-        SENDMOUSEEVENT,
-        KEYPRESSED,
-        UPDATESCREENCAPTUREAREA,
-        RESCAN,
-        UPDATECPULOAD
-    };
-
-    struct dbglock {
-        Client& client;
-        dbglock(Client& c, DbgLockID id) : client(c) {
-            client.m_clientMtx.lock();
-            client.m_clientMtxId = id;
-        }
-        ~dbglock() {
-            client.m_clientMtxId = NOLOCK;
-            client.m_clientMtx.unlock();
-        }
-    };
-    friend dbglock;
-
     bool audioLock() {
-        if (m_clientMtx.try_lock()) {
+        if (m_audioMtx.try_lock()) {
             if (isReadyLockFree()) {
-                m_clientMtxId = 1;
                 return true;
             }
-            m_clientMtx.unlock();
+            m_audioMtx.unlock();
         }
         return false;
     }
 
-    void audioUnlock() {
-        if (m_clientMtxId == 1) {
-            m_clientMtxId = 0;
-            m_clientMtx.unlock();
-        }
-    }
+    void audioUnlock() { m_audioMtx.unlock(); }
 
-    void send(AudioBuffer<float>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
+    void sendAudioMessage(AudioBuffer<float>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
         m_audioStreamerF->send(buffer, midi, posInfo);
     }
 
-    void send(AudioBuffer<double>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
+    void sendAudioMessage(AudioBuffer<double>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
         m_audioStreamerD->send(buffer, midi, posInfo);
     }
 
-    void read(AudioBuffer<float>& buffer, MidiBuffer& midi) { m_audioStreamerF->read(buffer, midi); }
+    void readAudioMessage(AudioBuffer<float>& buffer, MidiBuffer& midi) { m_audioStreamerF->read(buffer, midi); }
 
-    void read(AudioBuffer<double>& buffer, MidiBuffer& midi) { m_audioStreamerD->read(buffer, midi); }
+    void readAudioMessage(AudioBuffer<double>& buffer, MidiBuffer& midi) { m_audioStreamerD->read(buffer, midi); }
 
     const auto& getPlugins() const { return m_plugins; }
     Image getPluginScreen();  // create copy
@@ -289,19 +241,20 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     int m_srvId = 0;
     float m_srvLoad = 0.0f;
     bool m_needsReconnect = false;
-    int m_channelsIn = 0;
-    int m_channelsOut = 0;
     double m_rate = 0;
-    int m_samplesPerBlock = 0;
     bool m_doublePrecission = false;
-    int m_latency = 0;
+
+    std::atomic_int m_channelsIn{0};
+    std::atomic_int m_channelsOut{0};
+    std::atomic_int m_samplesPerBlock{0};
+    std::atomic_int m_latency{0};
+
+    std::atomic_bool m_ready{false};
+    std::atomic_bool m_error{false};
 
     std::mutex m_clientMtx;
     int m_clientMtxId = 0;
-    std::atomic_bool m_ready{false};
-    std::atomic_bool m_error{false};
     std::unique_ptr<StreamingSocket> m_cmd_socket;
-    std::unique_ptr<StreamingSocket> m_audio_socket;
     std::unique_ptr<StreamingSocket> m_screen_socket;
     std::vector<ServerPlugin> m_plugins;
 
@@ -334,6 +287,62 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     OnConnectCallback m_onConnectCallback;
     OnCloseCallback m_onCloseCallback;
 
+    enum LockID {
+        NOLOCK,
+        SETPLUGINSCREENUPDATECALLBACK,
+        SETONCONNECTCALLBACK,
+        SETONCLOSECALLBACK,
+        INIT1,
+        INIT2,
+        CLOSE,
+        ADDPLUGIN,
+        DELPLUGIN,
+        EDITPLUGIN,
+        HIDEPLUGIN,
+        GETPLUGINSETTINGS,
+        SETPLUGINSETTINGS,
+        BYPASSPLUGIN,
+        UNBYPASSPLUGIN,
+        EXCHANGEPLUGINS,
+        GETRECENTS,
+        SETPRESET,
+        GETPARAMETERVALUE,
+        SETPARAMETERVALUE,
+        GETALLPARAMETERVALUES,
+        SENDMOUSEEVENT,
+        KEYPRESSED,
+        UPDATESCREENCAPTUREAREA,
+        RESCAN,
+        UPDATECPULOAD,
+        GETLOADEDPLUGINSSTRING
+    };
+
+    struct LockByID {
+        Client& client;
+        LockID lockid;
+        LockByID(Client& c, LockID id, bool enforce = true) : client(c), lockid(id) {
+            if (enforce) {
+                lock();
+            } else {
+                tryLock();
+            }
+        }
+        ~LockByID() { unlock(); }
+        inline void lock() {
+            client.m_clientMtx.lock();
+            client.m_clientMtxId = lockid;
+        }
+        inline void tryLock() {
+            if (client.m_clientMtx.try_lock()) {
+                client.m_clientMtxId = lockid;
+            }
+        }
+        inline void unlock() {
+            client.m_clientMtxId = NOLOCK;
+            client.m_clientMtx.unlock();
+        }
+    };
+
     void quit();
     void init();
 
@@ -343,11 +352,15 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
 
 #include "AudioStreamer.hpp"
 
-    friend AudioStreamer<float>;
-    friend AudioStreamer<double>;
-
+    std::mutex m_audioMtx;
     std::unique_ptr<AudioStreamer<float>> m_audioStreamerF;
     std::unique_ptr<AudioStreamer<double>> m_audioStreamerD;
+
+    bool audioConnectionOk() {
+        std::lock_guard<std::mutex> lock(m_audioMtx);
+        return (nullptr != m_audioStreamerF && m_audioStreamerF->isOk()) ||
+               (nullptr != m_audioStreamerD && m_audioStreamerD->isOk());
+    }
 };
 
 }  // namespace e47

@@ -20,9 +20,9 @@ class AudioStreamer : public Thread, public LogTagDelegate {
     };
 
     Client* client;
-    StreamingSocket* socket;
+    std::unique_ptr<StreamingSocket> socket;
     boost::lockfree::spsc_queue<AudioMidiBuffer> writeQ, readQ;
-    std::mutex writeMtx, readMtx;
+    std::mutex writeMtx, readMtx, sockMtx;
     std::condition_variable writeCv, readCv;
     TimeStatistics::Duration duration;
 
@@ -35,7 +35,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
     AudioStreamer(Client* clnt, StreamingSocket* sock)
         : Thread("AudioStreamer"),
           client(clnt),
-          socket(sock),
+          socket(std::unique_ptr<StreamingSocket>(sock)),
           writeQ(as<size_t>(clnt->NUM_OF_BUFFERS * 2)),
           readQ(as<size_t>(clnt->NUM_OF_BUFFERS * 2)),
           duration(TimeStatistics::getDuration("audio")) {
@@ -58,6 +58,14 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         notifyRead();
         waitForThreadAndLog(getLogTagSource(), this);
         logln("audio streamer cleanup done");
+    }
+
+    bool isOk() {
+        if (!error) {
+            std::lock_guard<std::mutex> lock(sockMtx);
+            return nullptr != socket && socket->isConnected();
+        }
+        return false;
     }
 
     void run() {
@@ -207,7 +215,9 @@ class AudioStreamer : public Thread, public LogTagDelegate {
 
   private:
     void setError() {
+        sockMtx.lock();
         socket->close();
+        sockMtx.unlock();
         error = true;
         client->m_error = true;
         notifyRead();
@@ -299,7 +309,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
     bool sendReal(AudioMidiBuffer& buffer) {
         AudioMessage msg;
         if (nullptr != socket) {
-            return msg.sendToServer(socket, buffer.audio, buffer.midi, buffer.posInfo, buffer.channelsRequested,
+            std::lock_guard<std::mutex> lock(sockMtx);
+            return msg.sendToServer(socket.get(), buffer.audio, buffer.midi, buffer.posInfo, buffer.channelsRequested,
                                     buffer.samplesRequested);
         } else {
             return false;
@@ -314,7 +325,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                 buffer.audio.getNumSamples() < buffer.samplesRequested) {
                 buffer.audio.setSize(buffer.channelsRequested, buffer.samplesRequested);
             }
-            success = msg.readFromServer(socket, buffer.audio, buffer.midi, e);
+            std::lock_guard<std::mutex> lock(sockMtx);
+            success = msg.readFromServer(socket.get(), buffer.audio, buffer.midi, e);
         }
         if (success) {
             client->m_latency = msg.getLatencySamples();
