@@ -7,6 +7,10 @@
 
 #include "Logger.hpp"
 
+#if defined(JUCE_DEBUG) && defined(JUCE_WINDOWS)
+#include <windows.h>
+#endif
+
 namespace e47 {
 
 std::shared_ptr<AGLogger> AGLogger::m_inst;
@@ -52,7 +56,11 @@ void AGLogger::run() {
             m_outstream << msg.toStdString() << std::endl;
 #ifdef JUCE_DEBUG
             if (m_logToErr) {
+#ifdef JUCE_WINDOWS
+                OutputDebugStringA((msg + "\n").getCharPointer());
+#else
                 std::cerr << msg.toStdString() << std::endl;
+#endif
             }
 #endif
             m_msgQ[idx].pop();
