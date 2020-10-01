@@ -19,11 +19,11 @@ std::shared_ptr<AudioPluginInstance> AGProcessor::loadPlugin(PluginDescription& 
     String err;
     AudioPluginFormatManager plugmgr;
     plugmgr.addDefaultFormats();
-    std::lock_guard<std::mutex> lock(m_pluginLoaderMtx);  // don't load plugins in parallel
+    // std::lock_guard<std::mutex> lock(m_pluginLoaderMtx);  // don't load plugins in parallel
     auto inst =
         std::shared_ptr<AudioPluginInstance>(plugmgr.createPluginInstance(plugdesc, sampleRate, blockSize, err));
     if (nullptr == inst) {
-        auto getLogTag = [] { return "processorchain"; };
+        setLogTagStatic("agprocessor");
         logln("failed loading plugin " << plugdesc.fileOrIdentifier << ": " << err);
     }
     return inst;
@@ -39,7 +39,7 @@ std::shared_ptr<AudioPluginInstance> AGProcessor::loadPlugin(const String& id, d
     if (nullptr != plugdesc) {
         return loadPlugin(*plugdesc, sampleRate, blockSize);
     } else {
-        auto getLogTag = [] { return "processorchain"; };
+        setLogTagStatic("agprocessor");
         logln("failed to find plugin descriptor");
     }
     return nullptr;

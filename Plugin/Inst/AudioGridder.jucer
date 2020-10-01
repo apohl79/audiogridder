@@ -14,6 +14,8 @@
       <FILE id="TVidPD" name="json.hpp" compile="0" resource="0" file="../../Common/Source/json.hpp"/>
       <FILE id="vVoVj4" name="KeyAndMouseCommon.hpp" compile="0" resource="0"
             file="../../Common/Source/KeyAndMouseCommon.hpp"/>
+      <FILE id="cTXu7D" name="Logger.cpp" compile="1" resource="0" file="../../Common/Source/Logger.cpp"/>
+      <FILE id="kvWHz8" name="Logger.hpp" compile="0" resource="0" file="../../Common/Source/Logger.hpp"/>
       <FILE id="ROKVrh" name="mDNS.cpp" compile="1" resource="0" file="../../Common/Source/mDNS.cpp"/>
       <FILE id="kkWF5M" name="mDNS.hpp" compile="0" resource="0" file="../../Common/Source/mDNS.hpp"/>
       <FILE id="KqweXP" name="mDNSConnector.cpp" compile="1" resource="0"
@@ -43,8 +45,6 @@
       <FILE id="jsRCkN" name="ImageReader.hpp" compile="0" resource="0" file="../Source/ImageReader.hpp"/>
       <FILE id="MM6aeB" name="Images.cpp" compile="1" resource="0" file="../Source/Images.cpp"/>
       <FILE id="CaUZsn" name="Images.hpp" compile="0" resource="0" file="../Source/Images.hpp"/>
-      <FILE id="GAeJl4" name="Logger.cpp" compile="1" resource="0" file="../Source/Logger.cpp"/>
-      <FILE id="ChsUJE" name="Logger.hpp" compile="0" resource="0" file="../Source/Logger.hpp"/>
       <FILE id="vOh083" name="NewServerWindow.cpp" compile="1" resource="0"
             file="../Source/NewServerWindow.cpp"/>
       <FILE id="YEtrjp" name="NewServerWindow.hpp" compile="0" resource="0"

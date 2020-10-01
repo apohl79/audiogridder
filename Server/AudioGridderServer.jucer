@@ -17,6 +17,8 @@
       <FILE id="mzbQrZ" name="json.hpp" compile="0" resource="0" file="../Common/Source/json.hpp"/>
       <FILE id="TUrZAw" name="KeyAndMouseCommon.hpp" compile="0" resource="0"
             file="../Common/Source/KeyAndMouseCommon.hpp"/>
+      <FILE id="sdVgH8" name="Logger.cpp" compile="1" resource="0" file="../Common/Source/Logger.cpp"/>
+      <FILE id="u3gVnb" name="Logger.hpp" compile="0" resource="0" file="../Common/Source/Logger.hpp"/>
       <FILE id="nlNtvz" name="mDNS.cpp" compile="1" resource="0" file="../Common/Source/mDNS.cpp"/>
       <FILE id="ofljdU" name="mDNS.hpp" compile="0" resource="0" file="../Common/Source/mDNS.hpp"/>
       <FILE id="CfKC0h" name="mDNSConnector.cpp" compile="1" resource="0"

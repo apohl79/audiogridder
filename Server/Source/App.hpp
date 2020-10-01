@@ -309,7 +309,6 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     WindowCaptureCallbackNative m_windowFuncNative;
     WindowCaptureCallbackFFmpeg m_windowFuncFFmpeg;
     std::mutex m_windowMtx;
-    FileLogger* m_logger;
     std::unique_ptr<MenuBarWindow> m_menuWindow;
     std::atomic_bool m_stopChild{false};
 };

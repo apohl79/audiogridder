@@ -56,8 +56,7 @@ void App::initialise(const String& commandLineParameters) {
         case SERVER:
             break;
     }
-    m_logger = FileLogger::createDateStampedLogger(getApplicationName(), logName, ".log", "");
-    Logger::setCurrentLogger(m_logger);
+    AGLogger::initialize(getApplicationName(), logName);
     logln("commandline: " << commandLineParameters);
     switch (mode) {
         case SCAN:
@@ -178,8 +177,7 @@ void App::shutdown() {
             m_child->join();
         }
     }
-    Logger::setCurrentLogger(nullptr);
-    delete m_logger;
+    AGLogger::cleanup();
     setApplicationReturnValue(0);
 }
 

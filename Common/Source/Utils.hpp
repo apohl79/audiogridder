@@ -9,34 +9,13 @@
 #define Utils_hpp
 
 #ifdef AG_SERVER
-
 #define getApp() dynamic_cast<App*>(JUCEApplication::getInstance())
-
-#if (JUCE_DEBUG && !JUCE_DISABLE_ASSERTIONS)
-#define dbgln(M) \
-    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << getLogTag() << "] " << M; Logger::writeToLog(__str);)
-#else
-#define dbgln(M)
 #endif
-
-#define logln(M) \
-    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << getLogTag() << "] " << M; Logger::writeToLog(__str);)
-
-#else
 
 #include "Logger.hpp"
 
-#if JUCE_DEBUG
-#define dbgln(M) \
-    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << getLogTag() << "] " << M; AGLogger::log(__str);)
-#else
-#define dbgln(M)
-#endif
-
 #define logln(M) \
     JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << getLogTag() << "] " << M; AGLogger::log(__str);)
-
-#endif
 
 #define setLogTagStatic(t) auto getLogTag = [] { return LogTag::getTaggedStr(t, "static"); };
 
