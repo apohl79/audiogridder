@@ -74,7 +74,7 @@ struct MessageHelper {
 static bool send(StreamingSocket* socket, const char* data, int size, MessageHelper::Error* e = nullptr) {
     if (nullptr != socket && socket->isConnected()) {
         int toWrite = size;
-        int maxTries = 1000;
+        int maxTries = 10;
         do {
             int ret = socket->waitUntilReady(false, 100);
             if (ret < 0) {
@@ -90,7 +90,6 @@ static bool send(StreamingSocket* socket, const char* data, int size, MessageHel
                 toWrite -= len;
             } else {
                 maxTries--;
-                Thread::sleep(1);
             }
         } while (toWrite > 0 && maxTries > 0);
         if (toWrite > 0) {
