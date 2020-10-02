@@ -152,7 +152,12 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     void close();
 
     bool audioLock() {
-        if (m_audioMtx.try_lock()) {
+        int retry = 10;
+        bool locked;
+        while ((locked = m_audioMtx.try_lock()) == false && --retry > 0) {
+            sleep(1);
+        }
+        if (locked) {
             if (isReadyLockFree()) {
                 return true;
             }
