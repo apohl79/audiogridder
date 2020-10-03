@@ -287,7 +287,11 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
             m_processor.hidePlugin();
             size_t index = i > -1 ? as<size_t>(i) : as<size_t>(idx);
             m_pluginButtons[index]->setActive(false);
-            m_pluginButtons[index]->setColour(PluginButton::textColourOffId, Colours::white);
+            if (m_processor.isBypassed(index)) {
+                m_pluginButtons[index]->setColour(PluginButton::textColourOffId, Colours::gray);
+            } else {
+                m_pluginButtons[index]->setColour(PluginButton::textColourOffId, Colours::white);
+            }
             resized();
         };
         auto bypassFn = [this, idx, button] {

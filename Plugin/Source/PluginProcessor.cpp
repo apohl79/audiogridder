@@ -275,7 +275,7 @@ void AudioGridderAudioProcessor::processBlockReal(AudioBuffer<T>& buffer, MidiBu
     ScopedNoDenormals noDenormals;
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
-    
+
     if (totalNumInputChannels > buffer.getNumChannels()) {
         logln("error in processBlock: buffer has less channels than main input channels");
         totalNumInputChannels = buffer.getNumChannels();
