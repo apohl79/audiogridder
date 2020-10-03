@@ -275,6 +275,15 @@ void AudioGridderAudioProcessor::processBlockReal(AudioBuffer<T>& buffer, MidiBu
     ScopedNoDenormals noDenormals;
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
+    
+    if (totalNumInputChannels > buffer.getNumChannels()) {
+        logln("error in processBlock: buffer has less channels than main input channels");
+        totalNumInputChannels = buffer.getNumChannels();
+    }
+    if (totalNumOutputChannels > buffer.getNumChannels()) {
+        logln("error in processBlock: buffer has less channels than main output channels");
+        totalNumOutputChannels = buffer.getNumChannels();
+    }
 
     auto* phead = getPlayHead();
     AudioPlayHead::CurrentPositionInfo posInfo;
@@ -305,6 +314,15 @@ void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<float>& buffer
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
+    if (totalNumInputChannels > buffer.getNumChannels()) {
+        logln("error in processBlockBypassed: buffer has less channels than main input channels");
+        totalNumInputChannels = buffer.getNumChannels();
+    }
+    if (totalNumOutputChannels > buffer.getNumChannels()) {
+        logln("error in processBlockBypassed: buffer has less channels than main output channels");
+        totalNumOutputChannels = buffer.getNumChannels();
+    }
+
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
         buffer.clear(i, 0, buffer.getNumSamples());
     }
@@ -328,6 +346,15 @@ void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<double>& buffe
     ScopedNoDenormals noDenormals;
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
+
+    if (totalNumInputChannels > buffer.getNumChannels()) {
+        logln("error in processBlockBypassed: buffer has less channels than main input channels");
+        totalNumInputChannels = buffer.getNumChannels();
+    }
+    if (totalNumOutputChannels > buffer.getNumChannels()) {
+        logln("error in processBlockBypassed: buffer has less channels than main output channels");
+        totalNumOutputChannels = buffer.getNumChannels();
+    }
 
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
         buffer.clear(i, 0, buffer.getNumSamples());
