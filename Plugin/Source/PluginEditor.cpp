@@ -285,10 +285,10 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
         auto editFn = [this, idx] { editPlugin(idx); };
         auto hideFn = [this, idx](int i = -1) {
             m_processor.hidePlugin();
-            size_t index = i > -1 ? as<size_t>(i) : as<size_t>(idx);
+            size_t index = i > -1 ? (size_t)i : (size_t)idx;
             m_pluginButtons[index]->setActive(false);
-            if (m_processor.isBypassed(index)) {
-                m_pluginButtons[index]->setColour(PluginButton::textColourOffId, Colours::gray);
+            if (m_processor.isBypassed((int)index)) {
+                m_pluginButtons[index]->setColour(PluginButton::textColourOffId, Colours::grey);
             } else {
                 m_pluginButtons[index]->setColour(PluginButton::textColourOffId, Colours::white);
             }
