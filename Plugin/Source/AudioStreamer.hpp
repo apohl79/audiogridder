@@ -90,8 +90,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                 readQ.push(std::move(buf));
                 notifyRead();
             }
-            while (!waitWrite()) {
-            }
+            waitWrite();
         }
         logln("audio streamer terminated");
     }
