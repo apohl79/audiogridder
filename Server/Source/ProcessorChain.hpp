@@ -134,12 +134,7 @@ class AGProcessor {
         }
     }
 
-    void suspendProcessing(const bool shouldBeSuspended) {
-        auto p = getPlugin();
-        if (nullptr != p) {
-            p->suspendProcessing(shouldBeSuspended);
-        }
-    }
+    void suspendProcessing(const bool shouldBeSuspended);
 
   private:
     ProcessorChain& m_chain;

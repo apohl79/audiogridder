@@ -74,6 +74,19 @@ void AGProcessor::unload() {
     }
 }
 
+void AGProcessor::suspendProcessing(const bool shouldBeSuspended) {
+    auto p = getPlugin();
+    if (nullptr != p) {
+        if (shouldBeSuspended) {
+            p->suspendProcessing(true);
+            p->releaseResources();
+        } else {
+            p->prepareToPlay(m_chain.getSampleRate(), m_chain.getBlockSize());
+            p->suspendProcessing(false);
+        }
+    }
+}
+
 void ProcessorChain::prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock) {
     setRateAndBufferSizeDetails(sampleRate, maximumExpectedSamplesPerBlock);
     std::lock_guard<std::mutex> lock(m_processors_mtx);

@@ -379,6 +379,11 @@ void Worker::handleMessage(std::shared_ptr<Message<SetPluginSettings>> msg) {
 void Worker::handleMessage(std::shared_ptr<Message<BypassPlugin>> msg) {
     auto proc = m_audio.getProcessor(pPLD(msg).getNumber());
     if (nullptr != proc) {
+        proc->suspendProcessing(true);
+        m_audio.update();
+
+        /* The following code is completely unloading a plugin. Not doing this for now, as releaseRessources is
+         * enough hopefully.
         bool runOnMsgThread = false;
         if (m_shouldHideEditor) {
             m_screen.hideEditor();
@@ -396,17 +401,23 @@ void Worker::handleMessage(std::shared_ptr<Message<BypassPlugin>> msg) {
         } else {
             unloadfunc();
         }
+        */
     }
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<UnbypassPlugin>> msg) {
     auto proc = m_audio.getProcessor(pPLD(msg).getNumber());
     if (nullptr != proc) {
+        proc->suspendProcessing(false);
+        m_audio.update();
+
+        /* If the plugin got unloaded at the bypass call, we need the following to reload it.
         if (proc->load()) {
             m_audio.update();
         } else {
             logln("unbypass failed: can't load plugin");
         }
+        */
     }
 }
 
