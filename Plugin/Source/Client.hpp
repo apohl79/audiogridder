@@ -162,6 +162,8 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
                 return true;
             }
             m_audioMtx.unlock();
+        } else {
+            logln("warning: failed to lock audio stream, this will cause audio stutter");
         }
         return false;
     }

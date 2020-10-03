@@ -293,7 +293,6 @@ void AudioGridderAudioProcessor::processBlockReal(AudioBuffer<T>& buffer, MidiBu
                 updateLatency(m_client->getLatencySamples());
             }
         } else {
-            logln("warning: failed to lock audio stream, this will cause audio stutter");
             for (auto i = 0; i < buffer.getNumChannels(); ++i) {
                 buffer.clear(i, 0, buffer.getNumSamples());
             }
