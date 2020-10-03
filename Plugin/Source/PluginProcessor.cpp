@@ -552,6 +552,9 @@ void AudioGridderAudioProcessor::editPlugin(int idx) {
 }
 
 void AudioGridderAudioProcessor::hidePlugin(bool updateServer) {
+    if (m_activePlugin < 0) {
+        return;
+    }
     logln("hiding plugin: active plugin " << m_activePlugin << ", "
                                           << (updateServer ? "updating server" : "not updating server"));
     if (updateServer) {
