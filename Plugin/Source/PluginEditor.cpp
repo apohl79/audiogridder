@@ -16,6 +16,9 @@ using namespace e47;
 
 AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderAudioProcessor& p)
     : AudioProcessorEditor(&p), m_processor(p), m_newPluginButton("", "newPlug", false), m_genericEditor(p) {
+    setLogTagSource(&m_processor.getClient());
+    logln("creating editor");
+
     auto& lf = getLookAndFeel();
     lf.setUsingNativeAlertWindows(true);
     lf.setColour(ResizableWindow::backgroundColourId, Colour(DEFAULT_BG_COLOR));
@@ -41,8 +44,6 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
 
     addAndMakeVisible(m_srvLabel);
     m_srvLabel.setText("not connected", NotificationType::dontSendNotification);
-
-    setConnected(m_processor.getClient().isReadyLockFree());
 
     m_srvLabel.setBounds(30, 5, 140, 20);
     auto font = m_srvLabel.getFont();
@@ -75,7 +76,6 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
     m_cpuLabel.setBounds(200 - 45 + 16 - 2, 89, 50, 10);
     m_cpuLabel.setFont(Font(10, Font::plain));
     m_cpuLabel.setAlpha(0.6f);
-    setCPULoad(m_processor.getClient().getCPULoad());
 
     addChildComponent(m_pluginScreen);
     m_pluginScreen.setBounds(200, SCREENTOOLS_HEIGHT + SCREENTOOLS_MARGIN * 2, 1, 1);
@@ -143,11 +143,18 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
     initStButtons();
 
     setSize(200, 100);
+
+    logln("  setting connected state");
+    setConnected(m_processor.getClient().isReadyLockFree());
+    setCPULoad(m_processor.getClient().getCPULoad());
+    logln("editor created");
 }
 
 AudioGridderAudioProcessorEditor::~AudioGridderAudioProcessorEditor() {
+    logln("destroying editor");
     m_processor.hidePlugin();
     m_processor.getClient().setPluginScreenUpdateCallback(nullptr);
+    logln("editor destroyed");
 }
 
 void AudioGridderAudioProcessorEditor::paint(Graphics& g) {
@@ -494,7 +501,7 @@ void AudioGridderAudioProcessorEditor::setConnected(bool connected) {
 }
 
 void AudioGridderAudioProcessorEditor::setCPULoad(float load) {
-    m_cpuLabel.setText(String(lround(load)) + "%", NotificationType::sendNotificationAsync);
+    m_cpuLabel.setText(String(lround(load)) + "%", NotificationType::dontSendNotification);
     uint32 col;
     if (!m_connected) {
         col = Colours::white.getARGB();

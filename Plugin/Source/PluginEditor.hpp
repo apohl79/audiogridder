@@ -15,7 +15,8 @@
 
 class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
                                          public PluginButton::Listener,
-                                         public Button::Listener {
+                                         public Button::Listener,
+                                         public LogTagDelegate {
   public:
     AudioGridderAudioProcessorEditor(AudioGridderAudioProcessor&);
     ~AudioGridderAudioProcessorEditor() override;
