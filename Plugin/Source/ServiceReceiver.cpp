@@ -45,6 +45,8 @@ void ServiceReceiver::run() {
         return;
     }
 
+    logln("receiver ready");
+
     while (!currentThreadShouldExit()) {
         m_currentResult.clear();
 
@@ -64,35 +66,14 @@ void ServiceReceiver::run() {
         SortSrvByName comp;
         m_currentResult.sort(comp);
 
-        std::lock_guard<std::mutex> lock(m_serverMtx);
-        bool changed = false;
-        for (auto& s1 : m_currentResult) {
-            bool exists = false;
-            for (auto& s2 : m_servers) {
-                if (s1 == s2) {
-                    s2.refresh(s1.getLoad());
-                    exists = true;
-                    break;
-                }
-            }
-            if (!exists) {
-                m_servers.add(s1);
-                changed = true;
-            }
-        }
-        auto now = Time::getCurrentTime().toMilliseconds();
-        for (auto& s : m_servers) {
-            if (s.getUpdated().toMilliseconds() + 30000 < now) {
-                m_servers.remove(&s);
-                changed = true;
-            }
-        }
+        bool changed = updateServers();
         if (changed) {
+            auto newList = getServersReal();
             logln("updated server list:");
-            for (auto& s : m_servers) {
+            for (auto& s : newList) {
                 logln("  " << s.toString());
             }
-            m_serverMtx.unlock();
+
             bool locked = false;
             while (!currentThreadShouldExit() && (locked = m_instMtx.try_lock()) == false) {
                 sleep(5);
@@ -108,6 +89,37 @@ void ServiceReceiver::run() {
         }
     }
     connector.close();
+
+    logln("receiver terminated");
+}
+
+bool ServiceReceiver::updateServers() {
+    std::lock_guard<std::mutex> lock(m_serverMtx);
+    bool changed = false;
+    for (auto& s1 : m_currentResult) {
+        bool exists = false;
+        for (auto& s2 : m_servers) {
+            if (s1 == s2) {
+                s2.refresh(s1.getLoad());
+                exists = true;
+                break;
+            }
+        }
+        if (!exists) {
+            m_servers.add(s1);
+            changed = true;
+        }
+    }
+    auto now = Time::getCurrentTime().toMilliseconds();
+    for (int i = 0; i < m_servers.size();) {
+        if (m_servers.getReference(i).getUpdated().toMilliseconds() + 30000 < now) {
+            m_servers.remove(i);
+            changed = true;
+        } else {
+            i++;
+        }
+    }
+    return changed;
 }
 
 int ServiceReceiver::handleRecord(int /*sock*/, const struct sockaddr* from, size_t addrlen,
@@ -178,7 +190,10 @@ void ServiceReceiver::initialize(uint64 id, std::function<void()> fn) {
     m_instRefCount++;
 }
 
-std::shared_ptr<ServiceReceiver> ServiceReceiver::getInstance() { return m_inst; }
+std::shared_ptr<ServiceReceiver> ServiceReceiver::getInstance() {
+    std::lock_guard<std::mutex> lock(m_instMtx);
+    return m_inst;
+}
 
 void ServiceReceiver::cleanup(uint64 id) {
     std::lock_guard<std::mutex> lock(m_instMtx);
@@ -204,13 +219,9 @@ Array<ServerInfo> ServiceReceiver::getServersReal() {
 }
 
 String ServiceReceiver::hostToName(const String& host) {
-    auto inst = getInstance();
-    if (nullptr != inst) {
-        std::lock_guard<std::mutex> lock(inst->m_serverMtx);
-        for (auto& s : inst->m_servers) {
-            if (s.getHost() == host) {
-                return s.getName();
-            }
+    for (auto& s : getServers()) {
+        if (s.getHost() == host) {
+            return s.getName();
         }
     }
     return host;

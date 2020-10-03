@@ -19,7 +19,10 @@ namespace e47 {
 class ServiceReceiver : public Thread, public LogTag {
   public:
     ServiceReceiver() : Thread("ServiceReceiver"), LogTag("mdns") { startThread(); }
-    ~ServiceReceiver() override { stopThread(-1); }
+    ~ServiceReceiver() override {
+        logln("stopping receiver");
+        stopThread(-1);
+    }
 
     void run() override;
 
@@ -53,6 +56,7 @@ class ServiceReceiver : public Thread, public LogTag {
     HashMap<uint64, std::function<void()>> m_updateFn;
 
     Array<ServerInfo> getServersReal();
+    bool updateServers();
 };
 
 }  // namespace e47
