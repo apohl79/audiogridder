@@ -56,6 +56,8 @@ class Server : public Thread, public LogTag {
     void setScreenCapturingOff(bool b) { m_screenCapturingOff = b; }
     bool getScanForPlugins() const { return m_scanForPlugins; }
     void setScanForPlugins(bool b) { m_scanForPlugins = b; }
+    bool getUsePluginFilenames() const { return m_usePluginFilenames; }
+    void setUsePluginFilenames(bool b) { m_usePluginFilenames = b; }
     void run();
     const KnownPluginList& getPluginList() const { return m_pluginlist; }
     KnownPluginList& getPluginList() { return m_pluginlist; }
@@ -90,6 +92,7 @@ class Server : public Thread, public LogTag {
     StringArray m_vst3Folders;
     StringArray m_vst2Folders;
     bool m_scanForPlugins = true;
+    bool m_usePluginFilenames = false;
 
     void scanNextPlugin(const String& id, const String& fmt);
     void scanForPlugins();

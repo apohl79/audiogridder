@@ -120,6 +120,10 @@ void Server::loadConfig() {
         if (j.find("ScanForPlugins") != j.end()) {
             m_scanForPlugins = j["ScanForPlugins"].get<bool>();
         }
+        if (j.find("UsePluginFilenames") != j.end()) {
+            m_usePluginFilenames = j["UsePluginFilenames"].get<bool>();
+        }
+        logln("identify plugins by filenames (unused): " << (m_usePluginFilenames ? "enabled" : "disabled"));
     }
     File deadmanfile(DEAD_MANS_FILE);
     if (deadmanfile.exists()) {
@@ -169,6 +173,7 @@ void Server::saveConfig() {
         j["ExcludePlugins"].push_back(p.toStdString());
     }
     j["ScanForPlugins"] = m_scanForPlugins;
+    j["UsePluginFilenames"] = m_usePluginFilenames;
 
     File cfg(SERVER_CONFIG_FILE);
     cfg.deleteFile();
@@ -295,18 +300,31 @@ bool Server::scanPlugin(const String& id, const String& format) {
     } else {
         return false;
     }
-    KnownPluginList plist;
-    loadKnownPluginList(plist);
     setLogTagStatic("server");
     logln("scanning id=" << id << " fmt=" << format);
     bool success = true;
-    PluginDirectoryScanner scanner(plist, *fmt, {}, true, File(DEAD_MANS_FILE));
+    KnownPluginList plist, newlist;
+    loadKnownPluginList(plist);
+    PluginDirectoryScanner scanner(newlist, *fmt, {}, true, File(DEAD_MANS_FILE));
     scanner.setFilesOrIdentifiersToScan({id});
     String name;
     scanner.scanNextFile(true, name);
     for (auto& f : scanner.getFailedFiles()) {
         plist.addToBlacklist(f);
         success = false;
+    }
+    for (auto& t : newlist.getTypes()) {
+        logln("adding plugin description:");
+        logln("  name            = " << t.name << " (" << t.descriptiveName << ")");
+        logln("  uid             = " << t.uid);
+        logln("  id string       = " << t.createIdentifierString());
+        logln("  manufacturer    = " << t.manufacturerName);
+        logln("  category        = " << t.category);
+        logln("  shell           = " << (int)t.hasSharedContainer);
+        logln("  instrument      = " << (int)t.isInstrument);
+        logln("  input channels  = " << t.numInputChannels);
+        logln("  output channels = " << t.numOutputChannels);
+        plist.addType(t);
     }
     saveKnownPluginList(plist);
     return success;

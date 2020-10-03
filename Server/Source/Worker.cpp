@@ -31,6 +31,9 @@ Worker::~Worker() {
 }
 
 String Worker::getStringFrom(const PluginDescription& d) {
+    // String s = d.name + ";" + d.manufacturerName + ";" +
+    //           (getApp()->getServer().getUsePluginFilenames() ? d.fileOrIdentifier : d.createIdentifierString()) + ";"
+    //           + d.pluginFormatName + ";" + d.category + "\n";
     String s = d.name + ";" + d.manufacturerName + ";" + d.createIdentifierString() + ";" + d.pluginFormatName + ";" +
                d.category + "\n";
     return s;
