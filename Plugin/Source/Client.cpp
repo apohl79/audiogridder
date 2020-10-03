@@ -804,7 +804,7 @@ bool Client::keyPressed(const KeyPress& kp, Component* /* originatingComponent *
     } else {
         auto c = static_cast<char>(kp.getKeyCode());
         String key(CharPointer_UTF8(&c), 1);
-        auto kc = getKeyCode(key.toStdString());
+        auto kc = getKeyCode(key.toUpperCase().toStdString());
         if (NOKEY != kc) {
             keysToPress.push_back(kc);
         }
