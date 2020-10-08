@@ -43,10 +43,11 @@ typedef DWORD(WINAPI* fpNtQuerySystemInformation)(DWORD infoClass, void* sysInfo
 
 namespace e47 {
 
-std::unique_ptr<CPUInfo> CPUInfo::m_inst;
 std::atomic<float> CPUInfo::m_usage{0.0f};
 
 void CPUInfo::run() {
+    traceScope();
+
 #if defined(JUCE_WINDOWS)
     fpNtQuerySystemInformation pNtQuerySystemInformation =
         (fpNtQuerySystemInformation)GetProcAddress(GetModuleHandle("ntdll.dll"), "NtQuerySystemInformation");
@@ -139,21 +140,5 @@ void CPUInfo::run() {
 #endif
     }
 }
-
-void CPUInfo::initialize() {
-    if (nullptr == m_inst) {
-        m_inst = std::make_unique<CPUInfo>();
-        m_inst->startThread();
-    }
-}
-
-void CPUInfo::cleanup() {
-    if (nullptr != m_inst) {
-        m_inst->signalThreadShouldExit();
-        m_inst.reset();
-    }
-}
-
-float CPUInfo::getUsage() { return m_usage; }
 
 }  // namespace e47

@@ -17,6 +17,7 @@ using namespace e47;
 AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderAudioProcessor& p)
     : AudioProcessorEditor(&p), m_processor(p), m_newPluginButton("", "newPlug", false), m_genericEditor(p) {
     setLogTagSource(&m_processor.getClient());
+    traceScope();
     logln("creating editor");
 
     auto& lf = getLookAndFeel();
@@ -151,6 +152,7 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
 }
 
 AudioGridderAudioProcessorEditor::~AudioGridderAudioProcessorEditor() {
+    traceScope();
     logln("destroying editor");
     m_processor.hidePlugin();
     m_processor.getClient().setPluginScreenUpdateCallback(nullptr);
@@ -158,10 +160,12 @@ AudioGridderAudioProcessorEditor::~AudioGridderAudioProcessorEditor() {
 }
 
 void AudioGridderAudioProcessorEditor::paint(Graphics& g) {
+    traceScope();
     g.fillAll(getLookAndFeel().findColour(ResizableWindow::backgroundColourId));
 }
 
 void AudioGridderAudioProcessorEditor::resized() {
+    traceScope();
     int buttonWidth = 197;
     int buttonHeight = 20;
     int logoHeight = m_logo.getHeight();
@@ -225,8 +229,10 @@ void AudioGridderAudioProcessorEditor::resized() {
 
 void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const ModifierKeys& modifiers,
                                                      PluginButton::AreaType area) {
+    traceScope();
     if (!button->getName().compare("newPlug")) {
         auto addFn = [this](const ServerPlugin& plug) {
+            traceScope1();
             if (m_processor.loadPlugin(plug.getId(), plug.getName())) {
                 addPluginButton(plug.getId(), plug.getName());
 #if JucePlugin_IsSynth
@@ -284,6 +290,7 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
         int active = m_processor.getActivePlugin();
         auto editFn = [this, idx] { editPlugin(idx); };
         auto hideFn = [this, idx](int i = -1) {
+            traceScope1();
             m_processor.hidePlugin();
             size_t index = i > -1 ? (size_t)i : (size_t)idx;
             m_pluginButtons[index]->setActive(false);
@@ -295,11 +302,13 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
             resized();
         };
         auto bypassFn = [this, idx, button] {
+            traceScope1();
             m_processor.bypassPlugin(idx);
             button->setButtonText("( " + m_processor.getLoadedPlugin(idx).name + " )");
             button->setColour(PluginButton::textColourOffId, Colours::grey);
         };
         auto unBypassFn = [this, idx, active, button] {
+            traceScope1();
             m_processor.unbypassPlugin(idx);
             button->setButtonText(m_processor.getLoadedPlugin(idx).name);
             if (idx == active) {
@@ -309,6 +318,7 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
             }
         };
         auto moveUpFn = [this, idx] {
+            traceScope1();
             if (idx > 0) {
                 m_processor.exchangePlugins(idx, idx - 1);
                 std::swap(m_pluginButtons[as<size_t>(idx)], m_pluginButtons[as<size_t>(idx) - 1]);
@@ -316,6 +326,7 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
             }
         };
         auto moveDownFn = [this, idx] {
+            traceScope1();
             if (as<size_t>(idx) < m_pluginButtons.size() - 1) {
                 m_processor.exchangePlugins(idx, idx + 1);
                 std::swap(m_pluginButtons[as<size_t>(idx)], m_pluginButtons[as<size_t>(idx) + 1]);
@@ -323,6 +334,7 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
             }
         };
         auto deleteFn = [this, idx] {
+            traceScope1();
             m_processor.unloadPlugin(idx);
             int i = 0;
             for (auto it = m_pluginButtons.begin(); it < m_pluginButtons.end(); it++) {
@@ -385,7 +397,10 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
             PopupMenu presets;
             int preset = 0;
             for (auto& p : m_processor.getLoadedPlugin(idx).presets) {
-                presets.addItem(p, [this, idx, preset] { m_processor.getClient().setPreset(idx, preset); });
+                presets.addItem(p, [this, idx, preset] {
+                    traceScope1();
+                    m_processor.getClient().setPreset(idx, preset);
+                });
                 preset++;
             }
             m.addSubMenu("Presets", presets);
@@ -400,6 +415,7 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
                     enabled = true;
                 }
                 params.addItem(name, true, enabled, [this, idx, paramIdx, enabled] {
+                    traceScope1();
                     if (enabled) {
                         m_processor.disableParamAutomation(idx, paramIdx);
                     } else {
@@ -414,6 +430,7 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
 }
 
 void AudioGridderAudioProcessorEditor::buttonClicked(Button* button) {
+    traceScope();
     TextButton* tb = reinterpret_cast<TextButton*>(button);
     if (tb == &m_stPlus) {
         m_processor.increaseSCArea();
@@ -436,6 +453,7 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button) {
 }
 
 PluginButton* AudioGridderAudioProcessorEditor::addPluginButton(const String& id, const String& name) {
+    traceScope();
     int num = 0;
     for (auto& plug : m_pluginButtons) {
         if (!id.compare(plug->getPluginId())) {
@@ -455,6 +473,7 @@ PluginButton* AudioGridderAudioProcessorEditor::addPluginButton(const String& id
 }
 
 std::vector<PluginButton*> AudioGridderAudioProcessorEditor::getPluginButtons(const String& id) {
+    traceScope();
     std::vector<PluginButton*> ret;
     for (auto& b : m_pluginButtons) {
         if (b->getPluginId() == id) {
@@ -465,6 +484,7 @@ std::vector<PluginButton*> AudioGridderAudioProcessorEditor::getPluginButtons(co
 }
 
 int AudioGridderAudioProcessorEditor::getPluginIndex(const String& name) {
+    traceScope();
     int idx = 0;
     for (auto& plug : m_pluginButtons) {
         if (!name.compare(plug->getName())) {
@@ -476,6 +496,7 @@ int AudioGridderAudioProcessorEditor::getPluginIndex(const String& name) {
 }
 
 void AudioGridderAudioProcessorEditor::focusOfChildComponentChanged(FocusChangeType /* cause */) {
+    traceScope();
     if (hasKeyboardFocus(true)) {
         // reactivate the plugin screen
         int active = m_processor.getActivePlugin();
@@ -486,6 +507,7 @@ void AudioGridderAudioProcessorEditor::focusOfChildComponentChanged(FocusChangeT
 }
 
 void AudioGridderAudioProcessorEditor::setConnected(bool connected) {
+    traceScope();
     m_connected = connected;
     if (connected) {
         String srvTxt = m_processor.getActiveServerName();
@@ -505,6 +527,7 @@ void AudioGridderAudioProcessorEditor::setConnected(bool connected) {
 }
 
 void AudioGridderAudioProcessorEditor::setCPULoad(float load) {
+    traceScope();
     m_cpuLabel.setText(String(lround(load)) + "%", NotificationType::dontSendNotification);
     uint32 col;
     if (!m_connected) {
@@ -520,6 +543,7 @@ void AudioGridderAudioProcessorEditor::setCPULoad(float load) {
 }
 
 void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
+    traceScope();
     if (event.eventComponent == &m_srvIcon) {
         PopupMenu m;
         m.addSectionHeader("Buffering");
@@ -531,26 +555,46 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
             n << blocks << " Blocks (+" << blocks * iobuf * 1000 / rate << "ms)";
             return n;
         };
-        bufMenu.addItem("Disabled (+0ms)", true, m_processor.getClient().NUM_OF_BUFFERS == 0,
-                        [this] { m_processor.saveConfig(0); });
-        bufMenu.addItem(getName(2), true, m_processor.getClient().NUM_OF_BUFFERS == 2,
-                        [this] { m_processor.saveConfig(2); });
-        bufMenu.addItem(getName(4), true, m_processor.getClient().NUM_OF_BUFFERS == 4,
-                        [this] { m_processor.saveConfig(4); });
-        bufMenu.addItem(getName(8), true, m_processor.getClient().NUM_OF_BUFFERS == 8,
-                        [this] { m_processor.saveConfig(8); });
-        bufMenu.addItem(getName(12), true, m_processor.getClient().NUM_OF_BUFFERS == 12,
-                        [this] { m_processor.saveConfig(12); });
-        bufMenu.addItem(getName(16), true, m_processor.getClient().NUM_OF_BUFFERS == 16,
-                        [this] { m_processor.saveConfig(16); });
-        bufMenu.addItem(getName(20), true, m_processor.getClient().NUM_OF_BUFFERS == 20,
-                        [this] { m_processor.saveConfig(20); });
-        bufMenu.addItem(getName(24), true, m_processor.getClient().NUM_OF_BUFFERS == 24,
-                        [this] { m_processor.saveConfig(24); });
-        bufMenu.addItem(getName(28), true, m_processor.getClient().NUM_OF_BUFFERS == 28,
-                        [this] { m_processor.saveConfig(28); });
-        bufMenu.addItem(getName(30), true, m_processor.getClient().NUM_OF_BUFFERS == 30,
-                        [this] { m_processor.saveConfig(30); });
+        bufMenu.addItem("Disabled (+0ms)", true, m_processor.getClient().NUM_OF_BUFFERS == 0, [this] {
+            traceScope1();
+            m_processor.saveConfig(0);
+        });
+        bufMenu.addItem(getName(2), true, m_processor.getClient().NUM_OF_BUFFERS == 2, [this] {
+            traceScope1();
+            m_processor.saveConfig(2);
+        });
+        bufMenu.addItem(getName(4), true, m_processor.getClient().NUM_OF_BUFFERS == 4, [this] {
+            traceScope1();
+            m_processor.saveConfig(4);
+        });
+        bufMenu.addItem(getName(8), true, m_processor.getClient().NUM_OF_BUFFERS == 8, [this] {
+            traceScope1();
+            m_processor.saveConfig(8);
+        });
+        bufMenu.addItem(getName(12), true, m_processor.getClient().NUM_OF_BUFFERS == 12, [this] {
+            traceScope1();
+            m_processor.saveConfig(12);
+        });
+        bufMenu.addItem(getName(16), true, m_processor.getClient().NUM_OF_BUFFERS == 16, [this] {
+            traceScope1();
+            m_processor.saveConfig(16);
+        });
+        bufMenu.addItem(getName(20), true, m_processor.getClient().NUM_OF_BUFFERS == 20, [this] {
+            traceScope1();
+            m_processor.saveConfig(20);
+        });
+        bufMenu.addItem(getName(24), true, m_processor.getClient().NUM_OF_BUFFERS == 24, [this] {
+            traceScope1();
+            m_processor.saveConfig(24);
+        });
+        bufMenu.addItem(getName(28), true, m_processor.getClient().NUM_OF_BUFFERS == 28, [this] {
+            traceScope1();
+            m_processor.saveConfig(28);
+        });
+        bufMenu.addItem(getName(30), true, m_processor.getClient().NUM_OF_BUFFERS == 30, [this] {
+            traceScope1();
+            m_processor.saveConfig(30);
+        });
         m.addSubMenu("Buffer Size", bufMenu);
         m.addSectionHeader("Servers");
         auto& servers = m_processor.getServers();
@@ -558,17 +602,28 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
         for (auto s : servers) {
             if (s == active) {
                 PopupMenu srvMenu;
-                srvMenu.addItem("Rescan", [this] { m_processor.getClient().rescan(); });
-                srvMenu.addItem("Wipe Cache & Rescan", [this] { m_processor.getClient().rescan(true); });
-                srvMenu.addItem("Reconnect", [this] { m_processor.getClient().reconnect(); });
+                srvMenu.addItem("Rescan", [this] {
+                    traceScope1();
+                    m_processor.getClient().rescan();
+                });
+                srvMenu.addItem("Wipe Cache & Rescan", [this] {
+                    traceScope1();
+                    m_processor.getClient().rescan(true);
+                });
+                srvMenu.addItem("Reconnect", [this] {
+                    traceScope1();
+                    m_processor.getClient().reconnect();
+                });
                 m.addSubMenu(s, srvMenu, true, nullptr, true, 0);
             } else {
                 PopupMenu srvMenu;
                 srvMenu.addItem("Connect", [this, s] {
+                    traceScope1();
                     m_processor.setActiveServer(s);
                     m_processor.saveConfig();
                 });
                 srvMenu.addItem("Remove", [this, s] {
+                    traceScope1();
                     m_processor.delServer(s);
                     m_processor.saveConfig();
                 });
@@ -585,13 +640,23 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
                 name << " [load: " << lround(s.getLoad()) << "%]";
                 if (s.getHostAndID() == active) {
                     PopupMenu srvMenu;
-                    srvMenu.addItem("Rescan", [this] { m_processor.getClient().rescan(); });
-                    srvMenu.addItem("Wipe Cache & Rescan", [this] { m_processor.getClient().rescan(true); });
-                    srvMenu.addItem("Reconnect", [this] { m_processor.getClient().reconnect(); });
+                    srvMenu.addItem("Rescan", [this] {
+                        traceScope1();
+                        m_processor.getClient().rescan();
+                    });
+                    srvMenu.addItem("Wipe Cache & Rescan", [this] {
+                        traceScope1();
+                        m_processor.getClient().rescan(true);
+                    });
+                    srvMenu.addItem("Reconnect", [this] {
+                        traceScope1();
+                        m_processor.getClient().reconnect();
+                    });
                     m.addSubMenu(name, srvMenu, true, nullptr, true, 0);
                 } else {
                     PopupMenu srvMenu;
                     srvMenu.addItem("Connect", [this, s] {
+                        traceScope1();
                         m_processor.setActiveServer(s);
                         m_processor.saveConfig();
                     });
@@ -601,8 +666,10 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
         }
         m.addSeparator();
         m.addItem("Add", [this] {
+            traceScope1();
             auto w = new NewServerWindow(as<float>(getScreenX() + 2), as<float>(getScreenY() + 30));
             w->onOk([this](String server) {
+                traceScope2();
                 m_processor.addServer(server);
                 m_processor.setActiveServer(server);
                 m_processor.saveConfig();
@@ -615,17 +682,26 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
         PopupMenu m;
         m.addSectionHeader("Editor");
         m.addItem("Generic Editor", true, m_processor.getGenericEditor(), [this] {
+            traceScope1();
             m_processor.setGenericEditor(!m_processor.getGenericEditor());
             m_processor.saveConfig();
             editPlugin();
         });
         m.addSectionHeader("Plugin Menu");
         m.addItem("Show Category", true, m_processor.getMenuShowCategory(), [this] {
+            traceScope1();
             m_processor.setMenuShowCategory(!m_processor.getMenuShowCategory());
             m_processor.saveConfig();
         });
         m.addItem("Show Company", true, m_processor.getMenuShowCompany(), [this] {
+            traceScope1();
             m_processor.setMenuShowCompany(!m_processor.getMenuShowCompany());
+            m_processor.saveConfig();
+        });
+        m.addSectionHeader("Debugging");
+        m.addItem("Tracing", true, Tracer::isEnabled(), [this] {
+            traceScope1();
+            Tracer::setEnabled(!Tracer::isEnabled());
             m_processor.saveConfig();
         });
         m.showAt(&m_settingsIcon);
@@ -633,6 +709,7 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
 }
 
 void AudioGridderAudioProcessorEditor::initStButtons() {
+    traceScope();
     enableStButton(&m_stA);
     disableStButton(&m_stB);
     m_processor.resetSettingsAB();
@@ -640,25 +717,32 @@ void AudioGridderAudioProcessorEditor::initStButtons() {
 }
 
 void AudioGridderAudioProcessorEditor::enableStButton(TextButton* b) {
+    traceScope();
     b->setColour(PluginButton::textColourOffId, Colours::white);
     b->setColour(ComboBox::outlineColourId, Colour(DEFAULT_BUTTON_COLOR));
 }
 
 void AudioGridderAudioProcessorEditor::disableStButton(TextButton* b) {
+    traceScope();
     b->setColour(PluginButton::textColourOffId, Colours::grey);
     b->setColour(ComboBox::outlineColourId, Colour(DEFAULT_BUTTON_COLOR));
 }
 
 void AudioGridderAudioProcessorEditor::hilightStButton(TextButton* b) {
+    traceScope();
     b->setColour(PluginButton::textColourOffId, Colour(DEFAULT_ACTIVE_COLOR));
     b->setColour(ComboBox::outlineColourId, Colour(DEFAULT_ACTIVE_COLOR));
     m_hilightedStButton = b;
 }
 
-bool AudioGridderAudioProcessorEditor::isHilightedStButton(TextButton* b) { return b == m_hilightedStButton; }
+bool AudioGridderAudioProcessorEditor::isHilightedStButton(TextButton* b) {
+    traceScope();
+    return b == m_hilightedStButton;
+}
 
 PopupMenu AudioGridderAudioProcessorEditor::createPluginMenu(MenuLevel& level,
                                                              std::function<void(const ServerPlugin& plug)> addFn) {
+    traceScope();
     PopupMenu m;
     if (nullptr != level.entryMap) {
         for (auto& pair : *level.entryMap) {
@@ -675,6 +759,7 @@ PopupMenu AudioGridderAudioProcessorEditor::createPluginMenu(MenuLevel& level,
 }
 
 void AudioGridderAudioProcessorEditor::editPlugin(int idx) {
+    traceScope();
     int active = m_processor.getActivePlugin();
     if (idx == -1) {
         idx = active;
@@ -695,8 +780,10 @@ void AudioGridderAudioProcessorEditor::editPlugin(int idx) {
         auto* p_processor = &m_processor;
         m_processor.getClient().setPluginScreenUpdateCallback(
             [this, idx, p_processor](std::shared_ptr<Image> img, int width, int height) {
+                traceScope1();
                 if (nullptr != img) {
                     MessageManager::callAsync([this, p_processor, img, width, height] {
+                        traceScope2();
                         auto p = dynamic_cast<AudioGridderAudioProcessorEditor*>(p_processor->getActiveEditor());
                         if (this == p) {  // make sure the editor hasn't been closed
                             m_pluginScreen.setSize(width, height);
@@ -706,6 +793,7 @@ void AudioGridderAudioProcessorEditor::editPlugin(int idx) {
                     });
                 } else {
                     MessageManager::callAsync([this, idx, p_processor] {
+                        traceScope2();
                         auto p = dynamic_cast<AudioGridderAudioProcessorEditor*>(p_processor->getActiveEditor());
                         if (this == p && m_pluginButtons.size() > as<size_t>(idx)) {
                             m_processor.hidePlugin(false);

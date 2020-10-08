@@ -10,6 +10,7 @@
 #include <JuceHeader.h>
 
 #include "PluginProcessor.hpp"
+#include "Tracer.hpp"
 
 using namespace e47;
 
@@ -26,10 +27,11 @@ class GenericEditor : public Component, public LogTag {
 
     Array<std::unique_ptr<Component>> m_labels;
     Array<std::unique_ptr<Component>> m_components;
-    struct OnClick : public MouseListener {
+    struct OnClick : public MouseListener, public LogTagDelegate {
         std::function<void()> func;
         OnClick(std::function<void()> f) : func(f) {}
         void mouseUp(const MouseEvent& ev) override {
+            traceScope();
             if (func && ev.mouseDownTime < ev.eventTime) {
                 func();
             }

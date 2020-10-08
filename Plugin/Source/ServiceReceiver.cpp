@@ -29,6 +29,8 @@ size_t ServiceReceiver::m_instRefCount = 0;
 int queryCallback(int sock, const struct sockaddr* from, size_t addrlen, mdns_entry_type_t entry, uint16_t query_id,
                   uint16_t rtype, uint16_t rclass, uint32_t ttl, const void* data, size_t size, size_t name_offset,
                   size_t name_length, size_t record_offset, size_t record_length, void* user_data) {
+    setLogTagStatic("mdns_querycallback");
+    traceScope();
     auto inst = ServiceReceiver::getInstance();
     if (nullptr != inst) {
         return inst->handleRecord(sock, from, addrlen, entry, query_id, rtype, rclass, ttl, data, size, name_offset,
@@ -38,6 +40,7 @@ int queryCallback(int sock, const struct sockaddr* from, size_t addrlen, mdns_en
 }
 
 void ServiceReceiver::run() {
+    traceScope();
     mDNSConnector connector(this);
     int num = connector.openClientSockets(32, 33445);
     if (num < 1) {
@@ -94,6 +97,7 @@ void ServiceReceiver::run() {
 }
 
 bool ServiceReceiver::updateServers() {
+    traceScope();
     std::lock_guard<std::mutex> lock(m_serverMtx);
     bool changed = false;
     for (auto& s1 : m_currentResult) {
@@ -127,6 +131,7 @@ int ServiceReceiver::handleRecord(int /*sock*/, const struct sockaddr* from, siz
                                   uint16_t /*rclass*/, uint32_t /*ttl*/, const void* data, size_t size,
                                   size_t /*name_offset*/, size_t /*name_length*/, size_t record_offset,
                                   size_t record_length, void* /*user_data*/) {
+    traceScope();
     bool complete = false;
     switch (rtype) {
         case MDNS_RECORDTYPE_SRV: {
@@ -214,6 +219,7 @@ Array<ServerInfo> ServiceReceiver::getServers() {
 }
 
 Array<ServerInfo> ServiceReceiver::getServersReal() {
+    traceScope();
     std::lock_guard<std::mutex> lock(m_serverMtx);
     return m_servers;
 }

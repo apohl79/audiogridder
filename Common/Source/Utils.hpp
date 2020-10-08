@@ -14,10 +14,37 @@
 
 #include "Logger.hpp"
 
-#define logln(M) \
-    JUCE_BLOCK_WITH_FORCED_SEMICOLON(String __str; __str << "[" << getLogTag() << "] " << M; AGLogger::log(__str);)
+#define logln(M)                                                                          \
+    do {                                                                                  \
+        String __msg, __str;                                                              \
+        __msg << M;                                                                       \
+        __str << "[" << getLogTagSource()->getLogTag() << "] " << __msg;                  \
+        AGLogger::log(__str);                                                             \
+        if (Tracer::isEnabled()) {                                                        \
+            Tracer::traceMessage(getLogTagSource(), __FILE__, __LINE__, __func__, __msg); \
+        }                                                                                 \
+    } while (0)
 
-#define setLogTagStatic(t) auto getLogTag = [] { return LogTag::getTaggedStr(t, "static"); };
+#define loglnNoTrace(M)                                                  \
+    do {                                                                 \
+        String __msg, __str;                                             \
+        __msg << M;                                                      \
+        __str << "[" << getLogTagSource()->getLogTag() << "] " << __msg; \
+        AGLogger::log(__str);                                            \
+    } while (0)
+
+#define setLogTagStatic(t)  \
+    static LogTag __tag(t); \
+    auto getLogTagSource = [] { return &__tag; }
+
+#define traceln(M)                                                                        \
+    do {                                                                                  \
+        if (Tracer::isEnabled() && nullptr != getLogTagSource()) {                        \
+            String __msg;                                                                 \
+            __msg << M;                                                                   \
+            Tracer::traceMessage(getLogTagSource(), __FILE__, __LINE__, __func__, __msg); \
+        }                                                                                 \
+    } while (0)
 
 namespace e47 {
 
@@ -25,7 +52,7 @@ class LogTag {
   public:
     LogTag(const String& name) : m_name(name) {}
 
-    static String getStrWithLeadingZero(int n, int digits = 2) {
+    static inline String getStrWithLeadingZero(int n, int digits = 2) {
         String s = "";
         while (--digits > 0) {
             if (n < pow(10, digits)) {
@@ -36,7 +63,7 @@ class LogTag {
         return s;
     }
 
-    static String getTimeStr() {
+    static inline String getTimeStr() {
         auto now = Time::getCurrentTime();
         auto H = getStrWithLeadingZero(now.getHours());
         auto M = getStrWithLeadingZero(now.getMinutes());
@@ -47,13 +74,18 @@ class LogTag {
         return ret;
     }
 
-    static String getTaggedStr(const String& name, const String& ptr) {
+    static inline String getTaggedStr(const String& name, const String& ptr, bool withTime) {
         String tag = "";
-        tag << getTimeStr() << "|" << name << "|" << ptr;
+        if (withTime) {
+            tag << getTimeStr() << "|";
+        }
+        tag << name << "|0x" << ptr;
         return tag;
     }
 
-    String getLogTag() const { return getTaggedStr(m_name, String((uint64)this)); }
+    const LogTag* getLogTagSource() const { return this; }
+    String getLogTag() const { return getTaggedStr(m_name, String::toHexString((uint64)this), true); }
+    String getLogTagNoTime() const { return getTaggedStr(m_name, String::toHexString((uint64)this), false); }
 
   private:
     String m_name;
@@ -62,10 +94,17 @@ class LogTag {
 class LogTagDelegate {
   public:
     LogTagDelegate() {}
-    LogTagDelegate(LogTag* r) : m_logTagSrc(r) {}
-    LogTag* m_logTagSrc;
-    void setLogTagSource(LogTag* r) { m_logTagSrc = r; }
-    LogTag* getLogTagSource() const { return m_logTagSrc; }
+    LogTagDelegate(const LogTag* r) : m_logTagSrc(r) {}
+    const LogTag* m_logTagSrc;
+    void setLogTagSource(const LogTag* r) { m_logTagSrc = r; }
+    const LogTag* getLogTagSource() const {
+        if (nullptr != m_logTagSrc) {
+            return m_logTagSrc;
+        }
+        // make sure there is always a tag source
+        static auto fallbackTag = std::make_unique<LogTag>("unset");
+        return fallbackTag.get();
+    }
     String getLogTag() const {
         if (nullptr != m_logTagSrc) {
             return m_logTagSrc->getLogTag();
@@ -74,13 +113,13 @@ class LogTagDelegate {
     }
 };
 
-static inline void waitForThreadAndLog(LogTag* tag, Thread* t, int millisUntilWarning = 3000) {
-    auto getLogTag = [tag] { return tag->getLogTag(); };
+static inline void waitForThreadAndLog(const LogTag* tag, Thread* t, int millisUntilWarning = 3000) {
+    auto getLogTagSource = [tag] { return tag; };
     if (millisUntilWarning > -1) {
         auto warnTime = Time::getMillisecondCounter() + (uint32)millisUntilWarning;
         while (!t->waitForThreadToExit(1000)) {
             if (Time::getMillisecondCounter() > warnTime) {
-                logln("warning: waiting for thread " << t->getThreadName() << " to finish");
+                loglnNoTrace("warning: waiting for thread " << t->getThreadName() << " to finish");
             }
         }
     } else {
@@ -196,5 +235,7 @@ inline void callOnMessageThread(std::function<void()> fn) {
 }
 
 }  // namespace e47
+
+#include "Tracer.hpp"
 
 #endif /* Utils_hpp */

@@ -28,6 +28,8 @@ int mDNSConnector::openClientSockets(int maxSockets, int port) {
     // When sending, each socket can only send to one network interface
     // Thus we need to open one socket for each interface and address family
 
+    traceScope();
+
 #ifdef JUCE_WINDOWS
     // Make sure windows sockets are initialized
     StreamingSocket dummy;
@@ -169,6 +171,8 @@ int mDNSConnector::openServiceSockets(int maxSockets) {
     // When recieving, each socket can recieve data from all network interfaces
     // Thus we only need to open one socket for each address family
 
+    traceScope();
+
     // Call the client socket function to enumerate and get local addresses,
     // but not open the actual sockets
     openClientSockets(0, 0);
@@ -221,6 +225,7 @@ void mDNSConnector::readResponses(mdns_record_callback_fn callback, void* userDa
 }
 
 void mDNSConnector::sendQuery(const String& service) {
+    traceScope();
     for (int sock : m_sockets) {
         mdns_query_send(sock, MDNS_RECORDTYPE_PTR, service.getCharPointer(), (size_t)service.length(), m_buffer,
                         m_bufferSize, 0);
@@ -228,6 +233,7 @@ void mDNSConnector::sendQuery(const String& service) {
 }
 
 void mDNSConnector::readRecords(ReadType type, mdns_record_callback_fn callback, void* userData, int timeoutSeconds) {
+    traceScope();
     int nfds = 0;
     fd_set readfs;
     FD_ZERO(&readfs);
@@ -258,6 +264,7 @@ void mDNSConnector::readRecords(ReadType type, mdns_record_callback_fn callback,
 }
 
 void mDNSConnector::close() {
+    traceScope();
     for (int sock : m_sockets) {
         mdns_socket_close(sock);
     }

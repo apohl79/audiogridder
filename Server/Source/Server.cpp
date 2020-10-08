@@ -19,6 +19,7 @@
 namespace e47 {
 
 Server::Server(json opts) : Thread("Server"), LogTag("server"), m_opts(opts) {
+    traceScope();
     logln("starting server (version: " << AUDIOGRIDDER_VERSION << ")...");
     File runFile(SERVER_RUN_FILE);
     runFile.create();
@@ -28,11 +29,15 @@ Server::Server(json opts) : Thread("Server"), LogTag("server"), m_opts(opts) {
 }
 
 void Server::loadConfig() {
+    traceScope();
     logln("loading config");
     File cfg(SERVER_CONFIG_FILE);
     if (cfg.exists()) {
         FileInputStream fis(cfg);
         json j = json::parse(fis.readEntireStreamAsString().toStdString());
+        if (j.find("Tracer") != j.end()) {
+            Tracer::setEnabled(j["Tracer"].get<bool>());
+        }
         if (j.find("ID") != j.end()) {
             m_id = j["ID"].get<int>();
         }
@@ -97,7 +102,10 @@ void Server::loadConfig() {
             scmode = "off";
         } else if (m_screenCapturingFFmpeg) {
             scmode = "ffmpeg (" + encoder + ")";
-            MessageManager::callAsync([this] { ScreenRecorder::initialize(m_screenCapturingFFmpegEncMode); });
+            MessageManager::callAsync([this] {
+                traceScope1();
+                ScreenRecorder::initialize(m_screenCapturingFFmpegEncMode);
+            });
         } else {
             scmode = "native";
         }
@@ -138,8 +146,10 @@ void Server::loadConfig() {
 }
 
 void Server::saveConfig() {
+    traceScope();
     logln("saving config");
     json j;
+    j["Tracer"] = Tracer::isEnabled();
     j["ID"] = m_id;
     j["NAME"] = m_name.toStdString();
 #ifdef JUCE_MAC
@@ -207,6 +217,7 @@ void Server::saveKnownPluginList(KnownPluginList& plist) {
 }
 
 Server::~Server() {
+    traceScope();
     if (m_masterSocket.isConnected()) {
         m_masterSocket.close();
     }
@@ -221,6 +232,7 @@ Server::~Server() {
 }
 
 void Server::shutdown() {
+    traceScope();
     logln("shutting down");
     m_masterSocket.close();
     for (auto& w : m_workers) {
@@ -232,17 +244,20 @@ void Server::shutdown() {
 }
 
 void Server::setName(const String& name) {
+    traceScope();
     m_name = name;
     ServiceResponder::setHostName(name);
     logln("setting server name to " << name);
 }
 
 bool Server::shouldExclude(const String& name) {
+    traceScope();
     std::vector<String> emptylist;
     return shouldExclude(name, emptylist);
 }
 
 bool Server::shouldExclude(const String& name, const std::vector<String>& include) {
+    traceScope();
     if (name.containsIgnoreCase("AGridder") || name.containsIgnoreCase("AudioGridder")) {
         return true;
     }
@@ -264,7 +279,9 @@ bool Server::shouldExclude(const String& name, const std::vector<String>& includ
 }
 
 void Server::addPlugins(const std::vector<String>& names, std::function<void(bool)> fn) {
+    traceScope();
     std::thread([this, names, fn] {
+        traceScope1();
         scanForPlugins(names);
         saveConfig();
         saveKnownPluginList();
@@ -331,6 +348,7 @@ bool Server::scanPlugin(const String& id, const String& format) {
 }
 
 void Server::scanNextPlugin(const String& id, const String& fmt) {
+    traceScope();
     String fileFmt = id;
     fileFmt << "|" << fmt;
     ChildProcess proc;
@@ -355,11 +373,13 @@ void Server::scanNextPlugin(const String& id, const String& fmt) {
 }
 
 void Server::scanForPlugins() {
+    traceScope();
     std::vector<String> emptylist;
     scanForPlugins(emptylist);
 }
 
 void Server::scanForPlugins(const std::vector<String>& include) {
+    traceScope();
     logln("scanning for plugins...");
     std::vector<std::unique_ptr<AudioPluginFormat>> fmts;
 #ifdef JUCE_MAC
@@ -424,6 +444,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
 }
 
 void Server::run() {
+    traceScope();
     if ((m_scanForPlugins || getOpt("ScanForPlugins", false)) && !getOpt("NoScanForPlugins", false)) {
         scanForPlugins();
     } else {
@@ -466,7 +487,10 @@ void Server::run() {
                         i++;
                     }
                 }
-                MessageManager::callAsync([deadWorkers] { deadWorkers->clear(); });
+                MessageManager::callAsync([this, deadWorkers] {
+                    traceScope1();
+                    deadWorkers->clear();
+                });
             }
         }
     } else {

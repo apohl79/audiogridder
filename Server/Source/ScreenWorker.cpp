@@ -13,15 +13,20 @@
 namespace e47 {
 
 ScreenWorker::~ScreenWorker() {
+    traceScope();
     if (nullptr != m_socket && m_socket->isConnected()) {
         m_socket->close();
     }
     waitForThreadAndLog(getLogTagSource(), this);
 }
 
-void ScreenWorker::init(std::unique_ptr<StreamingSocket> s) { m_socket = std::move(s); }
+void ScreenWorker::init(std::unique_ptr<StreamingSocket> s) {
+    traceScope();
+    m_socket = std::move(s);
+}
 
 void ScreenWorker::run() {
+    traceScope();
     logln("screen processor started");
 
     if (getApp()->getServer().getScreenCapturingFFmpeg()) {
@@ -36,6 +41,7 @@ void ScreenWorker::run() {
 }
 
 void ScreenWorker::runFFmpeg() {
+    traceScope();
     Message<ScreenCapture> msg;
     while (!currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected()) {
         std::unique_lock<std::mutex> lock(m_currentImageLock);
@@ -57,6 +63,7 @@ void ScreenWorker::runFFmpeg() {
 }
 
 void ScreenWorker::runNative() {
+    traceScope();
     Message<ScreenCapture> msg;
     float qual = getApp()->getServer().getScreenQuality();
     PNGImageFormat png;
@@ -94,8 +101,14 @@ void ScreenWorker::runNative() {
 
             if (brightness >= mostlyWhite || brightness <= mostlyBlack) {
                 logln("resetting editor window");
-                MessageManager::callAsync([] { getApp()->resetEditor(); });
-                MessageManager::callAsync([] { getApp()->restartEditor(); });
+                MessageManager::callAsync([this] {
+                    traceScope1();
+                    getApp()->resetEditor();
+                });
+                MessageManager::callAsync([this] {
+                    traceScope1();
+                    getApp()->restartEditor();
+                });
             } else {
                 if (diffPxCount > 0) {
                     MemoryOutputStream mos;
@@ -131,6 +144,7 @@ void ScreenWorker::runNative() {
 }
 
 void ScreenWorker::shutdown() {
+    traceScope();
     signalThreadShouldExit();
     std::lock_guard<std::mutex> lock(m_currentImageLock);
     m_currentImage = nullptr;
@@ -139,12 +153,18 @@ void ScreenWorker::shutdown() {
 }
 
 void ScreenWorker::showEditor(std::shared_ptr<AGProcessor> proc) {
+    traceScope();
     auto tid = getThreadId();
 
     if (getApp()->getServer().getScreenCapturingFFmpeg()) {
-        MessageManager::callAsync([] { getApp()->resetEditor(); });
+        MessageManager::callAsync([this] {
+            traceScope1();
+            getApp()->resetEditor();
+        });
         MessageManager::callAsync([this, proc, tid] {
+            traceScope1();
             getApp()->showEditor(proc, tid, [this](const uint8_t* data, int size, int w, int h, double scale) {
+                traceScope2();
                 if (currentThreadShouldExit()) {
                     return;
                 }
@@ -161,14 +181,19 @@ void ScreenWorker::showEditor(std::shared_ptr<AGProcessor> proc) {
             });
         });
     } else {
-        MessageManager::callAsync([] { getApp()->resetEditor(); });
+        MessageManager::callAsync([this] {
+            traceScope1();
+            getApp()->resetEditor();
+        });
         MessageManager::callAsync([this, proc, tid] {
+            traceScope1();
             m_currentImageLock.lock();
             m_currentImage.reset();
             m_lastImage.reset();
             m_currentImageLock.unlock();
 
             getApp()->showEditor(proc, tid, [this](std::shared_ptr<Image> i, int w, int h) {
+                traceScope2();
                 if (nullptr != i) {
                     if (currentThreadShouldExit()) {
                         return;
@@ -191,8 +216,10 @@ void ScreenWorker::showEditor(std::shared_ptr<AGProcessor> proc) {
 }
 
 void ScreenWorker::hideEditor() {
+    traceScope();
     auto tid = getThreadId();
     MessageManager::callAsync([this, tid] {
+        traceScope1();
         getApp()->hideEditor(tid);
 
         std::lock_guard<std::mutex> lock(m_currentImageLock);

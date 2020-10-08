@@ -16,6 +16,8 @@ std::mutex AGProcessor::m_pluginLoaderMtx;
 // Sync version.
 std::shared_ptr<AudioPluginInstance> AGProcessor::loadPlugin(PluginDescription& plugdesc, double sampleRate,
                                                              int blockSize) {
+    setLogTagStatic("agprocessor");
+    traceScope();
     String err;
     AudioPluginFormatManager plugmgr;
     plugmgr.addDefaultFormats();
@@ -23,13 +25,14 @@ std::shared_ptr<AudioPluginInstance> AGProcessor::loadPlugin(PluginDescription& 
     auto inst =
         std::shared_ptr<AudioPluginInstance>(plugmgr.createPluginInstance(plugdesc, sampleRate, blockSize, err));
     if (nullptr == inst) {
-        setLogTagStatic("agprocessor");
         logln("failed loading plugin " << plugdesc.fileOrIdentifier << ": " << err);
     }
     return inst;
 }
 
 std::shared_ptr<AudioPluginInstance> AGProcessor::loadPlugin(const String& id, double sampleRate, int blockSize) {
+    setLogTagStatic("agprocessor");
+    traceScope();
     auto& pluglist = getApp()->getPluginList();
     auto plugdesc = pluglist.getTypeForIdentifierString(id);
     // try fallback
@@ -39,13 +42,13 @@ std::shared_ptr<AudioPluginInstance> AGProcessor::loadPlugin(const String& id, d
     if (nullptr != plugdesc) {
         return loadPlugin(*plugdesc, sampleRate, blockSize);
     } else {
-        setLogTagStatic("agprocessor");
         logln("failed to find plugin descriptor");
     }
     return nullptr;
 }
 
 bool AGProcessor::load() {
+    traceScope();
     bool loaded = false;
     std::shared_ptr<AudioPluginInstance> p;
     {
@@ -66,6 +69,7 @@ bool AGProcessor::load() {
 }
 
 void AGProcessor::unload() {
+    traceScope();
     std::shared_ptr<AudioPluginInstance> p;
     {
         std::lock_guard<std::mutex> lock(m_pluginMtx);
@@ -75,6 +79,7 @@ void AGProcessor::unload() {
 }
 
 void AGProcessor::suspendProcessing(const bool shouldBeSuspended) {
+    traceScope();
     auto p = getPlugin();
     if (nullptr != p) {
         if (shouldBeSuspended) {
@@ -88,6 +93,7 @@ void AGProcessor::suspendProcessing(const bool shouldBeSuspended) {
 }
 
 void ProcessorChain::prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock) {
+    traceScope();
     setRateAndBufferSizeDetails(sampleRate, maximumExpectedSamplesPerBlock);
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     for (auto& proc : m_processors) {
@@ -96,6 +102,7 @@ void ProcessorChain::prepareToPlay(double sampleRate, int maximumExpectedSamples
 }
 
 void ProcessorChain::releaseResources() {
+    traceScope();
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     for (auto& proc : m_processors) {
         proc->releaseResources();
@@ -103,6 +110,7 @@ void ProcessorChain::releaseResources() {
 }
 
 void ProcessorChain::processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMessages) {
+    traceScope();
     auto start_proc = Time::getHighResolutionTicks();
     processBlockReal(buffer, midiMessages);
     auto end_proc = Time::getHighResolutionTicks();
@@ -113,6 +121,7 @@ void ProcessorChain::processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMe
 }
 
 void ProcessorChain::processBlock(AudioBuffer<double>& buffer, MidiBuffer& midiMessages) {
+    traceScope();
     auto start_proc = Time::getHighResolutionTicks();
     processBlockReal(buffer, midiMessages);
     auto end_proc = Time::getHighResolutionTicks();
@@ -136,6 +145,7 @@ bool ProcessorChain::isBusesLayoutSupported(const BusesLayout& layouts) const {
 }
 
 bool ProcessorChain::updateChannels(int channelsIn, int channelsOut) {
+    traceScope();
     AudioProcessor::BusesLayout layout;
     if (channelsIn == 1) {
         layout.inputBuses.add(AudioChannelSet::mono());
@@ -160,6 +170,7 @@ bool ProcessorChain::updateChannels(int channelsIn, int channelsOut) {
 }
 
 bool ProcessorChain::setProcessorBusesLayout(std::shared_ptr<AudioPluginInstance> proc) {
+    traceScope();
     auto layout = getBusesLayout();
     if (proc->checkBusesLayoutSupported(layout)) {
         return proc->setBusesLayout(layout);
@@ -202,11 +213,13 @@ bool ProcessorChain::setProcessorBusesLayout(std::shared_ptr<AudioPluginInstance
 }
 
 int ProcessorChain::getExtraChannels() {
+    traceScope();
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     return m_extraChannels;
 }
 
 bool ProcessorChain::initPluginInstance(std::shared_ptr<AudioPluginInstance> inst) {
+    traceScope();
     if (!setProcessorBusesLayout(inst)) {
         logln("I/O layout (" << getMainBusNumInputChannels() << "," << getMainBusNumOutputChannels() << " +"
                              << m_extraChannels << ") not supported by plugin: " << inst->getName());
@@ -232,6 +245,7 @@ bool ProcessorChain::initPluginInstance(std::shared_ptr<AudioPluginInstance> ins
 }
 
 bool ProcessorChain::addPluginProcessor(const String& id) {
+    traceScope();
     auto proc = std::make_shared<AGProcessor>(*this, id, getSampleRate(), getBlockSize());
     if (proc->load()) {
         addProcessor(proc);
@@ -241,12 +255,14 @@ bool ProcessorChain::addPluginProcessor(const String& id) {
 }
 
 void ProcessorChain::addProcessor(std::shared_ptr<AGProcessor> processor) {
+    traceScope();
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     m_processors.push_back(processor);
     updateNoLock();
 }
 
 void ProcessorChain::delProcessor(int idx) {
+    traceScope();
     int i = 0;
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     for (auto it = m_processors.begin(); it < m_processors.end(); it++) {
@@ -259,11 +275,13 @@ void ProcessorChain::delProcessor(int idx) {
 }
 
 void ProcessorChain::update() {
+    traceScope();
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     updateNoLock();
 }
 
 void ProcessorChain::updateNoLock() {
+    traceScope();
     int latency = 0;
     bool supportsDouble = true;
     m_extraChannels = 0;
@@ -296,6 +314,7 @@ void ProcessorChain::updateNoLock() {
 }
 
 std::shared_ptr<AGProcessor> ProcessorChain::getProcessor(int index) {
+    traceScope();
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     if (index > -1 && as<size_t>(index) < m_processors.size()) {
         return m_processors[as<size_t>(index)];
@@ -304,6 +323,7 @@ std::shared_ptr<AGProcessor> ProcessorChain::getProcessor(int index) {
 }
 
 void ProcessorChain::exchangeProcessors(int idxA, int idxB) {
+    traceScope();
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     if (idxA > -1 && as<size_t>(idxA) < m_processors.size() && idxB > -1 && as<size_t>(idxB) < m_processors.size()) {
         std::swap(m_processors[as<size_t>(idxA)], m_processors[as<size_t>(idxB)]);
@@ -311,6 +331,7 @@ void ProcessorChain::exchangeProcessors(int idxA, int idxB) {
 }
 
 float ProcessorChain::getParameterValue(int idx, int paramIdx) {
+    traceScope();
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     if (idx > -1 && as<size_t>(idx) < m_processors.size()) {
         auto p = m_processors[as<size_t>(idx)]->getPlugin();
@@ -326,12 +347,14 @@ float ProcessorChain::getParameterValue(int idx, int paramIdx) {
 }
 
 void ProcessorChain::clear() {
+    traceScope();
     releaseResources();
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     m_processors.clear();
 }
 
 String ProcessorChain::toString() {
+    traceScope();
     String ret;
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     bool first = true;

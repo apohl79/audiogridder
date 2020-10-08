@@ -29,6 +29,10 @@
       <FILE id="mXHK5q" name="MiniDump.hpp" compile="0" resource="0" file="../../Common/Source/MiniDump.hpp"/>
       <FILE id="yCHJOt" name="NumberConversion.hpp" compile="0" resource="0"
             file="../../Common/Source/NumberConversion.hpp"/>
+      <FILE id="nltG0l" name="SharedInstance.hpp" compile="0" resource="0"
+            file="../../Common/Source/SharedInstance.hpp"/>
+      <FILE id="B6dn8Z" name="Tracer.cpp" compile="1" resource="0" file="../../Common/Source/Tracer.cpp"/>
+      <FILE id="LFw0K6" name="Tracer.hpp" compile="0" resource="0" file="../../Common/Source/Tracer.hpp"/>
       <FILE id="Qwiqkn" name="Utils.hpp" compile="0" resource="0" file="../../Common/Source/Utils.hpp"/>
       <FILE id="jXVo1g" name="Version.hpp" compile="0" resource="0" file="../../Common/Source/Version.hpp"/>
     </GROUP>

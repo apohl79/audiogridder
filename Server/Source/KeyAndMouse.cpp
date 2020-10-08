@@ -21,8 +21,11 @@
 
 namespace e47 {
 
+setLogTagStatic("keyandmouse");
+
 #if defined(JUCE_MAC)
 void mouseEventReal(CGMouseButton button, CGEventType type, CGPoint location, CGEventFlags flags) {
+    traceScope();
     CGEventRef event = CGEventCreateMouseEvent(nullptr, type, location, button);
     CGEventSetType(event, type);
     CGEventSetFlags(event, flags | CGEventGetFlags(event));
@@ -31,6 +34,7 @@ void mouseEventReal(CGMouseButton button, CGEventType type, CGPoint location, CG
 }
 
 void mouseScrollEventReal(float deltaX, float deltaY) {
+    traceScope();
     if (deltaX == 0 && deltaY == 0) {
         return;
     }
@@ -46,6 +50,7 @@ void mouseScrollEventReal(float deltaX, float deltaY) {
 }
 
 void keyEventReal(uint16_t keyCode, uint64_t flags, bool keyDown) {
+    traceScope();
     CGEventRef ev = CGEventCreateKeyboardEvent(nullptr, keyCode, keyDown);
     CGEventSetFlags(ev, flags | CGEventGetFlags(ev));
     CGEventPost(kCGSessionEventTap, ev);
@@ -105,6 +110,7 @@ inline std::pair<CGMouseButton, CGEventType> toMouseButtonType(MouseEvType t) {
 }
 #elif defined(JUCE_WINDOWS)
 void sendInput(INPUT* in) {
+    traceScope();
     if (SendInput(1, in, sizeof(INPUT)) != 1) {
         auto err = GetLastError();
         LPSTR lpMsgBuf;
@@ -116,6 +122,7 @@ void sendInput(INPUT* in) {
 }
 
 void sendKey(WORD vk, bool keyDown) {
+    traceScope();
     INPUT event;
     event.type = INPUT_KEYBOARD;
     event.ki.wVk = vk;
@@ -131,6 +138,7 @@ void sendKey(WORD vk, bool keyDown) {
 }
 
 void mouseEventReal(POINT pos, DWORD evFlags, uint64_t flags) {
+    traceScope();
     INPUT event = {0};
     event.type = INPUT_MOUSE;
     event.mi.dx = pos.x;
@@ -167,6 +175,7 @@ void mouseEventReal(POINT pos, DWORD evFlags, uint64_t flags) {
 }
 
 void mouseScrollEventReal(POINT pos, DWORD deltaX, DWORD deltaY) {
+    traceScope();
     SetCursorPos(pos.x, pos.y);
 
     INPUT event = {0};
@@ -188,6 +197,7 @@ void mouseScrollEventReal(POINT pos, DWORD deltaX, DWORD deltaY) {
 }
 
 void keyEventReal(WORD vk, uint64_t flags, bool keyDown) {
+    traceScope();
     // modifiers down
     if (keyDown) {
         if ((flags & VK_SHIFT) == VK_SHIFT) {
@@ -219,6 +229,7 @@ void keyEventReal(WORD vk, uint64_t flags, bool keyDown) {
 }
 
 inline POINT getScaledPoint(float x, float y) {
+    traceScope();
     HDC hDC = GetDC(0);
     float dpi = (GetDeviceCaps(hDC, LOGPIXELSX) + GetDeviceCaps(hDC, LOGPIXELSY)) / 2.0f;
     ReleaseDC(0, hDC);

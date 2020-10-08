@@ -126,9 +126,11 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
 
     // It looks like most hosts do not support dynamic parameter creation or changes to existing parameters. Logic at
     // least allows for the name to be updated. So we create slots at the start.
-    class Parameter : public AudioProcessorParameter {
+    class Parameter : public AudioProcessorParameter, public LogTagDelegate {
       public:
-        Parameter(AudioGridderAudioProcessor& processor, int slot) : m_processor(processor), m_slotId(slot) {}
+        Parameter(AudioGridderAudioProcessor& processor, int slot) : m_processor(processor), m_slotId(slot) {
+            setLogTagSource(m_processor.getLogTagSource());
+        }
         float getValue() const override;
         void setValue(float newValue) override;
         float getValueForText(const String& /* text */) const override { return 0; }

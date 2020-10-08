@@ -40,6 +40,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
           readQ(as<size_t>(clnt->NUM_OF_BUFFERS * 2)),
           duration(TimeStatistics::getDuration("audio")) {
         setLogTagSource(client);
+        traceScope();
 
         for (int i = 0; i < clnt->NUM_OF_BUFFERS; i++) {
             AudioMidiBuffer buf;
@@ -52,6 +53,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
     }
 
     ~AudioStreamer() {
+        traceScope();
         logln("audio streamer cleaning up");
         signalThreadShouldExit();
         notifyWrite();
@@ -61,6 +63,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
     }
 
     bool isOk() {
+        traceScope();
         if (!error) {
             std::lock_guard<std::mutex> lock(sockMtx);
             return nullptr != socket && socket->isConnected();
@@ -69,6 +72,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
     }
 
     void run() {
+        traceScope();
         logln("audio streamer ready");
         while (!currentThreadShouldExit() && !error && socket->isConnected()) {
             while (writeQ.read_available() > 0) {
@@ -96,6 +100,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
     }
 
     void send(AudioBuffer<T>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
+        traceScope();
         if (error) {
             return;
         }
@@ -159,6 +164,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
     }
 
     void read(AudioBuffer<T>& buffer, MidiBuffer& midi) {
+        traceScope();
         if (error) {
             return;
         }
@@ -214,6 +220,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
 
   private:
     void setError() {
+        traceScope();
         sockMtx.lock();
         socket->close();
         sockMtx.unlock();
@@ -224,17 +231,20 @@ class AudioStreamer : public Thread, public LogTagDelegate {
     }
 
     String getInstanceString() const {
+        traceScope();
         String ret = "instance (";
         ret << client->getLoadedPluginsString() << ")";
         return ret;
     }
 
     void notifyWrite() {
+        traceScope();
         std::lock_guard<std::mutex> lock(writeMtx);
         writeCv.notify_one();
     }
 
     bool waitWrite() {
+        traceScope();
         if (error || currentThreadShouldExit()) {
             return false;
         }
@@ -247,11 +257,13 @@ class AudioStreamer : public Thread, public LogTagDelegate {
     }
 
     void notifyRead() {
+        traceScope();
         std::lock_guard<std::mutex> lock(readMtx);
         readCv.notify_one();
     }
 
     bool waitRead() {
+        traceScope();
         if (client->NUM_OF_BUFFERS > 1 && readQ.read_available() < as<size_t>(client->NUM_OF_BUFFERS / 2) &&
             readQ.read_available() > 0) {
             logln("warning: " << getInstanceString() << ": input buffer below 50% (" << readQ.read_available() << "/"
@@ -272,6 +284,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
 
     bool copyToWorkingBuffer(AudioMidiBuffer& dst, int& workingSamples, AudioBuffer<T>& src, MidiBuffer& midi,
                              bool midiOnly = false) {
+        traceScope();
         if (!midiOnly) {
             if (src.getNumChannels() < 1) {
                 logln("error: " << getInstanceString() << ": copy failed, source audio buffer empty");
@@ -290,6 +303,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
     }
 
     void shiftSamplesToFront(AudioMidiBuffer& buf, int start, int num) {
+        traceScope();
         if (start + num <= buf.audio.getNumSamples()) {
             for (int chan = 0; chan < buf.audio.getNumChannels(); chan++) {
                 for (int s = 0; s < num; s++) {
@@ -306,7 +320,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
     }
 
     bool sendReal(AudioMidiBuffer& buffer) {
-        AudioMessage msg;
+        traceScope();
+        AudioMessage msg(client);
         if (nullptr != socket) {
             std::lock_guard<std::mutex> lock(sockMtx);
             return msg.sendToServer(socket.get(), buffer.audio, buffer.midi, buffer.posInfo, buffer.channelsRequested,
@@ -317,7 +332,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
     }
 
     bool readReal(AudioMidiBuffer& buffer, MessageHelper::Error* e) {
-        AudioMessage msg;
+        traceScope();
+        AudioMessage msg(client);
         bool success = false;
         if (nullptr != socket) {
             if (buffer.audio.getNumChannels() < buffer.channelsRequested ||

@@ -9,7 +9,9 @@
 #include "GenericEditor.hpp"
 
 //==============================================================================
-GenericEditor::GenericEditor(AudioGridderAudioProcessor& processor) : LogTag("editor"), m_processor(processor) {}
+GenericEditor::GenericEditor(AudioGridderAudioProcessor& processor) : LogTag("editor"), m_processor(processor) {
+    traceScope();
+}
 
 GenericEditor::~GenericEditor() {}
 
@@ -18,6 +20,7 @@ void GenericEditor::paint(juce::Graphics& g) {
 }
 
 void GenericEditor::resized() {
+    traceScope();
     m_labels.clear();
     m_components.clear();
     m_clickHandlers.clear();
@@ -76,6 +79,7 @@ void GenericEditor::resized() {
                     auto newVal = locComp->getValue() == 0.0 ? 1.0 : 0.0;
                     locComp->setValue(newVal);
                 });
+                handler->setLogTagSource(this);
                 c->addMouseListener(handler.get(), true);
                 m_clickHandlers.add(std::move(handler));
             } else {
@@ -115,12 +119,17 @@ void GenericEditor::resized() {
 }
 
 Client::Parameter& GenericEditor::getParameter(int paramIdx) {
+    traceScope();
     return m_processor.getLoadedPlugin(m_processor.getActivePlugin()).params.getReference(paramIdx);
 }
 
-Component* GenericEditor::getComponent(int paramIdx) { return m_components.getReference(paramIdx).get(); }
+Component* GenericEditor::getComponent(int paramIdx) {
+    traceScope();
+    return m_components.getReference(paramIdx).get();
+}
 
 void GenericEditor::updateParameter(int paramIdx) {
+    traceScope();
     m_processor.getClient().setParameterValue(m_processor.getActivePlugin(), paramIdx,
                                               getParameter(paramIdx).currentValue);
 }

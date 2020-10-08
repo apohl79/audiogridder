@@ -152,6 +152,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     void close();
 
     bool audioLock() {
+        traceScope();
         int retry = 10;
         bool locked;
         while ((locked = m_audioMtx.try_lock()) == false && --retry > 0) {
@@ -168,19 +169,30 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
         return false;
     }
 
-    void audioUnlock() { m_audioMtx.unlock(); }
+    void audioUnlock() {
+        traceScope();
+        m_audioMtx.unlock();
+    }
 
     void sendAudioMessage(AudioBuffer<float>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
+        traceScope();
         m_audioStreamerF->send(buffer, midi, posInfo);
     }
 
     void sendAudioMessage(AudioBuffer<double>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
+        traceScope();
         m_audioStreamerD->send(buffer, midi, posInfo);
     }
 
-    void readAudioMessage(AudioBuffer<float>& buffer, MidiBuffer& midi) { m_audioStreamerF->read(buffer, midi); }
+    void readAudioMessage(AudioBuffer<float>& buffer, MidiBuffer& midi) {
+        traceScope();
+        m_audioStreamerF->read(buffer, midi);
+    }
 
-    void readAudioMessage(AudioBuffer<double>& buffer, MidiBuffer& midi) { m_audioStreamerD->read(buffer, midi); }
+    void readAudioMessage(AudioBuffer<double>& buffer, MidiBuffer& midi) {
+        traceScope();
+        m_audioStreamerD->read(buffer, midi);
+    }
 
     const auto& getPlugins() const { return m_plugins; }
     Image getPluginScreen();  // create copy
@@ -265,13 +277,17 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     std::unique_ptr<StreamingSocket> m_screen_socket;
     std::vector<ServerPlugin> m_plugins;
 
+    MessageFactory m_msgFactory;
+
     class ScreenReceiver : public Thread, public LogTagDelegate {
       public:
         ScreenReceiver(Client* clnt, StreamingSocket* sock) : Thread("ScreenWorker"), m_client(clnt), m_socket(sock) {
             setLogTagSource(clnt);
+            traceScope();
             m_imgReader.setLogTagSource(clnt);
         }
         ~ScreenReceiver() {
+            traceScope();
             signalThreadShouldExit();
             waitForThreadAndLog(m_client, this, 1000);
         }
@@ -283,8 +299,6 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
         std::shared_ptr<Image> m_image;
         ImageReader m_imgReader;
     };
-
-    friend ScreenReceiver;
 
     std::unique_ptr<ScreenReceiver> m_screenWorker;
     std::shared_ptr<Image> m_pluginScreen;
@@ -324,14 +338,21 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
         GETLOADEDPLUGINSSTRING
     };
 
-    struct LockByID {
+    struct LockByID : public LogTagDelegate {
         Client& client;
         LockID lockid;
         LockByID(Client& c, LockID id, bool enforce = true) : client(c), lockid(id) {
+            setLogTagSource(&c);
+            traceln("id=" << (int)id << " enforce=" << (int)enforce);
             if (enforce) {
                 lock();
+                traceln("locked");
             } else {
-                tryLock();
+                if (tryLock()) {
+                    traceln("locked");
+                } else {
+                    traceln("lock failed, lock aquired by id " << client.m_clientMtxId);
+                }
             }
         }
         ~LockByID() { unlock(); }
@@ -339,10 +360,12 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
             client.m_clientMtx.lock();
             client.m_clientMtxId = lockid;
         }
-        inline void tryLock() {
+        inline bool tryLock() {
             if (client.m_clientMtx.try_lock()) {
                 client.m_clientMtxId = lockid;
+                return true;
             }
+            return false;
         }
         inline void unlock() {
             client.m_clientMtxId = NOLOCK;
@@ -364,6 +387,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     std::unique_ptr<AudioStreamer<double>> m_audioStreamerD;
 
     bool audioConnectionOk() {
+        traceScope();
         std::lock_guard<std::mutex> lock(m_audioMtx);
         return (nullptr != m_audioStreamerF && m_audioStreamerF->isOk()) ||
                (nullptr != m_audioStreamerD && m_audioStreamerD->isOk());

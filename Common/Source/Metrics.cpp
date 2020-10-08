@@ -118,6 +118,7 @@ void TimeStatistics::log(const String& name) {
 }
 
 void TimeStatistics::Aggregator::run() {
+    traceScope();
     int count = 1;
     while (!currentThreadShouldExit()) {
         int sleepfor = 10000 / 50;

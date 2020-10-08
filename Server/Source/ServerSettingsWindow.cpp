@@ -14,13 +14,15 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     : DocumentWindow("Server Settings",
                      LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId),
                      DocumentWindow::closeButton),
+      LogTag("settings"),
       m_app(app) {
+    traceScope();
     setUsingNativeTitleBar(true);
 
     int totalWidth = 500;
     int totalHeight = 80;
     int borderLR = 15;  // left/right border
-    int borderTB = 15;  // top/botton border
+    int borderTB = 15;  // top/bottom border
     int rowHeight = 35;
 
     int fieldWidth = 50;
@@ -268,12 +270,26 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 
     row++;
 
+    label = std::make_unique<Label>();
+    label->setText("Tracing (use only to report issues):", NotificationType::dontSendNotification);
+    label->setBounds(getLabelBounds(row));
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
+
+    m_tracer.setBounds(getCheckBoxBounds(row));
+    m_tracer.setToggleState(Tracer::isEnabled(), NotificationType::dontSendNotification);
+    addChildAndSetID(&m_tracer, "tracer");
+
+    row++;
+
     totalHeight += row * rowHeight;
 
     m_saveButton.setButtonText("Save");
     m_saveButton.setBounds(totalWidth / 2 - saveButtonWidth / 2, totalHeight - borderTB - saveButtonHeight,
                            saveButtonWidth, saveButtonHeight);
     m_saveButton.onClick = [this, app] {
+        traceScope1();
+        Tracer::setEnabled(m_tracer.getToggleState());
         auto appCpy = app;
         appCpy->getServer().setId(m_idText.getText().getIntValue());
         appCpy->getServer().setName(m_nameText.getText());
@@ -326,6 +342,9 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     setVisible(true);
 }
 
-void ServerSettingsWindow::closeButtonPressed() { m_app->hideServerSettings(); }
+void ServerSettingsWindow::closeButtonPressed() {
+    traceScope();
+    m_app->hideServerSettings();
+}
 
 }  // namespace e47

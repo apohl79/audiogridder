@@ -25,6 +25,7 @@ int ScreenRecorder::m_quality;
 
 void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode) {
     setLogTagStatic("screenrec");
+    traceScope();
 
     if (m_initialized) {
         return;
@@ -78,14 +79,16 @@ void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode) {
     m_initialized = true;
 }
 
-ScreenRecorder::ScreenRecorder() : LogTag("screenrec") {}
+ScreenRecorder::ScreenRecorder() : LogTag("screenrec") { traceScope(); }
 
 ScreenRecorder::~ScreenRecorder() {
+    traceScope();
     cleanupInput();
     cleanupOutput();
 }
 
 void ScreenRecorder::cleanupInput() {
+    traceScope();
     if (nullptr != m_capturePacket) {
         av_free(m_capturePacket);
     }
@@ -115,6 +118,7 @@ void ScreenRecorder::cleanupInput() {
 }
 
 void ScreenRecorder::cleanupOutput() {
+    traceScope();
     if (nullptr != m_outputPacket) {
         av_free(m_outputPacket);
     }
@@ -139,6 +143,7 @@ void ScreenRecorder::cleanupOutput() {
 }
 
 void ScreenRecorder::start(Rectangle<int> rect, CaptureCallback fn) {
+    traceScope();
     if (!m_initialized) {
         logln("screen recording not possible: initialization failed");
         return;
@@ -151,6 +156,7 @@ void ScreenRecorder::start(Rectangle<int> rect, CaptureCallback fn) {
 }
 
 void ScreenRecorder::stop() {
+    traceScope();
     m_capture = false;
     if (nullptr != m_thread) {
         while (m_threadRunning) {
@@ -168,6 +174,7 @@ void ScreenRecorder::stop() {
 }
 
 void ScreenRecorder::resume(Rectangle<int> rect) {
+    traceScope();
     if (!m_initialized) {
         logln("screen recording not possible: initialization failed");
         return;
@@ -178,6 +185,7 @@ void ScreenRecorder::resume(Rectangle<int> rect) {
         m_thread->detach();
     }
     m_thread = std::make_unique<std::thread>([this, rect] {
+        traceScope1();
         bool ready = true;
         if (rect.isEmpty()) {
             // start
@@ -195,6 +203,7 @@ void ScreenRecorder::resume(Rectangle<int> rect) {
 }
 
 bool ScreenRecorder::updateArea(Rectangle<int> rect) {
+    traceScope();
     m_captureRect = rect * m_scale;
 #ifdef JUCE_WINDOWS
     cleanupInput();
@@ -210,6 +219,7 @@ bool ScreenRecorder::updateArea(Rectangle<int> rect) {
 }
 
 bool ScreenRecorder::prepareInput() {
+    traceScope();
     AVDictionary* opts = nullptr;
 
 #ifdef JUCE_MAC
@@ -280,6 +290,7 @@ bool ScreenRecorder::prepareInput() {
 }
 
 bool ScreenRecorder::prepareOutput() {
+    traceScope();
     if (nullptr == m_captureCodecCtx) {
         logln("prepareOutput: input not ready");
         return false;
@@ -387,6 +398,7 @@ bool ScreenRecorder::prepareOutput() {
 }
 
 void ScreenRecorder::record() {
+    traceScope();
     logln("started capturing: rectangle " << m_captureRect.getX() << "," << m_captureRect.getY() << ":"
                                           << m_captureRect.getWidth() << "x" << m_captureRect.getHeight() << " scale *"
                                           << m_scale << " <- input rectange " << m_captureCodecCtx->width << "x"

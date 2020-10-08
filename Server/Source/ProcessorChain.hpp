@@ -16,21 +16,26 @@ namespace e47 {
 
 class ProcessorChain;
 
-class AGProcessor {
+class AGProcessor : public LogTag {
   public:
     AGProcessor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize)
-        : m_chain(chain), m_id(id), m_sampleRate(sampleRate), m_blockSize(blockSize) {}
+        : LogTag("agprocessor"), m_chain(chain), m_id(id), m_sampleRate(sampleRate), m_blockSize(blockSize) {}
 
     std::shared_ptr<AudioPluginInstance> getPlugin() {
+        traceScope();
         std::lock_guard<std::mutex> lock(m_pluginMtx);
         return m_plugin;
     }
 
     void updateScreenCaptureArea(int val) {
+        traceScope();
         m_additionalScreenSpace = m_additionalScreenSpace + val > 0 ? m_additionalScreenSpace + val : 0;
     }
 
-    int getAdditionalScreenCapturingSpace() { return m_additionalScreenSpace; }
+    int getAdditionalScreenCapturingSpace() {
+        traceScope();
+        return m_additionalScreenSpace;
+    }
 
     static std::shared_ptr<AudioPluginInstance> loadPlugin(PluginDescription& plugdesc, double sampleRate,
                                                            int blockSize);
@@ -42,6 +47,7 @@ class AGProcessor {
 
     template <typename T>
     bool processBlock(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
+        traceScope();
         auto p = getPlugin();
         if (nullptr != p && !p->isSuspended()) {
             p->processBlock(buffer, midiMessages);
@@ -51,6 +57,7 @@ class AGProcessor {
     }
 
     void prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock) {
+        traceScope();
         auto p = getPlugin();
         if (nullptr != p) {
             p->prepareToPlay(sampleRate, maximumExpectedSamplesPerBlock);
@@ -58,6 +65,7 @@ class AGProcessor {
     }
 
     void releaseResources() {
+        traceScope();
         auto p = getPlugin();
         if (nullptr != p) {
             p->releaseResources();
@@ -65,6 +73,7 @@ class AGProcessor {
     }
 
     int getLatencySamples() {
+        traceScope();
         auto p = getPlugin();
         if (nullptr != p) {
             return p->getLatencySamples();
@@ -73,6 +82,7 @@ class AGProcessor {
     }
 
     const String getName() {
+        traceScope();
         auto p = getPlugin();
         if (nullptr != p) {
             return p->getName();
@@ -81,6 +91,7 @@ class AGProcessor {
     }
 
     bool hasEditor() {
+        traceScope();
         auto p = getPlugin();
         if (nullptr != p) {
             return p->hasEditor();
@@ -89,6 +100,7 @@ class AGProcessor {
     }
 
     bool isSuspended() {
+        traceScope();
         auto p = getPlugin();
         if (nullptr != p) {
             return p->isSuspended();
@@ -97,6 +109,7 @@ class AGProcessor {
     }
 
     double getTailLengthSeconds() {
+        traceScope();
         auto p = getPlugin();
         if (nullptr != p) {
             return p->getTailLengthSeconds();
@@ -105,6 +118,7 @@ class AGProcessor {
     }
 
     AudioProcessorEditor* createEditorIfNeeded() {
+        traceScope();
         auto p = getPlugin();
         if (nullptr != p) {
             return p->createEditorIfNeeded();
@@ -113,6 +127,7 @@ class AGProcessor {
     }
 
     AudioProcessorEditor* getActiveEditor() {
+        traceScope();
         auto p = getPlugin();
         if (nullptr != p) {
             return p->getActiveEditor();
@@ -121,6 +136,7 @@ class AGProcessor {
     }
 
     void getStateInformation(juce::MemoryBlock& destData) {
+        traceScope();
         auto p = getPlugin();
         if (nullptr != p) {
             p->getStateInformation(destData);
@@ -128,6 +144,7 @@ class AGProcessor {
     }
 
     void setStateInformation(const void* data, int sizeInBytes) {
+        traceScope();
         auto p = getPlugin();
         if (nullptr != p) {
             p->setStateInformation(data, sizeInBytes);
@@ -165,6 +182,8 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
     ProcessorChain(const BusesProperties& props) : AudioProcessor(props) {}
 
     static BusesProperties createBussesProperties(bool instrument) {
+        setLogTagStatic("processorchain");
+        traceScope();
         if (instrument) {
             return BusesProperties().withOutput("Output", AudioChannelSet::stereo(), false);
         } else {
@@ -227,6 +246,7 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
 
     template <typename T>
     void processBlockReal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
+        traceScope();
         int latency = 0;
         std::lock_guard<std::mutex> lock(m_processors_mtx);
         for (auto& proc : m_processors) {
@@ -242,6 +262,7 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
 
     template <typename T>
     void preProcessBlocks(std::shared_ptr<AudioPluginInstance> inst) {
+        traceScope();
         MidiBuffer midi;
         int channels = jmax(getMainBusNumInputChannels(), getMainBusNumOutputChannels()) + m_extraChannels;
         AudioBuffer<T> buf(channels, getBlockSize());

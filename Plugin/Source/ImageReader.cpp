@@ -15,6 +15,7 @@ namespace e47 {
 ImageReader::ImageReader() {}
 
 std::shared_ptr<Image> ImageReader::read(const char* data, size_t size, int width, int height, double scale) {
+    traceScope();
     if (nullptr != data) {
         if (size > 4 && data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F') {
             if ((m_width != width || m_height != height) && nullptr != m_inputCodecCtx) {
@@ -92,6 +93,7 @@ std::shared_ptr<Image> ImageReader::read(const char* data, size_t size, int widt
 }
 
 bool ImageReader::initCodec() {
+    traceScope();
     m_inputCodec = avcodec_find_decoder_by_name("webp");
     if (nullptr == m_inputCodec) {
         logln("unable to find webp codec");
@@ -149,6 +151,7 @@ bool ImageReader::initCodec() {
 }
 
 void ImageReader::closeCodec() {
+    traceScope();
     if (nullptr != m_inputPacket) {
         av_packet_unref(m_inputPacket);
         av_free(m_inputPacket);

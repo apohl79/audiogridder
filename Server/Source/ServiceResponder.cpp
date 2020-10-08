@@ -20,6 +20,8 @@ std::unique_ptr<ServiceResponder> ServiceResponder::m_inst;
 int serviceCallback(int sock, const struct sockaddr* from, size_t addrlen, mdns_entry_type_t entry, uint16_t query_id,
                     uint16_t rtype, uint16_t rclass, uint32_t ttl, const void* data, size_t size, size_t name_offset,
                     size_t name_length, size_t record_offset, size_t record_length, void* user_data) {
+    setLogTagStatic("mdns");
+    traceScope();
     if (nullptr != ServiceResponder::m_inst) {
         return ServiceResponder::m_inst->handleRecord(sock, from, addrlen, entry, query_id, rtype, rclass, ttl, data,
                                                       size, name_offset, name_length, record_offset, record_length,
@@ -30,12 +32,17 @@ int serviceCallback(int sock, const struct sockaddr* from, size_t addrlen, mdns_
 
 ServiceResponder::ServiceResponder(int port, int id, const String& hostname)
     : Thread("ServiceResponder"), LogTag("mdns"), m_port(port), m_id(id), m_hostname(hostname), m_connector(this) {
+    traceScope();
+
     if (m_hostname.isEmpty()) {
         m_hostname = m_connector.getHostName();
     }
 }
 
-ServiceResponder::~ServiceResponder() { stopThread(3000); }
+ServiceResponder::~ServiceResponder() {
+    traceScope();
+    stopThread(-1);
+}
 
 void ServiceResponder::setHostName(const String& hostname) { m_inst->m_hostname = hostname; }
 
@@ -52,6 +59,7 @@ void ServiceResponder::cleanup() {
 }
 
 void ServiceResponder::run() {
+    traceScope();
     int num = m_connector.openServiceSockets(32);
     if (num <= 0) {
         logln("failed to open client socket(s)");
@@ -74,6 +82,7 @@ int ServiceResponder::handleRecord(int sock, const struct sockaddr* from, size_t
                                    uint16_t query_id, uint16_t rtype, uint16_t rclass, uint32_t /*ttl*/,
                                    const void* data, size_t size, size_t /*name_offset*/, size_t /*name_length*/,
                                    size_t record_offset, size_t record_length, void* /*user_data*/) {
+    traceScope();
     if (entry != MDNS_ENTRYTYPE_QUESTION) {
         return 0;
     }

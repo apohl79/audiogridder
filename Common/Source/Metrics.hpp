@@ -63,10 +63,10 @@ class TimeStatistics : public LogTag {
         void updateBin(size_t bin, size_t c) { dist[bin].second += c; }
     };
 
-    class Aggregator : public Thread {
+    class Aggregator : public Thread, public LogTag {
       public:
         friend TimeStatistics;
-        Aggregator() : Thread("Aggregator") {}
+        Aggregator() : Thread("Aggregator"), LogTag("stats_aggregator") {}
         ~Aggregator() { stopThread(3000); }
         void run();
     };

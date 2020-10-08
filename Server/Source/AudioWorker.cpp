@@ -17,6 +17,7 @@ HashMap<String, AudioWorker::RecentsListType> AudioWorker::m_recents;
 std::mutex AudioWorker::m_recentsMtx;
 
 AudioWorker::~AudioWorker() {
+    traceScope();
     if (nullptr != m_socket && m_socket->isConnected()) {
         m_socket->close();
     }
@@ -26,6 +27,7 @@ AudioWorker::~AudioWorker() {
 
 void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channelsIn, int channelsOut, double rate,
                        int samplesPerBlock, bool doublePrecission) {
+    traceScope();
     m_socket = std::move(s);
     m_rate = rate;
     m_samplesPerBlock = samplesPerBlock;
@@ -41,12 +43,13 @@ void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channelsIn, int c
 }
 
 void AudioWorker::run() {
+    traceScope();
     logln("audio processor started");
 
     AudioBuffer<float> bufferF;
     AudioBuffer<double> bufferD;
     MidiBuffer midi;
-    AudioMessage msg;
+    AudioMessage msg(getLogTagSource());
     AudioPlayHead::CurrentPositionInfo posInfo;
     auto duration = TimeStatistics::getDuration("audio");
 
@@ -107,15 +110,22 @@ void AudioWorker::run() {
     logln("audio processor terminated");
 }
 
-void AudioWorker::shutdown() { signalThreadShouldExit(); }
+void AudioWorker::shutdown() {
+    traceScope();
+    signalThreadShouldExit();
+}
 
 void AudioWorker::clear() {
+    traceScope();
     if (nullptr != m_chain) {
         m_chain->releaseResources();
         if (!MessageManager::getInstance()->isThisTheMessageThread()) {
             if (m_chain->getSize() > 0) {
                 auto pChain = m_chain;
-                MessageManager::callAsync([pChain] { pChain->clear(); });
+                MessageManager::callAsync([this, pChain] {
+                    traceScope1();
+                    pChain->clear();
+                });
             }
         } else {
             m_chain->clear();
@@ -123,24 +133,31 @@ void AudioWorker::clear() {
     }
 }
 
-bool AudioWorker::addPlugin(const String& id) { return m_chain->addPluginProcessor(id); }
+bool AudioWorker::addPlugin(const String& id) {
+    traceScope();
+    return m_chain->addPluginProcessor(id);
+}
 
 void AudioWorker::delPlugin(int idx) {
+    traceScope();
     logln("deleting plugin " << idx);
     m_chain->delProcessor(idx);
 }
 
 void AudioWorker::exchangePlugins(int idxA, int idxB) {
+    traceScope();
     logln("exchanging plugins idxA=" << idxA << " idxB=" << idxB);
     m_chain->exchangeProcessors(idxA, idxB);
 }
 
 AudioWorker::RecentsListType& AudioWorker::getRecentsList(String host) const {
+    traceScope();
     std::lock_guard<std::mutex> lock(m_recentsMtx);
     return m_recents.getReference(host);
 }
 
 void AudioWorker::addToRecentsList(const String& id, const String& host) {
+    traceScope();
     auto& pluginList = getApp()->getPluginList();
     auto plug = pluginList.getTypeForIdentifierString(id);
     if (plug != nullptr) {

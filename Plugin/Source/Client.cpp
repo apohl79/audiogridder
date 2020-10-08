@@ -17,16 +17,19 @@
 
 namespace e47 {
 
-Client::Client(AudioGridderAudioProcessor* processor) : Thread("Client"), LogTag("client"), m_processor(processor) {
+Client::Client(AudioGridderAudioProcessor* processor)
+    : Thread("Client"), LogTag("client"), m_processor(processor), m_msgFactory(this) {
     logln("client created");
 }
 
 Client::~Client() {
+    traceScope();
     signalThreadShouldExit();
     close();
 }
 
 void Client::run() {
+    traceScope();
     logln("entering client loop");
     bool lastState = isReady();
     while (!currentThreadShouldExit()) {
@@ -95,6 +98,7 @@ void Client::run() {
 }
 
 void Client::setServer(const ServerInfo& srv) {
+    traceScope();
     logln("setting server to " << srv.toString());
     String currHost = getServerHostAndID();
     std::lock_guard<std::mutex> lock(m_srvMtx);
@@ -106,16 +110,19 @@ void Client::setServer(const ServerInfo& srv) {
 }
 
 String Client::getServerHost() {
+    traceScope();
     std::lock_guard<std::mutex> lock(m_srvMtx);
     return m_srvHost;
 }
 
 int Client::getServerID() {
+    traceScope();
     std::lock_guard<std::mutex> lock(m_srvMtx);
     return m_srvId;
 }
 
 String Client::getServerHostAndID() {
+    traceScope();
     std::lock_guard<std::mutex> lock(m_srvMtx);
     String h = m_srvHost;
     if (m_srvId > 0) {
@@ -125,26 +132,31 @@ String Client::getServerHostAndID() {
 }
 
 int Client::getServerPort() {
+    traceScope();
     std::lock_guard<std::mutex> lock(m_srvMtx);
     return m_srvPort;
 }
 
 void Client::setPluginScreenUpdateCallback(ScreenUpdateCallback fn) {
+    traceScope();
     LockByID lock(*this, SETPLUGINSCREENUPDATECALLBACK);
     m_pluginScreenUpdateCallback = fn;
 }
 
 void Client::setOnConnectCallback(OnConnectCallback fn) {
+    traceScope();
     LockByID lock(*this, SETONCONNECTCALLBACK);
     m_onConnectCallback = fn;
 }
 
 void Client::setOnCloseCallback(OnCloseCallback fn) {
+    traceScope();
     LockByID lock(*this, SETONCLOSECALLBACK);
     m_onCloseCallback = fn;
 }
 
 void Client::init(int channelsIn, int channelsOut, double rate, int samplesPerBlock, bool doublePrecission) {
+    traceScope();
     logln("init: channelsIn=" << channelsIn << " channelsOut=" << channelsOut << " rate=" << rate << " samplesPerBlock="
                               << samplesPerBlock << " doublePrecission=" << as<int>(doublePrecission));
     LockByID lock(*this, INIT1);
@@ -162,6 +174,7 @@ void Client::init(int channelsIn, int channelsOut, double rate, int samplesPerBl
 }
 
 void Client::init() {
+    traceScope();
     String host;
     int id;
     int port;
@@ -251,7 +264,7 @@ void Client::init() {
 
         // receive plugin list
         m_plugins.clear();
-        Message<PluginList> msg;
+        Message<PluginList> msg(this);
         MessageHelper::Error err;
         if (!msg.read(m_cmd_socket.get(), &err, 5000)) {
             logln("failed reading plugin list: " << err.toString());
@@ -274,6 +287,7 @@ void Client::init() {
 }
 
 bool Client::isReady(int timeout) {
+    traceScope();
     int retry = timeout / 10;
     bool locked = false;
     while (retry-- > 0) {
@@ -298,6 +312,7 @@ bool Client::isReady(int timeout) {
 bool Client::isReadyLockFree() { return !m_error && m_ready; }
 
 void Client::close() {
+    traceScope();
     if (m_ready) {
         logln("closing");
     }
@@ -334,11 +349,13 @@ void Client::close() {
 }
 
 Image Client::getPluginScreen() {
+    traceScope();
     std::lock_guard<std::mutex> lock(m_pluginScreenMtx);
     return *m_pluginScreen;
 }
 
 void Client::setPluginScreen(std::shared_ptr<Image> img, int w, int h) {
+    traceScope();
     std::lock_guard<std::mutex> lock(m_pluginScreenMtx);
     m_pluginScreen = img;
     if (m_pluginScreenUpdateCallback) {
@@ -347,21 +364,23 @@ void Client::setPluginScreen(std::shared_ptr<Image> img, int w, int h) {
 }
 
 void Client::quit() {
+    traceScope();
     // called from close which already holds a lock
-    Message<Quit> msg;
+    Message<Quit> msg(this);
     msg.send(m_cmd_socket.get());
 }
 
 bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params, String settings) {
+    traceScope();
     if (!isReadyLockFree()) {
         return false;
     };
     MessageHelper::Error err;
-    Message<AddPlugin> msg;
+    Message<AddPlugin> msg(this);
     PLD(msg).setString(id);
     LockByID lock(*this, ADDPLUGIN);
     if (msg.send(m_cmd_socket.get())) {
-        auto result = MessageFactory::getResult(m_cmd_socket.get(), LOAD_PLUGIN_TIMEOUT, &err);
+        auto result = m_msgFactory.getResult(m_cmd_socket.get(), LOAD_PLUGIN_TIMEOUT, &err);
         if (nullptr == result) {
             logln("  failed to get result: " << err.toString());
             return false;
@@ -371,13 +390,13 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
             return false;
         }
         m_latency = result->getReturnCode();
-        Message<Presets> msgPresets;
+        Message<Presets> msgPresets(this);
         if (!msgPresets.read(m_cmd_socket.get(), &err)) {
             logln("  failed to read presets: " << err.toString());
             return false;
         }
         presets = StringArray::fromTokens(msgPresets.payload.getString(), "|", "");
-        Message<Parameters> msgParams;
+        Message<Parameters> msgParams(this);
         if (!msgParams.read(m_cmd_socket.get(), &err)) {
             logln("  failed to read parameters: " << err.toString());
             return false;
@@ -394,7 +413,7 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
             }
             params.add(std::move(newParam));
         }
-        Message<PluginSettings> msgSettings;
+        Message<PluginSettings> msgSettings(this);
         if (settings.isNotEmpty()) {
             MemoryBlock block;
             block.fromBase64Encoding(settings);
@@ -410,50 +429,54 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
 }
 
 void Client::delPlugin(int idx) {
+    traceScope();
     if (!isReadyLockFree()) {
         return;
     };
-    Message<DelPlugin> msg;
+    Message<DelPlugin> msg(this);
     PLD(msg).setNumber(idx);
     LockByID lock(*this, DELPLUGIN);
     msg.send(m_cmd_socket.get());
-    auto result = MessageFactory::getResult(m_cmd_socket.get());
+    auto result = m_msgFactory.getResult(m_cmd_socket.get());
     if (nullptr != result && result->getReturnCode() > -1) {
         m_latency = result->getReturnCode();
     }
 }
 
 void Client::editPlugin(int idx) {
+    traceScope();
     if (!isReadyLockFree()) {
         return;
     };
-    Message<EditPlugin> msg;
+    Message<EditPlugin> msg(this);
     PLD(msg).setNumber(idx);
     LockByID lock(*this, EDITPLUGIN);
     msg.send(m_cmd_socket.get());
 }
 
 void Client::hidePlugin() {
+    traceScope();
     if (!isReadyLockFree()) {
         return;
     };
-    Message<HidePlugin> msg;
+    Message<HidePlugin> msg(this);
     LockByID lock(*this, HIDEPLUGIN);
     msg.send(m_cmd_socket.get());
 }
 
 MemoryBlock Client::getPluginSettings(int idx) {
+    traceScope();
     MemoryBlock block;
     if (!isReadyLockFree()) {
         return block;
     };
-    Message<GetPluginSettings> msg;
+    Message<GetPluginSettings> msg(this);
     PLD(msg).setNumber(idx);
     LockByID lock(*this, GETPLUGINSETTINGS);
     if (!msg.send(m_cmd_socket.get())) {
         m_error = true;
     } else {
-        Message<PluginSettings> res;
+        Message<PluginSettings> res(this);
         MessageHelper::Error err;
         if (res.read(m_cmd_socket.get(), &err, 5000)) {
             if (*res.payload.size > 0) {
@@ -468,13 +491,14 @@ MemoryBlock Client::getPluginSettings(int idx) {
 }
 
 void Client::setPluginSettings(int idx, String settings) {
-    Message<SetPluginSettings> msg;
+    traceScope();
+    Message<SetPluginSettings> msg(this);
     PLD(msg).setNumber(idx);
     LockByID lock(*this, SETPLUGINSETTINGS);
     if (!msg.send(m_cmd_socket.get())) {
         m_error = true;
     } else {
-        Message<PluginSettings> msgSettings;
+        Message<PluginSettings> msgSettings(this);
         if (settings.isNotEmpty()) {
             MemoryBlock block;
             block.fromBase64Encoding(settings);
@@ -488,30 +512,33 @@ void Client::setPluginSettings(int idx, String settings) {
 }
 
 void Client::bypassPlugin(int idx) {
+    traceScope();
     if (!isReadyLockFree()) {
         return;
     };
-    Message<BypassPlugin> msg;
+    Message<BypassPlugin> msg(this);
     PLD(msg).setNumber(idx);
     LockByID lock(*this, BYPASSPLUGIN);
     msg.send(m_cmd_socket.get());
 }
 
 void Client::unbypassPlugin(int idx) {
+    traceScope();
     if (!isReadyLockFree()) {
         return;
     };
-    Message<UnbypassPlugin> msg;
+    Message<UnbypassPlugin> msg(this);
     PLD(msg).setNumber(idx);
     LockByID lock(*this, UNBYPASSPLUGIN);
     msg.send(m_cmd_socket.get());
 }
 
 void Client::exchangePlugins(int idxA, int idxB) {
+    traceScope();
     if (!isReadyLockFree()) {
         return;
     };
-    Message<ExchangePlugins> msg;
+    Message<ExchangePlugins> msg(this);
     DATA(msg)->idxA = idxA;
     DATA(msg)->idxB = idxB;
     LockByID lock(*this, EXCHANGEPLUGINS);
@@ -519,11 +546,12 @@ void Client::exchangePlugins(int idxA, int idxB) {
 }
 
 std::vector<ServerPlugin> Client::getRecents() {
+    traceScope();
     std::vector<ServerPlugin> recents;
     if (!isReadyLockFree()) {
         return recents;
     };
-    Message<RecentsList> msg;
+    Message<RecentsList> msg(this);
     MessageHelper::Error err;
     LockByID lock(*this, GETRECENTS);
     msg.send(m_cmd_socket.get());
@@ -543,10 +571,11 @@ std::vector<ServerPlugin> Client::getRecents() {
 }
 
 void Client::setPreset(int idx, int preset) {
+    traceScope();
     if (!isReadyLockFree()) {
         return;
     };
-    Message<Preset> msg;
+    Message<Preset> msg(this);
     DATA(msg)->idx = idx;
     DATA(msg)->preset = preset;
     LockByID lock(*this, SETPRESET);
@@ -554,15 +583,16 @@ void Client::setPreset(int idx, int preset) {
 }
 
 float Client::getParameterValue(int idx, int paramIdx) {
+    traceScope();
     if (!isReadyLockFree()) {
         return 0;
     };
-    Message<GetParameterValue> msg;
+    Message<GetParameterValue> msg(this);
     DATA(msg)->idx = idx;
     DATA(msg)->paramIdx = paramIdx;
     LockByID lock(*this, GETPARAMETERVALUE);
     msg.send(m_cmd_socket.get());
-    Message<ParameterValue> ret;
+    Message<ParameterValue> ret(this);
     MessageHelper::Error err;
     if (ret.read(m_cmd_socket.get(), &err)) {
         if (DATA(msg)->idx == DATA(ret)->idx && DATA(msg)->paramIdx == DATA(ret)->paramIdx) {
@@ -576,10 +606,11 @@ float Client::getParameterValue(int idx, int paramIdx) {
 }
 
 void Client::setParameterValue(int idx, int paramIdx, float val) {
+    traceScope();
     if (!isReadyLockFree()) {
         return;
     };
-    Message<ParameterValue> msg;
+    Message<ParameterValue> msg(this);
     DATA(msg)->idx = idx;
     DATA(msg)->paramIdx = paramIdx;
     DATA(msg)->value = val;
@@ -588,16 +619,17 @@ void Client::setParameterValue(int idx, int paramIdx, float val) {
 }
 
 Array<Client::ParameterResult> Client::getAllParameterValues(int idx, int count) {
+    traceScope();
     if (!isReadyLockFree()) {
         return {};
     };
-    Message<GetAllParameterValues> msg;
+    Message<GetAllParameterValues> msg(this);
     PLD(msg).setNumber(idx);
     LockByID lock(*this, GETALLPARAMETERVALUES);
     msg.send(m_cmd_socket.get());
     Array<Client::ParameterResult> ret;
     for (int i = 0; i < count; i++) {
-        Message<ParameterValue> msgVal;
+        Message<ParameterValue> msgVal(this);
         MessageHelper::Error err;
         if (msgVal.read(m_cmd_socket.get(), &err)) {
             if (idx == DATA(msgVal)->idx) {
@@ -609,8 +641,8 @@ Array<Client::ParameterResult> Client::getAllParameterValues(int idx, int count)
 }
 
 void Client::ScreenReceiver::run() {
-    using MsgType = Message<ScreenCapture>;
-    MsgType msg;
+    traceScope();
+    Message<ScreenCapture> msg(getLogTagSource());
     MessageHelper::Error err;
     do {
         if (msg.read(m_socket, &err, 200)) {
@@ -636,16 +668,19 @@ void Client::ScreenReceiver::run() {
 }
 
 void Client::mouseMove(const MouseEvent& event) {
+    traceScope();
     sendMouseEvent(MouseEvType::MOVE, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
                    event.mods.isAltDown());
 }
 
 void Client::mouseEnter(const MouseEvent& event) {
+    traceScope();
     sendMouseEvent(MouseEvType::MOVE, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
                    event.mods.isAltDown());
 }
 
 void Client::mouseDown(const MouseEvent& event) {
+    traceScope();
     if (event.mods.isLeftButtonDown()) {
         sendMouseEvent(MouseEvType::LEFT_DOWN, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
                        event.mods.isAltDown());
@@ -659,6 +694,7 @@ void Client::mouseDown(const MouseEvent& event) {
 }
 
 void Client::mouseDrag(const MouseEvent& event) {
+    traceScope();
     if (event.mods.isLeftButtonDown()) {
         sendMouseEvent(MouseEvType::LEFT_DRAG, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
                        event.mods.isAltDown());
@@ -672,6 +708,7 @@ void Client::mouseDrag(const MouseEvent& event) {
 }
 
 void Client::mouseUp(const MouseEvent& event) {
+    traceScope();
     if (event.mods.isLeftButtonDown()) {
         sendMouseEvent(MouseEvType::LEFT_UP, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
                        event.mods.isAltDown());
@@ -687,6 +724,7 @@ void Client::mouseUp(const MouseEvent& event) {
 void Client::mouseDoubleClick(const MouseEvent& /*event*/) {}
 
 void Client::mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wheel) {
+    traceScope();
     if (!wheel.isInertial) {
         sendMouseEvent(MouseEvType::WHEEL, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
                        event.mods.isAltDown(), &wheel);
@@ -695,10 +733,11 @@ void Client::mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wh
 
 void Client::sendMouseEvent(MouseEvType ev, Point<float> p, bool isShiftDown, bool isCtrlDown, bool isAltDown,
                             const MouseWheelDetails* wheel) {
+    traceScope();
     if (!isReadyLockFree()) {
         return;
     };
-    Message<Mouse> msg;
+    Message<Mouse> msg(this);
     DATA(msg)->type = ev;
     DATA(msg)->x = p.x;
     DATA(msg)->y = p.y;
@@ -720,6 +759,7 @@ void Client::sendMouseEvent(MouseEvType ev, Point<float> p, bool isShiftDown, bo
 
 bool Client::keyPressed(const KeyPress& kp, Component* /* originatingComponent */) {
     if (!isReadyLockFree() || m_processor->getActivePlugin() == -1) {
+        traceScope();
         return false;
     };
     bool consumed = true;
@@ -810,7 +850,7 @@ bool Client::keyPressed(const KeyPress& kp, Component* /* originatingComponent *
         }
     }
 
-    Message<Key> msg;
+    Message<Key> msg(this);
     PLD(msg).setData(reinterpret_cast<const char*>(keysToPress.data()),
                      static_cast<int>(keysToPress.size() * sizeof(uint16_t)));
     LockByID lock(*this, KEYPRESSED);
@@ -820,21 +860,24 @@ bool Client::keyPressed(const KeyPress& kp, Component* /* originatingComponent *
 }
 
 void Client::updateScreenCaptureArea(int val) {
-    Message<UpdateScreenCaptureArea> msg;
+    traceScope();
+    Message<UpdateScreenCaptureArea> msg(this);
     PLD(msg).setNumber(val);
     LockByID lock(*this, UPDATESCREENCAPTUREAREA);
     msg.send(m_cmd_socket.get());
 }
 
 void Client::rescan(bool wipe) {
-    Message<Rescan> msg;
+    traceScope();
+    Message<Rescan> msg(this);
     PLD(msg).setNumber(wipe ? 1 : 0);
     LockByID lock(*this, RESCAN);
     msg.send(m_cmd_socket.get());
 }
 
 void Client::updateCPULoad() {
-    Message<CPULoad> msg;
+    traceScope();
+    Message<CPULoad> msg(this);
     LockByID lock(*this, UPDATECPULOAD);
     msg.send(m_cmd_socket.get());
     msg.read(m_cmd_socket.get());
@@ -843,6 +886,7 @@ void Client::updateCPULoad() {
 }
 
 StreamingSocket* Client::accept(StreamingSocket& sock) const {
+    traceScope();
     StreamingSocket* clnt = nullptr;
     int retry = 100;
     do {
@@ -857,6 +901,7 @@ StreamingSocket* Client::accept(StreamingSocket& sock) const {
 }
 
 String Client::getLoadedPluginsString() {
+    traceScope();
     LockByID lock(*this, GETLOADEDPLUGINSSTRING, false);
     String ret;
     bool first = true;

@@ -22,7 +22,11 @@ namespace e47 {
 App::App() : LogTag("app") {}
 
 #ifdef JUCE_WINDOWS
-void abortHandler(int signal) { RaiseException(0, 0, 0, NULL); }
+void abortHandler(int /*signal*/) {
+    setLogTagStatic("abort");
+    traceScope();
+    RaiseException(0, 0, 0, NULL);
+}
 #endif
 
 void App::initialise(const String& commandLineParameters) {
@@ -56,6 +60,7 @@ void App::initialise(const String& commandLineParameters) {
         case SERVER:
             break;
     }
+    Tracer::initialize(getApplicationName(), logName);
     AGLogger::initialize(getApplicationName(), logName);
     logln("commandline: " << commandLineParameters);
     switch (mode) {
@@ -82,6 +87,7 @@ void App::initialise(const String& commandLineParameters) {
             }
             break;
         case SERVER: {
+            traceScope();
 #ifdef JUCE_WINDOWS
             signal(SIGABRT, abortHandler);
             auto dumpPath = FileLogger::getSystemLogFileFolder().getFullPathName();
@@ -165,6 +171,7 @@ void App::initialise(const String& commandLineParameters) {
 }
 
 void App::shutdown() {
+    traceScope();
     logln("shutdown");
     if (m_server != nullptr) {
         m_server->shutdown();
@@ -177,11 +184,14 @@ void App::shutdown() {
             m_child->join();
         }
     }
+    Tracer::cleanup();
     AGLogger::cleanup();
     setApplicationReturnValue(0);
 }
 
 void App::restartServer(bool rescan) {
+    traceScope();
+
     logln("restarting server...");
 
     hideEditor();
@@ -192,6 +202,8 @@ void App::restartServer(bool rescan) {
     setSplashInfo("Restarting server...");
 
     std::thread([this, rescan] {
+        traceScope1();
+
         logln("running restart thread");
 
         // leave message thread context
@@ -214,6 +226,7 @@ void App::restartServer(bool rescan) {
 const KnownPluginList& App::getPluginList() { return m_server->getPluginList(); }
 
 void App::showEditor(std::shared_ptr<AGProcessor> proc, Thread::ThreadID tid, WindowCaptureCallbackNative func) {
+    traceScope();
     if (proc->hasEditor()) {
         std::lock_guard<std::mutex> lock(m_windowMtx);
         forgetEditorIfNeeded();
@@ -232,6 +245,7 @@ void App::showEditor(std::shared_ptr<AGProcessor> proc, Thread::ThreadID tid, Wi
 }
 
 void App::showEditor(std::shared_ptr<AGProcessor> proc, Thread::ThreadID tid, WindowCaptureCallbackFFmpeg func) {
+    traceScope();
     if (proc->hasEditor()) {
         std::lock_guard<std::mutex> lock(m_windowMtx);
         forgetEditorIfNeeded();
@@ -250,6 +264,7 @@ void App::showEditor(std::shared_ptr<AGProcessor> proc, Thread::ThreadID tid, Wi
 }
 
 void App::hideEditor(Thread::ThreadID tid) {
+    traceScope();
     if (tid == nullptr || tid == m_windowOwner) {
         std::lock_guard<std::mutex> lock(m_windowMtx);
         forgetEditorIfNeeded();
@@ -269,6 +284,7 @@ void App::hideEditor(Thread::ThreadID tid) {
 }
 
 void App::resetEditor() {
+    traceScope();
     std::lock_guard<std::mutex> lock(m_windowMtx);
     forgetEditorIfNeeded();
     if (m_window != nullptr) {
@@ -279,6 +295,7 @@ void App::resetEditor() {
 }
 
 void App::restartEditor() {
+    traceScope();
     std::lock_guard<std::mutex> lock(m_windowMtx);
     forgetEditorIfNeeded();
     if (m_windowProc != nullptr) {
@@ -288,6 +305,7 @@ void App::restartEditor() {
 }
 
 void App::forgetEditorIfNeeded() {
+    traceScope();
     // No lock, locked already
     if (m_windowProc != nullptr && m_windowProc->getActiveEditor() == nullptr && m_window != nullptr) {
         logln("forgetting editor");
@@ -296,6 +314,7 @@ void App::forgetEditorIfNeeded() {
 }
 
 void App::updateScreenCaptureArea(int val) {
+    traceScope();
     std::lock_guard<std::mutex> lock(m_windowMtx);
     if (m_windowProc != nullptr && m_window != nullptr) {
         m_windowProc->updateScreenCaptureArea(val);
@@ -304,6 +323,7 @@ void App::updateScreenCaptureArea(int val) {
 }
 
 Point<float> App::localPointToGlobal(Point<float> lp) {
+    traceScope();
     std::lock_guard<std::mutex> lock(m_windowMtx);
     if (m_windowProc != nullptr) {
         auto* ed = m_windowProc->getActiveEditor();

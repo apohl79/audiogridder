@@ -28,7 +28,6 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
                          .withInput("Input", AudioChannelSet::stereo(), true)
 #endif
                          .withOutput("Output", AudioChannelSet::stereo(), true)) {
-
 #if !defined(JUCE_WINDOWS)
     signal(SIGPIPE, SIG_IGN);
 #endif
@@ -49,20 +48,25 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
                          AUDIOGRIDDER_VERSIONW, true);
 #endif
 
+    Tracer::initialize(appName, logName);
     AGLogger::initialize(appName, logName);
     TimeStatistics::initialize();
+
+    m_client = std::make_unique<e47::Client>(this);
+    setLogTagSource(m_client.get());
+    traceScope();
+    logln(mode << " plugin loaded (version: " << AUDIOGRIDDER_VERSION << ")");
+
     ServiceReceiver::initialize(m_instId.hash(), [this] {
+        traceScope1();
         MessageManager::callAsync([this] {
+            traceScope2();
             auto* editor = getActiveEditor();
             if (editor != nullptr) {
                 dynamic_cast<AudioGridderAudioProcessorEditor*>(editor)->setConnected(m_client->isReadyLockFree());
             }
         });
     });
-
-    m_client = std::make_unique<e47::Client>(this);
-    setLogTagSource(m_client.get());
-    logln(mode << " plugin loaded (version: " << AUDIOGRIDDER_VERSION << ")");
 
     updateLatency(0);
 
@@ -80,6 +84,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
 
     // load plugins on reconnect
     m_client->setOnConnectCallback([this] {
+        traceScope1();
         logln("connected");
         int idx = 0;
         for (auto& p : m_loadedPlugins) {
@@ -104,6 +109,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
             idx++;
         }
         MessageManager::callAsync([this] {
+            traceScope2();
             auto* editor = getActiveEditor();
             if (editor != nullptr) {
                 dynamic_cast<AudioGridderAudioProcessorEditor*>(editor)->setConnected(true);
@@ -112,8 +118,10 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     });
     // handle connection close
     m_client->setOnCloseCallback([this] {
+        traceScope1();
         logln("disconnected");
         MessageManager::callAsync([this] {
+            traceScope2();
             auto* editor = getActiveEditor();
             if (editor != nullptr) {
                 dynamic_cast<AudioGridderAudioProcessorEditor*>(editor)->setConnected(false);
@@ -130,6 +138,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
 }
 
 AudioGridderAudioProcessor::~AudioGridderAudioProcessor() {
+    traceScope();
     logln("plugin shutdown: terminating client");
     m_client->signalThreadShouldExit();
     m_client->close();
@@ -138,10 +147,12 @@ AudioGridderAudioProcessor::~AudioGridderAudioProcessor() {
     TimeStatistics::cleanup();
     ServiceReceiver::cleanup(m_instId.hash());
     logln("plugin unloaded");
+    Tracer::cleanup();
     AGLogger::cleanup();
 }
 
 void AudioGridderAudioProcessor::loadConfig() {
+    traceScope();
     File cfg(PLUGIN_CONFIG_FILE);
     try {
         if (cfg.exists()) {
@@ -155,6 +166,7 @@ void AudioGridderAudioProcessor::loadConfig() {
 }
 
 void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
+    traceScope();
     if (j.find("Servers") != j.end() && !isUpdate) {
         for (auto& srv : j["Servers"]) {
             m_servers.add(srv.get<std::string>());
@@ -184,9 +196,13 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
     if (j.find("GenericEditor") != j.end()) {
         m_genericEditor = j["GenericEditor"].get<bool>();
     }
+    if (j.find("Tracer") != j.end()) {
+        Tracer::setEnabled(j["Tracer"].get<bool>());
+    }
 }
 
 void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
+    traceScope();
     auto jservers = json::array();
     for (auto& srv : m_servers) {
         jservers.push_back(srv.toStdString());
@@ -200,9 +216,11 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
     jcfg["LastServer"] = m_client->getServerHostAndID().toStdString();
     jcfg["NumberOfBuffers"] = numOfBuffers;
     jcfg["NumberOfAutomationSlots"] = m_numberOfAutomationSlots;
+    jcfg["LoadPluginTimeout"] = m_client->LOAD_PLUGIN_TIMEOUT.load();
     jcfg["MenuShowCategory"] = m_menuShowCategory;
     jcfg["MenuShowCompany"] = m_menuShowCompany;
     jcfg["GenericEditor"] = m_genericEditor;
+    jcfg["Tracer"] = Tracer::isEnabled();
     File cfg(PLUGIN_CONFIG_FILE);
     cfg.deleteFile();
     FileOutputStream fos(cfg);
@@ -250,6 +268,7 @@ const String AudioGridderAudioProcessor::getProgramName(int /* index */) { retur
 void AudioGridderAudioProcessor::changeProgramName(int /* index */, const String& /* newName */) {}
 
 void AudioGridderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
+    traceScope();
     logln("prepareToPlay: sampleRate = " << sampleRate << ", samplesPerBlock=" << samplesPerBlock);
     m_client->init(getTotalNumInputChannels(), getTotalNumOutputChannels(), sampleRate, samplesPerBlock,
                    isUsingDoublePrecision());
@@ -272,6 +291,7 @@ bool AudioGridderAudioProcessor::isBusesLayoutSupported(const BusesLayout& layou
 
 template <typename T>
 void AudioGridderAudioProcessor::processBlockReal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
+    traceScope();
     ScopedNoDenormals noDenormals;
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
@@ -310,6 +330,7 @@ void AudioGridderAudioProcessor::processBlockReal(AudioBuffer<T>& buffer, MidiBu
 }
 
 void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<float>& buffer, MidiBuffer& /* midiMessages */) {
+    traceScope();
     ScopedNoDenormals noDenormals;
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
@@ -343,6 +364,7 @@ void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<float>& buffer
 }
 
 void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<double>& buffer, MidiBuffer& /* midiMessages */) {
+    traceScope();
     ScopedNoDenormals noDenormals;
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
@@ -376,6 +398,7 @@ void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<double>& buffe
 }
 
 void AudioGridderAudioProcessor::updateLatency(int samples) {
+    traceScope();
     logln("updating latency samples to " << samples);
     setLatencySamples(samples);
     int channels = getTotalNumOutputChannels();
@@ -417,7 +440,7 @@ bool AudioGridderAudioProcessor::hasEditor() const { return true; }
 AudioProcessorEditor* AudioGridderAudioProcessor::createEditor() { return new AudioGridderAudioProcessorEditor(*this); }
 
 void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData) {
-    logln("getStateInformation");
+    traceScope();
 
     json j;
     auto jservers = json::array();
@@ -456,7 +479,7 @@ void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData) {
 }
 
 void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
-    logln("setStateInformation");
+    traceScope();
 
     std::string dump(static_cast<const char*>(data), as<size_t>(sizeInBytes));
     try {
@@ -518,6 +541,7 @@ void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeI
 }
 
 std::vector<ServerPlugin> AudioGridderAudioProcessor::getPlugins(const String& type) const {
+    traceScope();
     std::vector<ServerPlugin> ret;
     for (auto& plugin : getPlugins()) {
         if (!plugin.getType().compare(type)) {
@@ -528,6 +552,7 @@ std::vector<ServerPlugin> AudioGridderAudioProcessor::getPlugins(const String& t
 }
 
 std::set<String> AudioGridderAudioProcessor::getPluginTypes() const {
+    traceScope();
     std::set<String> ret;
     for (auto& plugin : m_client->getPlugins()) {
         ret.insert(plugin.getType());
@@ -536,6 +561,7 @@ std::set<String> AudioGridderAudioProcessor::getPluginTypes() const {
 }
 
 bool AudioGridderAudioProcessor::loadPlugin(const String& id, const String& name) {
+    traceScope();
     StringArray presets;
     Array<e47::Client::Parameter> params;
     logln("loading " << name << " (" << id << ")... ");
@@ -551,6 +577,7 @@ bool AudioGridderAudioProcessor::loadPlugin(const String& id, const String& name
 }
 
 void AudioGridderAudioProcessor::unloadPlugin(int idx) {
+    traceScope();
     suspendProcessing(true);
     m_client->delPlugin(idx);
     suspendProcessing(false);
@@ -570,6 +597,7 @@ void AudioGridderAudioProcessor::unloadPlugin(int idx) {
 }
 
 void AudioGridderAudioProcessor::editPlugin(int idx) {
+    traceScope();
     logln("edit plugin " << idx);
     if (!m_genericEditor) {
         m_client->editPlugin(idx);
@@ -578,6 +606,7 @@ void AudioGridderAudioProcessor::editPlugin(int idx) {
 }
 
 void AudioGridderAudioProcessor::hidePlugin(bool updateServer) {
+    traceScope();
     if (m_activePlugin < 0) {
         return;
     }
@@ -590,6 +619,7 @@ void AudioGridderAudioProcessor::hidePlugin(bool updateServer) {
 }
 
 bool AudioGridderAudioProcessor::isBypassed(int idx) {
+    traceScope();
     if (idx > -1 && as<size_t>(idx) < m_loadedPlugins.size()) {
         return m_loadedPlugins[as<size_t>(idx)].bypassed;
     }
@@ -597,6 +627,7 @@ bool AudioGridderAudioProcessor::isBypassed(int idx) {
 }
 
 void AudioGridderAudioProcessor::bypassPlugin(int idx) {
+    traceScope();
     if (idx > -1 && as<size_t>(idx) < m_loadedPlugins.size()) {
         logln("bypassing plugin " << idx);
         m_client->bypassPlugin(idx);
@@ -607,6 +638,7 @@ void AudioGridderAudioProcessor::bypassPlugin(int idx) {
 }
 
 void AudioGridderAudioProcessor::unbypassPlugin(int idx) {
+    traceScope();
     if (idx > -1 && as<size_t>(idx) < m_loadedPlugins.size()) {
         logln("unbypassing plugin " << idx);
         m_client->unbypassPlugin(idx);
@@ -617,6 +649,7 @@ void AudioGridderAudioProcessor::unbypassPlugin(int idx) {
 }
 
 void AudioGridderAudioProcessor::exchangePlugins(int idxA, int idxB) {
+    traceScope();
     if (idxA > -1 && as<size_t>(idxA) < m_loadedPlugins.size() && idxB > -1 &&
         as<size_t>(idxB) < m_loadedPlugins.size()) {
         logln("exchanging plugins " << idxA << " and " << idxB);
@@ -643,6 +676,7 @@ void AudioGridderAudioProcessor::exchangePlugins(int idxA, int idxB) {
 }
 
 bool AudioGridderAudioProcessor::enableParamAutomation(int idx, int paramIdx, int slot) {
+    traceScope();
     logln("enabling automation for plugin " << idx << ", parameter " << paramIdx << ", slot " << slot);
     auto& param = m_loadedPlugins[as<size_t>(idx)].params.getReference(paramIdx);
     Parameter* pparam = nullptr;
@@ -669,6 +703,7 @@ bool AudioGridderAudioProcessor::enableParamAutomation(int idx, int paramIdx, in
 }
 
 void AudioGridderAudioProcessor::disableParamAutomation(int idx, int paramIdx) {
+    traceScope();
     logln("disabling automation for plugin " << idx << ", parameter " << paramIdx);
     auto& param = m_loadedPlugins[as<size_t>(idx)].params.getReference(paramIdx);
     auto* pparam = dynamic_cast<Parameter*>(getParameters()[param.automationSlot]);
@@ -678,6 +713,7 @@ void AudioGridderAudioProcessor::disableParamAutomation(int idx, int paramIdx) {
 }
 
 void AudioGridderAudioProcessor::getAllParameterValues(int idx) {
+    traceScope();
     logln("reading all parameter values for plugin " << idx);
     auto& params = m_loadedPlugins[as<size_t>(idx)].params;
     for (auto& res : m_client->getAllParameterValues(idx, params.size())) {
@@ -693,6 +729,7 @@ void AudioGridderAudioProcessor::getAllParameterValues(int idx) {
 }
 
 void AudioGridderAudioProcessor::delServer(const String& s) {
+    traceScope();
     if (m_servers.contains(s)) {
         logln("deleting server " << s);
         m_servers.removeString(s);
@@ -702,16 +739,19 @@ void AudioGridderAudioProcessor::delServer(const String& s) {
 }
 
 void AudioGridderAudioProcessor::increaseSCArea() {
+    traceScope();
     logln("increasing screen capturing area by +" << SCAREA_STEPS << "px");
     m_client->updateScreenCaptureArea(SCAREA_STEPS);
 }
 
 void AudioGridderAudioProcessor::decreaseSCArea() {
+    traceScope();
     logln("decreasing screen capturing area by -" << SCAREA_STEPS << "px");
     m_client->updateScreenCaptureArea(-SCAREA_STEPS);
 }
 
 void AudioGridderAudioProcessor::storeSettingsA() {
+    traceScope();
     if (m_activePlugin < 0) {
         return;
     }
@@ -722,6 +762,7 @@ void AudioGridderAudioProcessor::storeSettingsA() {
 }
 
 void AudioGridderAudioProcessor::storeSettingsB() {
+    traceScope();
     if (m_activePlugin < 0) {
         return;
     }
@@ -732,6 +773,7 @@ void AudioGridderAudioProcessor::storeSettingsB() {
 }
 
 void AudioGridderAudioProcessor::restoreSettingsA() {
+    traceScope();
     if (m_activePlugin < 0) {
         return;
     }
@@ -739,6 +781,7 @@ void AudioGridderAudioProcessor::restoreSettingsA() {
 }
 
 void AudioGridderAudioProcessor::restoreSettingsB() {
+    traceScope();
     if (m_activePlugin < 0) {
         return;
     }
@@ -746,13 +789,18 @@ void AudioGridderAudioProcessor::restoreSettingsB() {
 }
 
 void AudioGridderAudioProcessor::resetSettingsAB() {
+    traceScope();
     m_settingsA = "";
     m_settingsB = "";
 }
 
-void AudioGridderAudioProcessor::setActiveServer(const ServerInfo& s) { m_client->setServer(s); }
+void AudioGridderAudioProcessor::setActiveServer(const ServerInfo& s) {
+    traceScope();
+    m_client->setServer(s);
+}
 
 String AudioGridderAudioProcessor::getActiveServerName() const {
+    traceScope();
     String ret = ServiceReceiver::hostToName(m_client->getServerHost());
     int id = m_client->getServerID();
     if (id > 0) {
@@ -761,10 +809,15 @@ String AudioGridderAudioProcessor::getActiveServerName() const {
     return ret;
 }
 
-Array<ServerInfo> AudioGridderAudioProcessor::getServersMDNS() { return ServiceReceiver::getServers(); }
+Array<ServerInfo> AudioGridderAudioProcessor::getServersMDNS() {
+    traceScope();
+    return ServiceReceiver::getServers();
+}
 
 void AudioGridderAudioProcessor::setCPULoad(float load) {
+    traceScope();
     MessageManager::callAsync([this, load] {
+        traceScope1();
         auto* editor = getActiveEditor();
         if (editor != nullptr) {
             dynamic_cast<AudioGridderAudioProcessorEditor*>(editor)->setCPULoad(load);
@@ -773,6 +826,7 @@ void AudioGridderAudioProcessor::setCPULoad(float load) {
 }
 
 float AudioGridderAudioProcessor::Parameter::getValue() const {
+    traceScope();
     if (m_idx > -1 && m_paramIdx > -1) {
         return m_processor.getClient().getParameterValue(m_idx, m_paramIdx);
     }
@@ -780,13 +834,17 @@ float AudioGridderAudioProcessor::Parameter::getValue() const {
 }
 
 void AudioGridderAudioProcessor::Parameter::setValue(float newValue) {
+    traceScope();
     if (m_idx > -1 && m_paramIdx > -1) {
-        MessageManager::callAsync(
-            [this, newValue] { m_processor.getClient().setParameterValue(m_idx, m_paramIdx, newValue); });
+        MessageManager::callAsync([this, newValue] {
+            traceScope1();
+            m_processor.getClient().setParameterValue(m_idx, m_paramIdx, newValue);
+        });
     }
 }
 
 String AudioGridderAudioProcessor::Parameter::getName(int maximumStringLength) const {
+    traceScope();
     String name;
     name << m_slotId << ":" << getPlugin().name << ":" << getParam().name;
     if (name.length() <= maximumStringLength) {

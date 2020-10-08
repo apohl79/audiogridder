@@ -55,6 +55,7 @@ class Worker : public Thread, public LogTag {
     ScreenWorker m_screen;
     bool m_shouldHideEditor = false;
     std::atomic_bool m_shutdown{false};
+    MessageFactory m_msgFactory;
 
     String getStringFrom(const PluginDescription& d);
 };

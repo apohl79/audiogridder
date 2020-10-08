@@ -14,19 +14,16 @@
 
 namespace e47 {
 
-class CPUInfo : public Thread, public LogTag {
+class CPUInfo : public Thread, public LogTag, public SharedInstance<CPUInfo> {
   public:
-    CPUInfo() : Thread("CPUInfo"), LogTag("cpuinfo") {}
+    CPUInfo() : Thread("CPUInfo"), LogTag("cpuinfo") { startThread(); }
     ~CPUInfo() { stopThread(-1); }
 
     void run();
 
-    static void initialize();
-    static void cleanup();
-    static float getUsage();
+    static float getUsage() { return m_usage; }
 
   private:
-    static std::unique_ptr<CPUInfo> m_inst;
     static std::atomic<float> m_usage;
 };
 

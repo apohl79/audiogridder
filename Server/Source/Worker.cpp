@@ -18,12 +18,14 @@
 
 namespace e47 {
 
-Worker::Worker(StreamingSocket* clnt) : Thread("Worker"), LogTag("worker"), m_client(clnt) {
+Worker::Worker(StreamingSocket* clnt) : Thread("Worker"), LogTag("worker"), m_client(clnt), m_msgFactory(this) {
+    traceScope();
     m_audio.setLogTagSource(this);
     m_screen.setLogTagSource(this);
 }
 
 Worker::~Worker() {
+    traceScope();
     if (nullptr != m_client && m_client->isConnected()) {
         m_client->close();
     }
@@ -40,6 +42,7 @@ String Worker::getStringFrom(const PluginDescription& d) {
 }
 
 void Worker::run() {
+    traceScope();
     Handshake cfg;
     std::unique_ptr<StreamingSocket> sock;
     int len;
@@ -87,7 +90,7 @@ void Worker::run() {
                 list += getStringFrom(plugin) + "\n";
             }
         }
-        Message<PluginList> msgPL;
+        Message<PluginList> msgPL(this);
         PLD(msgPL).setString(list);
         if (!msgPL.send(m_client.get())) {
             logln("failed to send plugin list");
@@ -99,7 +102,7 @@ void Worker::run() {
         logln("command processor started");
         while (!currentThreadShouldExit() && nullptr != m_client && m_client->isConnected()) {
             MessageHelper::Error e;
-            auto msg = MessageFactory::getNextMessage(m_client.get(), &e);
+            auto msg = m_msgFactory.getNextMessage(m_client.get(), &e);
             if (nullptr != msg) {
                 switch (msg->getType()) {
                     case Quit::Type:
@@ -177,6 +180,7 @@ void Worker::run() {
 }
 
 void Worker::shutdown() {
+    traceScope();
     if (m_shutdown) {
         return;
     }
@@ -191,20 +195,24 @@ void Worker::shutdown() {
     signalThreadShouldExit();
 }
 
-void Worker::handleMessage(std::shared_ptr<Message<Quit>> /* msg */) { shutdown(); }
+void Worker::handleMessage(std::shared_ptr<Message<Quit>> /* msg */) {
+    traceScope();
+    shutdown();
+}
 
 void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
+    traceScope();
     auto id = pPLD(msg).getString();
     logln("adding plugin " << id << "...");
     bool success = m_audio.addPlugin(id);
     logln("..." << (success ? "ok" : "failed"));
     if (!success) {
-        MessageFactory::sendResult(m_client.get(), -1);
+        m_msgFactory.sendResult(m_client.get(), -1);
         return;
     }
     m_audio.addToRecentsList(id, m_client->getHostName());
     // send new updated latency samples back
-    if (!MessageFactory::sendResult(m_client.get(), m_audio.getLatencySamples())) {
+    if (!m_msgFactory.sendResult(m_client.get(), m_audio.getLatencySamples())) {
         logln("failed to send result");
         m_client->close();
         return;
@@ -262,7 +270,7 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
         }
         jparams.push_back(jparam);
     }
-    Message<Parameters> msgParams;
+    Message<Parameters> msgParams(this);
     msgParams.payload.setJson(jparams);
     if (!msgParams.send(m_client.get())) {
         logln("failed to send Parameters message");
@@ -271,7 +279,7 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     }
     logln("...ok");
     logln("reading plugin settings...");
-    Message<PluginSettings> msgSettings;
+    Message<PluginSettings> msgSettings(this);
     if (!msgSettings.read(m_client.get())) {
         logln("failed to read PluginSettings message");
         m_client->close();
@@ -286,12 +294,14 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<DelPlugin>> msg) {
+    traceScope();
     m_audio.delPlugin(pPLD(msg).getNumber());
     // send new updated latency samples back
-    MessageFactory::sendResult(m_client.get(), m_audio.getLatencySamples());
+    m_msgFactory.sendResult(m_client.get(), m_audio.getLatencySamples());
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<EditPlugin>> msg) {
+    traceScope();
     auto proc = m_audio.getProcessor(pPLD(msg).getNumber());
     if (nullptr != proc) {
         m_screen.showEditor(proc);
@@ -300,13 +310,16 @@ void Worker::handleMessage(std::shared_ptr<Message<EditPlugin>> msg) {
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<HidePlugin>> /* msg */) {
+    traceScope();
     m_screen.hideEditor();
     m_shouldHideEditor = false;
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<Mouse>> msg) {
+    traceScope();
     auto ev = *pDATA(msg);
-    MessageManager::callAsync([ev] {
+    MessageManager::callAsync([this, ev] {
+        traceScope1();
         auto point = getApp()->localPointToGlobal(Point<float>(ev.x, ev.y));
         if (ev.type == MouseEvType::WHEEL) {
             mouseScrollEvent(point.x, point.y, ev.deltaX, ev.deltaY, ev.isSmooth);
@@ -327,7 +340,9 @@ void Worker::handleMessage(std::shared_ptr<Message<Mouse>> msg) {
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<Key>> msg) {
-    MessageManager::callAsync([msg] {
+    traceScope();
+    MessageManager::callAsync([this, msg] {
+        traceScope1();
         auto* codes = pPLD(msg).getKeyCodes();
         auto num = pPLD(msg).getKeyCount();
         uint16_t key = 0;
@@ -349,20 +364,22 @@ void Worker::handleMessage(std::shared_ptr<Message<Key>> msg) {
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<GetPluginSettings>> msg) {
+    traceScope();
     auto proc = m_audio.getProcessor(pPLD(msg).getNumber());
     if (nullptr != proc) {
         MemoryBlock block;
         proc->getStateInformation(block);
-        Message<PluginSettings> ret;
+        Message<PluginSettings> ret(this);
         ret.payload.setData(block.begin(), static_cast<int>(block.getSize()));
         ret.send(m_client.get());
     }
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<SetPluginSettings>> msg) {
+    traceScope();
     auto proc = m_audio.getProcessor(pPLD(msg).getNumber());
     if (nullptr != proc) {
-        Message<PluginSettings> msgSettings;
+        Message<PluginSettings> msgSettings(this);
         if (!msgSettings.read(m_client.get())) {
             logln("failed to read PluginSettings message");
             m_client->close();
@@ -377,6 +394,7 @@ void Worker::handleMessage(std::shared_ptr<Message<SetPluginSettings>> msg) {
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<BypassPlugin>> msg) {
+    traceScope();
     auto proc = m_audio.getProcessor(pPLD(msg).getNumber());
     if (nullptr != proc) {
         proc->suspendProcessing(true);
@@ -406,6 +424,7 @@ void Worker::handleMessage(std::shared_ptr<Message<BypassPlugin>> msg) {
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<UnbypassPlugin>> msg) {
+    traceScope();
     auto proc = m_audio.getProcessor(pPLD(msg).getNumber());
     if (nullptr != proc) {
         proc->suspendProcessing(false);
@@ -422,10 +441,12 @@ void Worker::handleMessage(std::shared_ptr<Message<UnbypassPlugin>> msg) {
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<ExchangePlugins>> msg) {
+    traceScope();
     m_audio.exchangePlugins(pDATA(msg)->idxA, pDATA(msg)->idxB);
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<RecentsList>> msg) {
+    traceScope();
     auto& recents = m_audio.getRecentsList(m_client->getHostName());
     String list;
     for (auto& r : recents) {
@@ -436,6 +457,7 @@ void Worker::handleMessage(std::shared_ptr<Message<RecentsList>> msg) {
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<Preset>> msg) {
+    traceScope();
     auto p = m_audio.getProcessor(pDATA(msg)->idx)->getPlugin();
     if (nullptr != p) {
         p->setCurrentProgram(pDATA(msg)->preset);
@@ -443,6 +465,7 @@ void Worker::handleMessage(std::shared_ptr<Message<Preset>> msg) {
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<ParameterValue>> msg) {
+    traceScope();
     auto p = m_audio.getProcessor(pDATA(msg)->idx)->getPlugin();
     if (nullptr != p) {
         for (auto* param : p->getParameters()) {
@@ -455,7 +478,8 @@ void Worker::handleMessage(std::shared_ptr<Message<ParameterValue>> msg) {
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<GetParameterValue>> msg) {
-    Message<ParameterValue> ret;
+    traceScope();
+    Message<ParameterValue> ret(this);
     DATA(ret)->idx = pDATA(msg)->idx;
     DATA(ret)->paramIdx = pDATA(msg)->paramIdx;
     DATA(ret)->value = m_audio.getParameterValue(pDATA(msg)->idx, pDATA(msg)->paramIdx);
@@ -463,10 +487,11 @@ void Worker::handleMessage(std::shared_ptr<Message<GetParameterValue>> msg) {
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<GetAllParameterValues>> msg) {
+    traceScope();
     auto p = m_audio.getProcessor(pPLD(msg).getNumber())->getPlugin();
     if (nullptr != p) {
         for (auto* param : p->getParameters()) {
-            Message<ParameterValue> ret;
+            Message<ParameterValue> ret(this);
             DATA(ret)->idx = pPLD(msg).getNumber();
             DATA(ret)->paramIdx = param->getParameterIndex();
             DATA(ret)->value = param->getValue();
@@ -476,12 +501,15 @@ void Worker::handleMessage(std::shared_ptr<Message<GetAllParameterValues>> msg) 
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<UpdateScreenCaptureArea>> msg) {
+    traceScope();
     getApp()->updateScreenCaptureArea(pPLD(msg).getNumber());
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<Rescan>> msg) {
+    traceScope();
     bool wipe = pPLD(msg).getNumber() == 1;
-    MessageManager::callAsync([wipe] {
+    MessageManager::callAsync([this, wipe] {
+        traceScope1();
         if (wipe) {
             getApp()->getServer().getPluginList().clear();
             getApp()->getServer().saveKnownPluginList();
@@ -491,6 +519,7 @@ void Worker::handleMessage(std::shared_ptr<Message<Rescan>> msg) {
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<CPULoad>> msg) {
+    traceScope();
     pPLD(msg).setFloat(CPUInfo::getUsage());
     msg->send(m_client.get());
 }

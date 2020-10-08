@@ -173,13 +173,15 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
         });
     }
 
-    class ProcessorWindow : public DocumentWindow, private Timer {
+    class ProcessorWindow : public DocumentWindow, private Timer, public LogTag {
       public:
         ProcessorWindow(std::shared_ptr<AGProcessor> proc, WindowCaptureCallbackNative func)
             : DocumentWindow(proc->getName(), Colours::lightgrey, 0),
+              LogTag("procwindow"),
               m_processor(proc),
               m_callbackNative(func),
               m_callbackFFmpeg(nullptr) {
+            traceScope();
             if (m_processor->hasEditor()) {
                 createEditor();
             }
@@ -187,15 +189,18 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
 
         ProcessorWindow(std::shared_ptr<AGProcessor> proc, WindowCaptureCallbackFFmpeg func)
             : DocumentWindow(proc->getName(), Colours::lightgrey, 0),
+              LogTag("procwindow"),
               m_processor(proc),
               m_callbackNative(nullptr),
               m_callbackFFmpeg(func) {
+            traceScope();
             if (m_processor->hasEditor()) {
                 createEditor();
             }
         }
 
         ~ProcessorWindow() override {
+            traceScope();
             stopCapturing();
             if (m_editor != nullptr) {
                 delete m_editor;
@@ -206,12 +211,14 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
         BorderSize<int> getBorderThickness() override { return {}; }
 
         void forgetEditor() {
+            traceScope();
             // Allow a processor to delete his editor, so we should not delete it again
             m_editor = nullptr;
             stopCapturing();
         }
 
         Rectangle<int> getScreenCaptureRect() {
+            traceScope();
             if (nullptr != m_editor && nullptr != m_processor) {
                 auto rect = m_editor->getScreenBounds();
                 rect.setSize(rect.getWidth() + m_processor->getAdditionalScreenCapturingSpace(),
@@ -224,19 +231,24 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
                 }
                 return rect;
             }
+            traceln("m_editor=" << (uint64)m_editor << " m_processor=" << (uint64)m_processor.get());
             return m_screenCaptureRect;
         }
 
         void updateScreenCaptureArea() {
+            traceScope();
+            auto rect = getScreenCaptureRect();
             if (m_screenRec.isRecording() && m_processor->hasEditor() && nullptr != m_editor &&
-                m_screenCaptureRect != getScreenCaptureRect()) {
-                m_screenCaptureRect = getScreenCaptureRect();
+                m_screenCaptureRect != rect) {
+                traceln("updating area");
+                m_screenCaptureRect = rect;
                 m_screenRec.stop();
                 m_screenRec.resume(m_screenCaptureRect);
             }
         }
 
         void stopCapturing() {
+            traceScope();
             if (m_callbackNative) {
                 stopTimer();
             } else {
@@ -245,11 +257,13 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
         }
 
         void resized() override {
+            traceScope();
             ResizableWindow::resized();
             updateScreenCaptureArea();
         }
 
         void setVisible(bool b) override {
+            traceScope();
             if (!b) {
                 stopCapturing();
             }
@@ -265,6 +279,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
         Rectangle<int> m_screenCaptureRect, m_totalRect;
 
         void createEditor() {
+            traceScope();
             m_totalRect = Desktop::getInstance().getDisplays().getMainDisplay().totalArea;
             m_editor = m_processor->createEditorIfNeeded();
             setContentNonOwned(m_editor, true);
@@ -284,13 +299,17 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
         void timerCallback() override { captureWindow(); }
 
         void captureWindow() {
+            traceScope();
             if (m_editor == nullptr) {
+                traceln("no editor");
                 return;
             }
             if (m_callbackNative) {
                 m_screenCaptureRect = getScreenCaptureRect();
                 m_callbackNative(captureScreenNative(m_screenCaptureRect), m_screenCaptureRect.getWidth(),
                                  m_screenCaptureRect.getHeight());
+            } else {
+                traceln("no callback");
             }
         }
 

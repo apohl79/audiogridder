@@ -11,6 +11,7 @@
 #include "KeyAndMouseCommon.hpp"
 #include "NumberConversion.hpp"
 #include "json.hpp"
+#include "Utils.hpp"
 
 using json = nlohmann::json;
 
@@ -72,6 +73,8 @@ struct MessageHelper {
 };
 
 static bool send(StreamingSocket* socket, const char* data, int size, MessageHelper::Error* e = nullptr) {
+    setLogTagStatic("send");
+    traceScope();
     if (nullptr != socket && socket->isConnected()) {
         int toWrite = size;
         int maxTries = 10;
@@ -79,11 +82,13 @@ static bool send(StreamingSocket* socket, const char* data, int size, MessageHel
             int ret = socket->waitUntilReady(false, 100);
             if (ret < 0) {
                 MessageHelper::seterr(e, MessageHelper::E_SYSCALL);
+                traceln("waitUntilReady failed: E_SYSCALL");
                 return false;  // error
             } else if (ret > 0) {
                 int len = socket->write(static_cast<const char*>(data) + size - toWrite, toWrite);
                 if (len < 0) {
                     MessageHelper::seterr(e, MessageHelper::E_SYSCALL);
+                    traceln("write failed: E_SYSCALL");
                     return false;
                 }
                 data += len;
@@ -94,19 +99,25 @@ static bool send(StreamingSocket* socket, const char* data, int size, MessageHel
         } while (toWrite > 0 && maxTries > 0);
         if (toWrite > 0) {
             MessageHelper::seterr(e, MessageHelper::E_TIMEOUT);
+            traceln("failed: E_TIMEOUT");
             return false;
         }
         return true;
     } else {
+        MessageHelper::seterr(e, MessageHelper::E_STATE);
+        traceln("failed: E_STATE");
         return false;
     }
 }
 
 static bool read(StreamingSocket* socket, void* data, int size, int timeoutMilliseconds = 0,
                  MessageHelper::Error* e = nullptr) {
+    setLogTagStatic("send");
+    traceScope();
     MessageHelper::seterr(e, MessageHelper::E_NONE);
     if (nullptr != socket && !socket->isConnected()) {
         MessageHelper::seterr(e, MessageHelper::E_STATE);
+        traceln("failed: E_STATE");
         return false;
     }
     auto now = Time::getMillisecondCounterHiRes();
@@ -119,14 +130,17 @@ static bool read(StreamingSocket* socket, void* data, int size, int timeoutMilli
         int ret = socket->waitUntilReady(true, 100);
         if (ret < 0) {
             MessageHelper::seterr(e, MessageHelper::E_SYSCALL);
+            traceln("waitUntilReady failed: E_SYSCALL");
             return false;  // error
         } else if (ret > 0) {
             int len = socket->read(static_cast<char*>(data) + size - toRead, toRead, timeoutMilliseconds == 0);
             if (len < 0) {
                 MessageHelper::seterr(e, MessageHelper::E_SYSCALL);
+                traceln("read failed: E_SYSCALL");
                 return false;
             } else if (len == 0) {
                 MessageHelper::seterr(e, MessageHelper::E_DATA);
+                traceln("failed: E_DATA");
                 return false;
             }
             toRead -= len;
@@ -137,6 +151,7 @@ static bool read(StreamingSocket* socket, void* data, int size, int timeoutMilli
         return true;
     } else {
         MessageHelper::seterr(e, MessageHelper::E_TIMEOUT);
+        traceln("failed: E_TIMEOUT");
         return false;
     }
 }
@@ -157,8 +172,10 @@ struct Handshake {
 /*
  * Audio streaming
  */
-class AudioMessage {
+class AudioMessage : public LogTagDelegate {
   public:
+    AudioMessage(const LogTag* tag) : LogTagDelegate(tag) {}
+
     struct RequestHeader {
         int channels;
         int samples;
@@ -192,6 +209,7 @@ class AudioMessage {
     bool sendToServer(StreamingSocket* socket, AudioBuffer<T>& buffer, MidiBuffer& midi,
                       AudioPlayHead::CurrentPositionInfo& posInfo, int channelsRequested = -1,
                       int samplesRequested = -1) {
+        traceScope();
         m_reqHeader.channels = buffer.getNumChannels();
         m_reqHeader.samples = buffer.getNumSamples();
         m_reqHeader.channelsRequested = channelsRequested > -1 ? channelsRequested : buffer.getNumChannels();
@@ -229,6 +247,7 @@ class AudioMessage {
     template <typename T>
     bool sendToClient(StreamingSocket* socket, AudioBuffer<T>& buffer, MidiBuffer& midi, int latencySamples,
                       int channelsToSend) {
+        traceScope();
         m_resHeader.channels = channelsToSend;
         m_resHeader.samples = buffer.getNumSamples();
         m_resHeader.latencySamples = latencySamples;
@@ -260,6 +279,7 @@ class AudioMessage {
 
     template <typename T>
     bool readFromServer(StreamingSocket* socket, AudioBuffer<T>& buffer, MidiBuffer& midi, MessageHelper::Error* e) {
+        traceScope();
         if (socket->isConnected()) {
             if (!read(socket, &m_resHeader, sizeof(m_resHeader), 1000, e)) {
                 MessageHelper::seterrstr(e, "response header");
@@ -299,6 +319,7 @@ class AudioMessage {
             }
         } else {
             MessageHelper::seterr(e, MessageHelper::E_STATE, "not connected");
+            traceln("failed: E_STATE");
             return false;
         }
         MessageHelper::seterr(e, MessageHelper::E_NONE);
@@ -307,6 +328,7 @@ class AudioMessage {
 
     template <typename T>
     int prepareBufferForRead(AudioBuffer<T>& buffer, int totalChannels, int totalSamples) {
+        traceScope();
         buffer.setSize(totalChannels, totalSamples);
         // no data for extra channels
         for (int chan = m_reqHeader.channels; chan < totalChannels; ++chan) {
@@ -319,6 +341,7 @@ class AudioMessage {
     bool readFromClient(StreamingSocket* socket, AudioBuffer<float>& bufferF, AudioBuffer<double>& bufferD,
                         MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo, int extraChannels,
                         MessageHelper::Error* e) {
+        traceScope();
         if (socket->isConnected()) {
             if (!read(socket, &m_reqHeader, sizeof(m_reqHeader), 0, e)) {
                 MessageHelper::seterrstr(e, "request header");
@@ -364,6 +387,7 @@ class AudioMessage {
             }
         } else {
             MessageHelper::seterr(e, MessageHelper::E_STATE, "not connected");
+            traceln("failed: E_STATE");
             return false;
         }
         MessageHelper::seterr(e, MessageHelper::E_NONE);
@@ -742,9 +766,11 @@ class CPULoad : public FloatPayload {
 };
 
 template <typename T>
-class Message {
+class Message : public LogTagDelegate {
   public:
     static constexpr int MAX_SIZE = 1024 * 1024 * 20;  // 20 MB
+
+    Message(const LogTag* tag = nullptr) : LogTagDelegate(tag) {}
 
     struct Header {
         int type;
@@ -754,6 +780,7 @@ class Message {
     virtual ~Message() {}
 
     bool read(StreamingSocket* socket, MessageHelper::Error* e = nullptr, int timeoutMilliseconds = 1000) {
+        traceScope();
         bool success = false;
         MessageHelper::seterr(e, MessageHelper::E_NONE);
         if (nullptr != socket && socket->isConnected()) {
@@ -768,6 +795,7 @@ class Message {
                         String estr;
                         estr << "invalid message type " << hdr.type << " (" << t << " expected)";
                         MessageHelper::seterr(e, MessageHelper::E_DATA, estr);
+                        traceln(estr);
                     } else {
                         payload.setType(hdr.type);
                         if (hdr.size > 0) {
@@ -776,6 +804,7 @@ class Message {
                                 String estr;
                                 estr << "max size of " << MAX_SIZE << " bytes exceeded (" << hdr.size << " bytes)";
                                 MessageHelper::seterr(e, MessageHelper::E_DATA, estr);
+                                traceln(estr);
                             } else {
                                 if (payload.getSize() != hdr.size) {
                                     payload.setSize(hdr.size);
@@ -783,6 +812,7 @@ class Message {
                                 if (!e47::read(socket, payload.getData(), hdr.size)) {
                                     success = false;
                                     MessageHelper::seterr(e, MessageHelper::E_DATA, "failed to read message body");
+                                    traceln("read of message body failed");
                                 }
                             }
                         }
@@ -790,16 +820,20 @@ class Message {
                 } else {
                     success = false;
                     MessageHelper::seterr(e, MessageHelper::E_DATA, "failed to read message header");
+                    traceln("read of message header failed");
                 }
             } else if (ret < 0) {
                 success = false;
                 MessageHelper::seterr(e, MessageHelper::E_SYSCALL, "failed to wait for message header");
+                traceln("failed: E_SYSCALL");
             } else {
                 success = false;
                 MessageHelper::seterr(e, MessageHelper::E_TIMEOUT);
+                traceln("failed: E_TIMEOUT");
             }
         } else {
             MessageHelper::seterr(e, MessageHelper::E_STATE);
+            traceln("failed: E_STATE");
         }
         return success;
     }
@@ -825,7 +859,7 @@ class Message {
 
     template <typename T2>
     static std::shared_ptr<Message<T2>> convert(std::shared_ptr<Message<T>> in) {
-        auto out = std::make_shared<Message<T2>>();
+        auto out = std::make_shared<Message<T2>>(in->getLogTagSource());
         out->payload.payloadBuffer = std::move(in->payload.payloadBuffer);
         out->payload.realign();
         return out;
@@ -839,28 +873,36 @@ class Message {
 #define DATA(m) PLD(m).data
 #define pDATA(m) pPLD(m).data
 
-class MessageFactory {
+class MessageFactory : public LogTagDelegate {
   public:
-    static std::shared_ptr<Message<Any>> getNextMessage(StreamingSocket* socket, MessageHelper::Error* e) {
+    MessageFactory(const LogTag* tag) : LogTagDelegate(tag) {}
+
+    std::shared_ptr<Message<Any>> getNextMessage(StreamingSocket* socket, MessageHelper::Error* e) {
+        traceScope();
         if (nullptr != socket) {
-            auto msg = std::make_shared<Message<Any>>();
+            auto msg = std::make_shared<Message<Any>>(getLogTagSource());
             if (msg->read(socket, e)) {
                 return msg;
+            } else {
+                traceln("read failed");
             }
         }
+        traceln("no socket");
         return nullptr;
     }
 
-    static std::shared_ptr<Result> getResult(StreamingSocket* socket, int retry = 5,
-                                             MessageHelper::Error* e = nullptr) {
+    std::shared_ptr<Result> getResult(StreamingSocket* socket, int retry = 5, MessageHelper::Error* e = nullptr) {
+        traceScope();
         if (nullptr != socket) {
-            auto msg = std::make_shared<Message<Result>>();
+            auto msg = std::make_shared<Message<Result>>(getLogTagSource());
             MessageHelper::Error err;
             do {
                 if (msg->read(socket, &err)) {
                     auto res = std::make_shared<Result>();
                     *res = std::move(msg->payload);
                     return res;
+                } else {
+                    traceln("read failed");
                 }
             } while (retry-- > 0 && err.code == MessageHelper::E_TIMEOUT);
             if (nullptr != e) {
@@ -869,15 +911,18 @@ class MessageFactory {
                 m << retry;
                 m << " attempts";
                 MessageHelper::seterrstr(e, m);
+                traceln(m);
             }
         }
+        traceln("no socket");
         return nullptr;
     }
 
-    static bool sendResult(StreamingSocket* socket, int rc) { return sendResult(socket, rc, ""); }
+    bool sendResult(StreamingSocket* socket, int rc) { return sendResult(socket, rc, ""); }
 
-    static bool sendResult(StreamingSocket* socket, int rc, const String& str) {
-        Message<Result> msg;
+    bool sendResult(StreamingSocket* socket, int rc, const String& str) {
+        traceScope();
+        Message<Result> msg(getLogTagSource());
         msg.payload.setResult(rc, str);
         return msg.send(socket);
     }
