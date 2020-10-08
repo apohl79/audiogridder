@@ -95,6 +95,7 @@ void Tracer::run() {
                 return;
             }
         }
+        knownThreadIDs.clear();
         getMessageBufferKnownThreadIDs(knownThreadIDs);
         bool hadMessages = false;
         for (auto tid : knownThreadIDs) {
