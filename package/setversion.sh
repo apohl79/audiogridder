@@ -44,7 +44,8 @@ cat package/archiveWin.bat.in | sed "s/#STR_VER#/$STR_VER/g" > package/archiveWi
 echo $STR_VER > package/VERSION
 
 if [ "$STR_VER" != "dev-build" ]; then
-    mkdir -p ../Archive/Builds/$STR_VER/win
+    mkdir -p ../Archive/Builds/$STR_VER/win/vst
+    mkdir -p ../Archive/Builds/$STR_VER/win/vst3
     mkdir -p ../Archive/Builds/$STR_VER/osx
     mkdir -p ../Archive/Builds/$STR_VER/osx10.7
     mkdir -p ../Archive/Builds/$STR_VER/linux

@@ -109,7 +109,8 @@
                        libraryPath="Z:\FFmpeg\inst-win\lib"/>
         <CONFIGURATION isDebug="0" name="Release" headerPath="C:\local\boost_1_73_0&#10;Z:\vstsdk2.4&#10;Z:\FFmpeg"
                        useRuntimeLibDLL="0" defines="JUCE_WINDOWS&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING&#10;JUCE_DISABLE_ASSERTIONS"
-                       libraryPath="Z:\FFmpeg\inst-win\lib"/>
+                       libraryPath="Z:\FFmpeg\inst-win\lib" alwaysGenerateDebugSymbols="1"
+                       debugInformationFormat="ProgramDatabase"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_opengl"/>
