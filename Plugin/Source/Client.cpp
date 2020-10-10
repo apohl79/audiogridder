@@ -232,7 +232,8 @@ void Client::init() {
             logln("failed to set master socket non-blocking");
         }
 
-        Handshake cfg = {1, clientPort, m_channelsIn, m_channelsOut, m_rate, m_samplesPerBlock, m_doublePrecission};
+        Handshake cfg = {1,      clientPort,        m_channelsIn,       m_channelsOut,
+                         m_rate, m_samplesPerBlock, m_doublePrecission, (uint64)this};
         if (!e47::send(m_cmd_socket.get(), reinterpret_cast<const char*>(&cfg), sizeof(cfg))) {
             m_cmd_socket->close();
             return;

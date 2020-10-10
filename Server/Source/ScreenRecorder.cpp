@@ -406,7 +406,8 @@ void ScreenRecorder::record() {
     logln("started capturing: rectangle " << m_captureRect.getX() << "," << m_captureRect.getY() << ":"
                                           << m_captureRect.getWidth() << "x" << m_captureRect.getHeight() << " scale *"
                                           << m_scale << " <- input rectange " << m_captureCodecCtx->width << "x"
-                                          << m_captureCodecCtx->height << ", codecs: in=" << m_captureCodec->name << " out=" << m_outputCodec->name);
+                                          << m_captureCodecCtx->height << ", codecs: in=" << m_captureCodec->name
+                                          << " out=" << m_outputCodec->name);
     auto durationPkt = TimeStatistics::getDuration("screen-pkt");
     auto durationScale = TimeStatistics::getDuration("screen-scale");
     auto durationEnc = TimeStatistics::getDuration("screen-enc");

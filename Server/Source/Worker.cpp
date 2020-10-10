@@ -48,7 +48,10 @@ void Worker::run() {
     int len;
     len = m_client->read(&cfg, sizeof(cfg), true);
     if (len > 0) {
+        setLogTagExtra("client:" + String::toHexString(cfg.clientId));
+
         logln("  version          = " << cfg.version);
+        logln("  clientId         = " << String::toHexString(cfg.clientId));
         logln("  clientPort       = " << cfg.clientPort);
         logln("  channelsIn       = " << cfg.channelsIn);
         logln("  channelsOut      = " << cfg.channelsOut);

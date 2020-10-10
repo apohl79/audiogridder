@@ -67,7 +67,7 @@ void Tracer::traceMessage(const String& tag, const String& file, int line, const
                 threadTag = "message_thread";
             }
         }
-        threadTag << ":0x" << String::toHexString((uint64)tid);
+        threadTag << ":" << String::toHexString((uint64)tid);
         String out = LogTag::getTimeStr();
         out << "|" << threadTag << "|" << tag << "|" << File::createFileWithoutCheckingPath(file).getFileName() << ":"
             << line << "|" << func << "|" << msg;

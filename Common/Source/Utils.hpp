@@ -74,21 +74,27 @@ class LogTag {
         return ret;
     }
 
-    static inline String getTaggedStr(const String& name, const String& ptr, bool withTime) {
+    static inline String getTaggedStr(const String& name, const String& ptr, const String& extra, bool withTime) {
         String tag = "";
         if (withTime) {
             tag << getTimeStr() << "|";
         }
-        tag << name << "|0x" << ptr;
+        tag << name << "|" << ptr;
+        if (extra.isNotEmpty()) {
+            tag << "|" << extra;
+        }
         return tag;
     }
 
+    void setLogTagExtra(const String& s) { m_extra = s; }
+
     const LogTag* getLogTagSource() const { return this; }
-    String getLogTag() const { return getTaggedStr(m_name, String::toHexString((uint64)this), true); }
-    String getLogTagNoTime() const { return getTaggedStr(m_name, String::toHexString((uint64)this), false); }
+    String getLogTag() const { return getTaggedStr(m_name, String::toHexString((uint64)this), m_extra, true); }
+    String getLogTagNoTime() const { return getTaggedStr(m_name, String::toHexString((uint64)this), m_extra, false); }
 
   private:
     String m_name;
+    String m_extra;
 };
 
 class LogTagDelegate {

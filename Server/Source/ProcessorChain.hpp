@@ -16,10 +16,9 @@ namespace e47 {
 
 class ProcessorChain;
 
-class AGProcessor : public LogTag {
+class AGProcessor : public LogTagDelegate {
   public:
-    AGProcessor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize)
-        : LogTag("agprocessor"), m_chain(chain), m_id(id), m_sampleRate(sampleRate), m_blockSize(blockSize) {}
+    AGProcessor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize);
 
     std::shared_ptr<AudioPluginInstance> getPlugin() {
         traceScope();

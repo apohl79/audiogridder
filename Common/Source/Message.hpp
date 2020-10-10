@@ -167,6 +167,11 @@ struct Handshake {
     double rate;
     int samplesPerBlock;
     bool doublePrecission;
+    uint64 clientId;
+    int unused1;
+    int unused2;
+    int unused3;
+    int unused4;
 };
 
 /*

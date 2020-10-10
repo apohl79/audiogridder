@@ -13,6 +13,13 @@ namespace e47 {
 
 std::mutex AGProcessor::m_pluginLoaderMtx;
 
+AGProcessor::AGProcessor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize)
+    : LogTagDelegate(chain.getLogTagSource()),
+      m_chain(chain),
+      m_id(id),
+      m_sampleRate(sampleRate),
+      m_blockSize(blockSize) {}
+
 // Sync version.
 std::shared_ptr<AudioPluginInstance> AGProcessor::loadPlugin(PluginDescription& plugdesc, double sampleRate,
                                                              int blockSize) {

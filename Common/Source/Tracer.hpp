@@ -81,7 +81,7 @@ class Tracer : public Thread, public SharedInstance<Tracer> {
     static std::set<Thread::ThreadID> m_messageBuffersKnownThreadIDs;
 
     static const int MAX_TRACE_MESSAGES_PER_FILE = 10000;
-    static const int NUMBER_OF_TRACE_FILES = 10;
+    static const int NUMBER_OF_TRACE_FILES = 20;
 
     String m_fileName[NUMBER_OF_TRACE_FILES];
     int m_fileIdx = 0;
