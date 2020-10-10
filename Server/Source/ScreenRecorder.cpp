@@ -27,6 +27,22 @@ void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode) {
     setLogTagStatic("screenrec");
     traceScope();
 
+    m_encMode = encMode;
+    const char* encName;
+    switch (m_encMode) {
+        case WEBP:
+            encName = "libwebp";
+            break;
+        case MJPEG:
+            encName = "mjpeg";
+            break;
+    }
+    m_outputCodec = avcodec_find_encoder_by_name(encName);
+    if (nullptr == m_outputCodec) {
+        logln("unable to find output codec " << encName);
+        return;
+    }
+
     if (m_initialized) {
         return;
     }
@@ -57,22 +73,6 @@ void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode) {
     m_inputFmt = av_find_input_format(m_inputFmtName.getCharPointer());
     if (nullptr == m_inputFmt) {
         logln("unable to find " << m_inputFmtName << " input format");
-        return;
-    }
-
-    m_encMode = encMode;
-    const char* encName;
-    switch (m_encMode) {
-        case WEBP:
-            encName = "libwebp";
-            break;
-        case MJPEG:
-            encName = "mjpeg";
-            break;
-    }
-    m_outputCodec = avcodec_find_encoder_by_name(encName);
-    if (nullptr == m_outputCodec) {
-        logln("unable to find output codec " << encName);
         return;
     }
 
@@ -342,7 +342,11 @@ bool ScreenRecorder::prepareOutput() {
             av_dict_set(&opts, "global_quality", String(m_quality).getCharPointer(), 0);
             break;
         case MJPEG:
+#ifdef JUCE_WINDOWS
+            av_dict_set(&opts, "b", "14000000", 0);
+#else
             av_dict_set(&opts, "b", "4000000", 0);
+#endif
             break;
     }
     int ret = avcodec_open2(m_outputCodecCtx, m_outputCodec, &opts);
@@ -402,7 +406,7 @@ void ScreenRecorder::record() {
     logln("started capturing: rectangle " << m_captureRect.getX() << "," << m_captureRect.getY() << ":"
                                           << m_captureRect.getWidth() << "x" << m_captureRect.getHeight() << " scale *"
                                           << m_scale << " <- input rectange " << m_captureCodecCtx->width << "x"
-                                          << m_captureCodecCtx->height);
+                                          << m_captureCodecCtx->height << ", codecs: in=" << m_captureCodec->name << " out=" << m_outputCodec->name);
     auto durationPkt = TimeStatistics::getDuration("screen-pkt");
     auto durationScale = TimeStatistics::getDuration("screen-scale");
     auto durationEnc = TimeStatistics::getDuration("screen-enc");
