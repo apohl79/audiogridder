@@ -75,9 +75,11 @@ provide.
 - Report only one issue at a time, if you have multiple problems,
   please create multiple issues.
 - Minimize the log files:
-  - Wipe all AudioGridder log folders (see below).
-  - Restart the server.
-  - Restart the DAW.
+  - Stop the server and the DAW
+  - Wipe all AudioGridder log folders (server and plugins, see below).
+  - Enable tracing (see below).
+  - Start the server.
+  - Start the DAW.
   - Load only the minimal amount of plugins needed to run into the
     problem you have.
   - Take only the actions that lead to the problem you have.
@@ -87,6 +89,21 @@ provide.
 - If you see a crash on Windows, the log file directories contain dump
   files, just follow the steps to "minimize the log files" and you are
   good.
+
+## Tracing
+
+Version 1.1-beta8 introduced tracing support (extensive function call
+logging) to give better analysis possibilities in case AG crashes or
+hangs.
+
+Tracing can be enabled while AG is running or via configuration file.
+Both the plugins and the server have tracing options in their
+respective settings.
+
+To enable tracing via configuration file, you have to add/enable the
+following option:
+
+```"Tracer": true```
 
 # AudioGridder Server
 
