@@ -5,10 +5,12 @@
               companyEmail="audiogridder@e47.org" pluginFormats="buildAU,buildVST,buildVST3"
               pluginManufacturerCode="XE47" pluginCode="E402" headerPath="../../../Source&#10;../../../../Common/Source&#10;"
               pluginName="AGridder" pluginVST3Category="Instrument,Network"
-              version="1.0.0" pluginCharacteristicsValue="pluginIsMidiEffectPlugin,pluginIsSynth,pluginProducesMidiOut,pluginWantsMidiIn"
+              version="1.0.0" pluginCharacteristicsValue="pluginIsSynth,pluginProducesMidiOut,pluginWantsMidiIn"
               displaySplashScreen="1" jucerFormatVersion="1">
   <MAINGROUP id="tTbkq6" name="AudioGridderInst">
     <GROUP id="{3368243C-E955-A248-6B2F-5609CABD8F4F}" name="Common">
+      <FILE id="S76Xcn" name="CoreDump.cpp" compile="1" resource="0" file="../../Common/Source/CoreDump.cpp"/>
+      <FILE id="rLhqRY" name="CoreDump.hpp" compile="0" resource="0" file="../../Common/Source/CoreDump.hpp"/>
       <FILE id="uEnPnR" name="Defaults.hpp" compile="0" resource="0" file="../../Common/Source/Defaults.hpp"/>
       <FILE id="O60LQQ" name="ImageDiff.hpp" compile="0" resource="0" file="../../Common/Source/ImageDiff.hpp"/>
       <FILE id="TVidPD" name="json.hpp" compile="0" resource="0" file="../../Common/Source/json.hpp"/>
@@ -22,17 +24,19 @@
             file="../../Common/Source/mDNSConnector.cpp"/>
       <FILE id="EPP32g" name="mDNSConnector.hpp" compile="0" resource="0"
             file="../../Common/Source/mDNSConnector.hpp"/>
+      <FILE id="smFuSM" name="Message.cpp" compile="1" resource="0" file="../../Common/Source/Message.cpp"/>
       <FILE id="WsZh1v" name="Message.hpp" compile="0" resource="0" file="../../Common/Source/Message.hpp"/>
       <FILE id="X2s50I" name="Metrics.cpp" compile="1" resource="0" file="../../Common/Source/Metrics.cpp"/>
       <FILE id="uP3tqO" name="Metrics.hpp" compile="0" resource="0" file="../../Common/Source/Metrics.hpp"/>
-      <FILE id="ytixH7" name="MiniDump.cpp" compile="1" resource="0" file="../../Common/Source/MiniDump.cpp"/>
-      <FILE id="mXHK5q" name="MiniDump.hpp" compile="0" resource="0" file="../../Common/Source/MiniDump.hpp"/>
       <FILE id="yCHJOt" name="NumberConversion.hpp" compile="0" resource="0"
             file="../../Common/Source/NumberConversion.hpp"/>
       <FILE id="nltG0l" name="SharedInstance.hpp" compile="0" resource="0"
             file="../../Common/Source/SharedInstance.hpp"/>
+      <FILE id="y5TRhn" name="Signals.cpp" compile="1" resource="0" file="../../Common/Source/Signals.cpp"/>
+      <FILE id="A2KnCn" name="Signals.hpp" compile="0" resource="0" file="../../Common/Source/Signals.hpp"/>
       <FILE id="B6dn8Z" name="Tracer.cpp" compile="1" resource="0" file="../../Common/Source/Tracer.cpp"/>
       <FILE id="LFw0K6" name="Tracer.hpp" compile="0" resource="0" file="../../Common/Source/Tracer.hpp"/>
+      <FILE id="aSVbBH" name="Utils.cpp" compile="1" resource="0" file="../../Common/Source/Utils.cpp"/>
       <FILE id="Qwiqkn" name="Utils.hpp" compile="0" resource="0" file="../../Common/Source/Utils.hpp"/>
       <FILE id="jXVo1g" name="Version.hpp" compile="0" resource="0" file="../../Common/Source/Version.hpp"/>
     </GROUP>
@@ -71,6 +75,10 @@
             file="../Source/ServiceReceiver.cpp"/>
       <FILE id="IvSxoL" name="ServiceReceiver.hpp" compile="0" resource="0"
             file="../Source/ServiceReceiver.hpp"/>
+      <FILE id="xDMwXP" name="StatisticsWindow.cpp" compile="1" resource="0"
+            file="../Source/StatisticsWindow.cpp"/>
+      <FILE id="mMzbrs" name="StatisticsWindow.hpp" compile="0" resource="0"
+            file="../Source/StatisticsWindow.hpp"/>
     </GROUP>
   </MAINGROUP>
   <EXPORTFORMATS>
@@ -78,10 +86,11 @@
                externalLibraries="avdevice&#10;avcodec&#10;avformat&#10;avfilter&#10;avutil&#10;swscale&#10;swresample&#10;webp&#10;webpmux"
                extraFrameworks="AVFoundation,CoreMedia,VideoToolbox" iosDevelopmentTeamID="62QZB3NCZR">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" headerPath="/usr/local/include&#10;$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg"
+        <CONFIGURATION isDebug="1" name="Debug" headerPath="$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg&#10;/usr/local/include"
                        recommendedWarnings="LLVM" libraryPath="$(HOME)/audio/FFmpeg/inst-osx-dbg/lib"
-                       defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING&#10;"/>
-        <CONFIGURATION isDebug="1" name="Release" headerPath="/usr/local/include&#10;$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg"
+                       defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING&#10;"
+                       enablePluginBinaryCopyStep="1"/>
+        <CONFIGURATION isDebug="1" name="Release" headerPath="$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg&#10;/usr/local/include"
                        recommendedWarnings="LLVM" enablePluginBinaryCopyStep="0" optimisation="3"
                        libraryPath="$(HOME)/audio/FFmpeg/inst-osx/lib" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING&#10;JUCE_DISABLE_ASSERTIONS"/>
       </CONFIGURATIONS>
@@ -129,11 +138,12 @@
         <MODULEPATH id="juce_audio_basics"/>
       </MODULEPATHS>
     </VS2019>
-    <LINUX_MAKE targetFolder="Builds/LinuxMakefile" extraLinkerFlags="-lavdevice -lavcodec -lavformat -lavfilter -lavutil -lswscale -lswresample"
-                extraCompilerFlags="-fvisibility=hidden">
+    <LINUX_MAKE targetFolder="Builds/LinuxMakefile" extraCompilerFlags="-fvisibility=hidden"
+                externalLibraries="avdevice&#10;avcodec&#10;avformat&#10;avfilter&#10;avutil&#10;swscale&#10;swresample">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" headerPath="/mnt/audio/vstsdk2.4"/>
-        <CONFIGURATION isDebug="0" name="Release" headerPath="/mnt/audio/vstsdk2.4"/>
+        <CONFIGURATION isDebug="1" name="Debug" headerPath="/mnt/audio/vstsdk2.4" defines="JUCE_LINUX"/>
+        <CONFIGURATION isDebug="0" name="Release" headerPath="/mnt/audio/vstsdk2.4"
+                       defines="JUCE_LINUX"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_opengl" path="../../juce"/>

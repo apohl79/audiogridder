@@ -12,6 +12,7 @@
 
 #include "Images.hpp"
 #include "Version.hpp"
+#include "Defaults.hpp"
 
 namespace e47 {
 
@@ -19,13 +20,13 @@ class SplashWindow : public TopLevelWindow {
   public:
     SplashWindow() : TopLevelWindow("Splash", true) {
         auto& lf = getLookAndFeel();
-        lf.setColour(ResizableWindow::backgroundColourId, Colour(DEFAULT_BG_COLOR));
-        lf.setColour(PopupMenu::backgroundColourId, Colour(DEFAULT_BG_COLOR));
-        lf.setColour(TextEditor::backgroundColourId, Colour(DEFAULT_BUTTON_COLOR));
-        lf.setColour(TextButton::buttonColourId, Colour(DEFAULT_BUTTON_COLOR));
-        lf.setColour(ComboBox::backgroundColourId, Colour(DEFAULT_BUTTON_COLOR));
-        lf.setColour(ListBox::backgroundColourId, Colour(DEFAULT_BG_COLOR));
-        lf.setColour(AlertWindow::backgroundColourId, Colour(DEFAULT_BG_COLOR));
+        lf.setColour(ResizableWindow::backgroundColourId, Colour(Defaults::BG_COLOR));
+        lf.setColour(PopupMenu::backgroundColourId, Colour(Defaults::BG_COLOR));
+        lf.setColour(TextEditor::backgroundColourId, Colour(Defaults::BUTTON_COLOR));
+        lf.setColour(TextButton::buttonColourId, Colour(Defaults::BUTTON_COLOR));
+        lf.setColour(ComboBox::backgroundColourId, Colour(Defaults::BUTTON_COLOR));
+        lf.setColour(ListBox::backgroundColourId, Colour(Defaults::BG_COLOR));
+        lf.setColour(AlertWindow::backgroundColourId, Colour(Defaults::BG_COLOR));
 
         centreWithSize(450, 180);
 

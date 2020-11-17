@@ -16,8 +16,9 @@
 #include "json.hpp"
 
 using json = nlohmann::json;
+using namespace e47;
 
-class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDelegate {
+class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate {
   public:
     AudioGridderAudioProcessor();
     ~AudioGridderAudioProcessor() override;
@@ -62,7 +63,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
     void loadConfig(const json& j, bool isUpdate = false);
     void saveConfig(int numOfBuffers = -1);
 
-    e47::Client& getClient() { return *m_client; }
+    Client& getClient() { return *m_client; }
     std::vector<ServerPlugin> getPlugins(const String& type) const;
     const std::vector<ServerPlugin>& getPlugins() const { return m_client->getPlugins(); }
     std::set<String> getPluginTypes() const;
@@ -72,17 +73,16 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
         String name;
         String settings;
         StringArray presets;
-        Array<e47::Client::Parameter> params;
+        Array<Client::Parameter> params;
         bool bypassed;
         bool ok;
     };
 
     auto& getLoadedPlugins() const { return m_loadedPlugins; }
-    LoadedPlugin& getLoadedPlugin(int idx) {
-        return idx > -1 ? m_loadedPlugins[e47::as<size_t>(idx)] : m_unusedDummyPlugin;
-    }
-    bool loadPlugin(const String& id, const String& name);
+    LoadedPlugin& getLoadedPlugin(int idx) { return idx > -1 ? m_loadedPlugins[as<size_t>(idx)] : m_unusedDummyPlugin; }
+    bool loadPlugin(const String& id, const String& name, String& err);
     void unloadPlugin(int idx);
+    String getLoadedPluginsString() const;
     void editPlugin(int idx);
     void hidePlugin(bool updateServer = true);
     int getActivePlugin() const { return m_activePlugin; }
@@ -116,12 +116,12 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
     void delServer(const String& s);
     String getActiveServerHost() const { return m_client->getServerHostAndID(); }
     String getActiveServerName() const;
-    void setActiveServer(const e47::ServerInfo& s);
-    Array<e47::ServerInfo> getServersMDNS();
+    void setActiveServer(const ServerInfo& s);
+    Array<ServerInfo> getServersMDNS();
     void setCPULoad(float load);
 
     int getLatencyMillis() const {
-        return e47::as<int>(lround(m_client->NUM_OF_BUFFERS * getBlockSize() * 1000 / getSampleRate()));
+        return as<int>(lround(m_client->NUM_OF_BUFFERS * getBlockSize() * 1000 / getSampleRate()));
     }
 
     // It looks like most hosts do not support dynamic parameter creation or changes to existing parameters. Logic at
@@ -130,6 +130,11 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
       public:
         Parameter(AudioGridderAudioProcessor& processor, int slot) : m_processor(processor), m_slotId(slot) {
             setLogTagSource(m_processor.getLogTagSource());
+            initAsyncFunctors();
+        }
+        ~Parameter() override {
+            traceScope();
+            stopAsyncFunctors();
         }
         float getValue() const override;
         void setValue(float newValue) override;
@@ -151,17 +156,20 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
         int m_slotId = 0;
 
         const LoadedPlugin& getPlugin() const { return m_processor.getLoadedPlugin(m_idx); }
-        const e47::Client::Parameter& getParam() const { return getPlugin().params.getReference(m_paramIdx); }
+        const Client::Parameter& getParam() const { return getPlugin().params.getReference(m_paramIdx); }
 
         void reset() {
             m_idx = -1;
             m_paramIdx = 0;
         }
+
+        ENABLE_ASYNC_FUNCTORS();
     };
 
   private:
     Uuid m_instId;
-    std::unique_ptr<e47::Client> m_client;
+    std::unique_ptr<Client> m_client;
+    std::atomic_bool m_prepared{false};
     std::vector<LoadedPlugin> m_loadedPlugins;
     int m_activePlugin = -1;
     StringArray m_servers;
@@ -170,7 +178,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
 
     int m_numberOfAutomationSlots = 16;
     LoadedPlugin m_unusedDummyPlugin;
-    e47::Client::Parameter m_unusedParam;
+    Client::Parameter m_unusedParam;
 
     Array<Array<float>> m_bypassBufferF;
     Array<Array<double>> m_bypassBufferD;
@@ -181,6 +189,8 @@ class AudioGridderAudioProcessor : public AudioProcessor, public e47::LogTagDele
     bool m_menuShowCategory = true;
     bool m_menuShowCompany = true;
     bool m_genericEditor = false;
+
+    ENABLE_ASYNC_FUNCTORS();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioGridderAudioProcessor)
 };

@@ -11,6 +11,7 @@
 #include "PluginButton.hpp"
 #include "PluginProcessor.hpp"
 #include "GenericEditor.hpp"
+#include "StatisticsWindow.hpp"
 #include "Utils.hpp"
 
 class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
@@ -31,6 +32,8 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
 
     void setConnected(bool connected);
     void setCPULoad(float load);
+
+    void hideStatistics();
 
   private:
     AudioGridderAudioProcessor& m_processor;
@@ -54,6 +57,8 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     int m_currentActiveAB = -1;
     TextButton* m_hilightedStButton = nullptr;
 
+    std::unique_ptr<StatisticsWindow> m_statsWindow;
+
     PluginButton* addPluginButton(const String& id, const String& name);
     std::vector<PluginButton*> getPluginButtons(const String& id);
     int getPluginIndex(const String& name);
@@ -72,6 +77,8 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     PopupMenu createPluginMenu(MenuLevel& level, std::function<void(const ServerPlugin& plug)> addFn);
 
     void editPlugin(int idx = -1);
+
+    ENABLE_ASYNC_FUNCTORS();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioGridderAudioProcessorEditor)
 };

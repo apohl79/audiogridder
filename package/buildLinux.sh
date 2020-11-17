@@ -10,6 +10,10 @@ cd Plugin/Inst/Builds/LinuxMakefile
 make clean
 make -j4
 cd -
+cd Plugin/Midi/Builds/LinuxMakefile
+make clean
+make -j4
+cd -
 
 
 VERSION=$(cat package/VERSION)
@@ -19,8 +23,10 @@ mkdir -p package/build/vst3
 
 cp Plugin/Fx/Builds/LinuxMakefile/build/AudioGridder.so package/build/vst/
 cp Plugin/Inst/Builds/LinuxMakefile/build/AudioGridderInst.so package/build/vst/
+cp Plugin/Midi/Builds/LinuxMakefile/build/AudioGridderMidi.so package/build/vst/
 cp -r Plugin/Fx/Builds/LinuxMakefile/build/AudioGridder.vst3 package/build/vst3/
 cp -r Plugin/Inst/Builds/LinuxMakefile/build/AudioGridderInst.vst3 package/build/vst3/
+cp -r Plugin/Midi/Builds/LinuxMakefile/build/AudioGridderMidi.vst3 package/build/vst3/
 
 cp package/build/vst/* ../Archive/Builds/$VERSION/linux
 cp -r package/build/vst3/* ../Archive/Builds/$VERSION/linux

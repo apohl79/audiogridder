@@ -16,6 +16,7 @@
 #include "ScreenRecorder.hpp"
 #include "PluginListWindow.hpp"
 #include "ServerSettingsWindow.hpp"
+#include "StatisticsWindow.hpp"
 #include "SplashWindow.hpp"
 #include "Utils.hpp"
 
@@ -29,13 +30,24 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     using WindowCaptureCallbackNative = std::function<void(std::shared_ptr<Image> image, int width, int height)>;
     using WindowCaptureCallbackFFmpeg = ScreenRecorder::CaptureCallback;
 
-    App();
+    static constexpr uint32 EXIT_RESTART = 66;
+
+    App() : LogTag("app") {
+        traceScope();
+        initAsyncFunctors();
+    }
+    ~App() override {
+        traceScope();
+        stopAsyncFunctors();
+    }
 
     const String getApplicationName() override { return ProjectInfo::projectName; }
     const String getApplicationVersion() override { return ProjectInfo::versionString; }
     void initialise(const String& commandLineParameters) override;
     void shutdown() override;
     void systemRequestedQuit() override { quit(); }
+
+    void prepareShutdown(uint32 exitCode = 0);
 
     const KnownPluginList& getPluginList();
     Server& getServer() { return *m_server; }
@@ -99,7 +111,8 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
 #ifdef JUCE_MAC
             auto menu = m_app->getMenuForIndex(0, "Tray");
             menu.addSeparator();
-            menu.addItem("Quit", [this] { m_app->systemRequestedQuit(); });
+            menu.addItem("Restart", [this] { m_app->prepareShutdown(App::EXIT_RESTART); });
+            menu.addItem("Quit", [this] { m_app->prepareShutdown(); });
             showDropdownMenu(menu);
 #else
             auto menu = m_app->getMenuForIndex(0, "Tray");
@@ -114,7 +127,8 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
                 String info = "Copyright (c) 2020 by Andreas Pohl, https://audiogridder.com (MIT license)";
                 m_app->setSplashInfo(info);
             });
-            menu.addItem("Quit", [this] { m_app->systemRequestedQuit(); });
+            menu.addItem("Restart", [this] { m_app->prepareShutdown(App::EXIT_RESTART); });
+            menu.addItem("Quit", [this] { m_app->prepareShutdown(); });
             menu.show();
 #endif
         }
@@ -134,11 +148,16 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
         PopupMenu menu;
         if (topLevelMenuIndex == 0) {  // Settings
             menu.addItem("Plugins", [this] {
-                m_pluginListWindow =
-                    std::make_unique<PluginListWindow>(this, m_server->getPluginList(), DEAD_MANS_FILE);
+                m_pluginListWindow = std::make_unique<PluginListWindow>(
+                    this, m_server->getPluginList(), Defaults::getConfigFileName(Defaults::ConfigDeadMan));
             });
             menu.addItem("Server Settings",
                          [this] { m_srvSettingsWindow = std::make_unique<ServerSettingsWindow>(this); });
+            menu.addItem("Statistics", [this] {
+                if (nullptr == m_statsWindow) {
+                    m_statsWindow = std::make_unique<StatisticsWindow>(this);
+                }
+            });
             menu.addSeparator();
             menu.addItem("Rescan", [this] { restartServer(true); });
             menu.addItem("Wipe Cache & Rescan", [this] {
@@ -152,21 +171,38 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
 
     void menuItemSelected(int /* menuItemID */, int /* topLevelMenuIndex */) override {}
 
-    void hidePluginList() { m_pluginListWindow.reset(); }
-    void hideServerSettings() { m_srvSettingsWindow.reset(); }
+    void hidePluginList() {
+        traceScope();
+        m_pluginListWindow.reset();
+    }
+
+    void hideServerSettings() {
+        traceScope();
+        m_srvSettingsWindow.reset();
+    }
+
+    void hideStatistics() {
+        traceScope();
+        m_statsWindow.reset();
+    }
 
     void showSplashWindow(std::function<void(bool)> onClick = nullptr) {
-        m_splashWindow = std::make_unique<SplashWindow>();
+        traceScope();
+        m_splashWindow = std::make_shared<SplashWindow>();
         if (onClick) {
             m_splashWindow->onClick = onClick;
         }
     }
     // called from the server thread
     void hideSplashWindow() {
-        MessageManager::callAsync([this] { m_splashWindow.reset(); });
+        traceScope();
+        auto ptrcpy = m_splashWindow;
+        m_splashWindow.reset();
+        runOnMsgThreadAsync([ptrcpy] {});
     }
     void setSplashInfo(const String& txt) {
-        MessageManager::callAsync([this, txt] {
+        traceScope();
+        runOnMsgThreadAsync([this, txt] {
             if (nullptr != m_splashWindow) {
                 m_splashWindow->setInfo(txt);
             }
@@ -247,6 +283,17 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
             }
         }
 
+        void startCapturing() {
+            traceScope();
+            if (!getApp()->getServer().getScreenCapturingOff()) {
+                if (m_callbackNative) {
+                    startTimer(50);
+                } else {
+                    m_screenCaptureRect = getScreenCaptureRect();
+                    m_screenRec.start(m_screenCaptureRect, m_callbackFFmpeg);
+                }
+            }
+        }
         void stopCapturing() {
             traceScope();
             if (m_callbackNative) {
@@ -270,6 +317,8 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
             Component::setVisible(b);
         }
 
+        bool hasEditor() const { return nullptr != m_editor; }
+
       private:
         std::shared_ptr<AGProcessor> m_processor;
         AudioProcessorEditor* m_editor = nullptr;
@@ -280,19 +329,17 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
 
         void createEditor() {
             traceScope();
+            setAlwaysOnTop(true);
+            setTitleBarHeight(30);
             m_totalRect = Desktop::getInstance().getDisplays().getMainDisplay().totalArea;
             m_editor = m_processor->createEditorIfNeeded();
-            setContentNonOwned(m_editor, true);
-            setTitleBarHeight(30);
-            setVisible(true);
-            setAlwaysOnTop(true);
-            if (!getApp()->getServer().getScreenCapturingOff()) {
-                if (m_callbackNative) {
-                    startTimer(50);
-                } else {
-                    m_screenCaptureRect = getScreenCaptureRect();
-                    m_screenRec.start(m_screenCaptureRect, m_callbackFFmpeg);
-                }
+            if (nullptr != m_editor) {
+                Component::setVisible(true);
+                setContentNonOwned(m_editor, true);
+                startCapturing();
+            } else {
+                Component::setVisible(false);
+                logln("failed to create editor");
             }
         }
 
@@ -317,12 +364,13 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     };
 
   private:
-    std::unique_ptr<Server> m_server;
+    std::shared_ptr<Server> m_server;
     std::unique_ptr<std::thread> m_child;
     std::unique_ptr<ProcessorWindow> m_window;
     std::unique_ptr<PluginListWindow> m_pluginListWindow;
     std::unique_ptr<ServerSettingsWindow> m_srvSettingsWindow;
-    std::unique_ptr<SplashWindow> m_splashWindow;
+    std::unique_ptr<StatisticsWindow> m_statsWindow;
+    std::shared_ptr<SplashWindow> m_splashWindow;
     Thread::ThreadID m_windowOwner;
     std::shared_ptr<AGProcessor> m_windowProc;
     WindowCaptureCallbackNative m_windowFuncNative;
@@ -330,6 +378,10 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     std::mutex m_windowMtx;
     std::unique_ptr<MenuBarWindow> m_menuWindow;
     std::atomic_bool m_stopChild{false};
+
+    uint32 m_exitCode = 0;
+
+    ENABLE_ASYNC_FUNCTORS();
 };
 
 }  // namespace e47

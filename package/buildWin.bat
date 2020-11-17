@@ -6,6 +6,8 @@ msbuild ..\Plugin\Fx\Builds\VisualStudio2019\AudioGridder.sln /nologo /p:Configu
 msbuild ..\Plugin\Fx\Builds\VisualStudio2019\AudioGridder.sln /nologo /p:Configuration=Release /p:Platform=x64
 msbuild ..\Plugin\Inst\Builds\VisualStudio2019\AudioGridderInst.sln /nologo /p:Configuration=Release /p:Platform=x64 /t:Clean
 msbuild ..\Plugin\Inst\Builds\VisualStudio2019\AudioGridderInst.sln /nologo /p:Configuration=Release /p:Platform=x64
+msbuild ..\Plugin\Midi\Builds\VisualStudio2019\AudioGridderMidi.sln /nologo /p:Configuration=Release /p:Platform=x64 /t:Clean
+msbuild ..\Plugin\Midi\Builds\VisualStudio2019\AudioGridderMidi.sln /nologo /p:Configuration=Release /p:Platform=x64
 
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /Obuild AudioGridderPlugin.iss
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /Obuild AudioGridderServer.iss

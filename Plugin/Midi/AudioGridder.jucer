@@ -1,83 +1,83 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="JM1hGs" name="AudioGridder" projectType="audioplug" companyName="e47"
+<JUCERPROJECT id="JM1hGs" name="AudioGridderMidi" projectType="audioplug" companyName="e47"
               companyCopyright="2020 Andreas Pohl" companyWebsite="https://www.audiogridder.com"
               companyEmail="audiogridder@e47.org" pluginFormats="buildAU,buildVST,buildVST3"
-              pluginManufacturerCode="XE47" pluginCode="E401" headerPath="../../../Source&#10;../../../../Common/Source&#10;"
-              pluginName="AGridder" pluginVST3Category="Network" version="1.0.0"
-              pluginAUMainType="'aufx'" displaySplashScreen="1" jucerFormatVersion="1"
-              pluginCharacteristicsValue="pluginProducesMidiOut,pluginWantsMidiIn">
-  <MAINGROUP id="tTbkq6" name="AudioGridder">
+              pluginManufacturerCode="XE47" pluginCode="E403" headerPath="../../../Source&#10;../../../../Common/Source&#10;"
+              pluginName="AGridder" pluginVST3Category="Fx,Network" version="1.0.0"
+              pluginCharacteristicsValue="pluginIsMidiEffectPlugin,pluginProducesMidiOut,pluginWantsMidiIn"
+              displaySplashScreen="1" jucerFormatVersion="1">
+  <MAINGROUP id="tTbkq6" name="AudioGridderMidi">
     <GROUP id="{3368243C-E955-A248-6B2F-5609CABD8F4F}" name="Common">
-      <FILE id="ugmT8H" name="CoreDump.cpp" compile="1" resource="0" file="../../Common/Source/CoreDump.cpp"/>
-      <FILE id="vrR0ue" name="CoreDump.hpp" compile="0" resource="0" file="../../Common/Source/CoreDump.hpp"/>
-      <FILE id="SJ6Nvc" name="Defaults.hpp" compile="0" resource="0" file="../../Common/Source/Defaults.hpp"/>
-      <FILE id="TSJZlm" name="ImageDiff.hpp" compile="0" resource="0" file="../../Common/Source/ImageDiff.hpp"/>
-      <FILE id="b7Jhvp" name="json.hpp" compile="0" resource="0" file="../../Common/Source/json.hpp"/>
-      <FILE id="Dmjsrg" name="KeyAndMouseCommon.hpp" compile="0" resource="0"
+      <FILE id="S76Xcn" name="CoreDump.cpp" compile="1" resource="0" file="../../Common/Source/CoreDump.cpp"/>
+      <FILE id="rLhqRY" name="CoreDump.hpp" compile="0" resource="0" file="../../Common/Source/CoreDump.hpp"/>
+      <FILE id="uEnPnR" name="Defaults.hpp" compile="0" resource="0" file="../../Common/Source/Defaults.hpp"/>
+      <FILE id="O60LQQ" name="ImageDiff.hpp" compile="0" resource="0" file="../../Common/Source/ImageDiff.hpp"/>
+      <FILE id="TVidPD" name="json.hpp" compile="0" resource="0" file="../../Common/Source/json.hpp"/>
+      <FILE id="vVoVj4" name="KeyAndMouseCommon.hpp" compile="0" resource="0"
             file="../../Common/Source/KeyAndMouseCommon.hpp"/>
-      <FILE id="tuVYvK" name="Logger.cpp" compile="1" resource="0" file="../../Common/Source/Logger.cpp"/>
-      <FILE id="FTfcsg" name="Logger.hpp" compile="0" resource="0" file="../../Common/Source/Logger.hpp"/>
-      <FILE id="M5OJsI" name="mDNS.cpp" compile="1" resource="0" file="../../Common/Source/mDNS.cpp"/>
-      <FILE id="YBVEZu" name="mDNS.hpp" compile="0" resource="0" file="../../Common/Source/mDNS.hpp"/>
-      <FILE id="VZ8etI" name="mDNSConnector.cpp" compile="1" resource="0"
+      <FILE id="cTXu7D" name="Logger.cpp" compile="1" resource="0" file="../../Common/Source/Logger.cpp"/>
+      <FILE id="kvWHz8" name="Logger.hpp" compile="0" resource="0" file="../../Common/Source/Logger.hpp"/>
+      <FILE id="ROKVrh" name="mDNS.cpp" compile="1" resource="0" file="../../Common/Source/mDNS.cpp"/>
+      <FILE id="kkWF5M" name="mDNS.hpp" compile="0" resource="0" file="../../Common/Source/mDNS.hpp"/>
+      <FILE id="KqweXP" name="mDNSConnector.cpp" compile="1" resource="0"
             file="../../Common/Source/mDNSConnector.cpp"/>
-      <FILE id="eU7GCJ" name="mDNSConnector.hpp" compile="0" resource="0"
+      <FILE id="EPP32g" name="mDNSConnector.hpp" compile="0" resource="0"
             file="../../Common/Source/mDNSConnector.hpp"/>
-      <FILE id="kZv5lv" name="Message.cpp" compile="1" resource="0" file="../../Common/Source/Message.cpp"/>
-      <FILE id="kHdL6a" name="Message.hpp" compile="0" resource="0" file="../../Common/Source/Message.hpp"/>
-      <FILE id="vBs8XC" name="Metrics.cpp" compile="1" resource="0" file="../../Common/Source/Metrics.cpp"/>
-      <FILE id="znpWTc" name="Metrics.hpp" compile="0" resource="0" file="../../Common/Source/Metrics.hpp"/>
-      <FILE id="tai7su" name="NumberConversion.hpp" compile="0" resource="0"
+      <FILE id="smFuSM" name="Message.cpp" compile="1" resource="0" file="../../Common/Source/Message.cpp"/>
+      <FILE id="WsZh1v" name="Message.hpp" compile="0" resource="0" file="../../Common/Source/Message.hpp"/>
+      <FILE id="X2s50I" name="Metrics.cpp" compile="1" resource="0" file="../../Common/Source/Metrics.cpp"/>
+      <FILE id="uP3tqO" name="Metrics.hpp" compile="0" resource="0" file="../../Common/Source/Metrics.hpp"/>
+      <FILE id="yCHJOt" name="NumberConversion.hpp" compile="0" resource="0"
             file="../../Common/Source/NumberConversion.hpp"/>
-      <FILE id="wnI0p7" name="SharedInstance.hpp" compile="0" resource="0"
+      <FILE id="nltG0l" name="SharedInstance.hpp" compile="0" resource="0"
             file="../../Common/Source/SharedInstance.hpp"/>
-      <FILE id="NQrjwm" name="Signals.cpp" compile="1" resource="0" file="../../Common/Source/Signals.cpp"/>
-      <FILE id="mtOYDQ" name="Signals.hpp" compile="0" resource="0" file="../../Common/Source/Signals.hpp"/>
-      <FILE id="Vjb8qn" name="Tracer.cpp" compile="1" resource="0" file="../../Common/Source/Tracer.cpp"/>
-      <FILE id="ayK1ub" name="Tracer.hpp" compile="0" resource="0" file="../../Common/Source/Tracer.hpp"/>
-      <FILE id="bRrb9s" name="Utils.cpp" compile="1" resource="0" file="../../Common/Source/Utils.cpp"/>
-      <FILE id="I8QGZk" name="Utils.hpp" compile="0" resource="0" file="../../Common/Source/Utils.hpp"/>
-      <FILE id="VyI0aI" name="Version.hpp" compile="0" resource="0" file="../../Common/Source/Version.hpp"/>
+      <FILE id="y5TRhn" name="Signals.cpp" compile="1" resource="0" file="../../Common/Source/Signals.cpp"/>
+      <FILE id="A2KnCn" name="Signals.hpp" compile="0" resource="0" file="../../Common/Source/Signals.hpp"/>
+      <FILE id="B6dn8Z" name="Tracer.cpp" compile="1" resource="0" file="../../Common/Source/Tracer.cpp"/>
+      <FILE id="LFw0K6" name="Tracer.hpp" compile="0" resource="0" file="../../Common/Source/Tracer.hpp"/>
+      <FILE id="aSVbBH" name="Utils.cpp" compile="1" resource="0" file="../../Common/Source/Utils.cpp"/>
+      <FILE id="Qwiqkn" name="Utils.hpp" compile="0" resource="0" file="../../Common/Source/Utils.hpp"/>
+      <FILE id="jXVo1g" name="Version.hpp" compile="0" resource="0" file="../../Common/Source/Version.hpp"/>
     </GROUP>
     <GROUP id="{A2A08E54-1037-9844-5B73-F16B657A5259}" name="Source">
-      <FILE id="FaxY5N" name="AudioStreamer.hpp" compile="0" resource="0"
+      <FILE id="JYgJIV" name="AudioStreamer.hpp" compile="0" resource="0"
             file="../Source/AudioStreamer.hpp"/>
-      <FILE id="OYKLkH" name="Client.cpp" compile="1" resource="0" file="../Source/Client.cpp"/>
-      <FILE id="iWAQgS" name="Client.hpp" compile="0" resource="0" file="../Source/Client.hpp"/>
-      <FILE id="xpSJTl" name="GenericEditor.cpp" compile="1" resource="0"
+      <FILE id="voq3fe" name="Client.cpp" compile="1" resource="0" file="../Source/Client.cpp"/>
+      <FILE id="DVEYaG" name="Client.hpp" compile="0" resource="0" file="../Source/Client.hpp"/>
+      <FILE id="UWmkMQ" name="GenericEditor.cpp" compile="1" resource="0"
             file="../Source/GenericEditor.cpp"/>
-      <FILE id="yruIT5" name="GenericEditor.hpp" compile="0" resource="0"
+      <FILE id="qnXlki" name="GenericEditor.hpp" compile="0" resource="0"
             file="../Source/GenericEditor.hpp"/>
-      <FILE id="f4Lx0e" name="ImageReader.cpp" compile="1" resource="0" file="../Source/ImageReader.cpp"/>
-      <FILE id="uNfssC" name="ImageReader.hpp" compile="0" resource="0" file="../Source/ImageReader.hpp"/>
-      <FILE id="KFE1km" name="Images.cpp" compile="1" resource="0" file="../Source/Images.cpp"/>
-      <FILE id="bNKB6z" name="Images.hpp" compile="0" resource="0" file="../Source/Images.hpp"/>
-      <FILE id="TtcZns" name="NewServerWindow.cpp" compile="1" resource="0"
+      <FILE id="zdADmQ" name="ImageReader.cpp" compile="1" resource="0" file="../Source/ImageReader.cpp"/>
+      <FILE id="jsRCkN" name="ImageReader.hpp" compile="0" resource="0" file="../Source/ImageReader.hpp"/>
+      <FILE id="MM6aeB" name="Images.cpp" compile="1" resource="0" file="../Source/Images.cpp"/>
+      <FILE id="CaUZsn" name="Images.hpp" compile="0" resource="0" file="../Source/Images.hpp"/>
+      <FILE id="vOh083" name="NewServerWindow.cpp" compile="1" resource="0"
             file="../Source/NewServerWindow.cpp"/>
-      <FILE id="IE18nC" name="NewServerWindow.hpp" compile="0" resource="0"
+      <FILE id="YEtrjp" name="NewServerWindow.hpp" compile="0" resource="0"
             file="../Source/NewServerWindow.hpp"/>
-      <FILE id="xtRSyq" name="PluginButton.cpp" compile="1" resource="0"
+      <FILE id="RXAF67" name="PluginButton.cpp" compile="1" resource="0"
             file="../Source/PluginButton.cpp"/>
-      <FILE id="eriSMf" name="PluginButton.hpp" compile="0" resource="0"
+      <FILE id="CVWwTM" name="PluginButton.hpp" compile="0" resource="0"
             file="../Source/PluginButton.hpp"/>
-      <FILE id="KoiWSL" name="PluginEditor.cpp" compile="1" resource="0"
+      <FILE id="MReNoI" name="PluginEditor.cpp" compile="1" resource="0"
             file="../Source/PluginEditor.cpp"/>
-      <FILE id="lkGBSv" name="PluginEditor.hpp" compile="0" resource="0"
+      <FILE id="p5SrY8" name="PluginEditor.hpp" compile="0" resource="0"
             file="../Source/PluginEditor.hpp"/>
-      <FILE id="I1MuaF" name="PluginProcessor.cpp" compile="1" resource="0"
+      <FILE id="fX856x" name="PluginProcessor.cpp" compile="1" resource="0"
             file="../Source/PluginProcessor.cpp"/>
-      <FILE id="sfJS6b" name="PluginProcessor.hpp" compile="0" resource="0"
+      <FILE id="dbZlQ7" name="PluginProcessor.hpp" compile="0" resource="0"
             file="../Source/PluginProcessor.hpp"/>
-      <FILE id="jBgUv5" name="ServerPlugin.hpp" compile="0" resource="0"
+      <FILE id="HIUpeV" name="ServerPlugin.hpp" compile="0" resource="0"
             file="../Source/ServerPlugin.hpp"/>
-      <FILE id="qNLsnB" name="ServiceReceiver.cpp" compile="1" resource="0"
+      <FILE id="PtLIN5" name="ServiceReceiver.cpp" compile="1" resource="0"
             file="../Source/ServiceReceiver.cpp"/>
-      <FILE id="jzUfLj" name="ServiceReceiver.hpp" compile="0" resource="0"
+      <FILE id="IvSxoL" name="ServiceReceiver.hpp" compile="0" resource="0"
             file="../Source/ServiceReceiver.hpp"/>
-      <FILE id="JCFwGr" name="StatisticsWindow.cpp" compile="1" resource="0"
+      <FILE id="FRqDjX" name="StatisticsWindow.cpp" compile="1" resource="0"
             file="../Source/StatisticsWindow.cpp"/>
-      <FILE id="FFMZ2w" name="StatisticsWindow.hpp" compile="0" resource="0"
+      <FILE id="GyFFsW" name="StatisticsWindow.hpp" compile="0" resource="0"
             file="../Source/StatisticsWindow.hpp"/>
     </GROUP>
   </MAINGROUP>
@@ -86,9 +86,10 @@
                externalLibraries="avdevice&#10;avcodec&#10;avformat&#10;avfilter&#10;avutil&#10;swscale&#10;swresample&#10;webp&#10;webpmux"
                extraFrameworks="AVFoundation,CoreMedia,VideoToolbox" iosDevelopmentTeamID="62QZB3NCZR">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" headerPath="$(HOME)/audio/AudioGridder/Plugin/Fx/JuceLibraryCode&#10;$(HOME)/audio/AudioGridder/Common/Source&#10;$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg&#10;/usr/local/include"
+        <CONFIGURATION isDebug="1" name="Debug" headerPath="$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg&#10;/usr/local/include"
                        recommendedWarnings="LLVM" libraryPath="$(HOME)/audio/FFmpeg/inst-osx-dbg/lib"
-                       defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING&#10;"/>
+                       defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING&#10;"
+                       enablePluginBinaryCopyStep="1"/>
         <CONFIGURATION isDebug="1" name="Release" headerPath="$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg&#10;/usr/local/include"
                        recommendedWarnings="LLVM" enablePluginBinaryCopyStep="0" optimisation="3"
                        libraryPath="$(HOME)/audio/FFmpeg/inst-osx/lib" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING&#10;JUCE_DISABLE_ASSERTIONS"/>
@@ -142,7 +143,7 @@
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" headerPath="/mnt/audio/vstsdk2.4" defines="JUCE_LINUX"/>
         <CONFIGURATION isDebug="0" name="Release" headerPath="/mnt/audio/vstsdk2.4"
-                       enablePluginBinaryCopyStep="1" defines="JUCE_LINUX"/>
+                       defines="JUCE_LINUX"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_opengl" path="../../juce"/>

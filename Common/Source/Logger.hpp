@@ -21,9 +21,12 @@ class AGLogger : public Thread {
 
     static void log(String msg);
 
-    static void initialize(const String& appName, const String& filePrefix);
+    static void initialize(const String& appName, const String& filePrefix, const String& configFile);
     static std::shared_ptr<AGLogger> getInstance();
     static void cleanup();
+
+    static bool isEnabled() { return m_enabled; }
+    static void setEnabled(bool b);
 
   private:
     File m_file;
@@ -42,6 +45,8 @@ class AGLogger : public Thread {
     static std::shared_ptr<AGLogger> m_inst;
     static std::mutex m_instMtx;
     static size_t m_instRefCount;
+
+    static std::atomic_bool m_enabled;
 };
 }  // namespace e47
 

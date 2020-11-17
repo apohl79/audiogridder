@@ -8,8 +8,10 @@ OutputBaseFilename=AudioGridderPlugin_#STR_VER#
 [Files]
 Source: "..\Plugin\Fx\Builds\VisualStudio2019\x64\Release\VST3\AudioGridder.vst3"; DestDir: {code:GetVST3Dir}; Flags: ignoreversion
 Source: "..\Plugin\Inst\Builds\VisualStudio2019\x64\Release\VST3\AudioGridderInst.vst3"; DestDir: {code:GetVST3Dir}; Flags: ignoreversion
+Source: "..\Plugin\Midi\Builds\VisualStudio2019\x64\Release\VST3\AudioGridderMidi.vst3"; DestDir: {code:GetVST3Dir}; Flags: ignoreversion
 Source: "..\Plugin\Fx\Builds\VisualStudio2019\x64\Release\VST\AudioGridder.dll"; DestDir: {code:GetVST2Dir}; Flags: ignoreversion
 Source: "..\Plugin\Inst\Builds\VisualStudio2019\x64\Release\VST\AudioGridderInst.dll"; DestDir: {code:GetVST2Dir}; Flags: ignoreversion
+Source: "..\Plugin\Midi\Builds\VisualStudio2019\x64\Release\VST\AudioGridderMidi.dll"; DestDir: {code:GetVST2Dir}; Flags: ignoreversion
 
 [Code]
 var

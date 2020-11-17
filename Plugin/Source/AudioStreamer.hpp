@@ -8,6 +8,10 @@
 #ifndef AudioStreamer_hpp
 #define AudioStreamer_hpp
 
+#include <memory>
+#include "Client.hpp"
+#include "Metrics.hpp"
+
 template <typename T>
 class AudioStreamer : public Thread, public LogTagDelegate {
   public:
@@ -24,7 +28,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
     boost::lockfree::spsc_queue<AudioMidiBuffer> writeQ, readQ;
     std::mutex writeMtx, readMtx, sockMtx;
     std::condition_variable writeCv, readCv;
-    TimeStatistics::Duration duration;
+    TimeStatistic::Duration duration;
+    std::shared_ptr<Meter> m_bytesOutMeter, m_bytesInMeter;
 
     AudioMidiBuffer workingSendBuf, workingReadBuf;
     int workingSendSamples = 0;
@@ -38,7 +43,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
           socket(std::unique_ptr<StreamingSocket>(sock)),
           writeQ(as<size_t>(clnt->NUM_OF_BUFFERS * 2)),
           readQ(as<size_t>(clnt->NUM_OF_BUFFERS * 2)),
-          duration(TimeStatistics::getDuration("audio")) {
+          duration(TimeStatistic::getDuration("audio")) {
         setLogTagSource(client);
         traceScope();
 
@@ -50,6 +55,9 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         }
         workingSendBuf.audio.clear();
         workingReadBuf.audio.clear();
+
+        m_bytesOutMeter = Metrics::getStatistic<Meter>("NetBytesOut");
+        m_bytesInMeter = Metrics::getStatistic<Meter>("NetBytesIn");
     }
 
     ~AudioStreamer() {
@@ -325,7 +333,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         if (nullptr != socket) {
             std::lock_guard<std::mutex> lock(sockMtx);
             return msg.sendToServer(socket.get(), buffer.audio, buffer.midi, buffer.posInfo, buffer.channelsRequested,
-                                    buffer.samplesRequested);
+                                    buffer.samplesRequested, nullptr, *m_bytesOutMeter);
         } else {
             return false;
         }
@@ -341,7 +349,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                 buffer.audio.setSize(buffer.channelsRequested, buffer.samplesRequested);
             }
             std::lock_guard<std::mutex> lock(sockMtx);
-            success = msg.readFromServer(socket.get(), buffer.audio, buffer.midi, e);
+            success = msg.readFromServer(socket.get(), buffer.audio, buffer.midi, e, *m_bytesInMeter);
         }
         if (success) {
             client->m_latency = msg.getLatencySamples();

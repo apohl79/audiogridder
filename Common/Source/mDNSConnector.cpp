@@ -18,7 +18,6 @@
 #else
 #include <netdb.h>
 #include <ifaddrs.h>
-#include <sys/select.h>
 #include <unistd.h>
 #endif
 
@@ -135,7 +134,8 @@ int mDNSConnector::openClientSockets(int maxSockets, int port) {
                     int sock = mdns_socket_open_ipv4(saddr);
                     if (sock >= 0) {
                         m_sockets.add(sock);
-                        logln("opened socket for " << ipv4ToString(saddr, sizeof(sockaddr_in)));
+                        logln("opened socket " << sock << " for " << ipv4ToString(saddr, sizeof(sockaddr_in)) << " ("
+                                               << ifa->ifa_name << ")");
                     }
                 }
             }
@@ -155,7 +155,8 @@ int mDNSConnector::openClientSockets(int maxSockets, int port) {
                     int sock = mdns_socket_open_ipv6(saddr);
                     if (sock >= 0) {
                         m_sockets.add(sock);
-                        logln("opened socket for " << ipv6ToString(saddr, sizeof(sockaddr_in6)));
+                        logln("opened socket for " << ipv6ToString(saddr, sizeof(sockaddr_in6)) << " (" << ifa->ifa_name
+                                                   << ")");
                     }
                 }
             }
@@ -191,7 +192,7 @@ int mDNSConnector::openServiceSockets(int maxSockets) {
         sock_addr.sin_len = sizeof(struct sockaddr_in);
 #endif
         int sock = mdns_socket_open_ipv4(&sock_addr);
-        if (sock >= 0) {
+        if (sock > 0) {
             m_sockets.add(sock);
             logln("opened socket for " << ipv4ToString(&sock_addr, sizeof(sockaddr_in)));
         }
@@ -207,7 +208,7 @@ int mDNSConnector::openServiceSockets(int maxSockets) {
         sock_addr.sin6_len = sizeof(struct sockaddr_in6);
 #endif
         int sock = mdns_socket_open_ipv6(&sock_addr);
-        if (sock >= 0) {
+        if (sock > 0) {
             m_sockets.add(sock);
             logln("opened socket for " << ipv6ToString(&sock_addr, sizeof(sockaddr_in6)));
         }
@@ -226,9 +227,26 @@ void mDNSConnector::readResponses(mdns_record_callback_fn callback, void* userDa
 
 void mDNSConnector::sendQuery(const String& service) {
     traceScope();
-    for (int sock : m_sockets) {
-        mdns_query_send(sock, MDNS_RECORDTYPE_PTR, service.getCharPointer(), (size_t)service.length(), m_buffer,
-                        m_bufferSize, 0);
+    for (int i = 0; i < m_sockets.size();) {
+        int sock = m_sockets[i];
+        if (mdns_query_send(sock, MDNS_RECORDTYPE_PTR, service.getCharPointer(), (size_t)service.length(), m_buffer,
+                            m_bufferSize, 0) < 0) {
+            int e = errno;
+#ifdef JUCE_WINDOWS
+            logln("failed to send query: " << strerror(e));
+#else
+            char errstr[64];
+            if (0 == strerror_r(e, errstr, sizeof(errstr))) {
+                logln("failed to send query: " << errstr);
+            } else {
+                logln("failed to send query: errno=" << e);
+            }
+#endif
+            m_sockets.remove(i);
+            logln("remaining sockets: " << m_sockets.size());
+        } else {
+            i++;
+        }
     }
 }
 

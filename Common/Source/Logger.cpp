@@ -6,10 +6,14 @@
  */
 
 #include "Logger.hpp"
+#include "Defaults.hpp"
+#include "json.hpp"
 
 #if defined(JUCE_DEBUG) && defined(JUCE_WINDOWS)
 #include <windows.h>
 #endif
+
+using json = nlohmann::json;
 
 namespace e47 {
 
@@ -17,26 +21,25 @@ std::shared_ptr<AGLogger> AGLogger::m_inst;
 std::mutex AGLogger::m_instMtx;
 size_t AGLogger::m_instRefCount = 0;
 
+std::atomic_bool AGLogger::m_enabled{false};
+
 AGLogger::AGLogger(const String& appName, const String& filePrefix) : Thread("AGLogger") {
 #ifdef JUCE_DEBUG
     m_logToErr = juce_isRunningUnderDebugger();
 #endif
-    m_file = FileLogger::getSystemLogFileFolder()
-                 .getChildFile(appName)
-                 .getChildFile(filePrefix + Time::getCurrentTime().formatted("%Y-%m-%d_%H-%M-%S"))
-                 .withFileExtension(".log")
-                 .getNonexistentSibling();
-    if (!m_file.exists()) {
-        m_file.create();
+    m_file = File(Defaults::getLogFileName(appName, filePrefix, ".log")).getNonexistentSibling();
+    // create dir if needed
+    auto d = m_file.getParentDirectory();
+    if (!d.exists()) {
+        d.createDirectory();
     }
-    m_outstream.open(m_file.getFullPathName().getCharPointer());
-    if (m_outstream.is_open()) {
-        startThread();
-    }
+    cleanDirectory(d.getFullPathName(), filePrefix, ".log");
 }
 
 AGLogger::~AGLogger() {
-    stopThread(3000);
+    if (isThreadRunning()) {
+        stopThread(3000);
+    }
     if (m_outstream.is_open()) {
         m_outstream.close();
     }
@@ -69,9 +72,11 @@ void AGLogger::run() {
 }
 
 void AGLogger::log(String msg) {
-    auto inst = getInstance();
-    if (nullptr != inst) {
-        inst->logReal(std::move(msg));
+    if (m_enabled) {
+        auto inst = getInstance();
+        if (nullptr != inst) {
+            inst->logReal(std::move(msg));
+        }
     }
 }
 
@@ -81,12 +86,20 @@ void AGLogger::logReal(String msg) {
     m_cv.notify_one();
 }
 
-void AGLogger::initialize(const String& appName, const String& filePrefix) {
-    std::lock_guard<std::mutex> lock(m_instMtx);
-    if (nullptr == m_inst) {
-        m_inst = std::make_shared<AGLogger>(appName, filePrefix);
+void AGLogger::initialize(const String& appName, const String& filePrefix, const String& configFile) {
+    bool checkConfig = false;
+    {
+        std::lock_guard<std::mutex> lock(m_instMtx);
+        if (nullptr == m_inst) {
+            m_inst = std::make_shared<AGLogger>(appName, filePrefix);
+            checkConfig = true;
+        }
+        m_instRefCount++;
     }
-    m_instRefCount++;
+    if (checkConfig) {
+        bool enable = jsonGetValue(configParseFile(configFile), "Logger", m_enabled.load());
+        setEnabled(enable);
+    }
 }
 
 std::shared_ptr<AGLogger> AGLogger::getInstance() { return m_inst; }
@@ -95,9 +108,28 @@ void AGLogger::cleanup() {
     std::lock_guard<std::mutex> lock(m_instMtx);
     m_instRefCount--;
     if (m_instRefCount == 0) {
-        m_inst->signalThreadShouldExit();
-        m_inst->log("");
+        if (m_inst->isThreadRunning()) {
+            m_inst->signalThreadShouldExit();
+            m_inst->logReal("");
+        }
         m_inst.reset();
     }
 }
+
+void AGLogger::setEnabled(bool b) {
+    if (b) {
+        std::lock_guard<std::mutex> lock(m_instMtx);
+        if (nullptr != m_inst && !m_inst->m_outstream.is_open()) {
+            if (!m_inst->m_file.exists()) {
+                m_inst->m_file.create();
+            }
+            m_inst->m_outstream.open(m_inst->m_file.getFullPathName().getCharPointer());
+            if (m_inst->m_outstream.is_open()) {
+                m_inst->startThread();
+            }
+        }
+    }
+    m_enabled = b;
+}
+
 }  // namespace e47

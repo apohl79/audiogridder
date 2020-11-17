@@ -57,6 +57,10 @@ void CPUInfo::run() {
     }
 #endif
 
+    std::vector<float> lastValues(5);
+    memset(lastValues.data(), 0, lastValues.size() * sizeof(float));
+    size_t valueIdx = 0;
+
     while (!currentThreadShouldExit()) {
         const int waitTime = 1000;
 
@@ -92,7 +96,7 @@ void CPUInfo::run() {
             idleTime += procInfoEnd[i].cpu_ticks[CPU_STATE_IDLE] - procInfoStart[i].cpu_ticks[CPU_STATE_IDLE];
         }
         float totalTime = (float)usageTime + idleTime;
-        m_usage = (float)usageTime / totalTime * 100;
+        float usage = (float)usageTime / totalTime * 100;
 #elif defined(JUCE_WINDOWS)
         DWORD retSize;
         SYSTEM_BASIC_INFORMATION sbi = {0};
@@ -136,8 +140,14 @@ void CPUInfo::run() {
             idleTime += spiEnd[i].IdleTime.QuadPart - spiStart[i].IdleTime.QuadPart;
         }
         auto usageTime = (float)totalTime - idleTime;
-        m_usage = usageTime / totalTime * 100;
+        float usage = usageTime / totalTime * 100;
 #endif
+        lastValues[valueIdx++ % lastValues.size()] = usage;
+        usage = 0;
+        for (auto u : lastValues) {
+            usage += u;
+        }
+        m_usage = usage / lastValues.size();
     }
 }
 

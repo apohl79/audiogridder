@@ -42,7 +42,7 @@ int queryCallback(int sock, const struct sockaddr* from, size_t addrlen, mdns_en
 void ServiceReceiver::run() {
     traceScope();
     mDNSConnector connector(this);
-    int num = connector.openClientSockets(32, 33445);
+    int num = connector.openClientSockets(32, 0);
     if (num < 1) {
         logln("failed to open client socket(s)");
         return;
@@ -53,7 +53,7 @@ void ServiceReceiver::run() {
     while (!currentThreadShouldExit()) {
         m_currentResult.clear();
 
-        connector.sendQuery(MDNS_SERVICE_NAME);
+        connector.sendQuery(Defaults::MDNS_SERVICE_NAME);
         // read/store result
         auto timeout = Time::currentTimeMillis() + 3000;
         do {
@@ -231,6 +231,15 @@ String ServiceReceiver::hostToName(const String& host) {
         }
     }
     return host;
+}
+
+ServerInfo ServiceReceiver::hostToServerInfo(const String& host) {
+    for (auto& s : getServers()) {
+        if (s.getHost() == host) {
+            return s;
+        }
+    }
+    return {};
 }
 
 }  // namespace e47

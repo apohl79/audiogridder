@@ -6,6 +6,7 @@
  */
 
 #include "AudioWorker.hpp"
+#include <memory>
 #include "Message.hpp"
 #include "Defaults.hpp"
 #include "App.hpp"
@@ -13,16 +14,24 @@
 
 namespace e47 {
 
-HashMap<String, AudioWorker::RecentsListType> AudioWorker::m_recents;
+std::atomic_uint32_t AudioWorker::count{0};
+std::atomic_uint32_t AudioWorker::runCount{0};
+std::unordered_map<String, AudioWorker::RecentsListType> AudioWorker::m_recents;
 std::mutex AudioWorker::m_recentsMtx;
+
+AudioWorker::AudioWorker(LogTag* tag) : Thread("AudioWorker"), LogTagDelegate(tag) {
+    initAsyncFunctors();
+    count++;
+}
 
 AudioWorker::~AudioWorker() {
     traceScope();
+    stopAsyncFunctors();
     if (nullptr != m_socket && m_socket->isConnected()) {
         m_socket->close();
     }
-    m_recents.clear();
     waitForThreadAndLog(getLogTagSource(), this);
+    count--;
 }
 
 void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channelsIn, int channelsOut, double rate,
@@ -44,6 +53,7 @@ void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channelsIn, int c
 
 void AudioWorker::run() {
     traceScope();
+    runCount++;
     logln("audio processor started");
 
     AudioBuffer<float> bufferF;
@@ -51,7 +61,9 @@ void AudioWorker::run() {
     MidiBuffer midi;
     AudioMessage msg(getLogTagSource());
     AudioPlayHead::CurrentPositionInfo posInfo;
-    auto duration = TimeStatistics::getDuration("audio");
+    auto duration = TimeStatistic::getDuration("audio");
+    auto bytesIn = Metrics::getStatistic<Meter>("NetBytesIn");
+    auto bytesOut = Metrics::getStatistic<Meter>("NetBytesOut");
 
     ProcessorChain::PlayHead playHead(&posInfo);
     m_chain->prepareToPlay(m_rate, m_samplesPerBlock);
@@ -61,7 +73,8 @@ void AudioWorker::run() {
     while (!currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected()) {
         // Read audio chunk
         if (m_socket->waitUntilReady(true, 1000)) {
-            if (msg.readFromClient(m_socket.get(), bufferF, bufferD, midi, posInfo, m_chain->getExtraChannels(), &e)) {
+            if (msg.readFromClient(m_socket.get(), bufferF, bufferD, midi, posInfo, m_chain->getExtraChannels(), &e,
+                                   *bytesIn)) {
                 duration.reset();
                 if (hasToSetPlayHead) {  // do not set the playhead before it's initialized
                     m_chain->setPlayHead(&playHead);
@@ -84,15 +97,15 @@ void AudioWorker::run() {
                         m_chain->processBlock(bufferF, midi);
                         bufferD.makeCopyOf(bufferF);
                     }
-                    sendOk =
-                        msg.sendToClient(m_socket.get(), bufferD, midi, m_chain->getLatencySamples(), m_channelsOut);
+                    sendOk = msg.sendToClient(m_socket.get(), bufferD, midi, m_chain->getLatencySamples(),
+                                              m_channelsOut, &e, *bytesOut);
                 } else {
                     m_chain->processBlock(bufferF, midi);
-                    sendOk =
-                        msg.sendToClient(m_socket.get(), bufferF, midi, m_chain->getLatencySamples(), m_channelsOut);
+                    sendOk = msg.sendToClient(m_socket.get(), bufferF, midi, m_chain->getLatencySamples(),
+                                              m_channelsOut, &e, *bytesOut);
                 }
                 if (!sendOk) {
-                    logln("error: failed to send audio data to client");
+                    logln("error: failed to send audio data to client: " << e.toString());
                     m_socket->close();
                 }
                 duration.update();
@@ -108,6 +121,7 @@ void AudioWorker::run() {
     clear();
     signalThreadShouldExit();
     logln("audio processor terminated");
+    runCount--;
 }
 
 void AudioWorker::shutdown() {
@@ -119,23 +133,13 @@ void AudioWorker::clear() {
     traceScope();
     if (nullptr != m_chain) {
         m_chain->releaseResources();
-        if (!MessageManager::getInstance()->isThisTheMessageThread()) {
-            if (m_chain->getSize() > 0) {
-                auto pChain = m_chain;
-                MessageManager::callAsync([this, pChain] {
-                    traceScope1();
-                    pChain->clear();
-                });
-            }
-        } else {
-            m_chain->clear();
-        }
+        m_chain->clear();
     }
 }
 
-bool AudioWorker::addPlugin(const String& id) {
+bool AudioWorker::addPlugin(const String& id, String& err) {
     traceScope();
-    return m_chain->addPluginProcessor(id);
+    return m_chain->addPluginProcessor(id, err);
 }
 
 void AudioWorker::delPlugin(int idx) {
@@ -150,27 +154,31 @@ void AudioWorker::exchangePlugins(int idxA, int idxB) {
     m_chain->exchangeProcessors(idxA, idxB);
 }
 
-AudioWorker::RecentsListType& AudioWorker::getRecentsList(String host) const {
+String AudioWorker::getRecentsList(String host) const {
     traceScope();
     std::lock_guard<std::mutex> lock(m_recentsMtx);
-    return m_recents.getReference(host);
+    if (m_recents.find(host) == m_recents.end()) {
+        return "";
+    }
+    auto& recents = m_recents[host];
+    String list;
+    for (auto& r : recents) {
+        list += AGProcessor::createString(r) + "\n";
+    }
+    return list;
 }
 
 void AudioWorker::addToRecentsList(const String& id, const String& host) {
     traceScope();
-    auto& pluginList = getApp()->getPluginList();
-    auto plug = pluginList.getTypeForIdentifierString(id);
+    auto plug = AGProcessor::findPluginDescritpion(id);
     if (plug != nullptr) {
-        auto& recents = getRecentsList(host);
+        std::lock_guard<std::mutex> lock(m_recentsMtx);
+        auto& recents = m_recents[host];
+        recents.removeAllInstancesOf(*plug);
         recents.insert(0, *plug);
-        for (int i = 1; i < recents.size(); i++) {
-            if (!plug->createIdentifierString().compare(recents.getReference(i).createIdentifierString())) {
-                recents.remove(i);
-                break;
-            }
-        }
-        while (recents.size() > DEFAULT_NUM_RECENTS) {
-            recents.removeLast();
+        int toRemove = recents.size() - Defaults::DEFAULT_NUM_RECENTS;
+        if (toRemove > 0) {
+            recents.removeLast(toRemove);
         }
     }
 }

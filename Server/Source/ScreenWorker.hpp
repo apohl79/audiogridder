@@ -18,7 +18,10 @@ namespace e47 {
 
 class ScreenWorker : public Thread, public LogTagDelegate {
   public:
-    ScreenWorker() : Thread("ScreenWorker") {}
+    static std::atomic_uint32_t count;
+    static std::atomic_uint32_t runCount;
+
+    ScreenWorker(LogTag* tag);
     virtual ~ScreenWorker();
 
     void init(std::unique_ptr<StreamingSocket> s);
@@ -45,6 +48,10 @@ class ScreenWorker : public Thread, public LogTagDelegate {
     bool m_updated = false;
     std::mutex m_currentImageLock;
     std::condition_variable m_currentImageCv;
+
+    std::atomic_bool m_visible{false};
+
+    ENABLE_ASYNC_FUNCTORS();
 };
 
 }  // namespace e47

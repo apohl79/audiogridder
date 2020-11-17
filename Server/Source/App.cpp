@@ -8,31 +8,17 @@
 #include "App.hpp"
 #include "Server.hpp"
 #include "Screen.h"
+#include "Signals.hpp"
+#include "CoreDump.hpp"
 
 #ifdef JUCE_WINDOWS
-#include "MiniDump.hpp"
 #include <stdlib.h>
 #include <tchar.h>
 #endif
 
-#include <signal.h>
-
 namespace e47 {
 
-App::App() : LogTag("app") {}
-
-#ifdef JUCE_WINDOWS
-void abortHandler(int /*signal*/) {
-    setLogTagStatic("abort");
-    traceScope();
-    RaiseException(0, 0, 0, NULL);
-}
-#endif
-
 void App::initialise(const String& commandLineParameters) {
-#ifdef JUCE_MAC
-    signal(SIGPIPE, SIG_IGN);
-#endif
     auto args = getCommandLineParameterArray();
     enum Modes { SCAN, MASTER, SERVER };
     Modes mode = MASTER;
@@ -48,26 +34,32 @@ void App::initialise(const String& commandLineParameters) {
             srvid = args[i + 1].getIntValue();
         }
     }
-    String logName = "AudioGridderServer_";
+    String appName;
+    String logName = getApplicationName() + "_";
     switch (mode) {
         case MASTER:
-            logName << "Master_";
+            appName = "Master";
             break;
         case SCAN:
-            logName << "Scan_" << fileToScan << "_";
+            appName = "Scan";
+            logName = fileToScan + "_";
             logName = logName.replaceCharacters(":/\\|. ", "------");
             break;
         case SERVER:
+            appName = "Server";
             break;
     }
-    Tracer::initialize(getApplicationName(), logName);
-    AGLogger::initialize(getApplicationName(), logName);
+    AGLogger::initialize(appName, logName, Defaults::getConfigFileName(Defaults::ConfigServer));
+    Tracer::initialize(appName, logName);
+    Signals::initialize();
+
     logln("commandline: " << commandLineParameters);
     switch (mode) {
         case SCAN:
 #ifdef JUCE_MAC
             Process::setDockIconVisible(false);
 #endif
+            AGLogger::setEnabled(true);
             if (fileToScan.length() > 0) {
                 auto parts = StringArray::fromTokens(fileToScan, "|", "");
                 String id = parts[0];
@@ -88,14 +80,7 @@ void App::initialise(const String& commandLineParameters) {
             break;
         case SERVER: {
             traceScope();
-#ifdef JUCE_WINDOWS
-            signal(SIGABRT, abortHandler);
-            auto dumpPath = FileLogger::getSystemLogFileFolder().getFullPathName();
-            auto appName = getApplicationName();
-            MiniDump::initialize(dumpPath.toWideCharPointer(), appName.toWideCharPointer(), logName.toWideCharPointer(),
-                                 AUDIOGRIDDER_VERSIONW, false);
-#endif
-
+            CoreDump::initialize(appName, logName, false);
             showSplashWindow();
             setSplashInfo("Starting server...");
             m_menuWindow = std::make_unique<MenuBarWindow>(this);
@@ -110,7 +95,8 @@ void App::initialise(const String& commandLineParameters) {
             if (srvid > -1) {
                 opts["ID"] = srvid;
             }
-            m_server = std::make_unique<Server>(opts);
+            m_server = std::make_shared<Server>(opts);
+            m_server->initialize();
             m_server->startThread();
             break;
         }
@@ -137,7 +123,7 @@ void App::initialise(const String& commandLineParameters) {
                                 logln("killing child process");
                                 proc.kill();
                                 proc.waitForProcessToFinish(-1);
-                                File serverRunFile(SERVER_RUN_FILE);
+                                File serverRunFile(Defaults::getConfigFileName(Defaults::ConfigServerRun));
                                 if (serverRunFile.exists()) {
                                     serverRunFile.deleteFile();
                                 }
@@ -146,10 +132,13 @@ void App::initialise(const String& commandLineParameters) {
                             }
                         }
                         ec = proc.getExitCode();
-                        if (ec != 0) {
+                        if (ec == EXIT_RESTART) {
+                            logln("restarting server");
+                            continue;
+                        } else if (ec != 0) {
                             logln("error: server failed with exit code " << as<int>(ec));
                         }
-                        File serverRunFile(SERVER_RUN_FILE);
+                        File serverRunFile(Defaults::getConfigFileName(Defaults::ConfigServerRun));
                         if (serverRunFile.exists()) {
                             logln("error: server did non shutdown properly");
                             serverRunFile.deleteFile();
@@ -170,23 +159,39 @@ void App::initialise(const String& commandLineParameters) {
     logln("initialise complete");
 }
 
+void App::prepareShutdown(uint32 exitCode) {
+    traceScope();
+    logln("preparing shutdown");
+
+    m_exitCode = exitCode;
+
+    std::thread([this] {
+        traceScope();
+
+        if (m_server != nullptr) {
+            m_server->shutdown();
+            m_server->waitForThreadToExit(-1);
+            m_server.reset();
+        }
+
+        quit();
+    }).detach();
+}
+
 void App::shutdown() {
     traceScope();
     logln("shutdown");
-    if (m_server != nullptr) {
-        m_server->shutdown();
-        m_server->waitForThreadToExit(-1);
-        m_server.reset();
-    }
+
     if (m_child != nullptr) {
         m_stopChild = true;
         if (m_child->joinable()) {
             m_child->join();
         }
     }
+
     Tracer::cleanup();
     AGLogger::cleanup();
-    setApplicationReturnValue(0);
+    setApplicationReturnValue((int)m_exitCode);
 }
 
 void App::restartServer(bool rescan) {
@@ -202,7 +207,7 @@ void App::restartServer(bool rescan) {
     setSplashInfo("Restarting server...");
 
     std::thread([this, rescan] {
-        traceScope1();
+        traceScope();
 
         logln("running restart thread");
 
@@ -219,6 +224,7 @@ void App::restartServer(bool rescan) {
             opts["NoScanForPlugins"] = true;
         }
         m_server = std::make_unique<Server>(opts);
+        m_server->initialize();
         m_server->startThread();
     }).detach();
 }

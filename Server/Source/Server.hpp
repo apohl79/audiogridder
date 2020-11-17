@@ -26,7 +26,8 @@ using json = nlohmann::json;
 class Server : public Thread, public LogTag {
   public:
     Server(json opts = {});
-    virtual ~Server();
+    ~Server();
+    void initialize();
     void shutdown();
     void loadConfig();
     void saveConfig();
@@ -56,8 +57,8 @@ class Server : public Thread, public LogTag {
     void setScreenCapturingOff(bool b) { m_screenCapturingOff = b; }
     bool getScanForPlugins() const { return m_scanForPlugins; }
     void setScanForPlugins(bool b) { m_scanForPlugins = b; }
-    bool getUsePluginFilenames() const { return m_usePluginFilenames; }
-    void setUsePluginFilenames(bool b) { m_usePluginFilenames = b; }
+    bool getUseJucePluginIDs() const { return m_useJucePluginIDs; }
+    void setUseJucePluginIDs(bool b) { m_useJucePluginIDs = b; }
     void run();
     const KnownPluginList& getPluginList() const { return m_pluginlist; }
     KnownPluginList& getPluginList() { return m_pluginlist; }
@@ -73,11 +74,11 @@ class Server : public Thread, public LogTag {
     json m_opts;
 
     String m_host;
-    int m_port = DEFAULT_SERVER_PORT;
+    int m_port = Defaults::SERVER_PORT;
     int m_id = 0;
     String m_name;
     StreamingSocket m_masterSocket;
-    using WorkerList = Array<std::unique_ptr<Worker>>;
+    using WorkerList = Array<std::shared_ptr<Worker>>;
     WorkerList m_workers;
     KnownPluginList m_pluginlist;
     std::set<String> m_pluginexclude;
@@ -92,7 +93,7 @@ class Server : public Thread, public LogTag {
     StringArray m_vst3Folders;
     StringArray m_vst2Folders;
     bool m_scanForPlugins = true;
-    bool m_usePluginFilenames = false;
+    bool m_useJucePluginIDs = false;
 
     void scanNextPlugin(const String& id, const String& fmt);
     void scanForPlugins();
@@ -102,15 +103,12 @@ class Server : public Thread, public LogTag {
     static void loadKnownPluginList(KnownPluginList& plist);
     static void saveKnownPluginList(KnownPluginList& plist);
 
-    inline bool hasOpt(const std::string& name) const { return m_opts.find(name) != m_opts.end(); }
-
     template <typename T>
-    inline T getOpt(const std::string& name, T def) const {
-        if (!hasOpt(name)) {
-            return def;
-        }
-        return m_opts[name].get<T>();
+    inline T getOpt(const String& name, T def) const {
+        return jsonGetValue(m_opts, name, def);
     }
+
+    ENABLE_ASYNC_FUNCTORS();
 };
 
 }  // namespace e47

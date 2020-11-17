@@ -18,7 +18,21 @@ class ProcessorChain;
 
 class AGProcessor : public LogTagDelegate {
   public:
+    static std::atomic_uint32_t count;
+    static std::atomic_uint32_t loadedCount;
+
     AGProcessor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize);
+    ~AGProcessor();
+
+    static String createPluginID(const PluginDescription& d, bool useJuce);
+    static String createPluginID(const PluginDescription& d);
+
+    inline static String createString(const PluginDescription& d) {
+        return d.name + ";" + d.manufacturerName + ";" + createPluginID(d) + ";" + d.pluginFormatName + ";" +
+               d.category + "\n";
+    }
+
+    static std::unique_ptr<PluginDescription> findPluginDescritpion(const String& id);
 
     std::shared_ptr<AudioPluginInstance> getPlugin() {
         traceScope();
@@ -37,11 +51,11 @@ class AGProcessor : public LogTagDelegate {
     }
 
     static std::shared_ptr<AudioPluginInstance> loadPlugin(PluginDescription& plugdesc, double sampleRate,
-                                                           int blockSize);
+                                                           int blockSize, String& err);
     static std::shared_ptr<AudioPluginInstance> loadPlugin(const String& fileOrIdentifier, double sampleRate,
-                                                           int blockSize);
+                                                           int blockSize, String& err);
 
-    bool load();
+    bool load(String& err);
     void unload();
 
     template <typename T>
@@ -60,6 +74,7 @@ class AGProcessor : public LogTagDelegate {
         auto p = getPlugin();
         if (nullptr != p) {
             p->prepareToPlay(sampleRate, maximumExpectedSamplesPerBlock);
+            prepared = true;
         }
     }
 
@@ -68,6 +83,7 @@ class AGProcessor : public LogTagDelegate {
         auto p = getPlugin();
         if (nullptr != p) {
             p->releaseResources();
+            prepared = false;
         }
     }
 
@@ -160,8 +176,9 @@ class AGProcessor : public LogTagDelegate {
     std::shared_ptr<AudioPluginInstance> m_plugin;
     std::mutex m_pluginMtx;
     int m_additionalScreenSpace = 0;
+    bool prepared = false;
 
-    static std::mutex m_pluginLoaderMtx;
+    // static std::mutex m_pluginLoaderMtx;
 };
 
 class ProcessorChain : public AudioProcessor, public LogTagDelegate {
@@ -217,8 +234,8 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
     void getStateInformation(juce::MemoryBlock& /* destData */) override {}
     void setStateInformation(const void* /* data */, int /* sizeInBytes */) override {}
 
-    bool initPluginInstance(std::shared_ptr<AudioPluginInstance> processor);
-    bool addPluginProcessor(const String& id);
+    bool initPluginInstance(std::shared_ptr<AudioPluginInstance> processor, String& err);
+    bool addPluginProcessor(const String& id, String& err);
     void addProcessor(std::shared_ptr<AGProcessor> processor);
     size_t getSize() const { return m_processors.size(); }
     std::shared_ptr<AGProcessor> getProcessor(int index);

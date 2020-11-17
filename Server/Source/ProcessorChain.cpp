@@ -11,50 +11,91 @@
 
 namespace e47 {
 
-std::mutex AGProcessor::m_pluginLoaderMtx;
+std::atomic_uint32_t AGProcessor::count{0};
+std::atomic_uint32_t AGProcessor::loadedCount{0};
 
 AGProcessor::AGProcessor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize)
     : LogTagDelegate(chain.getLogTagSource()),
       m_chain(chain),
       m_id(id),
       m_sampleRate(sampleRate),
-      m_blockSize(blockSize) {}
+      m_blockSize(blockSize) {
+    count++;
+}
 
-// Sync version.
+AGProcessor::~AGProcessor() {
+    unload();
+    count--;
+}
+
+String AGProcessor::createPluginID(const PluginDescription& d, bool useJuce) {
+    if (useJuce) {
+        return d.createIdentifierString();
+    } else {
+        return d.pluginFormatName + "-" + d.name + "-" + String::toHexString(d.uid);
+    }
+}
+
+String AGProcessor::createPluginID(const PluginDescription& d) {
+    return createPluginID(d, getApp()->getServer().getUseJucePluginIDs());
+}
+
+std::unique_ptr<PluginDescription> AGProcessor::findPluginDescritpion(const String& id) {
+    auto& pluglist = getApp()->getPluginList();
+    std::unique_ptr<PluginDescription> plugdesc;
+    for (auto& desc : pluglist.getTypes()) {
+        if (createPluginID(desc) == id) {
+            plugdesc = std::make_unique<PluginDescription>(desc);
+        }
+    }
+    // fallback with juce ID
+    if (nullptr == plugdesc) {
+        plugdesc = pluglist.getTypeForIdentifierString(id);
+    }
+    // fallback with filename
+    if (nullptr == plugdesc) {
+        plugdesc = pluglist.getTypeForFile(id);
+    }
+    return plugdesc;
+}
+
 std::shared_ptr<AudioPluginInstance> AGProcessor::loadPlugin(PluginDescription& plugdesc, double sampleRate,
-                                                             int blockSize) {
+                                                             int blockSize, String& err) {
     setLogTagStatic("agprocessor");
     traceScope();
-    String err;
+    String err2;
     AudioPluginFormatManager plugmgr;
     plugmgr.addDefaultFormats();
     // std::lock_guard<std::mutex> lock(m_pluginLoaderMtx);  // don't load plugins in parallel
-    auto inst =
-        std::shared_ptr<AudioPluginInstance>(plugmgr.createPluginInstance(plugdesc, sampleRate, blockSize, err));
+    std::shared_ptr<AudioPluginInstance> inst;
+    runOnMsgThreadSync([&] {
+        traceScope();
+        inst =
+            std::shared_ptr<AudioPluginInstance>(plugmgr.createPluginInstance(plugdesc, sampleRate, blockSize, err2));
+    });
     if (nullptr == inst) {
-        logln("failed loading plugin " << plugdesc.fileOrIdentifier << ": " << err);
+        err = "failed loading plugin ";
+        err << plugdesc.fileOrIdentifier << ": " << err2;
+        logln(err);
     }
     return inst;
 }
 
-std::shared_ptr<AudioPluginInstance> AGProcessor::loadPlugin(const String& id, double sampleRate, int blockSize) {
+std::shared_ptr<AudioPluginInstance> AGProcessor::loadPlugin(const String& id, double sampleRate, int blockSize,
+                                                             String& err) {
     setLogTagStatic("agprocessor");
     traceScope();
-    auto& pluglist = getApp()->getPluginList();
-    auto plugdesc = pluglist.getTypeForIdentifierString(id);
-    // try fallback
-    if (nullptr == plugdesc) {
-        plugdesc = pluglist.getTypeForFile(id);
-    }
+    auto plugdesc = findPluginDescritpion(id);
     if (nullptr != plugdesc) {
-        return loadPlugin(*plugdesc, sampleRate, blockSize);
+        return loadPlugin(*plugdesc, sampleRate, blockSize, err);
     } else {
-        logln("failed to find plugin descriptor");
+        err = "failed to find plugin descriptor";
+        logln(err);
     }
     return nullptr;
 }
 
-bool AGProcessor::load() {
+bool AGProcessor::load(String& err) {
     traceScope();
     bool loaded = false;
     std::shared_ptr<AudioPluginInstance> p;
@@ -63,12 +104,13 @@ bool AGProcessor::load() {
         p = m_plugin;
     }
     if (nullptr == p) {
-        p = loadPlugin(m_id, m_sampleRate, m_blockSize);
+        p = loadPlugin(m_id, m_sampleRate, m_blockSize, err);
         if (nullptr != p) {
-            if (m_chain.initPluginInstance(p)) {
+            if (m_chain.initPluginInstance(p, err)) {
                 loaded = true;
                 std::lock_guard<std::mutex> lock(m_pluginMtx);
                 m_plugin = p;
+                loadedCount++;
             }
         }
     }
@@ -80,8 +122,14 @@ void AGProcessor::unload() {
     std::shared_ptr<AudioPluginInstance> p;
     {
         std::lock_guard<std::mutex> lock(m_pluginMtx);
-        p = m_plugin;
-        m_plugin.reset();
+        if (nullptr != m_plugin) {
+            if (prepared) {
+                m_plugin->releaseResources();
+            }
+            p = m_plugin;
+            m_plugin.reset();
+            loadedCount--;
+        }
     }
 }
 
@@ -182,37 +230,29 @@ bool ProcessorChain::setProcessorBusesLayout(std::shared_ptr<AudioPluginInstance
     if (proc->checkBusesLayoutSupported(layout)) {
         return proc->setBusesLayout(layout);
     } else {
-        // try with extra channels
+        // try to figure out if we can add some extra channels to make the plugin work
         auto procLayout = proc->getBusesLayout();
-        int extraInChannels = 0;
+        // main bus IN
+        int extraInChannels = procLayout.getMainInputChannels() - layout.getMainInputChannels();
+        // check extra busses IN
         for (int busIdx = 1; busIdx < procLayout.inputBuses.size(); busIdx++) {
             auto bus = procLayout.inputBuses[busIdx];
             extraInChannels += bus.size();
             layout.inputBuses.add(bus);
         }
-        int extraOutChannels = 0;
+        // main bus OUT
+        int extraOutChannels = procLayout.getMainOutputChannels() - layout.getMainOutputChannels();
+        // check extra busses OUT
         for (int busIdx = 1; busIdx < procLayout.outputBuses.size(); busIdx++) {
             auto bus = procLayout.outputBuses[busIdx];
             extraOutChannels += bus.size();
             layout.outputBuses.add(bus);
         }
-        if (proc->checkBusesLayoutSupported(layout) && proc->setBusesLayout(layout)) {
+
+        if ((extraInChannels > 0 || extraOutChannels > 0) && proc->checkBusesLayoutSupported(layout) &&
+            proc->setBusesLayout(layout)) {
             m_extraChannels = jmax(m_extraChannels, extraInChannels, extraOutChannels);
             logln(extraInChannels << " extra input(s), " << extraOutChannels << " extra output(s)");
-            return true;
-        }
-        // still no luck, it could be an instrument plugin with audio inputs (instrument/fx combo),
-        // try adding a main bus
-        int addedMainChannels = 0;
-        if (procLayout.getMainInputChannels() > 0 && layout.getMainInputChannels() == 0) {
-            auto bus = procLayout.getMainInputChannelSet();
-            layout.inputBuses.add(bus);
-            addedMainChannels = procLayout.getMainInputChannels();
-        }
-        if (proc->checkBusesLayoutSupported(layout) && proc->setBusesLayout(layout)) {
-            m_extraChannels = jmax(m_extraChannels, extraInChannels, extraOutChannels);
-            logln("added " << addedMainChannels << " main channel(s), " << extraInChannels << " extra input(s), "
-                           << extraOutChannels << " extra output(s)");
             return true;
         }
     }
@@ -225,11 +265,12 @@ int ProcessorChain::getExtraChannels() {
     return m_extraChannels;
 }
 
-bool ProcessorChain::initPluginInstance(std::shared_ptr<AudioPluginInstance> inst) {
+bool ProcessorChain::initPluginInstance(std::shared_ptr<AudioPluginInstance> inst, String& err) {
     traceScope();
     if (!setProcessorBusesLayout(inst)) {
-        logln("I/O layout (" << getMainBusNumInputChannels() << "," << getMainBusNumOutputChannels() << " +"
-                             << m_extraChannels << ") not supported by plugin: " << inst->getName());
+        err = "I/O layout (" + String(getMainBusNumInputChannels()) + "," + String(getMainBusNumOutputChannels()) +
+              " +" + String(m_extraChannels) + ") not supported by plugin: " + inst->getName();
+        logln(err);
         return false;
     }
     AudioProcessor::ProcessingPrecision prec = AudioProcessor::singlePrecision;
@@ -251,10 +292,10 @@ bool ProcessorChain::initPluginInstance(std::shared_ptr<AudioPluginInstance> ins
     return true;
 }
 
-bool ProcessorChain::addPluginProcessor(const String& id) {
+bool ProcessorChain::addPluginProcessor(const String& id, String& err) {
     traceScope();
     auto proc = std::make_shared<AGProcessor>(*this, id, getSampleRate(), getBlockSize());
-    if (proc->load()) {
+    if (proc->load(err)) {
         addProcessor(proc);
         return true;
     }

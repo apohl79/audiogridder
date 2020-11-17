@@ -10,6 +10,7 @@
 
 #include <JuceHeader.h>
 
+#include "SharedInstance.hpp"
 #include "Utils.hpp"
 
 namespace e47 {

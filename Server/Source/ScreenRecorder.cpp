@@ -28,7 +28,7 @@ void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode) {
     traceScope();
 
     m_encMode = encMode;
-    const char* encName;
+    const char* encName = "unset";
     switch (m_encMode) {
         case WEBP:
             encName = "libwebp";
@@ -185,7 +185,7 @@ void ScreenRecorder::resume(Rectangle<int> rect) {
         m_thread->detach();
     }
     m_thread = std::make_unique<std::thread>([this, rect] {
-        traceScope1();
+        traceScope();
         bool ready = true;
         if (rect.isEmpty()) {
             // start
@@ -408,9 +408,10 @@ void ScreenRecorder::record() {
                                           << m_scale << " <- input rectange " << m_captureCodecCtx->width << "x"
                                           << m_captureCodecCtx->height << ", codecs: in=" << m_captureCodec->name
                                           << " out=" << m_outputCodec->name);
-    auto durationPkt = TimeStatistics::getDuration("screen-pkt");
-    auto durationScale = TimeStatistics::getDuration("screen-scale");
-    auto durationEnc = TimeStatistics::getDuration("screen-enc");
+    auto durationPkt = TimeStatistic::getDuration("screen-pkt");
+    auto durationScale = TimeStatistic::getDuration("screen-scale");
+    auto durationEnc = TimeStatistic::getDuration("screen-enc");
+    int initalFramesToSkip = 3;  // avoid flickering at switching between plugins when an editor is initailly painting
     int retRDF;
     do {
         retRDF = av_read_frame(m_captureFmtCtx, m_capturePacket);
@@ -458,8 +459,12 @@ void ScreenRecorder::record() {
                             retRCP = avcodec_receive_packet(m_outputCodecCtx, m_outputPacket);
                             durationEnc.update();
                             if (retRCP == 0) {
-                                m_callback(m_outputPacket->data, m_outputPacket->size, m_outputFrame->width,
-                                           m_outputFrame->height, 1 /*m_scale*/);
+                                if (initalFramesToSkip == 0) {
+                                    m_callback(m_outputPacket->data, m_outputPacket->size, m_outputFrame->width,
+                                               m_outputFrame->height, 1 /*m_scale*/);
+                                } else {
+                                    initalFramesToSkip--;
+                                }
                                 av_packet_unref(m_outputPacket);
                             }
                         } while (retRCP == AVERROR(EAGAIN));

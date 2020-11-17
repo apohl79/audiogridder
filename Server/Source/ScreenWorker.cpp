@@ -12,12 +12,22 @@
 
 namespace e47 {
 
+std::atomic_uint32_t ScreenWorker::count{0};
+std::atomic_uint32_t ScreenWorker::runCount{0};
+
+ScreenWorker::ScreenWorker(LogTag* tag) : Thread("ScreenWorker"), LogTagDelegate(tag) {
+    initAsyncFunctors();
+    count++;
+}
+
 ScreenWorker::~ScreenWorker() {
     traceScope();
+    stopAsyncFunctors();
     if (nullptr != m_socket && m_socket->isConnected()) {
         m_socket->close();
     }
     waitForThreadAndLog(getLogTagSource(), this);
+    count--;
 }
 
 void ScreenWorker::init(std::unique_ptr<StreamingSocket> s) {
@@ -27,6 +37,7 @@ void ScreenWorker::init(std::unique_ptr<StreamingSocket> s) {
 
 void ScreenWorker::run() {
     traceScope();
+    runCount++;
     logln("screen processor started");
 
     if (getApp()->getServer().getScreenCapturingFFmpeg()) {
@@ -35,9 +46,12 @@ void ScreenWorker::run() {
         runNative();
     }
 
-    hideEditor();
+    if (m_visible) {
+        hideEditor();
+    }
 
     logln("screen processor terminated");
+    runCount--;
 }
 
 void ScreenWorker::runFFmpeg() {
@@ -101,12 +115,12 @@ void ScreenWorker::runNative() {
 
             if (brightness >= mostlyWhite || brightness <= mostlyBlack) {
                 logln("resetting editor window");
-                MessageManager::callAsync([this] {
-                    traceScope1();
+                runOnMsgThreadAsync([this] {
+                    traceScope();
                     getApp()->resetEditor();
                 });
-                MessageManager::callAsync([this] {
-                    traceScope1();
+                runOnMsgThreadAsync([this] {
+                    traceScope();
                     getApp()->restartEditor();
                 });
             } else {
@@ -154,17 +168,18 @@ void ScreenWorker::shutdown() {
 
 void ScreenWorker::showEditor(std::shared_ptr<AGProcessor> proc) {
     traceScope();
+
     auto tid = getThreadId();
 
     if (getApp()->getServer().getScreenCapturingFFmpeg()) {
-        MessageManager::callAsync([this] {
-            traceScope1();
+        runOnMsgThreadAsync([this] {
+            traceScope();
             getApp()->resetEditor();
         });
-        MessageManager::callAsync([this, proc, tid] {
-            traceScope1();
+        runOnMsgThreadAsync([this, proc, tid] {
+            traceScope();
             getApp()->showEditor(proc, tid, [this](const uint8_t* data, int size, int w, int h, double scale) {
-                traceScope2();
+                traceScope();
                 if (currentThreadShouldExit()) {
                     return;
                 }
@@ -181,19 +196,19 @@ void ScreenWorker::showEditor(std::shared_ptr<AGProcessor> proc) {
             });
         });
     } else {
-        MessageManager::callAsync([this] {
-            traceScope1();
+        runOnMsgThreadAsync([this] {
+            traceScope();
             getApp()->resetEditor();
         });
-        MessageManager::callAsync([this, proc, tid] {
-            traceScope1();
+        runOnMsgThreadAsync([this, proc, tid] {
+            traceScope();
             m_currentImageLock.lock();
             m_currentImage.reset();
             m_lastImage.reset();
             m_currentImageLock.unlock();
 
             getApp()->showEditor(proc, tid, [this](std::shared_ptr<Image> i, int w, int h) {
-                traceScope2();
+                traceScope();
                 if (nullptr != i) {
                     if (currentThreadShouldExit()) {
                         return;
@@ -213,19 +228,25 @@ void ScreenWorker::showEditor(std::shared_ptr<AGProcessor> proc) {
             });
         });
     }
+
+    m_visible = true;
 }
 
 void ScreenWorker::hideEditor() {
     traceScope();
+
     auto tid = getThreadId();
-    MessageManager::callAsync([this, tid] {
-        traceScope1();
+
+    runOnMsgThreadAsync([this, tid] {
+        traceScope();
         getApp()->hideEditor(tid);
 
         std::lock_guard<std::mutex> lock(m_currentImageLock);
         m_currentImage.reset();
         m_lastImage.reset();
     });
+
+    m_visible = false;
 }
 
 }  // namespace e47

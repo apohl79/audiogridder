@@ -12,6 +12,8 @@
       <FILE id="BFf7Mr" name="icon64.png" compile="0" resource="1" file="Resources/icon64.png"/>
     </GROUP>
     <GROUP id="{385AE6BC-8F0F-5D7D-102A-4D9FCF6538EC}" name="Common">
+      <FILE id="J7X5le" name="CoreDump.cpp" compile="1" resource="0" file="../Common/Source/CoreDump.cpp"/>
+      <FILE id="ifHgUt" name="CoreDump.hpp" compile="0" resource="0" file="../Common/Source/CoreDump.hpp"/>
       <FILE id="nNSIIt" name="Defaults.hpp" compile="0" resource="0" file="../Common/Source/Defaults.hpp"/>
       <FILE id="mieNIL" name="ImageDiff.hpp" compile="0" resource="0" file="../Common/Source/ImageDiff.hpp"/>
       <FILE id="mzbQrZ" name="json.hpp" compile="0" resource="0" file="../Common/Source/json.hpp"/>
@@ -25,17 +27,19 @@
             file="../Common/Source/mDNSConnector.cpp"/>
       <FILE id="ZsxIoW" name="mDNSConnector.hpp" compile="0" resource="0"
             file="../Common/Source/mDNSConnector.hpp"/>
+      <FILE id="ak13em" name="Message.cpp" compile="1" resource="0" file="../Common/Source/Message.cpp"/>
       <FILE id="olKSf7" name="Message.hpp" compile="0" resource="0" file="../Common/Source/Message.hpp"/>
       <FILE id="hFSlhs" name="Metrics.cpp" compile="1" resource="0" file="../Common/Source/Metrics.cpp"/>
       <FILE id="teWAXE" name="Metrics.hpp" compile="0" resource="0" file="../Common/Source/Metrics.hpp"/>
-      <FILE id="LDo1nR" name="MiniDump.cpp" compile="1" resource="0" file="../Common/Source/MiniDump.cpp"/>
-      <FILE id="XPg3Qc" name="MiniDump.hpp" compile="0" resource="0" file="../Common/Source/MiniDump.hpp"/>
       <FILE id="lOlfoU" name="NumberConversion.hpp" compile="0" resource="0"
             file="../Common/Source/NumberConversion.hpp"/>
       <FILE id="QbWsLq" name="SharedInstance.hpp" compile="0" resource="0"
             file="../Common/Source/SharedInstance.hpp"/>
+      <FILE id="NJAQPO" name="Signals.cpp" compile="1" resource="0" file="../Common/Source/Signals.cpp"/>
+      <FILE id="yI5sEo" name="Signals.hpp" compile="0" resource="0" file="../Common/Source/Signals.hpp"/>
       <FILE id="TDF09d" name="Tracer.cpp" compile="1" resource="0" file="../Common/Source/Tracer.cpp"/>
       <FILE id="BS7mfY" name="Tracer.hpp" compile="0" resource="0" file="../Common/Source/Tracer.hpp"/>
+      <FILE id="InHqkk" name="Utils.cpp" compile="1" resource="0" file="../Common/Source/Utils.cpp"/>
       <FILE id="hCUKCJ" name="Utils.hpp" compile="0" resource="0" file="../Common/Source/Utils.hpp"/>
       <FILE id="V3zRoR" name="Version.hpp" compile="0" resource="0" file="../Common/Source/Version.hpp"/>
     </GROUP>
@@ -85,20 +89,24 @@
             file="Source/ServiceResponder.hpp"/>
       <FILE id="DxDUnd" name="SplashWindow.hpp" compile="0" resource="0"
             file="Source/SplashWindow.hpp"/>
+      <FILE id="U7anFp" name="StatisticsWindow.cpp" compile="1" resource="0"
+            file="Source/StatisticsWindow.cpp"/>
+      <FILE id="eTsBeY" name="StatisticsWindow.hpp" compile="0" resource="0"
+            file="Source/StatisticsWindow.hpp"/>
       <FILE id="cjxAbW" name="Worker.cpp" compile="1" resource="0" file="Source/Worker.cpp"/>
       <FILE id="ng9B9v" name="Worker.hpp" compile="0" resource="0" file="Source/Worker.hpp"/>
     </GROUP>
   </MAINGROUP>
   <EXPORTFORMATS>
     <XCODE_MAC targetFolder="Builds/MacOSX" smallIcon="Az5gWg" bigIcon="Az5gWg"
-               externalLibraries="avdevice&#10;avcodec&#10;avformat&#10;avfilter&#10;avutil&#10;swscale&#10;swresample&#10;webp&#10;webpmux"
+               externalLibraries="avdevice&#10;avcodec&#10;avformat&#10;avfilter&#10;avutil&#10;swscale&#10;swresample&#10;webp&#10;webpmux&#10;avdevice&#10;avcodec&#10;avformat&#10;avfilter&#10;avutil&#10;swscale&#10;swresample"
                extraFrameworks="AVFoundation,CoreMedia,VideoToolbox" iosDevelopmentTeamID="62QZB3NCZR">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" osxCompatibility="10.8 SDK" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
-                       recommendedWarnings="LLVM" headerPath="$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg"
+        <CONFIGURATION isDebug="1" name="Debug" osxCompatibility="10.8 SDK" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING&#10;JUCE_DISABLE_ASSERTIONS"
+                       recommendedWarnings="LLVM" headerPath="$(HOME)/audio/AudioGridder/Server/JuceLibraryCode&#10;$(HOME)/audio/AudioGridder/Common/Source&#10;$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg&#10;/usr/local/include"
                        libraryPath="$(HOME)/audio/FFmpeg/inst-osx-dbg/lib"/>
         <CONFIGURATION isDebug="1" name="Release" osxCompatibility="10.8 SDK" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING&#10;JUCE_DISABLE_ASSERTIONS"
-                       recommendedWarnings="LLVM" headerPath="$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg"
+                       recommendedWarnings="LLVM" headerPath="$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg&#10;/usr/local/include"
                        optimisation="3" libraryPath="$(HOME)/audio/FFmpeg/inst-osx/lib"
                        linkTimeOptimisation="1"/>
       </CONFIGURATIONS>
@@ -117,15 +125,17 @@
         <MODULEPATH id="juce_opengl" path="../audio/JUCE/modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
-    <XCODE_MAC targetFolder="Builds/MacOSX10.7" externalLibraries="avdevice&#10;avcodec&#10;avformat&#10;avfilter&#10;avutil&#10;swscale&#10;swresample&#10;webp&#10;webpmux"
+    <XCODE_MAC targetFolder="Builds/MacOSX10.7" externalLibraries="avdevice&#10;avcodec&#10;avformat&#10;avfilter&#10;avutil&#10;swscale&#10;swresample&#10;webp&#10;webpmux&#10;avdevice&#10;avcodec&#10;avformat&#10;avfilter&#10;avutil&#10;swscale&#10;swresample"
                smallIcon="Az5gWg" bigIcon="Az5gWg" extraFrameworks="AVFoundation,CoreMedia,VideoToolbox"
                iosDevelopmentTeamID="62QZB3NCZR">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" headerPath="$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg"
-                       libraryPath="$(HOME)/audio/FFmpeg/inst-osx-10.7/lib" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
+        <CONFIGURATION isDebug="1" name="Debug" headerPath="/usr/local/include&#10;$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg"
+                       libraryPath="/usr/local/lib&#10;$(HOME)/audio/FFmpeg/inst-osx-10.7/lib"
+                       defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING"
                        recommendedWarnings="LLVM" osxCompatibility="10.7 SDK"/>
-        <CONFIGURATION isDebug="0" name="Release" headerPath="$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg"
-                       libraryPath="$(HOME)/audio/FFmpeg/inst-osx-10.7/lib" defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING&#10;JUCE_DISABLE_ASSERTIONS"
+        <CONFIGURATION isDebug="0" name="Release" headerPath="/usr/local/include&#10;$(HOME)/audio/vstsdk2.4&#10;$(HOME)/audio/FFmpeg"
+                       libraryPath="/usr/local/lib&#10;$(HOME)/audio/FFmpeg/inst-osx-10.7/lib"
+                       defines="JUCE_MAC&#10;JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING&#10;JUCE_DISABLE_ASSERTIONS"
                        recommendedWarnings="LLVM" osxCompatibility="10.7 SDK"/>
       </CONFIGURATIONS>
       <MODULEPATHS>

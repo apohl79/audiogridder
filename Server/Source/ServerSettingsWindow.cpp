@@ -271,7 +271,19 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     row++;
 
     label = std::make_unique<Label>();
-    label->setText("Tracing (use only to report issues):", NotificationType::dontSendNotification);
+    label->setText("Logging:", NotificationType::dontSendNotification);
+    label->setBounds(getLabelBounds(row));
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
+
+    m_logger.setBounds(getCheckBoxBounds(row));
+    m_logger.setToggleState(AGLogger::isEnabled(), NotificationType::dontSendNotification);
+    addChildAndSetID(&m_logger, "logger");
+
+    row++;
+
+    label = std::make_unique<Label>();
+    label->setText("Tracing (please enable to report issues):", NotificationType::dontSendNotification);
     label->setBounds(getLabelBounds(row));
     addChildAndSetID(label.get(), "lbl");
     m_components.push_back(std::move(label));
@@ -288,8 +300,9 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_saveButton.setBounds(totalWidth / 2 - saveButtonWidth / 2, totalHeight - borderTB - saveButtonHeight,
                            saveButtonWidth, saveButtonHeight);
     m_saveButton.onClick = [this, app] {
-        traceScope1();
+        traceScope();
         Tracer::setEnabled(m_tracer.getToggleState());
+        AGLogger::setEnabled(m_logger.getToggleState());
         auto appCpy = app;
         appCpy->getServer().setId(m_idText.getText().getIntValue());
         appCpy->getServer().setName(m_nameText.getText());

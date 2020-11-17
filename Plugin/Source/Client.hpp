@@ -18,6 +18,7 @@
 #include "ImageReader.hpp"
 
 #include <boost/lockfree/spsc_queue.hpp>
+#include <memory>
 
 class AudioGridderAudioProcessor;
 
@@ -25,6 +26,8 @@ namespace e47 {
 
 class Client : public Thread, public LogTag, public MouseListener, public KeyListener {
   public:
+    static std::atomic_uint32_t count;
+
     Client(AudioGridderAudioProcessor* processor);
     ~Client() override;
 
@@ -128,8 +131,8 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
         void setValue(float val) { currentValue = (float)range.convertTo0to1(val); }
     };
 
-    std::atomic_int NUM_OF_BUFFERS{DEFAULT_NUM_OF_BUFFERS};
-    std::atomic_int LOAD_PLUGIN_TIMEOUT{DEFAULT_LOAD_PLUGIN_TIMEOUT};
+    std::atomic_int NUM_OF_BUFFERS{Defaults::DEFAULT_NUM_OF_BUFFERS};
+    std::atomic_int LOAD_PLUGIN_TIMEOUT{Defaults::DEFAULT_LOAD_PLUGIN_TIMEOUT};
 
     void run() override;
 
@@ -143,6 +146,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     double getSampleRate() const { return m_rate; }
     int getSamplesPerBlock() const { return m_samplesPerBlock; }
     int getLatencySamples() const { return m_latency + NUM_OF_BUFFERS * m_samplesPerBlock; }
+    double isUsingDoublePrecission() const { return m_doublePrecission; }
 
     bool isReady(int timeout = 1000);
     bool isReadyLockFree();
@@ -207,7 +211,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     using OnCloseCallback = std::function<void()>;
     void setOnCloseCallback(OnCloseCallback fn);
 
-    bool addPlugin(String id, StringArray& presets, Array<Parameter>& params, String settings = "");
+    bool addPlugin(String id, StringArray& presets, Array<Parameter>& params, String settings, String& err);
     void delPlugin(int idx);
     void editPlugin(int idx);
     void hidePlugin();
@@ -232,6 +236,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     void updateScreenCaptureArea(int val);
 
     void rescan(bool wipe = false);
+    void restart();
 
     void updateCPULoad();
     float getCPULoad() const { return m_srvLoad; }
@@ -256,9 +261,10 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     AudioGridderAudioProcessor* m_processor;
     std::mutex m_srvMtx;
     String m_srvHost = "";
-    int m_srvPort = DEFAULT_SERVER_PORT;
+    int m_srvPort = Defaults::SERVER_PORT;
     int m_srvId = 0;
     float m_srvLoad = 0.0f;
+    int m_srvLoadLastUpdated = 0;
     bool m_needsReconnect = false;
     double m_rate = 0;
     bool m_doublePrecission = false;
@@ -271,45 +277,8 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     std::atomic_bool m_ready{false};
     std::atomic_bool m_error{false};
 
-    std::mutex m_clientMtx;
-    int m_clientMtxId = 0;
-    std::unique_ptr<StreamingSocket> m_cmd_socket;
-    std::unique_ptr<StreamingSocket> m_screen_socket;
-    std::vector<ServerPlugin> m_plugins;
-
-    MessageFactory m_msgFactory;
-
-    class ScreenReceiver : public Thread, public LogTagDelegate {
-      public:
-        ScreenReceiver(Client* clnt, StreamingSocket* sock) : Thread("ScreenWorker"), m_client(clnt), m_socket(sock) {
-            setLogTagSource(clnt);
-            traceScope();
-            m_imgReader.setLogTagSource(clnt);
-        }
-        ~ScreenReceiver() {
-            traceScope();
-            signalThreadShouldExit();
-            waitForThreadAndLog(m_client, this, 1000);
-        }
-        void run();
-
-      private:
-        Client* m_client;
-        StreamingSocket* m_socket;
-        std::shared_ptr<Image> m_image;
-        ImageReader m_imgReader;
-    };
-
-    std::unique_ptr<ScreenReceiver> m_screenWorker;
-    std::shared_ptr<Image> m_pluginScreen;
-    ScreenUpdateCallback m_pluginScreenUpdateCallback;
-    std::mutex m_pluginScreenMtx;
-
-    OnConnectCallback m_onConnectCallback;
-    OnCloseCallback m_onCloseCallback;
-
     enum LockID {
-        NOLOCK,
+        NOLOCK = 0,
         SETPLUGINSCREENUPDATECALLBACK,
         SETONCONNECTCALLBACK,
         SETONCLOSECALLBACK,
@@ -334,32 +303,48 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
         KEYPRESSED,
         UPDATESCREENCAPTUREAREA,
         RESCAN,
-        UPDATECPULOAD,
+        RESTART,
+        UPDATECPULOAD1,
+        UPDATECPULOAD2,
         GETLOADEDPLUGINSSTRING
     };
 
     struct LockByID : public LogTagDelegate {
         Client& client;
         LockID lockid;
+        bool locked = false;
+
         LockByID(Client& c, LockID id, bool enforce = true) : client(c), lockid(id) {
-            setLogTagSource(&c);
+            setLogTagSource(&client);
+            traceScope();
             traceln("id=" << (int)id << " enforce=" << (int)enforce);
             if (enforce) {
                 lock();
+                locked = true;
                 traceln("locked");
             } else {
                 if (tryLock()) {
+                    locked = true;
                     traceln("locked");
                 } else {
                     traceln("lock failed, lock aquired by id " << client.m_clientMtxId);
                 }
             }
         }
-        ~LockByID() { unlock(); }
+
+        ~LockByID() {
+            traceScope();
+            if (locked) {
+                unlock();
+                traceln("unlocked id " << lockid);
+            }
+        }
+
         inline void lock() {
             client.m_clientMtx.lock();
             client.m_clientMtxId = lockid;
         }
+
         inline bool tryLock() {
             if (client.m_clientMtx.try_lock()) {
                 client.m_clientMtxId = lockid;
@@ -367,11 +352,52 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
             }
             return false;
         }
+
         inline void unlock() {
             client.m_clientMtxId = NOLOCK;
             client.m_clientMtx.unlock();
         }
     };
+
+    std::mutex m_clientMtx;
+    LockID m_clientMtxId = NOLOCK;
+
+    std::unique_ptr<StreamingSocket> m_cmd_socket;
+    std::unique_ptr<StreamingSocket> m_screen_socket;
+    std::vector<ServerPlugin> m_plugins;
+
+    MessageFactory m_msgFactory;
+
+    class ScreenReceiver : public Thread, public LogTagDelegate {
+      public:
+        ScreenReceiver(Client* clnt, StreamingSocket* sock) : Thread("ScreenWorker"), m_client(clnt), m_socket(sock) {
+            setLogTagSource(clnt);
+            traceScope();
+            m_imgReader.setLogTagSource(clnt);
+        }
+
+        ~ScreenReceiver() {
+            traceScope();
+            signalThreadShouldExit();
+            waitForThreadAndLog(m_client, this, 1000);
+        }
+
+        void run();
+
+      private:
+        Client* m_client;
+        StreamingSocket* m_socket;
+        std::shared_ptr<Image> m_image;
+        ImageReader m_imgReader;
+    };
+
+    std::unique_ptr<ScreenReceiver> m_screenWorker;
+    std::shared_ptr<Image> m_pluginScreen;
+    ScreenUpdateCallback m_pluginScreenUpdateCallback;
+    std::mutex m_pluginScreenMtx;
+
+    OnConnectCallback m_onConnectCallback;
+    OnCloseCallback m_onCloseCallback;
 
     void quit();
     void init();

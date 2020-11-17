@@ -22,6 +22,9 @@ class Server;
 
 class Worker : public Thread, public LogTag {
   public:
+    static std::atomic_uint32_t count;
+    static std::atomic_uint32_t runCount;
+
     Worker(StreamingSocket* clnt);
     ~Worker() override;
     void run() override;
@@ -47,17 +50,18 @@ class Worker : public Thread, public LogTag {
     void handleMessage(std::shared_ptr<Message<GetAllParameterValues>> msg);
     void handleMessage(std::shared_ptr<Message<UpdateScreenCaptureArea>> msg);
     void handleMessage(std::shared_ptr<Message<Rescan>> msg);
+    void handleMessage(std::shared_ptr<Message<Restart>> msg);
     void handleMessage(std::shared_ptr<Message<CPULoad>> msg);
 
   private:
     std::unique_ptr<StreamingSocket> m_client;
-    AudioWorker m_audio;
-    ScreenWorker m_screen;
+    std::shared_ptr<AudioWorker> m_audio;
+    std::shared_ptr<ScreenWorker> m_screen;
     bool m_shouldHideEditor = false;
     std::atomic_bool m_shutdown{false};
     MessageFactory m_msgFactory;
 
-    String getStringFrom(const PluginDescription& d);
+    ENABLE_ASYNC_FUNCTORS();
 };
 
 }  // namespace e47

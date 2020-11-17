@@ -7,56 +7,178 @@
 
 #include "Tracer.hpp"
 #include "Utils.hpp"
+#include "SharedInstance.hpp"
+#include "Defaults.hpp"
+
+#ifdef JUCE_WINDOWS
+#include <windows.h>
+#else
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/mman.h>
+#endif
 
 namespace e47 {
+namespace Tracer {
 
-std::atomic_bool Tracer::m_enabled{false};
-std::unordered_map<Thread::ThreadID, Tracer::MessageBuffer> Tracer::m_messageBuffers;
-std::mutex Tracer::m_messageBuffersMtx;
-std::set<Thread::ThreadID> Tracer::m_messageBuffersKnownThreadIDs;
+#define NUM_OF_TRACE_RECORDS 250000  // ~50MB
 
-Tracer::Tracer() : Thread("ThreadTracer") {}
+std::atomic_bool l_tracerEnabled{false};
+std::atomic_uint64_t l_index{0};
+File l_file;
+#ifdef JUCE_WINDOWS
+HANDLE l_fd, l_mapped_hndl;
+#else
+int l_fd = -1;
+#endif
+char* l_data = nullptr;
+size_t l_size = 0;
 
-Tracer::~Tracer() { stopThread(-1); }
+struct Inst : SharedInstance<Inst> {};
 
-Tracer::Scope::Scope(const LogTag* t, const String& f, int l, const String& ff) {
-    if (Tracer::isEnabled()) {
+setLogTagStatic("tracer");
+
+#define TRACE_STRCPY(dst, src)                              \
+    do {                                                    \
+        int len = jmin((int)sizeof(dst) - 1, src.length()); \
+        strncpy(dst, src.getCharPointer(), (size_t)len);    \
+        dst[len] = 0;                                       \
+    } while (0)
+
+Scope::Scope(const LogTag* t, const String& f, int l, const String& ff) {
+    if (l_tracerEnabled) {
         enabled = true;
-        tag = t->getLogTagNoTime();
+        tagId = t->getId();
+        tagName = t->getName();
+        tagExtra = t->getExtra();
         file = f;
         line = l;
         func = ff;
         start = Time::getHighResolutionTicks();
-        traceMessage(tag, file, line, func, "enter");
+        traceMessage(tagId, tagName, tagExtra, file, line, func, "enter");
     }
 }
 
-Tracer::Scope::Scope(const LogTagDelegate* t, const String& f, int l, const String& ff)
+Scope::Scope(const LogTagDelegate* t, const String& f, int l, const String& ff)
     : Scope(t->getLogTagSource(), f, l, ff) {}
 
-void Tracer::initialize(const String& appName, const String& filePrefix) {
-    SharedInstance<Tracer>::initialize([&appName, &filePrefix](auto inst) {
-        for (int i = 0; i < NUMBER_OF_TRACE_FILES; i++) {
-            auto file = FileLogger::getSystemLogFileFolder()
-                            .getChildFile(appName)
-                            .getChildFile(filePrefix + Time::getCurrentTime().formatted("%Y-%m-%d_%H-%M-%S"))
-                            .withFileExtension(".trace." + String(i))
-                            .getNonexistentSibling();
-            inst->m_fileName[i] = file.getFullPathName();
+void openTraceFile() {
+    if (nullptr != l_data) {
+        logln("trace file already opened");
+        return;
+    }
+    void* m = nullptr;
+    l_size = NUM_OF_TRACE_RECORDS * sizeof(TraceRecord);
+#ifdef JUCE_WINDOWS
+    l_fd = CreateFileA(l_file.getFullPathName().getCharPointer(), (GENERIC_READ | GENERIC_WRITE), FILE_SHARE_READ, NULL,
+                       CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, NULL);
+    if (l_fd == INVALID_HANDLE_VALUE) {
+        logln("CreateFileA failed: " << GetLastErrorStr());
+        return;
+    }
+    LONG sizeh = (l_size >> (sizeof(LONG) * 8));
+    LONG sizel = (l_size & 0xffffffff);
+    auto res = SetFilePointer(l_fd, sizel, &sizeh, FILE_BEGIN);
+    if (INVALID_SET_FILE_POINTER == res) {
+        logln("SetFilePointer failed: " << GetLastErrorStr());
+        return;
+    }
+    if (!SetEndOfFile(l_fd)) {
+        logln("SetEndOfFile failed: " << GetLastErrorStr());
+        return;
+    }
+    l_mapped_hndl = CreateFileMappingA(l_fd, NULL, PAGE_READWRITE, 0, 0, NULL);
+    if (NULL == l_mapped_hndl) {
+        logln("CreateFileMappingA failed: " << GetLastErrorStr());
+        return;
+    }
+    m = MapViewOfFileEx(l_mapped_hndl, FILE_MAP_WRITE, 0, 0, 0, NULL);
+    if (NULL == m) {
+        logln("MapViewOfFileEx failed: " << GetLastErrorStr());
+        return;
+    }
+#else
+    l_fd = open(l_file.getFullPathName().getCharPointer(), O_CREAT | O_TRUNC | O_RDWR, S_IRWXU);
+    if (l_fd < 0) {
+        logln("open failed: " << strerror(errno));
+        return;
+    }
+    if (ftruncate(l_fd, (off_t)l_size)) {
+        logln("ftruncate failed: " << strerror(errno));
+        return;
+    }
+    m = mmap(nullptr, l_size, PROT_WRITE | PROT_READ, MAP_SHARED, l_fd, 0);
+    if (MAP_FAILED == m) {
+        logln("mmap failed: " << strerror(errno));
+        return;
+    }
+#endif
+    l_data = static_cast<char*>(m);
+    logln("trace file opened");
+}
+
+void closeTraceFile() {
+    if (nullptr == l_data) {
+        return;
+    }
+#ifdef JUCE_WINDOWS
+    UnmapViewOfFile(l_data);
+    CloseHandle(l_mapped_hndl);
+    l_mapped_hndl = NULL;
+    CloseHandle(l_fd);
+    l_fd = NULL;
+#else
+    munmap(l_data, l_size);
+    close(l_fd);
+    l_fd = -1;
+#endif
+    l_data = nullptr;
+    l_size = 0;
+    logln("trace file closed");
+}
+
+void initialize(const String& appName, const String& filePrefix) {
+    Inst::initialize([&](auto) {
+        l_file = File(Defaults::getLogFileName(appName, filePrefix, ".trace")).getNonexistentSibling();
+        // create dir if needed
+        auto d = l_file.getParentDirectory();
+        if (!d.exists()) {
+            d.createDirectory();
         }
-        inst->startThread();
+        cleanDirectory(d.getFullPathName(), filePrefix, ".trace");
     });
 }
 
-void Tracer::traceMessage(const LogTag* tag, const String& file, int line, const String& func, const String& msg) {
-    if (m_enabled) {
-        traceMessage(tag->getLogTagNoTime(), file, line, func, msg);
+void cleanup() {
+    Inst::cleanup([](auto) { closeTraceFile(); });
+}
+
+void setEnabled(bool b) {
+    if (b && nullptr == l_data) {
+        openTraceFile();
+    }
+    l_tracerEnabled = b;
+}
+
+bool isEnabled() { return l_tracerEnabled; }
+
+TraceRecord* getRecord() {
+    if (nullptr != l_data) {
+        auto offset = (l_index.fetch_add(1, std::memory_order_relaxed) % NUM_OF_TRACE_RECORDS) * sizeof(TraceRecord);
+        return reinterpret_cast<TraceRecord*>(l_data + offset);
+    }
+    return nullptr;
+}
+
+void traceMessage(const LogTag* tag, const String& file, int line, const String& func, const String& msg) {
+    if (l_tracerEnabled) {
+        traceMessage(tag->getId(), tag->getName(), tag->getExtra(), file, line, func, msg);
     }
 }
 
-void Tracer::traceMessage(const String& tag, const String& file, int line, const String& func, const String& msg) {
-    if (m_enabled) {
-        auto tid = Thread::getCurrentThreadId();
+void traceMessage(uint64 tagId, const String& tagName, const String& tagExtra, const String& file, int line,
+                  const String& func, const String& msg) {
+    if (l_tracerEnabled) {
         auto thread = Thread::getCurrentThread();
         String threadTag = "unknown";
         if (nullptr != thread) {
@@ -67,69 +189,24 @@ void Tracer::traceMessage(const String& tag, const String& file, int line, const
                 threadTag = "message_thread";
             }
         }
-        threadTag << ":" << String::toHexString((uint64)tid);
-        String out = LogTag::getTimeStr();
-        out << "|" << threadTag << "|" << tag << "|" << File::createFileWithoutCheckingPath(file).getFileName() << ":"
-            << line << "|" << func << "|" << msg;
-        getMessageBuffer(tid).push(out);
-    }
-}
-
-void Tracer::run() {
-    std::vector<Thread::ThreadID> knownThreadIDs;
-    int emptyCount = 0;
-    while (!currentThreadShouldExit()) {
-        if (!m_enabled) {
-            sleep(500);
-            continue;
-        }
-        if (m_currentMsgCount > MAX_TRACE_MESSAGES_PER_FILE) {
-            m_outstream.close();
-            ++m_fileIdx %= NUMBER_OF_TRACE_FILES;
-            m_currentMsgCount = 0;
-        }
-        if (!m_outstream.is_open()) {
-            m_outstream.open(m_fileName[m_fileIdx].getCharPointer());
-            if (!m_outstream.is_open()) {
-                m_enabled = false;
-                return;
-            }
-        }
-        knownThreadIDs.clear();
-        getMessageBufferKnownThreadIDs(knownThreadIDs);
-        bool hadMessages = false;
-        for (auto tid : knownThreadIDs) {
-            auto& msgBuf = getMessageBuffer(tid);
-            auto idx = msgBuf.getAndUpdateIndex();
-            hadMessages = !msgBuf.messages[idx].empty() || hadMessages;
-            while (!msgBuf.messages[idx].empty()) {
-                auto& msg = msgBuf.messages[idx].front();
-                m_outstream << msg.toStdString() << std::endl;
-                msgBuf.messages[idx].pop();
-                m_currentMsgCount++;
-            }
-        }
-        emptyCount += hadMessages ? 0 : 1;
-        if (emptyCount % 2 == 0) {
-            sleep(5);
+        auto* rec = getRecord();
+        if (nullptr != rec) {
+            rec->time = Time::getMillisecondCounterHiRes();
+            rec->threadId = (uint64)Thread::getCurrentThreadId();
+            rec->tagId = tagId;
+            rec->line = line;
+            TRACE_STRCPY(rec->threadName, threadTag);
+            TRACE_STRCPY(rec->tagName, tagName);
+            TRACE_STRCPY(rec->tagExtra, tagExtra);
+            TRACE_STRCPY(rec->file, File::createFileWithoutCheckingPath(file).getFileName());
+            TRACE_STRCPY(rec->func, func);
+            TRACE_STRCPY(rec->msg, msg);
+        } else {
+            l_tracerEnabled = false;
+            logln("failed to get trace record");
         }
     }
 }
 
-Tracer::MessageBuffer& Tracer::getMessageBuffer(Thread::ThreadID tid) {
-    std::lock_guard<std::mutex> lock(m_messageBuffersMtx);
-    m_messageBuffersKnownThreadIDs.insert(tid);
-    return m_messageBuffers[tid];
-}
-
-void Tracer::getMessageBufferKnownThreadIDs(std::vector<Thread::ThreadID>& tids) {
-    std::lock_guard<std::mutex> lock(m_messageBuffersMtx);
-    if (tids.size() < m_messageBuffersKnownThreadIDs.size()) {
-        tids.resize(m_messageBuffersKnownThreadIDs.size());
-    }
-    for (auto tid : m_messageBuffersKnownThreadIDs) {
-        tids.push_back(tid);
-    }
-}
-
+}  // namespace Tracer
 }  // namespace e47

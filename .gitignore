@@ -7,4 +7,9 @@ package/build/*
 package/AudioGridder*.iss
 package/VERSION
 package/archiveWin.bat
-
+GPATH
+GRTAGS
+GTAGS
+.clangd
+compile_commands.json
+.projectile

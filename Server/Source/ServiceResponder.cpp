@@ -67,7 +67,7 @@ void ServiceResponder::run() {
     }
 
     logln("opened " << num << " socket(s)");
-    logln("service: " << MDNS_SERVICE_NAME);
+    logln("service: " << Defaults::MDNS_SERVICE_NAME);
     logln("hostname: " << m_hostname);
 
     while (!currentThreadShouldExit()) {
@@ -90,7 +90,7 @@ int ServiceResponder::handleRecord(int sock, const struct sockaddr* from, size_t
     if (rtype == MDNS_RECORDTYPE_PTR) {
         auto service = MDNS_TO_JUCE_STRING(
             mdns_record_parse_ptr(data, size, record_offset, record_length, m_nameBuffer, sizeof(m_nameBuffer)));
-        if (service == MDNS_SERVICE_NAME) {
+        if (service == Defaults::MDNS_SERVICE_NAME) {
             uint16_t unicast = (rclass & MDNS_UNICAST_RESPONSE);
             // logln(fromaddrstr << " : question PTR " << service);
             // logln("  answer " << m_hostname << "." << MDNS_SERVICE_NAME << " port " << m_port << " ("
@@ -104,10 +104,9 @@ int ServiceResponder::handleRecord(int sock, const struct sockaddr* from, size_t
             String txtRecord;
             txtRecord << "INFO=" << j.dump();
             mdns_query_answer(sock, from, addrlen, m_sendBuffer, sizeof(m_sendBuffer), query_id,
-                              MDNS_SERVICE_NAME.getCharPointer(), (size_t)MDNS_SERVICE_NAME.length(),
-                              m_hostname.getCharPointer(), (size_t)m_hostname.length(), m_connector.getAddr4(),
-                              m_connector.getAddr6(), (uint16_t)m_port, txtRecord.getCharPointer(),
-                              (size_t)txtRecord.length());
+                              service.getCharPointer(), (size_t)service.length(), m_hostname.getCharPointer(),
+                              (size_t)m_hostname.length(), m_connector.getAddr4(), m_connector.getAddr6(),
+                              (uint16_t)m_port, txtRecord.getCharPointer(), (size_t)txtRecord.length());
         }
     }
     return 0;

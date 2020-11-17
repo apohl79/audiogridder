@@ -6,8 +6,10 @@
  */
 
 #include "Client.hpp"
+#include <memory>
 #include "PluginProcessor.hpp"
 #include "NumberConversion.hpp"
+#include "ServiceReceiver.hpp"
 
 #ifdef JUCE_WINDOWS
 #include "windows.h"
@@ -17,58 +19,53 @@
 
 namespace e47 {
 
+std::atomic_uint32_t Client::count{0};
+
 Client::Client(AudioGridderAudioProcessor* processor)
     : Thread("Client"), LogTag("client"), m_processor(processor), m_msgFactory(this) {
     logln("client created");
+    count++;
 }
 
 Client::~Client() {
     traceScope();
     signalThreadShouldExit();
     close();
+    count--;
 }
 
 void Client::run() {
     traceScope();
     logln("entering client loop");
+    uint32 cpuUpdateSeconds = 5;
+    uint32 loops = 0;
     bool lastState = isReady();
     while (!currentThreadShouldExit()) {
-        File cfg(PLUGIN_CONFIG_FILE);
-        try {
-            if (cfg.exists()) {
-                FileInputStream fis(cfg);
-                if (fis.openedOk()) {
-                    json j = json::parse(fis.readEntireStreamAsString().toStdString());
-                    if (j.find("NumberOfBuffers") != j.end()) {
-                        int newNum = j["NumberOfBuffers"].get<int>();
-                        if (NUM_OF_BUFFERS != newNum) {
-                            logln("number of buffers changed from " << NUM_OF_BUFFERS << " to " << newNum);
-                            NUM_OF_BUFFERS = newNum;
-                            reconnect();
-                        }
-                    }
-                    if (j.find("LoadPluginTimeout") != j.end()) {
-                        int newNum = j["LoadPluginTimeout"].get<int>();
-                        if (LOAD_PLUGIN_TIMEOUT != newNum) {
-                            logln("timeout for leading a plugin changed from " << LOAD_PLUGIN_TIMEOUT << " to "
-                                                                               << newNum);
-                            LOAD_PLUGIN_TIMEOUT = newNum;
-                        }
-                    }
-                    m_processor->loadConfig(j, true);
-                } else {
-                    logln("failed to open config file: " << fis.getStatus().getErrorMessage());
-                }
-            }
-        } catch (json::parse_error& e) {
-            logln("parsing config failed: " << e.what());
+        // Check for config updates from other clients
+        auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigPlugin));
+        int newNum;
+        newNum = jsonGetValue(cfg, "NumberOfBuffers", NUM_OF_BUFFERS.load());
+        if (NUM_OF_BUFFERS != newNum) {
+            logln("number of buffers changed from " << NUM_OF_BUFFERS << " to " << newNum);
+            NUM_OF_BUFFERS = newNum;
+            reconnect();
         }
+        newNum = jsonGetValue(cfg, "LoadPluginTimeoutMS", LOAD_PLUGIN_TIMEOUT.load());
+        if (LOAD_PLUGIN_TIMEOUT != newNum) {
+            logln("timeout for leading a plugin changed from " << LOAD_PLUGIN_TIMEOUT << " to " << newNum);
+            LOAD_PLUGIN_TIMEOUT = newNum;
+        }
+        m_processor->loadConfig(cfg, true);
+
+        // Try to auto connect to the first available host discovered via mDNS
         if (m_srvHost.isEmpty()) {
             auto servers = m_processor->getServersMDNS();
             if (servers.size() > 0) {
                 setServer(servers[0]);
             }
         }
+
+        // Health check & reconnect
         if ((!isReady(LOAD_PLUGIN_TIMEOUT + 5000) || m_needsReconnect) && m_srvHost.isNotEmpty() &&
             !currentThreadShouldExit()) {
             logln("(re)connecting...");
@@ -86,13 +83,18 @@ void Client::run() {
             }
             lastState = newState;
         }
-        if (isReadyLockFree()) {
+
+        // CPU load update
+        if ((loops % cpuUpdateSeconds == 0) && isReadyLockFree()) {
             updateCPULoad();
         }
+
+        // Relax
         int sleepfor = 20;
         while (!currentThreadShouldExit() && sleepfor-- > 0) {
             Thread::sleep(50);
         }
+        loops++;
     }
     logln("client loop terminated");
 }
@@ -194,10 +196,10 @@ void Client::init() {
     if (m_cmd_socket->connect(host, port, 1000)) {
         StreamingSocket sock;
         int retry = 0;
-        int clientPort = DEFAULT_CLIENT_PORT;
+        int clientPort = Defaults::CLIENT_PORT;
         do {
-            if (sock.createListener(DEFAULT_CLIENT_PORT - retry)) {
-                clientPort = DEFAULT_CLIENT_PORT - retry;
+            if (sock.createListener(Defaults::CLIENT_PORT - retry)) {
+                clientPort = Defaults::CLIENT_PORT - retry;
                 break;
             }
         } while (retry++ < 200);
@@ -371,35 +373,50 @@ void Client::quit() {
     msg.send(m_cmd_socket.get());
 }
 
-bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params, String settings) {
+bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params, String settings, String& err) {
     traceScope();
     if (!isReadyLockFree()) {
         return false;
     };
-    MessageHelper::Error err;
+    MessageHelper::Error e;
     Message<AddPlugin> msg(this);
     PLD(msg).setString(id);
     LockByID lock(*this, ADDPLUGIN);
+    TimeStatistic::Timeout timeout(LOAD_PLUGIN_TIMEOUT);
     if (msg.send(m_cmd_socket.get())) {
-        auto result = m_msgFactory.getResult(m_cmd_socket.get(), LOAD_PLUGIN_TIMEOUT, &err);
+        auto result = m_msgFactory.getResult(m_cmd_socket.get(), LOAD_PLUGIN_TIMEOUT / 1000, &e);
         if (nullptr == result) {
-            logln("  failed to get result: " << err.toString());
+            err = "failed to get result: " + e.toString();
+            logln(err);
             return false;
         }
         if (result->getReturnCode() < 0) {
-            logln("  negative return code");
+            err = result->getString();
+            logln(err);
             return false;
         }
-        m_latency = result->getReturnCode();
+        auto latency = result->getReturnCode();
+        if (timeout.getMillisecondsLeft() == 0) {
+            err = "timeout";
+            logln(err);
+            return false;
+        }
         Message<Presets> msgPresets(this);
-        if (!msgPresets.read(m_cmd_socket.get(), &err)) {
-            logln("  failed to read presets: " << err.toString());
+        if (!msgPresets.read(m_cmd_socket.get(), &e, timeout.getMillisecondsLeft())) {
+            err = "failed to read presets: " + e.toString();
+            logln(err);
             return false;
         }
         presets = StringArray::fromTokens(msgPresets.payload.getString(), "|", "");
+        if (timeout.getMillisecondsLeft() == 0) {
+            err = "timeout";
+            logln(err);
+            return false;
+        }
         Message<Parameters> msgParams(this);
-        if (!msgParams.read(m_cmd_socket.get(), &err)) {
-            logln("  failed to read parameters: " << err.toString());
+        if (!msgParams.read(m_cmd_socket.get(), &e, timeout.getMillisecondsLeft())) {
+            err = "failed to read parameters: " + e.toString();
+            logln(err);
             return false;
         }
         auto jparams = msgParams.payload.getJson();
@@ -421,9 +438,11 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
             msgSettings.payload.setData(block.begin(), static_cast<int>(block.getSize()));
         }
         if (!msgSettings.send(m_cmd_socket.get())) {
-            logln("  failed to send settings");
+            err = "failed to send settings";
+            logln(err);
             return false;
         }
+        m_latency = latency;
         return true;
     }
     return false;
@@ -619,7 +638,7 @@ void Client::setParameterValue(int idx, int paramIdx, float val) {
     msg.send(m_cmd_socket.get());
 }
 
-Array<Client::ParameterResult> Client::getAllParameterValues(int idx, int count) {
+Array<Client::ParameterResult> Client::getAllParameterValues(int idx, int cnt) {
     traceScope();
     if (!isReadyLockFree()) {
         return {};
@@ -629,7 +648,7 @@ Array<Client::ParameterResult> Client::getAllParameterValues(int idx, int count)
     LockByID lock(*this, GETALLPARAMETERVALUES);
     msg.send(m_cmd_socket.get());
     Array<Client::ParameterResult> ret;
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < cnt; i++) {
         Message<ParameterValue> msgVal(this);
         MessageHelper::Error err;
         if (msgVal.read(m_cmd_socket.get(), &err)) {
@@ -876,14 +895,41 @@ void Client::rescan(bool wipe) {
     msg.send(m_cmd_socket.get());
 }
 
+void Client::restart() {
+    traceScope();
+    Message<Restart> msg(this);
+    LockByID lock(*this, RESTART);
+    msg.send(m_cmd_socket.get());
+}
+
 void Client::updateCPULoad() {
     traceScope();
-    Message<CPULoad> msg(this);
-    LockByID lock(*this, UPDATECPULOAD);
-    msg.send(m_cmd_socket.get());
-    msg.read(m_cmd_socket.get());
-    m_srvLoad = PLD(msg).getFloat();
-    m_processor->setCPULoad(m_srvLoad);
+    auto srvInfo = ServiceReceiver::hostToServerInfo(getServerHost());
+    bool updated = false;
+    int now = Time::getCurrentTime().getUTCOffsetSeconds();
+    if (srvInfo.isValid()) {
+        traceln("updating cpu load from mDNS");
+        LockByID lock(*this, UPDATECPULOAD1);
+        if (m_srvLoad != srvInfo.getLoad()) {
+            m_srvLoad = srvInfo.getLoad();
+            updated = true;
+        }
+        m_srvLoadLastUpdated = now;
+    } else if (m_srvLoadLastUpdated + 10 < now) {
+        traceln("updating cpu load via server request");
+        Message<CPULoad> msg(this);
+        LockByID lock(*this, UPDATECPULOAD2);
+        msg.send(m_cmd_socket.get());
+        msg.read(m_cmd_socket.get());
+        if (m_srvLoad != PLD(msg).getFloat()) {
+            m_srvLoad = PLD(msg).getFloat();
+            updated = true;
+        }
+        m_srvLoadLastUpdated = now;
+    }
+    if (updated) {
+        m_processor->setCPULoad(m_srvLoad);
+    }
 }
 
 StreamingSocket* Client::accept(StreamingSocket& sock) const {
@@ -903,18 +949,7 @@ StreamingSocket* Client::accept(StreamingSocket& sock) const {
 
 String Client::getLoadedPluginsString() {
     traceScope();
-    LockByID lock(*this, GETLOADEDPLUGINSSTRING, false);
-    String ret;
-    bool first = true;
-    for (auto& p : m_processor->getLoadedPlugins()) {
-        if (first) {
-            first = false;
-        } else {
-            ret << " > ";
-        }
-        ret << p.name;
-    }
-    return ret;
+    return m_processor->getLoadedPluginsString();
 }
 
 }  // namespace e47

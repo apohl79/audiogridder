@@ -18,122 +18,98 @@
 
 namespace e47 {
 
-Server::Server(json opts) : Thread("Server"), LogTag("server"), m_opts(opts) {
+Server::Server(json opts) : Thread("Server"), LogTag("server"), m_opts(opts) { initAsyncFunctors(); }
+
+void Server::initialize() {
     traceScope();
     logln("starting server (version: " << AUDIOGRIDDER_VERSION << ")...");
-    File runFile(SERVER_RUN_FILE);
+    File runFile(Defaults::getConfigFileName(Defaults::ConfigServerRun));
     runFile.create();
     loadConfig();
-    TimeStatistics::initialize();
+    Metrics::initialize();
     CPUInfo::initialize();
 }
 
 void Server::loadConfig() {
     traceScope();
     logln("loading config");
-    File cfg(SERVER_CONFIG_FILE);
-    if (cfg.exists()) {
-        FileInputStream fis(cfg);
-        json j = json::parse(fis.readEntireStreamAsString().toStdString());
-        if (j.find("Tracer") != j.end()) {
-            Tracer::setEnabled(j["Tracer"].get<bool>());
-        }
-        if (j.find("ID") != j.end()) {
-            m_id = j["ID"].get<int>();
-        }
-        if (j.find("NAME") != j.end()) {
-            m_name = j["NAME"].get<std::string>();
-        }
+    auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigServer));
+    Tracer::setEnabled(jsonGetValue(cfg, "Tracer", Tracer::isEnabled()));
+    AGLogger::setEnabled(jsonGetValue(cfg, "Logger", AGLogger::isEnabled()));
+    m_id = jsonGetValue(cfg, "ID", m_id);
+    m_name = jsonGetValue(cfg, "NAME", m_name);
 #ifdef JUCE_MAC
-        if (j.find("AU") != j.end()) {
-            m_enableAU = j["AU"].get<bool>();
-            logln("AudioUnit support " << (m_enableAU ? "enabled" : "disabled"));
-        }
+    m_enableAU = jsonGetValue(cfg, "AU", m_enableAU);
+    logln("AudioUnit support " << (m_enableAU ? "enabled" : "disabled"));
 #endif
-        if (j.find("VST") != j.end()) {
-            m_enableVST3 = j["VST"].get<bool>();
-            logln("VST3 support " << (m_enableVST3 ? "enabled" : "disabled"));
-        }
-        m_vst3Folders.clear();
-        if (j.find("VST3Folders") != j.end() && j["VST3Folders"].size() > 0) {
-            logln("VST3 custom folders:");
-            for (auto& s : j["VST3Folders"]) {
-                if (s.get<std::string>().length() > 0) {
-                    logln("  " << s.get<std::string>());
-                    m_vst3Folders.add(s.get<std::string>());
-                }
+    m_enableVST3 = jsonGetValue(cfg, "VST", m_enableVST3);
+    logln("VST3 support " << (m_enableVST3 ? "enabled" : "disabled"));
+    m_vst3Folders.clear();
+    if (jsonHasValue(cfg, "VST3Folders") && cfg["VST3Folders"].size() > 0) {
+        logln("VST3 custom folders:");
+        for (auto& s : cfg["VST3Folders"]) {
+            if (s.get<std::string>().length() > 0) {
+                logln("  " << s.get<std::string>());
+                m_vst3Folders.add(s.get<std::string>());
             }
         }
-        if (j.find("VST2") != j.end()) {
-            m_enableVST2 = j["VST2"].get<bool>();
-            logln("VST2 support " << (m_enableVST2 ? "enabled" : "disabled"));
-        }
-        m_vst2Folders.clear();
-        if (j.find("VST2Folders") != j.end() && j["VST2Folders"].size() > 0) {
-            logln("VST2 custom folders:");
-            for (auto& s : j["VST2Folders"]) {
-                if (s.get<std::string>().length() > 0) {
-                    logln("  " << s.get<std::string>());
-                    m_vst2Folders.add(s.get<std::string>());
-                }
-            }
-        }
-        if (j.find("ScreenCapturingFFmpeg") != j.end()) {
-            m_screenCapturingFFmpeg = j["ScreenCapturingFFmpeg"].get<bool>();
-        }
-        String encoder;
-        if (j.find("ScreenCapturingFFmpegEncoder") != j.end()) {
-            encoder = j["ScreenCapturingFFmpegEncoder"].get<std::string>();
-            if (encoder == "webp") {
-                m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
-            } else if (encoder == "mjpeg") {
-                m_screenCapturingFFmpegEncMode = ScreenRecorder::MJPEG;
-            } else {
-                logln("unknown ffmpeg encoder mode " << encoder << "! falling back to webp.");
-                m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
-                encoder = "webp";
-            }
-        }
-        if (j.find("ScreenCapturingOff") != j.end()) {
-            m_screenCapturingOff = j["ScreenCapturingOff"].get<bool>();
-        }
-        String scmode;
-        if (m_screenCapturingOff) {
-            scmode = "off";
-        } else if (m_screenCapturingFFmpeg) {
-            scmode = "ffmpeg (" + encoder + ")";
-            MessageManager::callAsync([this] {
-                traceScope1();
-                ScreenRecorder::initialize(m_screenCapturingFFmpegEncMode);
-            });
-        } else {
-            scmode = "native";
-        }
-        logln("screen capturing mode: " << scmode);
-        if (j.find("ScreenDiffDetection") != j.end()) {
-            m_screenDiffDetection = j["ScreenDiffDetection"].get<bool>();
-            if (!m_screenCapturingFFmpeg && !m_screenCapturingOff) {
-                logln("screen capture difference detection " << (m_screenDiffDetection ? "enabled" : "disabled"));
-            }
-        }
-        if (j.find("ScreenQuality") != j.end()) {
-            m_screenJpgQuality = j["ScreenQuality"].get<float>();
-        }
-        m_pluginexclude.clear();
-        if (j.find("ExcludePlugins") != j.end()) {
-            for (auto& s : j["ExcludePlugins"]) {
-                m_pluginexclude.insert(s.get<std::string>());
-            }
-        }
-        if (j.find("ScanForPlugins") != j.end()) {
-            m_scanForPlugins = j["ScanForPlugins"].get<bool>();
-        }
-        if (j.find("UsePluginFilenames") != j.end()) {
-            m_usePluginFilenames = j["UsePluginFilenames"].get<bool>();
-        }
-        logln("identify plugins by filenames (unused): " << (m_usePluginFilenames ? "enabled" : "disabled"));
     }
-    File deadmanfile(DEAD_MANS_FILE);
+    m_enableVST2 = jsonGetValue(cfg, "VST2", m_enableVST2);
+    logln("VST2 support " << (m_enableVST2 ? "enabled" : "disabled"));
+    m_vst2Folders.clear();
+    if (jsonHasValue(cfg, "VST2Folders") && cfg["VST2Folders"].size() > 0) {
+        logln("VST2 custom folders:");
+        for (auto& s : cfg["VST2Folders"]) {
+            if (s.get<std::string>().length() > 0) {
+                logln("  " << s.get<std::string>());
+                m_vst2Folders.add(s.get<std::string>());
+            }
+        }
+    }
+    m_screenCapturingFFmpeg = jsonGetValue(cfg, "ScreenCapturingFFmpeg", m_screenCapturingFFmpeg);
+    String encoder;
+    if (jsonHasValue(cfg, "ScreenCapturingFFmpegEncoder")) {
+        encoder = jsonGetValue(cfg, "ScreenCapturingFFmpegEncoder", encoder);
+        if (encoder == "webp") {
+            m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
+        } else if (encoder == "mjpeg") {
+            m_screenCapturingFFmpegEncMode = ScreenRecorder::MJPEG;
+        } else {
+            logln("unknown ffmpeg encoder mode " << encoder << "! falling back to webp.");
+            m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
+            encoder = "webp";
+        }
+    }
+    m_screenCapturingOff = jsonGetValue(cfg, "ScreenCapturingOff", m_screenCapturingOff);
+    String scmode;
+    if (m_screenCapturingOff) {
+        scmode = "off";
+    } else if (m_screenCapturingFFmpeg) {
+        scmode = "ffmpeg (" + encoder + ")";
+        runOnMsgThreadAsync([this] {
+            traceScope();
+            ScreenRecorder::initialize(m_screenCapturingFFmpegEncMode);
+        });
+    } else {
+        scmode = "native";
+    }
+    logln("screen capturing mode: " << scmode);
+    m_screenDiffDetection = jsonGetValue(cfg, "ScreenDiffDetection", m_screenDiffDetection);
+    if (!m_screenCapturingFFmpeg && !m_screenCapturingOff) {
+        logln("screen capture difference detection " << (m_screenDiffDetection ? "enabled" : "disabled"));
+    }
+    m_screenJpgQuality = jsonGetValue(cfg, "ScreenQuality", m_screenJpgQuality);
+    m_pluginexclude.clear();
+    if (jsonHasValue(cfg, "ExcludePlugins")) {
+        for (auto& s : cfg["ExcludePlugins"]) {
+            m_pluginexclude.insert(s.get<std::string>());
+        }
+    }
+    m_scanForPlugins = jsonGetValue(cfg, "ScanForPlugins", m_scanForPlugins);
+    m_useJucePluginIDs = jsonGetValue(cfg, "UseJucePluginIDs", m_useJucePluginIDs);
+    logln("identify plugins by JUCE IDs: " << (m_useJucePluginIDs ? "enabled" : "disabled"));
+
+    File deadmanfile(Defaults::getConfigFileName(Defaults::ConfigDeadMan));
     if (deadmanfile.exists()) {
         StringArray lines;
         deadmanfile.readLines(lines);
@@ -150,6 +126,7 @@ void Server::saveConfig() {
     logln("saving config");
     json j;
     j["Tracer"] = Tracer::isEnabled();
+    j["Logger"] = AGLogger::isEnabled();
     j["ID"] = m_id;
     j["NAME"] = m_name.toStdString();
 #ifdef JUCE_MAC
@@ -183,10 +160,14 @@ void Server::saveConfig() {
         j["ExcludePlugins"].push_back(p.toStdString());
     }
     j["ScanForPlugins"] = m_scanForPlugins;
-    j["UsePluginFilenames"] = m_usePluginFilenames;
+    j["UseJucePluginIDs"] = m_useJucePluginIDs;
 
-    File cfg(SERVER_CONFIG_FILE);
-    cfg.deleteFile();
+    File cfg(Defaults::getConfigFileName(Defaults::ConfigServer));
+    if (cfg.exists()) {
+        cfg.deleteFile();
+    } else {
+        cfg.create();
+    }
     FileOutputStream fos(cfg);
     fos.writeText(j.dump(4), false, false, "\n");
 }
@@ -198,36 +179,49 @@ int Server::getId(bool ignoreOpts) const {
     return getOpt("ID", m_id);
 }
 
-void Server::loadKnownPluginList() { loadKnownPluginList(m_pluginlist); }
+void Server::loadKnownPluginList() {
+    traceScope();
+    loadKnownPluginList(m_pluginlist);
+}
 
 void Server::loadKnownPluginList(KnownPluginList& plist) {
-    File file(KNOWN_PLUGINS_FILE);
+    setLogTagStatic("server");
+    traceScope();
+    File file(Defaults::getConfigFileName(Defaults::ConfigPluginCache));
     if (file.exists()) {
         auto xml = XmlDocument::parse(file);
         plist.recreateFromXml(*xml);
     }
 }
 
-void Server::saveKnownPluginList() { saveKnownPluginList(m_pluginlist); }
+void Server::saveKnownPluginList() {
+    traceScope();
+    saveKnownPluginList(m_pluginlist);
+}
 
 void Server::saveKnownPluginList(KnownPluginList& plist) {
-    File file(KNOWN_PLUGINS_FILE);
+    setLogTagStatic("server");
+    traceScope();
+    File file(Defaults::getConfigFileName(Defaults::ConfigPluginCache));
     auto xml = plist.createXml();
-    xml->writeTo(file);
+    if (!xml->writeTo(file)) {
+        logln("failed to store plugin cache");
+    }
 }
 
 Server::~Server() {
     traceScope();
+    stopAsyncFunctors();
     if (m_masterSocket.isConnected()) {
         m_masterSocket.close();
     }
     waitForThreadAndLog(this, this);
     m_pluginlist.clear();
-    TimeStatistics::cleanup();
+    Metrics::cleanup();
     ServiceResponder::cleanup();
     CPUInfo::cleanup();
     logln("server terminated");
-    File runFile(SERVER_RUN_FILE);
+    File runFile(Defaults::getConfigFileName(Defaults::ConfigServerRun));
     runFile.deleteFile();
 }
 
@@ -238,6 +232,8 @@ void Server::shutdown() {
     for (auto& w : m_workers) {
         logln("shutting down worker, isRunning=" << (int)w->isThreadRunning());
         w->shutdown();
+    }
+    for (auto& w : m_workers) {
         w->waitForThreadToExit(-1);
     }
     signalThreadShouldExit();
@@ -281,7 +277,7 @@ bool Server::shouldExclude(const String& name, const std::vector<String>& includ
 void Server::addPlugins(const std::vector<String>& names, std::function<void(bool)> fn) {
     traceScope();
     std::thread([this, names, fn] {
-        traceScope1();
+        traceScope();
         scanForPlugins(names);
         saveConfig();
         saveKnownPluginList();
@@ -322,7 +318,7 @@ bool Server::scanPlugin(const String& id, const String& format) {
     bool success = true;
     KnownPluginList plist, newlist;
     loadKnownPluginList(plist);
-    PluginDirectoryScanner scanner(newlist, *fmt, {}, true, File(DEAD_MANS_FILE));
+    PluginDirectoryScanner scanner(newlist, *fmt, {}, true, File(Defaults::getConfigFileName(Defaults::ConfigDeadMan)));
     scanner.setFilesOrIdentifiersToScan({id});
     String name;
     scanner.scanNextFile(true, name);
@@ -334,7 +330,8 @@ bool Server::scanPlugin(const String& id, const String& format) {
         logln("adding plugin description:");
         logln("  name            = " << t.name << " (" << t.descriptiveName << ")");
         logln("  uid             = " << t.uid);
-        logln("  id string       = " << t.createIdentifierString());
+        logln("  id string       = " << AGProcessor::createPluginID(t, false));
+        logln("  juce id string  = " << AGProcessor::createPluginID(t, true));
         logln("  manufacturer    = " << t.manufacturerName);
         logln("  category        = " << t.category);
         logln("  shell           = " << (int)t.hasSharedContainer);
@@ -456,7 +453,7 @@ void Server::run() {
 
     getApp()->hideSplashWindow();
 
-#ifdef JUCE_MAC
+#ifndef JUCE_WINDOWS
     setsockopt(m_masterSocket.getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
 #endif
 
@@ -467,6 +464,22 @@ void Server::run() {
         saveConfig();
     }
 
+    logln("available plugins:");
+    std::set<String> knownIDs;
+    for (auto& desc : m_pluginlist.getTypes()) {
+        auto id = AGProcessor::createPluginID(desc);
+        bool exists = knownIDs.find(id) != knownIDs.end();
+        if (exists) {
+            logln("plugin ID collision! falling back to JUCE plugin IDs.");
+        } else {
+            knownIDs.insert(id);
+        }
+        logln("  " << desc.name << " [" << AGProcessor::createPluginID(desc) << "]"
+                   << " format=" << desc.pluginFormatName << " ins=" << desc.numInputChannels
+                   << " outs=" << desc.numOutputChannels << " instrument=" << (int)desc.isInstrument
+                   << (exists ? " !ID collision" : ""));
+    }
+
     logln("creating listener " << (m_host.length() == 0 ? "*" : m_host) << ":" << (m_port + getId()));
     if (m_masterSocket.createListener(m_port + getId(), m_host)) {
         logln("server started: ID=" << getId() << ", PORT=" << m_port + getId() << ", NAME=" << m_name);
@@ -474,27 +487,39 @@ void Server::run() {
             auto* clnt = m_masterSocket.waitForNextConnection();
             if (nullptr != clnt) {
                 logln("new client " << clnt->getHostName());
-                auto w = std::make_unique<Worker>(clnt);
+                auto w = std::make_shared<Worker>(clnt);
                 w->startThread();
-                m_workers.add(std::move(w));
+                m_workers.add(w);
                 // lazy cleanup
                 std::shared_ptr<WorkerList> deadWorkers = std::make_shared<WorkerList>();
                 for (int i = 0; i < m_workers.size();) {
                     if (!m_workers.getReference(i)->isThreadRunning()) {
-                        deadWorkers->add(std::move(m_workers.getReference(i)));
+                        deadWorkers->add(m_workers.getReference(i));
                         m_workers.remove(i);
                     } else {
                         i++;
                     }
                 }
-                MessageManager::callAsync([this, deadWorkers] {
-                    traceScope1();
-                    deadWorkers->clear();
-                });
+                traceln("about to remove " << deadWorkers->size() << " dead workers");
+                deadWorkers->clear();
             }
         }
     } else {
         logln("failed to create listener");
+        runOnMsgThreadAsync([this] {
+            traceScope();
+            uint32 ec = 0;
+            if (AlertWindow::showOkCancelBox(AlertWindow::WarningIcon, "Error",
+                                             "AudioGridder failed to bind to the server port " +
+                                                 String(m_port + getId()) +
+                                                 "!\n\nYou have to terminate the application that is blocking the port."
+                                                 "\n\nTry again?",
+                                             "Yes", "No")) {
+                ec = App::EXIT_RESTART;
+                logln("restarting server by user choice");
+            }
+            getApp()->prepareShutdown(ec);
+        });
     }
 }
 

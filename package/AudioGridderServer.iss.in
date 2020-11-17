@@ -15,7 +15,7 @@ Name: "{autoprograms}\AudioGridderServer"; Filename: "{app}\AudioGridderServer.e
 function NextButtonClick(PageId: Integer): Boolean;
 begin
     Result := True;
-    if (PageId = wpReady) and FileExists(ExpandConstant('{userappdata}\.audiogridderserver.running')) then begin
+    if (PageId = wpReady) and FileExists(ExpandConstant('{userappdata}\AudioGridder\audiogridderserver.running')) then begin
         MsgBox('AudioGridder Server seems to be running. Please terminate it before you continue!', mbError, MB_OK);
     end;
 end;

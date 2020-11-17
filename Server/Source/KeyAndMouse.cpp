@@ -112,12 +112,7 @@ inline std::pair<CGMouseButton, CGEventType> toMouseButtonType(MouseEvType t) {
 void sendInput(INPUT* in) {
     traceScope();
     if (SendInput(1, in, sizeof(INPUT)) != 1) {
-        auto err = GetLastError();
-        LPSTR lpMsgBuf;
-        FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&lpMsgBuf, 0, NULL);
-        setLogTagStatic("keyandmouse");
-        logln("SendInput failed: EC=" << err << " DESC=" << lpMsgBuf);
+        logln("SendInput failed: " << GetLastErrorStr());
     }
 }
 

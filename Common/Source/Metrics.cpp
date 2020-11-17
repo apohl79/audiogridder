@@ -6,20 +6,21 @@
  */
 
 #include "Metrics.hpp"
+#include <cstddef>
+#include <memory>
+#include "SharedInstance.hpp"
 
 namespace e47 {
 
-std::unique_ptr<TimeStatistics::Aggregator> TimeStatistics::m_aggregator;
-TimeStatistics::StatsMap TimeStatistics::m_stats;
-std::mutex TimeStatistics::m_aggregatorMtx;
-size_t TimeStatistics::m_aggregatorRefCount = 0;
+Metrics::StatsMap Metrics::m_stats;
 
-void TimeStatistics::update(double t) {
+void TimeStatistic::update(double t) {
+    m_meter.increment();
     std::lock_guard<std::mutex> lock(m_mtx);
     m_times[m_timesIdx].push_back(t);
 }
 
-void TimeStatistics::aggregate() {
+void TimeStatistic::aggregate() {
     auto& data = m_times[m_timesIdx];
     {
         // switch to the other buffer
@@ -36,6 +37,8 @@ void TimeStatistics::aggregate() {
             hist.sum += t;
         }
         hist.avg = hist.sum / hist.count;
+        auto nfIdx = (size_t)(hist.count * 0.95);
+        hist.nintyFifth = data[nfIdx];
 
         // calc the distribution over m_numOfBins bins with a size of m_binSize seconds
         std::size_t count = 0;
@@ -65,13 +68,16 @@ void TimeStatistics::aggregate() {
     }
 }
 
-TimeStatistics::Histogram TimeStatistics::get1minHistogram() {
+void TimeStatistic::aggregate1s() { m_meter.aggregate1s(); }
+
+TimeStatistic::Histogram TimeStatistic::get1minHistogram() {
     Histogram aggregate(m_numOfBins, m_binSize);
     if (m_1minValues.size() > 0) {
         aggregate.min = std::numeric_limits<double>::max();
         for (auto& hist : m_1minValues) {
             aggregate.sum += hist.sum;
             aggregate.count += hist.count;
+            aggregate.nintyFifth += hist.nintyFifth;
             for (std::size_t i = 0; i < m_numOfBins + 1; ++i) {
                 aggregate.updateBin(i, hist.dist[i].second);
             }
@@ -85,14 +91,16 @@ TimeStatistics::Histogram TimeStatistics::get1minHistogram() {
         if (aggregate.count > 0) {
             aggregate.avg = aggregate.sum / aggregate.count;
         }
+        aggregate.nintyFifth /= m_1minValues.size();
     }
     return aggregate;
 }
 
-void TimeStatistics::log(const String& name) {
+void TimeStatistic::log(const String& name) {
     auto hist = get1minHistogram();
     if (hist.count > 0) {
-        logln(name << ": total " << hist.count << ", avg " << String(hist.avg, 2) << "ms, min " << String(hist.min, 2)
+        logln(name << ": total " << hist.count << ", rps " << String(m_meter.rate_1min(), 2) << ", 95th "
+                   << String(hist.nintyFifth) << ", avg " << String(hist.avg, 2) << "ms, min " << String(hist.min, 2)
                    << "ms, max " << String(hist.max, 2) << "ms");
         String out = name;
         out << ":  dist ";
@@ -117,60 +125,52 @@ void TimeStatistics::log(const String& name) {
     }
 }
 
-void TimeStatistics::Aggregator::run() {
+void Metrics::aggregateAndShow(bool show) {
+    for (auto s : getStats()) {
+        s.second->aggregate();
+        if (show) {
+            s.second->log(s.first);
+        }
+    }
+}
+
+void Metrics::aggregate1s() {
+    for (auto s : getStats()) {
+        s.second->aggregate1s();
+    }
+}
+
+void Metrics::run() {
     traceScope();
     int count = 1;
     while (!currentThreadShouldExit()) {
-        int sleepfor = 10000 / 50;
+        int sleepstep = 50;
+        int sleepfor = 10000 / sleepstep;
+        int sleepcount = 0;
         while (!currentThreadShouldExit() && sleepfor-- > 0) {
-            Thread::sleep(50);
+            Thread::sleep(sleepstep);
+            sleepcount += sleepstep;
+            if (sleepcount % 1000 == 0) {
+                // every second
+                aggregate1s();
+            }
         }
         if (!currentThreadShouldExit()) {
-            StatsMap hmcpy;
-            {
-                std::lock_guard<std::mutex> lock(m_aggregatorMtx);
-                hmcpy = m_stats;
-            }
-            for (auto s : hmcpy) {
-                s.second->aggregate();
-                if (count == 0) {
-                    s.second->log(s.first);
-                }
-            }
+            aggregateAndShow(count == 0);
             ++count %= 6;
         }
     }
 }
 
-TimeStatistics::Duration TimeStatistics::getDuration(const String& name) {
-    std::lock_guard<std::mutex> lock(m_aggregatorMtx);
-    std::shared_ptr<TimeStatistics> stat;
-    auto it = m_stats.find(name);
-    if (m_stats.end() == it) {
-        auto itnew = m_stats.emplace(name, std::make_shared<TimeStatistics>());
-        stat = itnew.first->second;
-    } else {
-        stat = it->second;
-    }
-    return Duration(stat);
+TimeStatistic::Duration TimeStatistic::getDuration(const String& name) {
+    return Duration(Metrics::getStatistic<TimeStatistic>(name));
 }
 
-void TimeStatistics::initialize() {
-    std::lock_guard<std::mutex> lock(m_aggregatorMtx);
-    if (nullptr == m_aggregator) {
-        m_aggregator = std::make_unique<Aggregator>();
-        m_aggregator->startThread();
-    }
-    m_aggregatorRefCount++;
+Metrics::StatsMap Metrics::getStats() {
+    std::lock_guard<std::mutex> lock(getInstanceMtx());
+    return m_stats;
 }
 
-void TimeStatistics::cleanup() {
-    std::lock_guard<std::mutex> lock(m_aggregatorMtx);
-    m_aggregatorRefCount--;
-    if (m_aggregatorRefCount == 0) {
-        m_aggregator->signalThreadShouldExit();
-        m_aggregator.reset();
-    }
-}
+void Metrics::cleanup() { SharedInstance::cleanup(); }
 
 }  // namespace e47

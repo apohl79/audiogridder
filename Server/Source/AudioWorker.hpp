@@ -10,6 +10,7 @@
 
 #include <JuceHeader.h>
 #include <thread>
+#include <unordered_map>
 
 #include "ProcessorChain.hpp"
 #include "Message.hpp"
@@ -27,7 +28,10 @@ class ProcessorChain;
 
 class AudioWorker : public Thread, public LogTagDelegate {
   public:
-    AudioWorker() : Thread("AudioWorker") {}
+    static std::atomic_uint32_t count;
+    static std::atomic_uint32_t runCount;
+
+    AudioWorker(LogTag* tag);
     virtual ~AudioWorker() override;
 
     void init(std::unique_ptr<StreamingSocket> s, int channelsIn, int channelsOut, double rate, int samplesPerBlock,
@@ -37,7 +41,7 @@ class AudioWorker : public Thread, public LogTagDelegate {
     void shutdown();
     void clear();
 
-    bool addPlugin(const String& id);
+    bool addPlugin(const String& id, String& err);
     void delPlugin(int idx);
     void exchangePlugins(int idxA, int idxB);
     std::shared_ptr<AGProcessor> getProcessor(int idx) const { return m_chain->getProcessor(idx); }
@@ -47,8 +51,13 @@ class AudioWorker : public Thread, public LogTagDelegate {
 
     float getParameterValue(int idx, int paramIdx) { return m_chain->getParameterValue(idx, paramIdx); }
 
-    using RecentsListType = Array<PluginDescription>;
-    RecentsListType& getRecentsList(String host) const;
+    struct ComparablePluginDescription : PluginDescription {
+        ComparablePluginDescription(const PluginDescription& other) : PluginDescription(other) {}
+        bool operator==(const ComparablePluginDescription& other) const { return isDuplicateOf(other); }
+    };
+
+    using RecentsListType = Array<ComparablePluginDescription>;
+    String getRecentsList(String host) const;
     void addToRecentsList(const String& id, const String& host);
 
   private:
@@ -59,8 +68,10 @@ class AudioWorker : public Thread, public LogTagDelegate {
     int m_samplesPerBlock;
     bool m_doublePrecission;
     std::shared_ptr<ProcessorChain> m_chain;
-    static HashMap<String, RecentsListType> m_recents;
+    static std::unordered_map<String, RecentsListType> m_recents;
     static std::mutex m_recentsMtx;
+
+    ENABLE_ASYNC_FUNCTORS();
 };
 
 }  // namespace e47

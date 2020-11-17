@@ -14,6 +14,10 @@
 
 #include "Logger.hpp"
 
+#ifndef JUCE_WINDOWS
+#include <sys/resource.h>
+#endif
+
 #define logln(M)                                                                          \
     do {                                                                                  \
         String __msg, __str;                                                              \
@@ -46,11 +50,20 @@
         }                                                                                 \
     } while (0)
 
+#define _createUniqueVar_(P, S) P##S
+#define _createUniqueVar(P, S) _createUniqueVar_(P, S)
+#define traceScope() Tracer::Scope _createUniqueVar(__scope, __LINE__)(getLogTagSource(), __FILE__, __LINE__, __func__)
+
 namespace e47 {
+
+#ifdef JUCE_WINDOWS
+String GetLastErrorStr();
+#endif
 
 class LogTag {
   public:
-    LogTag(const String& name) : m_name(name) {}
+    LogTag(const String& name) : m_tagId((uint64)this), m_tagName(name) {}
+    virtual ~LogTag() {}
 
     static inline String getStrWithLeadingZero(int n, int digits = 2) {
         String s = "";
@@ -86,57 +99,37 @@ class LogTag {
         return tag;
     }
 
-    void setLogTagExtra(const String& s) { m_extra = s; }
+    void setLogTagExtra(const String& s) { m_tagExtra = s; }
+    const String& getName() const { return m_tagName; }
+    const String& getExtra() const { return m_tagExtra; }
+    uint64 getId() const { return m_tagId; }
 
     const LogTag* getLogTagSource() const { return this; }
-    String getLogTag() const { return getTaggedStr(m_name, String::toHexString((uint64)this), m_extra, true); }
-    String getLogTagNoTime() const { return getTaggedStr(m_name, String::toHexString((uint64)this), m_extra, false); }
+    String getLogTag() const { return getTaggedStr(m_tagName, String::toHexString(m_tagId), m_tagExtra, true); }
+    String getLogTagNoTime() const { return getTaggedStr(m_tagName, String::toHexString(m_tagId), m_tagExtra, false); }
 
-  private:
-    String m_name;
-    String m_extra;
+  protected:
+    uint64 m_tagId;
+    String m_tagName;
+    String m_tagExtra;
 };
 
-class LogTagDelegate {
+class LogTagDelegate : public LogTag {
   public:
-    LogTagDelegate() {}
-    LogTagDelegate(const LogTag* r) : m_logTagSrc(r) {}
-    const LogTag* m_logTagSrc;
-    void setLogTagSource(const LogTag* r) { m_logTagSrc = r; }
-    const LogTag* getLogTagSource() const {
-        if (nullptr != m_logTagSrc) {
-            return m_logTagSrc;
+    LogTagDelegate(const LogTag* src = nullptr) : LogTag("unset") { setLogTagSource(src); }
+    void setLogTagSource(const LogTag* src) {
+        if (nullptr != src) {
+            m_tagId = src->getId();
+            m_tagName = src->getName();
+            m_tagExtra = src->getExtra();
         }
-        // make sure there is always a tag source
-        static auto fallbackTag = std::make_unique<LogTag>("unset");
-        return fallbackTag.get();
-    }
-    String getLogTag() const {
-        if (nullptr != m_logTagSrc) {
-            return m_logTagSrc->getLogTag();
-        }
-        return "";
     }
 };
-
-static inline void waitForThreadAndLog(const LogTag* tag, Thread* t, int millisUntilWarning = 3000) {
-    auto getLogTagSource = [tag] { return tag; };
-    if (millisUntilWarning > -1) {
-        auto warnTime = Time::getMillisecondCounter() + (uint32)millisUntilWarning;
-        while (!t->waitForThreadToExit(1000)) {
-            if (Time::getMillisecondCounter() > warnTime) {
-                loglnNoTrace("warning: waiting for thread " << t->getThreadName() << " to finish");
-            }
-        }
-    } else {
-        t->waitForThreadToExit(-1);
-    }
-}
 
 class ServerInfo {
   public:
     ServerInfo() {
-        m_id = 0;
+        m_id = -1;
         m_load = 0.0f;
         refresh();
     }
@@ -171,6 +164,7 @@ class ServerInfo {
         return m_host == other.m_host && m_name == other.m_name && m_id == other.m_id;
     }
 
+    bool isValid() const { return m_id > -1; }
     const String& getHost() const { return m_host; }
     const String& getName() const { return m_name; }
     int getID() const { return m_id; }
@@ -226,7 +220,26 @@ class ServerInfo {
     Time m_updated;
 };
 
-inline void callOnMessageThread(std::function<void()> fn) {
+inline void cleanDirectory(const String& path, const String& filePrefix, const String& fileExtension,
+                           int filesToKeep = 5) {
+    File dir(path);
+    if (!dir.isDirectory()) {
+        return;
+    }
+    auto files = dir.findChildFiles(File::findFiles, false, filePrefix + "*" + fileExtension);
+    if (files.size() > filesToKeep) {
+        files.sort();
+        for (auto* it = files.begin(); it < files.end() - filesToKeep; it++) {
+            it->deleteFile();
+        }
+    }
+}
+
+inline void runOnMsgThreadSync(std::function<void()> fn) {
+    if (MessageManager::getInstance()->isThisTheMessageThread()) {
+        fn();
+        return;
+    }
     std::mutex mtx;
     std::condition_variable cv;
     bool done = false;
@@ -240,8 +253,108 @@ inline void callOnMessageThread(std::function<void()> fn) {
     cv.wait(lock, [&done] { return done; });
 }
 
+#define ENABLE_ASYNC_FUNCTORS()                                                                              \
+    inline std::function<void()> safeLambda(std::function<void()> fn) {                                      \
+        traceScope();                                                                                        \
+        if (nullptr == __m_asyncExecFlag) {                                                                  \
+            logln("initAsyncFunctors() has to be called in the ctor");                                       \
+            return nullptr;                                                                                  \
+        }                                                                                                    \
+        auto shouldExec = __m_asyncExecFlag;                                                                 \
+        auto execCnt = __m_asyncExecCnt;                                                                     \
+        return [shouldExec, execCnt, fn] {                                                                   \
+            if (shouldExec->load()) {                                                                        \
+                execCnt->fetch_add(1, std::memory_order_relaxed);                                            \
+                fn();                                                                                        \
+                execCnt->fetch_sub(1, std::memory_order_relaxed);                                            \
+            }                                                                                                \
+        };                                                                                                   \
+    }                                                                                                        \
+    inline void runOnMsgThreadAsync(std::function<void()> fn) { MessageManager::callAsync(safeLambda(fn)); } \
+    std::shared_ptr<std::atomic_bool> __m_asyncExecFlag;                                                     \
+    std::shared_ptr<std::atomic_uint32_t> __m_asyncExecCnt
+
+#define initAsyncFunctors()                                           \
+    do {                                                              \
+        __m_asyncExecFlag = std::make_shared<std::atomic_bool>(true); \
+        __m_asyncExecCnt = std::make_shared<std::atomic_uint32_t>(0); \
+    } while (0)
+
+#define stopAsyncFunctors()                                                               \
+    do {                                                                                  \
+        traceScope();                                                                     \
+        if (nullptr == __m_asyncExecFlag) {                                               \
+            logln("initAsyncFunctors() has to be called in the ctor");                    \
+            break;                                                                        \
+        }                                                                                 \
+        traceln("stop async functors, exec count is " << String(*__m_asyncExecCnt));      \
+        *__m_asyncExecFlag = false;                                                       \
+        if (!MessageManager::getInstance()->isThisTheMessageThread()) {                   \
+            runOnMsgThreadSync([] {});                                                    \
+            while (__m_asyncExecCnt->load() > 0) {                                        \
+                traceln("waiting for async functors, cnt=" << String(*__m_asyncExecCnt)); \
+                Thread::sleep(5);                                                         \
+            }                                                                             \
+        }                                                                                 \
+    } while (0)
+
 }  // namespace e47
 
 #include "Tracer.hpp"
+#include "json.hpp"
 
+using json = nlohmann::json;
+
+namespace e47 {
+
+static inline void waitForThreadAndLog(const LogTag* tag, Thread* t, int millisUntilWarning = 3000) {
+    auto getLogTagSource = [tag] { return tag; };
+    if (millisUntilWarning > -1) {
+        auto warnTime = Time::getMillisecondCounter() + (uint32)millisUntilWarning;
+        while (!t->waitForThreadToExit(1000)) {
+            if (Time::getMillisecondCounter() > warnTime) {
+                logln("warning: waiting for thread " << t->getThreadName() << " to finish");
+            }
+        }
+    } else {
+        t->waitForThreadToExit(-1);
+    }
+}
+
+static inline json configParseFile(const String& configFile) {
+    setLogTagStatic("utils");
+    File cfg(configFile);
+    if (cfg.exists()) {
+        FileInputStream fis(cfg);
+        if (fis.openedOk()) {
+            try {
+                return json::parse(fis.readEntireStreamAsString().toStdString());
+            } catch (json::parse_error& e) {
+                logln("parsing config file " << configFile << " failed: " << e.what());
+            }
+        } else {
+            logln("failed to open config file " << configFile << ": " << fis.getStatus().getErrorMessage());
+        }
+    }
+    return {};
+}
+
+static inline bool jsonHasValue(const json& cfg, const String& name) {
+    return cfg.find(name.toStdString()) != cfg.end();
+}
+
+template <typename T>
+static inline T jsonGetValue(const json& cfg, const String& name, const T& def) {
+    if (!jsonHasValue(cfg, name)) {
+        return def;
+    }
+    return cfg[name.toStdString()].get<T>();
+}
+
+template <>
+inline String jsonGetValue(const json& cfg, const String& name, const String& def) {
+    return jsonGetValue(cfg, name, def.toStdString());
+}
+
+}  // namespace e47
 #endif /* Utils_hpp */

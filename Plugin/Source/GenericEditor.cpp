@@ -61,7 +61,7 @@ void GenericEditor::resized() {
             c->onChange = [this, i] {
                 auto& locParam = getParameter(i);
                 auto* locComp = dynamic_cast<ComboBox*>(getComponent(i));
-                locParam.setValue(locComp->getSelectedItemIndex());
+                locParam.setValue((float)locComp->getSelectedItemIndex());
                 updateParameter(i);
             };
 
