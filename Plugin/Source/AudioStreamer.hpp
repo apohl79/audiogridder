@@ -112,7 +112,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         if (error) {
             return;
         }
-        if (client->NUM_OF_BUFFERS > 1) {
+        if (client->NUM_OF_BUFFERS > 0) {
             if (buffer.getNumSamples() == client->m_samplesPerBlock && workingSendSamples == 0) {
                 AudioMidiBuffer buf;
                 if (client->m_channelsIn > 0) {
@@ -177,7 +177,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
             return;
         }
         AudioMidiBuffer buf;
-        if (client->NUM_OF_BUFFERS > 1) {
+        if (client->NUM_OF_BUFFERS > 0) {
             if (buffer.getNumSamples() == client->m_samplesPerBlock && workingReadSamples == 0) {
                 if (!waitRead()) {
                     logln("error: " << getInstanceString() << ": waitRead failed");

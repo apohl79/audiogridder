@@ -64,6 +64,13 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
     addAndMakeVisible(m_versionLabel);
     String v = "";
     v << AUDIOGRIDDER_VERSION;
+#if JucePlugin_IsSynth
+    v << " (inst)";
+#elif JucePlugin_IsMidiEffect
+    v << " (midi)";
+#else
+    v << " (fx)";
+#endif
     m_versionLabel.setText(v, NotificationType::dontSendNotification);
     m_versionLabel.setBounds(16, 89, 190, 10);
     m_versionLabel.setFont(Font(10, Font::plain));
@@ -566,6 +573,10 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
         bufMenu.addItem("Disabled (+0ms)", true, m_processor.getClient().NUM_OF_BUFFERS == 0, [this] {
             traceScope();
             m_processor.saveConfig(0);
+        });
+        bufMenu.addItem(getName(1), true, m_processor.getClient().NUM_OF_BUFFERS == 1, [this] {
+            traceScope();
+            m_processor.saveConfig(1);
         });
         bufMenu.addItem(getName(2), true, m_processor.getClient().NUM_OF_BUFFERS == 2, [this] {
             traceScope();
