@@ -12,6 +12,8 @@
 #include <windows.h>
 #include <stdlib.h>
 #include <tchar.h>
+#else
+#include <execinfo.h>
 #endif
 
 #include <signal.h>
@@ -49,16 +51,22 @@ void signalHandler(int signum) {
 #ifdef JUCE_WINDOWS
     RaiseException(0, 0, 0, NULL);
 #else
-    signal(signum, orgAction);
-    raise(signum);
+    void* callstack[128];
+    int frames = backtrace(callstack, 128);
+    char** strs = backtrace_symbols(callstack, frames);
+    for (int i = 0; i < frames; ++i) {
+        traceln(strs[i]);
+    }
+    free(strs);
 #endif
 }
 
 void initialize() {
     l_orgAbrtAction = signal(SIGABRT, signalHandler);
-    l_orgSegvAction = signal(SIGSEGV, signalHandler);
     l_orgFpeAction = signal(SIGFPE, signalHandler);
-#ifndef JUCE_WINDOWS
+#ifdef JUCE_WINDOWS
+    l_orgSegvAction = signal(SIGSEGV, signalHandler);
+#else
     signal(SIGPIPE, SIG_IGN);
 #endif
 }
