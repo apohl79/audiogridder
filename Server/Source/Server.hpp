@@ -45,6 +45,8 @@ class Server : public Thread, public LogTag {
     void setVST3Folders(const StringArray& folders) { m_vst3Folders = folders; }
     const StringArray& getVST2Folders() const { return m_vst2Folders; }
     void setVST2Folders(const StringArray& folders) { m_vst2Folders = folders; }
+    bool getVSTNoStandardFolders() const { return m_vstNoStandardFolders; }
+    void setVSTNoStandardFolders(bool b) { m_vstNoStandardFolders = b; }
     float getScreenQuality() const { return m_screenJpgQuality; }
     void setScreenQuality(float q) { m_screenJpgQuality = q; }
     bool getScreenDiffDetection() const { return m_screenDiffDetection; }
@@ -92,6 +94,7 @@ class Server : public Thread, public LogTag {
     ScreenRecorder::EncoderMode m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
     StringArray m_vst3Folders;
     StringArray m_vst2Folders;
+    bool m_vstNoStandardFolders;
     bool m_scanForPlugins = true;
     bool m_useJucePluginIDs = false;
 

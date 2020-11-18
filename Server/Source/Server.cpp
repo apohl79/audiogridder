@@ -66,6 +66,8 @@ void Server::loadConfig() {
             }
         }
     }
+    m_vstNoStandardFolders = jsonGetValue(cfg, "VSTNoStandardFolders", false);
+    logln("include VST standard folders is " << (m_vstNoStandardFolders ? "disabled" : "enabled"));
     m_screenCapturingFFmpeg = jsonGetValue(cfg, "ScreenCapturingFFmpeg", m_screenCapturingFFmpeg);
     String encoder;
     if (jsonHasValue(cfg, "ScreenCapturingFFmpegEncoder")) {
@@ -142,6 +144,7 @@ void Server::saveConfig() {
     for (auto& f : m_vst2Folders) {
         j["VST2Folders"].push_back(f.toStdString());
     }
+    j["VSTNoStandardFolders"] = m_vstNoStandardFolders;
     j["ScreenCapturingFFmpeg"] = m_screenCapturingFFmpeg;
     switch (m_screenCapturingFFmpegEncMode) {
         case ScreenRecorder::WEBP:
@@ -396,7 +399,10 @@ void Server::scanForPlugins(const std::vector<String>& include) {
     loadKnownPluginList();
 
     for (auto& fmt : fmts) {
-        auto searchPaths = fmt->getDefaultLocationsToSearch();
+        FileSearchPath searchPaths;
+        if (!m_vstNoStandardFolders) {
+            searchPaths = fmt->getDefaultLocationsToSearch();
+        }
         if (!fmt->getName().compare("VST3")) {
             for (auto& f : m_vst3Folders) {
                 searchPaths.addIfNotAlreadyThere(f);
@@ -490,7 +496,7 @@ void Server::run() {
     args.add("-iTCP:55056");
     if (proc.start(args, ChildProcess::wantStdOut)) {
         auto out = proc.readAllProcessOutput();
-        for (auto& line: StringArray::fromLines(out)) {
+        for (auto& line : StringArray::fromLines(out)) {
             if (line.endsWith("(LISTEN)")) {
                 auto parts = StringArray::fromTokens(line, " ", "");
                 if (parts.size() > 1) {

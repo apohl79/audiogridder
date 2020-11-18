@@ -169,6 +169,19 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     row += largeFieldRows;
 
     label = std::make_unique<Label>();
+    label->setText("Do not include VST standard folders:", NotificationType::dontSendNotification);
+    label->setBounds(getLabelBounds(row));
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
+
+    m_vstNoStandardFolders.setBounds(getCheckBoxBounds(row));
+    m_vstNoStandardFolders.setToggleState(m_app->getServer().getVSTNoStandardFolders(),
+                                          NotificationType::dontSendNotification);
+    addChildAndSetID(&m_vstNoStandardFolders, "vstnostandarddirs");
+
+    row++;
+
+    label = std::make_unique<Label>();
     label->setText("Screen Capturing Mode:", NotificationType::dontSendNotification);
     label->setBounds(getLabelBounds(row));
     addChildAndSetID(label.get(), "lbl");
@@ -344,6 +357,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
         if (m_vst2Folders.getText().length() > 0) {
             appCpy->getServer().setVST2Folders(StringArray::fromLines(m_vst2Folders.getText()));
         }
+        appCpy->getServer().setVSTNoStandardFolders(m_vstNoStandardFolders.getToggleState());
         appCpy->getServer().saveConfig();
         appCpy->hideServerSettings();
         appCpy->restartServer();
