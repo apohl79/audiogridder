@@ -342,11 +342,7 @@ bool ScreenRecorder::prepareOutput() {
             av_dict_set(&opts, "global_quality", String(m_quality).getCharPointer(), 0);
             break;
         case MJPEG:
-#ifdef JUCE_WINDOWS
             av_dict_set(&opts, "b", "14000000", 0);
-#else
-            av_dict_set(&opts, "b", "4000000", 0);
-#endif
             break;
     }
     int ret = avcodec_open2(m_outputCodecCtx, m_outputCodec, &opts);
