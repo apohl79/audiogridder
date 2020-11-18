@@ -95,7 +95,9 @@ void Worker::run() {
             // exact match is fine
             inputMatch = (cfg.channelsIn == plugin.numInputChannels) || inputMatch;
             // don't show mono plugins for stereo channel configs
-            inputMatch = (cfg.channelsIn > 0 && plugin.numInputChannels >= cfg.channelsIn) || inputMatch;
+            inputMatch =
+                (cfg.channelsIn > 0 && plugin.numInputChannels > 0 && cfg.channelsIn >= plugin.numInputChannels) ||
+                inputMatch;
             // for instruments (no inputs) allow any plugin with the isInstrument flag
             inputMatch = (cfg.channelsIn == 0 && plugin.isInstrument) || inputMatch;
             if (inputMatch) {
