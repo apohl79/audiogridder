@@ -480,6 +480,31 @@ void Server::run() {
                    << (exists ? " !ID collision" : ""));
     }
 
+#ifdef JUCE_MAC
+    // Waves is spawning a WavesLocalServer on OSX that inherits the AG master socket and binds to the AG port. Trying
+    // to automatically kill any process, that binds to the AG server port before creating the master socket.
+    ChildProcess proc;
+    StringArray args;
+    args.add("lsof");
+    args.add("-nP");
+    args.add("-iTCP:55056");
+    if (proc.start(args, ChildProcess::wantStdOut)) {
+        auto out = proc.readAllProcessOutput();
+        for (auto& line: StringArray::fromLines(out)) {
+            if (line.endsWith("(LISTEN)")) {
+                auto parts = StringArray::fromTokens(line, " ", "");
+                if (parts.size() > 1) {
+                    auto pid = parts[1];
+                    logln("about to kill process " << pid << " that blocks server port " << Defaults::SERVER_PORT);
+                    ChildProcess kproc;
+                    kproc.start("kill " + pid);
+                    sleep(3000);
+                }
+            }
+        }
+    }
+#endif
+
     logln("creating listener " << (m_host.length() == 0 ? "*" : m_host) << ":" << (m_port + getId()));
     if (m_masterSocket.createListener(m_port + getId(), m_host)) {
         logln("server started: ID=" << getId() << ", PORT=" << m_port + getId() << ", NAME=" << m_name);
