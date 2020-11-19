@@ -21,7 +21,7 @@ std::shared_ptr<AGLogger> AGLogger::m_inst;
 std::mutex AGLogger::m_instMtx;
 size_t AGLogger::m_instRefCount = 0;
 
-std::atomic_bool AGLogger::m_enabled{false};
+std::atomic_bool AGLogger::m_enabled{true};
 
 AGLogger::AGLogger(const String& appName, const String& filePrefix) : Thread("AGLogger") {
 #ifdef JUCE_DEBUG
