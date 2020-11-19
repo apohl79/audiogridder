@@ -235,22 +235,9 @@ inline void cleanDirectory(const String& path, const String& filePrefix, const S
     }
 }
 
-inline void runOnMsgThreadSync(std::function<void()> fn) {
-    if (MessageManager::getInstance()->isThisTheMessageThread()) {
-        fn();
-        return;
-    }
-    std::mutex mtx;
-    std::condition_variable cv;
-    bool done = false;
-    MessageManager::callAsync([&] {
-        std::lock_guard<std::mutex> lock(mtx);
-        fn();
-        done = true;
-        cv.notify_one();
-    });
-    std::unique_lock<std::mutex> lock(mtx);
-    cv.wait(lock, [&done] { return done; });
+inline bool msgThreadExistsAndNotLocked() {
+    auto mm = MessageManager::getInstanceWithoutCreating();
+    return nullptr != mm && !mm->currentThreadHasLockedMessageManager();
 }
 
 #define ENABLE_ASYNC_FUNCTORS()                                                                              \
@@ -289,7 +276,7 @@ inline void runOnMsgThreadSync(std::function<void()> fn) {
         }                                                                                 \
         traceln("stop async functors, exec count is " << String(*__m_asyncExecCnt));      \
         *__m_asyncExecFlag = false;                                                       \
-        if (!MessageManager::getInstance()->isThisTheMessageThread()) {                   \
+        if (msgThreadExistsAndNotLocked()) {                                              \
             runOnMsgThreadSync([] {});                                                    \
             while (__m_asyncExecCnt->load() > 0) {                                        \
                 traceln("waiting for async functors, cnt=" << String(*__m_asyncExecCnt)); \
@@ -307,7 +294,36 @@ using json = nlohmann::json;
 
 namespace e47 {
 
-static inline void waitForThreadAndLog(const LogTag* tag, Thread* t, int millisUntilWarning = 3000) {
+inline void runOnMsgThreadSync(std::function<void()> fn) {
+    setLogTagStatic("utils");
+    auto mm = MessageManager::getInstanceWithoutCreating();
+    if (nullptr == mm) {
+        logln("error: message thread does not exists");
+        return;
+    }
+    if (mm->isThisTheMessageThread()) {
+        fn();
+        return;
+    }
+    if (mm->currentThreadHasLockedMessageManager()) {
+        logln("error: current thread has locked the message thread");
+        return;
+    }
+    std::mutex mtx;
+    std::condition_variable cv;
+    bool done = false;
+    MessageManager::callAsync([&] {
+        std::lock_guard<std::mutex> lock(mtx);
+        fn();
+        done = true;
+        cv.notify_one();
+    });
+    std::unique_lock<std::mutex> lock(mtx);
+    cv.wait(lock, [&done] { return done; });
+}
+
+
+inline void waitForThreadAndLog(const LogTag* tag, Thread* t, int millisUntilWarning = 3000) {
     auto getLogTagSource = [tag] { return tag; };
     if (millisUntilWarning > -1) {
         auto warnTime = Time::getMillisecondCounter() + (uint32)millisUntilWarning;
@@ -321,7 +337,7 @@ static inline void waitForThreadAndLog(const LogTag* tag, Thread* t, int millisU
     }
 }
 
-static inline json configParseFile(const String& configFile) {
+inline json configParseFile(const String& configFile) {
     setLogTagStatic("utils");
     File cfg(configFile);
     if (cfg.exists()) {
@@ -339,12 +355,12 @@ static inline json configParseFile(const String& configFile) {
     return {};
 }
 
-static inline bool jsonHasValue(const json& cfg, const String& name) {
+inline bool jsonHasValue(const json& cfg, const String& name) {
     return cfg.find(name.toStdString()) != cfg.end();
 }
 
 template <typename T>
-static inline T jsonGetValue(const json& cfg, const String& name, const T& def) {
+inline T jsonGetValue(const json& cfg, const String& name, const T& def) {
     if (!jsonHasValue(cfg, name)) {
         return def;
     }
