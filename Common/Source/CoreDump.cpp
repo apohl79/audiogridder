@@ -15,10 +15,12 @@
 #include <shellapi.h>
 #include <shlobj.h>
 #include <strsafe.h>
+#else
+#include <sys/types.h>
+#include <unistd.h>
 #endif
 
 #ifdef JUCE_MAC
-#include <sys/types.h>
 #include <sys/sysctl.h>
 #endif
 
@@ -81,7 +83,7 @@ void initialize(const String& appName, const String& filePrefix, bool showMessag
         }
         cleanDirectory(d.getFullPathName(), filePrefix, ".dmp", 3);
 
-        logln("core files will be written to " << d.getFullPathName());
+        logln("a core file will be written to " << file.getFullPathName());
 
         StringCchCopyW(l_appName, MAX_NAME, appName.toWideCharPointer());
         StringCchCopyW(l_path, MAX_PATH, file.getFullPathName().toWideCharPointer());
@@ -109,13 +111,45 @@ void initialize(const String& appName, const String& filePrefix, bool showMessag
         p = (char*)malloc(len);
         sysctlbyname("kern.corefile", p, &len, nullptr, 0);
         String coredirname(p);
-        logln("core files will be written to " << coredirname);
+        logln("matching core file name: " << coredirname.replace("%P", String(getpid())));
+
         if (File::isAbsolutePath(coredirname)) {
             File coredir = File::createFileWithoutCheckingPath(coredirname).getParentDirectory();
             if (!coredir.isDirectory() || !coredir.hasWriteAccess()) {
                 logln("missing write permission to core directory " << coredir.getFullPathName());
                 logln("you should run: sudo chmod o+w " << coredir.getFullPathName());
             }
+        }
+#endif
+
+#ifdef JUCE_LINUX
+        // Set core dump filter flags
+        // see: man 5 core
+        File dmpFilter("/proc/self/coredump_filter");
+        if (dmpFilter.exists()) {
+            FileOutputStream fos(dmpFilter);
+            fos.writeString("0x1F3");
+        }
+        // Check if we can figure out the core file name
+        File dmpPattern("/proc/sys/kernel/core_pattern");
+        if (dmpPattern.exists()) {
+            auto name = dmpPattern.loadFileAsString().trimEnd();
+            if (File::isAbsolutePath(name)) {
+                auto pid = String(getpid());
+                logln("matching core file name: " << name.replace("%P", pid).replace("%p", pid));
+                File coredir = File::createFileWithoutCheckingPath(name).getParentDirectory();
+                if (!coredir.isDirectory() || !coredir.hasWriteAccess()) {
+                    logln("missing write permission to core directory " << coredir.getFullPathName());
+                    logln("you should run: sudo chmod o+w " << coredir.getFullPathName());
+                }
+            } else {
+                logln("check the documentation of your distribution to find out where to find core files.");
+                logln("core files are handled by a user space program: " << name);
+                logln("the pid of this process is " << getpid());
+            }
+        } else {
+            logln("can't figure out where core files would be placed on this system.");
+            logln("the pid of this process is " << getpid());
         }
 #endif
     }
