@@ -1,8 +1,11 @@
 #!/bin/bash
 
+PROJECT=all
+PRETTIFY=0
+
 case "$1" in
     "-help")
-        echo "Usage: $0 [-server|-plugins|-fx|-inst|-midi] [-clean] [-keeptc]"
+        echo "Usage: $0 [-server|-plugins|-fx|-inst|-midi|-compiledb] [-clean] [-keeptc]"
         exit
         ;;
     "-server")
@@ -25,6 +28,11 @@ case "$1" in
         PROJECT=midi
         shift
         ;;
+    "-compiledb")
+        PROJECT=compiledb
+        PRETTIFY=1
+        shift
+        ;;
 esac
 
 if [ "$1" == "-clean" ]; then
@@ -35,12 +43,6 @@ fi
 UPDATE_TOOLCHAIN=1
 if [ "$1" == "-keeptc" ]; then
     UPDATE_TOOLCHAIN=0
-    shift
-fi
-
-PRETTIFY=1
-if [ "$1" == "-emacs" ]; then
-    PRETTIFY=0
     shift
 fi
 
@@ -56,10 +58,6 @@ rm -rf xcodebuild.log
 
 if [ -z "$CONFIG" ]; then
     CONFIG=Debug
-fi
-
-if [ -z "$PROJECT" ]; then
-    PROJECT=all
 fi
 
 COMPDBENABLED=1
@@ -104,7 +102,7 @@ function build() {
     fi
 }
 
-if [ "$PROJECT" == "all" ] || [ "$PROJECT" == "server" ]; then
+if [ "$PROJECT" == "all" ] || [ "$PROJECT" == "server" ] || [ "$PROJECT" == "compiledb" ]; then
     XCPROJECT=Server/Builds/MacOSX/AudioGridderServer.xcodeproj
     COMPDBENABLED=1
     COMPDBFILE=Server/compile_commands.json
@@ -116,7 +114,7 @@ if [ "$PROJECT" == "all" ] || [ "$PROJECT" == "server10.7" ]; then
     COMPDBFILE=""
     build
 fi
-if [ "$PROJECT" == "all" ] || [ "$PROJECT" == "fx" ] || [ "$PROJECT" == "plugins" ]; then
+if [ "$PROJECT" == "all" ] || [ "$PROJECT" == "fx" ] || [ "$PROJECT" == "plugins" ] || [ "$PROJECT" == "compiledb" ]; then
     XCPROJECT=Plugin/Fx/Builds/MacOSX/AudioGridder.xcodeproj
     COMPDBENABLED=1
     COMPDBFILE=Plugin/compile_commands.json
