@@ -189,6 +189,12 @@ void App::shutdown() {
         }
     }
 
+    if (m_server != nullptr) {
+        m_server->shutdown();
+        m_server->waitForThreadToExit(-1);
+        m_server.reset();
+    }
+
     Tracer::cleanup();
     AGLogger::cleanup();
     setApplicationReturnValue((int)m_exitCode);

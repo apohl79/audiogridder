@@ -237,7 +237,7 @@ inline void cleanDirectory(const String& path, const String& filePrefix, const S
 
 inline bool msgThreadExistsAndNotLocked() {
     auto mm = MessageManager::getInstanceWithoutCreating();
-    return nullptr != mm && !mm->currentThreadHasLockedMessageManager();
+    return nullptr != mm && !mm->hasStopMessageBeenSent() && !mm->currentThreadHasLockedMessageManager();
 }
 
 #define ENABLE_ASYNC_FUNCTORS()                                                                              \
@@ -303,6 +303,10 @@ inline void runOnMsgThreadSync(std::function<void()> fn) {
     }
     if (mm->isThisTheMessageThread()) {
         fn();
+        return;
+    }
+    if (mm->hasStopMessageBeenSent()) {
+        logln("error: dispatch loop has been stopped");
         return;
     }
     if (mm->currentThreadHasLockedMessageManager()) {
