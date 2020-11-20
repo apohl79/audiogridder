@@ -110,6 +110,8 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     void setMenuShowCompany(bool b) { m_menuShowCompany = b; }
     bool getGenericEditor() const { return m_genericEditor; }
     void setGenericEditor(bool b) { m_genericEditor = b; }
+    bool getConfirmDelete() const { return m_confirmDelete; }
+    void setConfirmDelete(bool b) { m_confirmDelete = b; }
 
     auto& getServers() const { return m_servers; }
     void addServer(const String& s) { m_servers.add(s); }
@@ -189,6 +191,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     bool m_menuShowCategory = true;
     bool m_menuShowCompany = true;
     bool m_genericEditor = false;
+    bool m_confirmDelete = true;
 
     ENABLE_ASYNC_FUNCTORS();
 

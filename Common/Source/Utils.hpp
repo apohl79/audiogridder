@@ -322,7 +322,6 @@ inline void runOnMsgThreadSync(std::function<void()> fn) {
     cv.wait(lock, [&done] { return done; });
 }
 
-
 inline void waitForThreadAndLog(const LogTag* tag, Thread* t, int millisUntilWarning = 3000) {
     auto getLogTagSource = [tag] { return tag; };
     if (millisUntilWarning > -1) {
@@ -355,9 +354,7 @@ inline json configParseFile(const String& configFile) {
     return {};
 }
 
-inline bool jsonHasValue(const json& cfg, const String& name) {
-    return cfg.find(name.toStdString()) != cfg.end();
-}
+inline bool jsonHasValue(const json& cfg, const String& name) { return cfg.find(name.toStdString()) != cfg.end(); }
 
 template <typename T>
 inline T jsonGetValue(const json& cfg, const String& name, const T& def) {

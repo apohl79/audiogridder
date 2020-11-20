@@ -179,6 +179,7 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
     m_menuShowCategory = jsonGetValue(j, "MenuShowCategory", m_menuShowCategory);
     m_menuShowCompany = jsonGetValue(j, "MenuShowCompany", m_menuShowCompany);
     m_genericEditor = jsonGetValue(j, "GenericEditor", m_genericEditor);
+    m_confirmDelete = jsonGetValue(j, "ConfirmDelete", m_confirmDelete);
 }
 
 void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
@@ -200,6 +201,7 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
     jcfg["MenuShowCategory"] = m_menuShowCategory;
     jcfg["MenuShowCompany"] = m_menuShowCompany;
     jcfg["GenericEditor"] = m_genericEditor;
+    jcfg["ConfirmDelete"] = m_confirmDelete;
     jcfg["Tracer"] = Tracer::isEnabled();
     jcfg["Logger"] = AGLogger::isEnabled();
     File cfg(Defaults::getConfigFileName(Defaults::ConfigPlugin));

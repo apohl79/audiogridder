@@ -350,18 +350,23 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
         };
         auto deleteFn = [this, idx] {
             traceScope();
-            m_processor.unloadPlugin(idx);
-            int i = 0;
-            for (auto it = m_pluginButtons.begin(); it < m_pluginButtons.end(); it++) {
-                if (i++ == idx) {
-                    m_pluginButtons.erase(it);
-                    break;
+            if (!m_processor.getConfirmDelete() ||
+                AlertWindow::showOkCancelBox(AlertWindow::QuestionIcon, "Delete",
+                                             "Are you sure to delete >" + m_processor.getLoadedPlugin(idx).name + "< ?",
+                                             "Yes", "No")) {
+                m_processor.unloadPlugin(idx);
+                int i = 0;
+                for (auto it = m_pluginButtons.begin(); it < m_pluginButtons.end(); it++) {
+                    if (i++ == idx) {
+                        m_pluginButtons.erase(it);
+                        break;
+                    }
                 }
-            }
 #if JucePlugin_IsSynth
-            m_newPluginButton.setEnabled(true);
+                m_newPluginButton.setEnabled(true);
 #endif
-            resized();
+                resized();
+            }
         };
         if (modifiers.isLeftButtonDown()) {
             switch (area) {
@@ -714,7 +719,7 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
             m_processor.saveConfig();
             editPlugin();
         });
-        m.addSectionHeader("Plugin Menu");
+        m.addSectionHeader("Plugin UI");
         m.addItem("Show Category", true, m_processor.getMenuShowCategory(), [this] {
             traceScope();
             m_processor.setMenuShowCategory(!m_processor.getMenuShowCategory());
@@ -723,6 +728,11 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
         m.addItem("Show Company", true, m_processor.getMenuShowCompany(), [this] {
             traceScope();
             m_processor.setMenuShowCompany(!m_processor.getMenuShowCompany());
+            m_processor.saveConfig();
+        });
+        m.addItem("Confirm Delete", true, m_processor.getConfirmDelete(), [this] {
+            traceScope();
+            m_processor.setConfirmDelete(!m_processor.getConfirmDelete());
             m_processor.saveConfig();
         });
         m.addSectionHeader("Debugging");
