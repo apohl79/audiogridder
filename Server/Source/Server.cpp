@@ -357,16 +357,26 @@ void Server::scanNextPlugin(const String& id, const String& fmt) {
     args.add("-scan");
     args.add(fileFmt);
     if (proc.start(args)) {
-        proc.waitForProcessToFinish(30000);
-        if (proc.isRunning()) {
-            logln("error: scan timeout, killing scan process");
-            proc.kill();
-        } else {
-            auto ec = proc.getExitCode();
-            if (ec != 0) {
-                logln("error: scan failed with exit code " << as<int>(ec));
+        bool finished;
+        do {
+            proc.waitForProcessToFinish(30000);
+            finished = true;
+            if (proc.isRunning()) {
+                if (!AlertWindow::showOkCancelBox(AlertWindow::WarningIcon, "Timeout",
+                                                 "The plugin scan did not finish yet. Do you want to continue to wait?",
+                                                 "Wait", "Abort")) {
+                    logln("error: scan timeout, killing scan process");
+                    proc.kill();
+                } else {
+                    finished = false;
+                }
+            } else {
+                auto ec = proc.getExitCode();
+                if (ec != 0) {
+                    logln("error: scan failed with exit code " << as<int>(ec));
+                }
             }
-        }
+        } while (!finished);
     } else {
         logln("error: failed to start scan process");
     }
