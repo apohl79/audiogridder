@@ -44,7 +44,7 @@ std::unique_ptr<PluginDescription> AGProcessor::findPluginDescritpion(const Stri
     auto& pluglist = getApp()->getPluginList();
     std::unique_ptr<PluginDescription> plugdesc;
     for (auto& desc : pluglist.getTypes()) {
-        if (createPluginID(desc) == id) {
+        if (createPluginID(desc, false) == id) {
             plugdesc = std::make_unique<PluginDescription>(desc);
         }
     }
