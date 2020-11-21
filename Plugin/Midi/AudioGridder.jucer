@@ -4,8 +4,8 @@
               companyCopyright="2020 Andreas Pohl" companyWebsite="https://www.audiogridder.com"
               companyEmail="audiogridder@e47.org" pluginFormats="buildAU,buildVST,buildVST3"
               pluginManufacturerCode="XE47" pluginCode="E403" headerPath="../../../Source&#10;../../../../Common/Source&#10;"
-              pluginName="AGridder" pluginVST3Category="Fx,Network" version="1.0.0"
-              pluginCharacteristicsValue="pluginIsMidiEffectPlugin,pluginProducesMidiOut,pluginWantsMidiIn"
+              pluginName="AGridder (midi)" pluginVST3Category="Fx,Network"
+              version="1.0.0" pluginCharacteristicsValue="pluginIsMidiEffectPlugin,pluginProducesMidiOut,pluginWantsMidiIn"
               displaySplashScreen="1" jucerFormatVersion="1">
   <MAINGROUP id="tTbkq6" name="AudioGridderMidi">
     <GROUP id="{3368243C-E955-A248-6B2F-5609CABD8F4F}" name="Common">
