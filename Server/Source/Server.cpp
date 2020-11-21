@@ -185,6 +185,24 @@ int Server::getId(bool ignoreOpts) const {
 void Server::loadKnownPluginList() {
     traceScope();
     loadKnownPluginList(m_pluginlist);
+    if (!m_pluginexclude.empty()) {
+        for (auto& desc: m_pluginlist.getTypes()) {
+            std::unique_ptr<AudioPluginFormat> fmt;
+            if (desc.pluginFormatName == "AudioUnit") {
+                fmt = std::make_unique<AudioUnitPluginFormat>();
+            } else if (desc.pluginFormatName == "VST") {
+                fmt = std::make_unique<VSTPluginFormat>();
+            } else if (desc.pluginFormatName == "VST3") {
+                fmt = std::make_unique<VST3PluginFormat>();
+            }
+            if (nullptr != fmt) {
+                auto name = fmt->getNameOfPluginFromIdentifier(desc.fileOrIdentifier);
+                if (shouldExclude(name)) {
+                    m_pluginlist.removeType(desc);
+                }
+            }
+        }
+    }
 }
 
 void Server::loadKnownPluginList(KnownPluginList& plist) {
@@ -410,7 +428,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
 
     for (auto& fmt : fmts) {
         FileSearchPath searchPaths;
-        if (!m_vstNoStandardFolders) {
+        if (fmt->getName().compare("AudioUnit") && !m_vstNoStandardFolders) {
             searchPaths = fmt->getDefaultLocationsToSearch();
         }
         if (!fmt->getName().compare("VST3")) {
@@ -428,8 +446,9 @@ void Server::scanForPlugins(const std::vector<String>& include) {
         for (auto& fileOrId : fileOrIds) {
             auto name = fmt->getNameOfPluginFromIdentifier(fileOrId);
             auto plugindesc = m_pluginlist.getTypeForFile(fileOrId);
+            bool excluded = shouldExclude(name, include);
             if ((nullptr == plugindesc || fmt->pluginNeedsRescanning(*plugindesc)) &&
-                !m_pluginlist.getBlacklistedFiles().contains(fileOrId) && !shouldExclude(name, include)) {
+                !m_pluginlist.getBlacklistedFiles().contains(fileOrId) && !excluded) {
                 logln("  scanning: " << name);
                 String splashName = name;
                 if (fmt->getName().compare("AudioUnit")) {
@@ -441,7 +460,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
                 getApp()->setSplashInfo(String("Scanning ") + fmt->getName() + ": " + splashName + " ...");
                 scanNextPlugin(fileOrId, fmt->getName());
             } else {
-                logln("  (skipping: " << name << ")");
+                logln("  (skipping: " << name << (excluded ? " excluded": "") << ")");
             }
             neverSeenList.erase(name);
         }
@@ -482,11 +501,13 @@ void Server::run() {
 
     logln("available plugins:");
     std::set<String> knownIDs;
+    bool fallbackToJuceIDs = false;
     for (auto& desc : m_pluginlist.getTypes()) {
         auto id = AGProcessor::createPluginID(desc);
         bool exists = knownIDs.find(id) != knownIDs.end();
         if (exists) {
             logln("plugin ID collision! falling back to JUCE plugin IDs.");
+            fallbackToJuceIDs = true;
         } else {
             knownIDs.insert(id);
         }
@@ -494,6 +515,9 @@ void Server::run() {
                    << " format=" << desc.pluginFormatName << " ins=" << desc.numInputChannels
                    << " outs=" << desc.numOutputChannels << " instrument=" << (int)desc.isInstrument
                    << (exists ? " !ID collision" : ""));
+    }
+    if (fallbackToJuceIDs) {
+        m_useJucePluginIDs = true;
     }
 
 #ifdef JUCE_MAC
