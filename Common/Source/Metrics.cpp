@@ -13,6 +13,7 @@
 namespace e47 {
 
 Metrics::StatsMap Metrics::m_stats;
+std::mutex Metrics::m_statsMtx;
 
 void TimeStatistic::update(double t) {
     m_meter.increment();
@@ -167,7 +168,7 @@ TimeStatistic::Duration TimeStatistic::getDuration(const String& name) {
 }
 
 Metrics::StatsMap Metrics::getStats() {
-    std::lock_guard<std::mutex> lock(getInstanceMtx());
+    std::lock_guard<std::mutex> lock(m_statsMtx);
     return m_stats;
 }
 

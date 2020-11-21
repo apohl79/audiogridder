@@ -151,7 +151,7 @@ class Metrics : public Thread, public LogTag, public SharedInstance<Metrics> {
   public:
     using StatsMap = std::unordered_map<String, std::shared_ptr<BasicStatistic>>;
 
-    Metrics() : Thread("Aggregator"), LogTag("stats_aggregator") { startThread(); }
+    Metrics() : Thread("Metrics"), LogTag("metrics") { startThread(); }
     ~Metrics() { stopThread(-1); }
     void run();
 
@@ -164,7 +164,7 @@ class Metrics : public Thread, public LogTag, public SharedInstance<Metrics> {
 
     template <typename T>
     static std::shared_ptr<T> getStatistic(const String& name) {
-        std::lock_guard<std::mutex> lock(getInstanceMtx());
+        std::lock_guard<std::mutex> lock(m_statsMtx);
         std::shared_ptr<T> stat;
         auto it = m_stats.find(name);
         if (m_stats.end() == it) {
@@ -178,6 +178,7 @@ class Metrics : public Thread, public LogTag, public SharedInstance<Metrics> {
 
   private:
     static StatsMap m_stats;
+    static std::mutex m_statsMtx;
 };
 
 }  // namespace e47
