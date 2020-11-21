@@ -216,7 +216,7 @@ void AudioGridderAudioProcessorEditor::resized() {
             m_pluginScreen.setVisible(true);
             m_stMinus.setVisible(true);
             m_stPlus.setVisible(true);
-            int screenHeight = m_pluginScreen.getHeight() + SCREENTOOLS_HEIGHT + 4;
+            int screenHeight = m_pluginScreen.getHeight() + SCREENTOOLS_HEIGHT + 5;
             windowHeight = jmax(windowHeight, screenHeight);
             windowWidth += m_pluginScreen.getWidth();
             m_stMinus.setBounds(windowWidth - SCREENTOOLS_HEIGHT - SCREENTOOLS_MARGIN * 2, SCREENTOOLS_MARGIN,
