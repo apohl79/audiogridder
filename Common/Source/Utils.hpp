@@ -373,5 +373,7 @@ inline String jsonGetValue(const json& cfg, const String& name, const String& de
     return jsonGetValue(cfg, name, def.toStdString());
 }
 
+void windowToFront(juce::Component* c);
+
 }  // namespace e47
 #endif /* Utils_hpp */

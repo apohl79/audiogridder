@@ -148,11 +148,16 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
         PopupMenu menu;
         if (topLevelMenuIndex == 0) {  // Settings
             menu.addItem("Plugins", [this] {
-                m_pluginListWindow = std::make_unique<PluginListWindow>(
-                    this, m_server->getPluginList(), Defaults::getConfigFileName(Defaults::ConfigDeadMan));
+                if (nullptr == m_pluginListWindow) {
+                    m_pluginListWindow = std::make_unique<PluginListWindow>(
+                        this, m_server->getPluginList(), Defaults::getConfigFileName(Defaults::ConfigDeadMan));
+                }
             });
-            menu.addItem("Server Settings",
-                         [this] { m_srvSettingsWindow = std::make_unique<ServerSettingsWindow>(this); });
+            menu.addItem("Server Settings", [this] {
+                if (nullptr == m_srvSettingsWindow) {
+                    m_srvSettingsWindow = std::make_unique<ServerSettingsWindow>(this);
+                }
+            });
             menu.addItem("Statistics", [this] {
                 if (nullptr == m_statsWindow) {
                     m_statsWindow = std::make_unique<StatisticsWindow>(this);
@@ -188,11 +193,14 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
 
     void showSplashWindow(std::function<void(bool)> onClick = nullptr) {
         traceScope();
-        m_splashWindow = std::make_shared<SplashWindow>();
+        if (nullptr == m_splashWindow) {
+            m_splashWindow = std::make_shared<SplashWindow>();
+        }
         if (onClick) {
             m_splashWindow->onClick = onClick;
         }
     }
+
     // called from the server thread
     void hideSplashWindow() {
         traceScope();
@@ -200,6 +208,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
         m_splashWindow.reset();
         runOnMsgThreadAsync([ptrcpy] {});
     }
+
     void setSplashInfo(const String& txt) {
         traceScope();
         runOnMsgThreadAsync([this, txt] {
@@ -220,6 +229,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
             traceScope();
             if (m_processor->hasEditor()) {
                 createEditor();
+                windowToFront(this);
             }
         }
 
@@ -232,6 +242,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
             traceScope();
             if (m_processor->hasEditor()) {
                 createEditor();
+                windowToFront(this);
             }
         }
 
@@ -329,7 +340,6 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
 
         void createEditor() {
             traceScope();
-            setAlwaysOnTop(true);
             setTitleBarHeight(30);
             m_totalRect = Desktop::getInstance().getDisplays().getMainDisplay().totalArea;
             m_editor = m_processor->createEditorIfNeeded();
