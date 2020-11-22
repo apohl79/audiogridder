@@ -168,6 +168,7 @@ StatisticsWindow::StatisticsWindow(AudioGridderAudioProcessorEditor* editor)
 
     centreWithSize(totalWidth, totalHeight);
     setVisible(true);
+    windowToFront(this);
 }
 
 StatisticsWindow::~StatisticsWindow() {
