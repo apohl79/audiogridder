@@ -58,6 +58,7 @@ rm -rf xcodebuild.log
 
 if [ -z "$CONFIG" ]; then
     CONFIG=Debug
+    package/setversion.sh
 fi
 
 COMPDBENABLED=1

@@ -47,7 +47,8 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     m_client = std::make_unique<Client>(this);
     setLogTagSource(m_client.get());
     traceScope();
-    logln(mode << " plugin loaded (version: " << AUDIOGRIDDER_VERSION << ")");
+    logln(mode << " plugin loaded (version: " << AUDIOGRIDDER_VERSION << ", build date: " << AUDIOGRIDDER_BUILD_DATE
+               << ")");
 
     ServiceReceiver::initialize(m_instId.hash(), [this] {
         traceScope();

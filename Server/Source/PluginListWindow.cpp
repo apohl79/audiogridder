@@ -28,6 +28,7 @@ PluginListWindow::PluginListWindow(App* app, KnownPluginList& list, const String
     centreWithSize(700, 600);
 
     setVisible(true);
+    windowToFront(this);
 }
 
 void PluginListWindow::closeButtonPressed() { m_app->hidePluginList(); }

@@ -22,7 +22,8 @@ Server::Server(json opts) : Thread("Server"), LogTag("server"), m_opts(opts) { i
 
 void Server::initialize() {
     traceScope();
-    logln("starting server (version: " << AUDIOGRIDDER_VERSION << ")...");
+    logln("starting server (version: " << AUDIOGRIDDER_VERSION << ", build date: " << AUDIOGRIDDER_BUILD_DATE
+                                       << ")...");
     File runFile(Defaults::getConfigFileName(Defaults::ConfigServerRun));
     runFile.create();
     loadConfig();
@@ -186,7 +187,7 @@ void Server::loadKnownPluginList() {
     traceScope();
     loadKnownPluginList(m_pluginlist);
     if (!m_pluginexclude.empty()) {
-        for (auto& desc: m_pluginlist.getTypes()) {
+        for (auto& desc : m_pluginlist.getTypes()) {
             std::unique_ptr<AudioPluginFormat> fmt;
             if (desc.pluginFormatName == "AudioUnit") {
                 fmt = std::make_unique<AudioUnitPluginFormat>();
@@ -380,9 +381,9 @@ void Server::scanNextPlugin(const String& id, const String& fmt) {
             proc.waitForProcessToFinish(30000);
             finished = true;
             if (proc.isRunning()) {
-                if (!AlertWindow::showOkCancelBox(AlertWindow::WarningIcon, "Timeout",
-                                                 "The plugin scan did not finish yet. Do you want to continue to wait?",
-                                                 "Wait", "Abort")) {
+                if (!AlertWindow::showOkCancelBox(
+                        AlertWindow::WarningIcon, "Timeout",
+                        "The plugin scan did not finish yet. Do you want to continue to wait?", "Wait", "Abort")) {
                     logln("error: scan timeout, killing scan process");
                     proc.kill();
                 } else {
@@ -460,7 +461,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
                 getApp()->setSplashInfo(String("Scanning ") + fmt->getName() + ": " + splashName + " ...");
                 scanNextPlugin(fileOrId, fmt->getName());
             } else {
-                logln("  (skipping: " << name << (excluded ? " excluded": "") << ")");
+                logln("  (skipping: " << name << (excluded ? " excluded" : "") << ")");
             }
             neverSeenList.erase(name);
         }

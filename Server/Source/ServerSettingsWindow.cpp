@@ -367,6 +367,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     setResizable(false, false);
     centreWithSize(totalWidth, totalHeight);
     setVisible(true);
+    windowToFront(this);
 }
 
 void ServerSettingsWindow::closeButtonPressed() {

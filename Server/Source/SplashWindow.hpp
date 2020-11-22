@@ -60,6 +60,15 @@ class SplashWindow : public TopLevelWindow {
         m_version.setBounds(200, 85, 240, 40);
         addChildAndSetID(&m_version, "version");
 
+        m_date.setText(String("Build date: ") + AUDIOGRIDDER_BUILD_DATE, NotificationType::dontSendNotification);
+        font.setHeight(13);
+        font.setStyleFlags(Font::plain);
+        m_date.setFont(font);
+        m_date.setJustificationType(Justification::right);
+        m_date.setAlpha(0.1f);
+        m_date.setBounds(200, 110, 240, 40);
+        addChildAndSetID(&m_date, "date");
+
         m_info.setBounds(10, 140, 430, 25);
         font.setHeight(15);
         font.setStyleFlags(Font::plain);
@@ -71,6 +80,7 @@ class SplashWindow : public TopLevelWindow {
         }
 
         setVisible(true);
+        windowToFront(this);
     }
 
     void paint(Graphics& g) override {
@@ -96,6 +106,7 @@ class SplashWindow : public TopLevelWindow {
     Label m_title2;
     Label m_info;
     Label m_version;
+    Label m_date;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SplashWindow)
 };
