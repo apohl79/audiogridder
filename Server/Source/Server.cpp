@@ -190,7 +190,9 @@ void Server::loadKnownPluginList() {
         for (auto& desc : m_pluginlist.getTypes()) {
             std::unique_ptr<AudioPluginFormat> fmt;
             if (desc.pluginFormatName == "AudioUnit") {
+#ifdef JUCE_MAC
                 fmt = std::make_unique<AudioUnitPluginFormat>();
+#endif
             } else if (desc.pluginFormatName == "VST") {
                 fmt = std::make_unique<VSTPluginFormat>();
             } else if (desc.pluginFormatName == "VST3") {
