@@ -4,7 +4,7 @@
               companyCopyright="2020 Andreas Pohl" companyWebsite="https://www.audiogridder.com"
               companyEmail="audiogridder@e47.org" pluginFormats="buildAU,buildVST,buildVST3"
               pluginManufacturerCode="XE47" pluginCode="E402" headerPath="../../../Source&#10;../../../../Common/Source&#10;"
-              pluginName="AGridder" pluginVST3Category="Instrument,Network"
+              pluginName="AGridder (inst)" pluginVST3Category="Instrument,Network"
               version="1.0.0" pluginCharacteristicsValue="pluginIsSynth,pluginProducesMidiOut,pluginWantsMidiIn"
               displaySplashScreen="1" jucerFormatVersion="1">
   <MAINGROUP id="tTbkq6" name="AudioGridderInst">
