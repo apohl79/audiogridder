@@ -31,6 +31,7 @@ case "$1" in
     "-compiledb")
         PROJECT=compiledb
         PRETTIFY=1
+        CLEAN=y
         shift
         ;;
 esac
@@ -91,13 +92,11 @@ function build() {
     fi
     if [ "$CONFIG" == "Release" ] || [ -n "$CLEAN" ]; then
         xc $XCPROJECT $CONFIG clean $PRETTYCMD
-    else
-        COMPDBENABLED=0
     fi
     if [ $PRETTIFY -gt 0 ] && [ $COMPDBENABLED -gt 0 ]; then
         PRETTYCMD_WITH_COMPDB="$PRETTYCMD $COMPDBPARAM"
     fi
-    xc $XCPROJECT $CONFIG build $PRETTYCMD_WITH_COMPDB
+    xc $XCPROJECT $CONFIG build "$PRETTYCMD_WITH_COMPDB"
     if [ -n "$COMPDBFILE" ] && [ -e build/reports/compilation_db.json ]; then
         mv build/reports/compilation_db.json $COMPDBFILE
     fi
