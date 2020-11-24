@@ -37,6 +37,13 @@ struct TraceRecord {
     char msg[64];
 };
 
+struct StatsRecord {
+    std::string name;
+    uint64 calls;
+    double timeEntered;
+    double timeTotol;
+};
+
 int COL_WIDTH_THREAD = 0;
 int COL_WIDTH_TAG = 0;
 int COL_WIDTH_EXTRA = 0;
@@ -78,6 +85,22 @@ int fnv(const std::string& str) {
 
 int getColorIdx(const std::string& str) { return fnv(str) % colors.size(); }
 
+std::string getTimeStr(double timediff) {
+    std::stringstream str;
+    int64 seconds = (int64)timediff / 1000;
+    double ms = (((int64)timediff % 1000) + timediff - (int64)timediff);
+    int64 h = seconds / 3600;
+    int64 m = (seconds - h * 3600) / 60;
+    int64 s = seconds % 60;
+
+    str << std::setfill('0') << std::setw(2) << h << ":";
+    str << std::setfill('0') << std::setw(2) << m << ":";
+    str << std::setfill('0') << std::setw(2) << s << ",";
+    str << std::setfill('0') << std::setw(10) << ms;
+
+    return str.str();
+}
+
 std::string colorize(const std::string& str, int col = -1) {
     col = col == -1 ? getColorIdx(str) : col;
     std::string ret;
@@ -105,17 +128,7 @@ void printRecord(const TraceRecord& rec, double firstTime, bool updateCols = fal
 
     if (!updateCols) {
         double timediff = (rec.time - firstTime);
-        int64 seconds = (int64)timediff / 1000;
-        double ms = (((int64)timediff % 1000) + timediff - (int64)timediff);
-        int64 h = seconds / 3600;
-        int64 m = (seconds - h * 3600) / 60;
-        int64 s = seconds % 60;
-
-        col << std::setfill('0') << std::setw(2) << h << ":";
-        col << std::setfill('0') << std::setw(2) << m << ":";
-        col << std::setfill('0') << std::setw(2) << s << ",";
-        col << std::setfill('0') << std::setw(10) << ms;
-        ;
+        col << getTimeStr(timediff);
         int w = 0;
         printColumn(col, w, false, false);
     }
@@ -154,6 +167,10 @@ void printThreadHeader(const std::string& thread, size_t msgCount) {
 void updateColumns(const TraceRecord& rec) { printRecord(rec, 0.0, true); }
 
 bool compRecords(const TraceRecord& lhs, const TraceRecord& rhs) { return lhs.time < rhs.time; }
+
+bool compRecordsByTime(const StatsRecord& lhs, const StatsRecord& rhs) { return lhs.timeTotol > rhs.timeTotol; }
+
+bool compRecordsByCalls(const StatsRecord& lhs, const StatsRecord& rhs) { return lhs.calls > rhs.calls; }
 
 bool startsWith(const std::string& str, const std::string& starts) {
     auto pos = str.find(starts);
@@ -198,6 +215,7 @@ int main(int argc, char** argv) {
         ("file,f", bpo::value<std::string>(), "Trace file")
         ("info,i", "Show a summary of the trace file")
         ("log", "Log file mode, order messages by time instead of by thread")
+        ("stats", "Statistics mode")
         ("number,n", bpo::value<int>()->default_value(10), "Number of messages per thread (0 for all)")
         ("thread,t", bpo::value<std::vector<std::string>>(), "Show specific thread(s)\n(format: 0x<hex id> | s:<name> | <decimal id>)")
         ("tag,x", bpo::value<std::vector<std::string>>(), "Show specific tag(s)\n(format: 0x<hex id> | s:<name> | <decimal id>)")
@@ -220,6 +238,7 @@ int main(int argc, char** argv) {
 
     bool summary = opts.count("info");
     bool logmode = opts.count("log");
+    bool statsmode = opts.count("stats");
 
     using IDFilter = std::set<uint64>;
     using NameFilter = std::set<std::string>;
@@ -248,6 +267,9 @@ int main(int argc, char** argv) {
 
     std::vector<TraceRecord> dataByTime;
     std::map<uint64, std::vector<TraceRecord>> dataByThread;
+    std::map<std::string, StatsRecord> dataStats;
+    std::map<std::string, StatsRecord> dataStatsCombined;
+    std::vector<StatsRecord> dataStatsSorted;
     std::map<uint64, std::string> threadNameMap;
     double firstTime = std::numeric_limits<double>::max();
 
@@ -263,12 +285,66 @@ int main(int argc, char** argv) {
             threadNameMap[rec.threadId] = rec.threadName;
             updateColumns(rec);
             dataByTime.push_back(rec);
+            if (statsmode) {
+            }
             dataByThread[rec.threadId].push_back(std::move(rec));
             recCount++;
         }
     } while (bytes == sizeof(rec));
 
     close(fd);
+
+    std::sort(dataByTime.begin(), dataByTime.end(), compRecords);
+
+    size_t maxStatsKeyLen = 0;
+
+    if (statsmode) {
+        for (auto& srec : dataByTime) {
+            bool isEnter = !strncmp(srec.msg, "enter", 5);
+            bool isExit = !strncmp(srec.msg, "exit", 4);
+            if (isEnter || isExit) {
+                std::stringstream statsKey;
+                statsKey << srec.threadId << ":" << srec.tagId << ":" << srec.file << ":" << srec.line;
+                bool exists = dataStats.find(statsKey.str()) != dataStats.end();
+                auto& statsSrec = dataStats[statsKey.str()];
+                if (!exists) {
+                    std::stringstream name;
+                    name << srec.func << " (" << srec.file << ":" << srec.line << ")";
+                    statsSrec.name = name.str();
+                    statsSrec.calls = 0;
+                    statsSrec.timeEntered = 0.0;
+                    statsSrec.timeTotol = 0.0;
+                    if (maxStatsKeyLen < statsSrec.name.size()) {
+                        maxStatsKeyLen = statsSrec.name.size();
+                    }
+                }
+                if (isEnter) {
+                    statsSrec.timeEntered = srec.time;
+                    statsSrec.calls++;
+                } else if (isExit) {
+                    if (statsSrec.timeEntered > 0.0) {
+                        statsSrec.timeTotol += (srec.time - statsSrec.timeEntered);
+                        statsSrec.timeEntered = 0.0;
+                    }
+                }
+            }
+        }
+        for (auto& kv : dataStats) {
+            bool isNew = dataStatsCombined.find(kv.second.name) == dataStatsCombined.end();
+            auto& statsRec = dataStatsCombined[kv.second.name];
+            if (isNew) {
+                statsRec.name = kv.second.name;
+                statsRec.calls = 0;
+                statsRec.timeTotol = 0.0;
+                statsRec.timeEntered = 0.0;
+            }
+            statsRec.calls += kv.second.calls;
+            statsRec.timeTotol += kv.second.timeTotol;
+        }
+        for (auto& kv : dataStatsCombined) {
+            dataStatsSorted.push_back(kv.second);
+        }
+    }
 
     if (summary) {
         std::cout << "messages: " << recCount << std::endl;
@@ -288,6 +364,22 @@ int main(int argc, char** argv) {
                 continue;
             }
             printRecord(r, firstTime);
+        }
+    } else if (statsmode) {
+        std::cout << "--- functions by time spent ---" << std::endl;
+        std::sort(dataStatsSorted.begin(), dataStatsSorted.end(), compRecordsByTime);
+        for (auto& statsRec : dataStatsSorted) {
+            size_t colIdx = (size_t)getColorIdx(statsRec.name);
+            std::cout << colors[colIdx] << std::setw((int)maxStatsKeyLen) << statsRec.name << RESET << ": "
+                      << getTimeStr(statsRec.timeTotol) << std::endl;
+        }
+        std::cout << std::endl;
+        std::cout << "--- functions by calls ---" << std::endl;
+        std::sort(dataStatsSorted.begin(), dataStatsSorted.end(), compRecordsByCalls);
+        for (auto& statsRec : dataStatsSorted) {
+            size_t colIdx = (size_t)getColorIdx(statsRec.name);
+            std::cout << colors[colIdx] << std::setw((int)maxStatsKeyLen) << statsRec.name << RESET << ": "
+                      << statsRec.calls << " calls" << std::endl;
         }
     } else {
         for (auto& kv : dataByThread) {
