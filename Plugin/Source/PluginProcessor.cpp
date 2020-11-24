@@ -316,11 +316,11 @@ void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<float>& buffer
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
     if (totalNumInputChannels > buffer.getNumChannels()) {
-        logln("error in processBlockBypassed: buffer has less channels than main input channels");
+        logln("buffer has less channels than main input channels");
         totalNumInputChannels = buffer.getNumChannels();
     }
     if (totalNumOutputChannels > buffer.getNumChannels()) {
-        logln("error in processBlockBypassed: buffer has less channels than main output channels");
+        logln("buffer has less channels than main output channels");
         totalNumOutputChannels = buffer.getNumChannels();
     }
 
@@ -328,17 +328,21 @@ void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<float>& buffer
         buffer.clear(i, 0, buffer.getNumSamples());
     }
 
+    if (m_bypassBufferF.size() < totalNumOutputChannels) {
+        logln("bypass buffer has less channels than needed");
+        for (auto i = 0; i < totalNumOutputChannels; ++i) {
+            buffer.clear(i, 0, buffer.getNumSamples());
+        }
+        return;
+    }
+
     for (auto c = 0; c < totalNumOutputChannels; ++c) {
         std::lock_guard<std::mutex> lock(m_bypassBufferMtx);
-        if (c < totalNumOutputChannels) {
-            auto& buf = m_bypassBufferF.getReference(c);
-            for (auto s = 0; s < buffer.getNumSamples(); ++s) {
-                buf.add(buffer.getSample(c, s));
-                buffer.setSample(c, s, buf.getFirst());
-                buf.remove(0);
-            }
-        } else {
-            logln("processBlockBypassed: error: m_bypassBufferF has less channels than buffer");
+        auto& buf = m_bypassBufferF.getReference(c);
+        for (auto s = 0; s < buffer.getNumSamples(); ++s) {
+            buf.add(buffer.getSample(c, s));
+            buffer.setSample(c, s, buf.getFirst());
+            buf.remove(0);
         }
     }
 }
@@ -350,11 +354,11 @@ void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<double>& buffe
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
     if (totalNumInputChannels > buffer.getNumChannels()) {
-        logln("error in processBlockBypassed: buffer has less channels than main input channels");
+        logln("buffer has less channels than main input channels");
         totalNumInputChannels = buffer.getNumChannels();
     }
     if (totalNumOutputChannels > buffer.getNumChannels()) {
-        logln("error in processBlockBypassed: buffer has less channels than main output channels");
+        logln("buffer has less channels than main output channels");
         totalNumOutputChannels = buffer.getNumChannels();
     }
 
@@ -362,17 +366,21 @@ void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<double>& buffe
         buffer.clear(i, 0, buffer.getNumSamples());
     }
 
+    if (m_bypassBufferD.size() < totalNumOutputChannels) {
+        logln("bypass buffer has less channels than needed");
+        for (auto i = 0; i < totalNumOutputChannels; ++i) {
+            buffer.clear(i, 0, buffer.getNumSamples());
+        }
+        return;
+    }
+
     for (auto c = 0; c < totalNumOutputChannels; ++c) {
         std::lock_guard<std::mutex> lock(m_bypassBufferMtx);
-        if (c < totalNumOutputChannels) {
-            auto& buf = m_bypassBufferD.getReference(c);
-            for (auto s = 0; s < buffer.getNumSamples(); ++s) {
-                buf.add(buffer.getSample(c, s));
-                buffer.setSample(c, s, buf.getFirst());
-                buf.remove(0);
-            }
-        } else {
-            logln("processBlockBypassed: error: m_bypassBufferD has less channels than buffer");
+        auto& buf = m_bypassBufferD.getReference(c);
+        for (auto s = 0; s < buffer.getNumSamples(); ++s) {
+            buf.add(buffer.getSample(c, s));
+            buffer.setSample(c, s, buf.getFirst());
+            buf.remove(0);
         }
     }
 }
