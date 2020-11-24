@@ -220,21 +220,6 @@ class ServerInfo {
     Time m_updated;
 };
 
-inline void cleanDirectory(const String& path, const String& filePrefix, const String& fileExtension,
-                           int filesToKeep = 5) {
-    File dir(path);
-    if (!dir.isDirectory()) {
-        return;
-    }
-    auto files = dir.findChildFiles(File::findFiles, false, filePrefix + "*" + fileExtension);
-    if (files.size() > filesToKeep) {
-        files.sort();
-        for (auto* it = files.begin(); it < files.end() - filesToKeep; it++) {
-            it->deleteFile();
-        }
-    }
-}
-
 inline bool msgThreadExistsAndNotLocked() {
     auto mm = MessageManager::getInstanceWithoutCreating();
     return nullptr != mm && !mm->hasStopMessageBeenSent() && !mm->currentThreadHasLockedMessageManager();
@@ -374,6 +359,46 @@ inline String jsonGetValue(const json& cfg, const String& name, const String& de
 }
 
 void windowToFront(juce::Component* c);
+
+inline void cleanDirectory(const String& path, const String& filePrefix, const String& fileExtension,
+                           int filesToKeep = 5) {
+    setLogTagStatic("utils");
+    File dir(path);
+    if (!dir.isDirectory()) {
+        return;
+    }
+    auto files = dir.findChildFiles(File::findFiles, false, filePrefix + "*" + fileExtension);
+    if (files.size() > filesToKeep) {
+        files.sort();
+        for (auto* it = files.begin(); it < files.end() - filesToKeep; it++) {
+#ifndef JUCE_WINDOWS
+            if (fileExtension == ".log") {
+                FileInputStream fis(*it);
+                while (!fis.isExhausted()) {
+                    auto line = fis.readNextLine();
+                    if (line.contains("matching core file name")) {
+                        auto parts = StringArray::fromTokens(line, " ", "");
+                        String corepath;
+                        for (int i = 5; i < parts.size(); i++) {
+                            if (i > 5) {
+                                corepath << " ";
+                            }
+                            corepath << parts[i];
+                        }
+                        File corefile(corepath);
+                        if (corefile.existsAsFile()) {
+                            logln("removing old diagnistics file: " << corepath);
+                            corefile.deleteFile();
+                        }
+                    }
+                }
+            }
+#endif
+            logln("removing old diagnostics file: " << it->getFullPathName());
+            it->deleteFile();
+        }
+    }
+}
 
 }  // namespace e47
 #endif /* Utils_hpp */
