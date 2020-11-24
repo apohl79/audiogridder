@@ -12,7 +12,7 @@ plugins will be executed on the remote machine and the remote plugin UI's will
 be streamed over the wire. With AudioGridder you get an experience very close to
 hosting the plugins directly in your DAW but not using your local CPU.
 
-For more information and intstallation instruction, please visit
+For more information and intstallation instructions, please visit
 [https://audiogridder.com](https://audiogridder.com).
 
 <p align="center">
