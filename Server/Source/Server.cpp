@@ -111,17 +111,6 @@ void Server::loadConfig() {
     m_scanForPlugins = jsonGetValue(cfg, "ScanForPlugins", m_scanForPlugins);
     m_useJucePluginIDs = jsonGetValue(cfg, "UseJucePluginIDs", m_useJucePluginIDs);
     logln("identify plugins by JUCE IDs: " << (m_useJucePluginIDs ? "enabled" : "disabled"));
-
-    File deadmanfile(Defaults::getConfigFileName(Defaults::ConfigDeadMan));
-    if (deadmanfile.exists()) {
-        StringArray lines;
-        deadmanfile.readLines(lines);
-        for (auto& line : lines) {
-            m_pluginlist.addToBlacklist(line);
-        }
-        deadmanfile.deleteFile();
-        saveConfig();
-    }
 }
 
 void Server::saveConfig() {
@@ -205,6 +194,18 @@ void Server::loadKnownPluginList() {
                 }
             }
         }
+    }
+    File deadmanfile(Defaults::getConfigFileName(Defaults::ConfigDeadMan));
+    if (deadmanfile.exists()) {
+        StringArray lines;
+        deadmanfile.readLines(lines);
+        for (auto& line : lines) {
+            logln("  adding " << line << " to blacklist");
+            m_pluginlist.addToBlacklist(line);
+        }
+        deadmanfile.deleteFile();
+        saveConfig();
+        saveKnownPluginList();
     }
 }
 
