@@ -278,7 +278,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
                 }
                 return rect;
             }
-            traceln("m_editor=" << (uint64)m_editor << " m_processor=" << (uint64)m_processor.get());
+            traceln("m_editor=" << (uint64)m_editor << " m_processor=" << String::toHexString((uint64)m_processor.get()));
             return m_screenCaptureRect;
         }
 

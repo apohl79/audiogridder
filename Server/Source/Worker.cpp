@@ -185,6 +185,7 @@ void Worker::run() {
                         logln("unknown message type " << msg->getType());
                 }
             } else if (e.code != MessageHelper::E_TIMEOUT) {
+                logln("failed to get next message: " << e.toString());
                 break;
             }
         }

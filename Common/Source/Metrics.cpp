@@ -101,7 +101,7 @@ void TimeStatistic::log(const String& name) {
     auto hist = get1minHistogram();
     if (hist.count > 0) {
         logln(name << ": total " << hist.count << ", rps " << String(m_meter.rate_1min(), 2) << ", 95th "
-                   << String(hist.nintyFifth) << ", avg " << String(hist.avg, 2) << "ms, min " << String(hist.min, 2)
+                   << String(hist.nintyFifth) << "ms, avg " << String(hist.avg, 2) << "ms, min " << String(hist.min, 2)
                    << "ms, max " << String(hist.max, 2) << "ms");
         String out = name;
         out << ":  dist ";

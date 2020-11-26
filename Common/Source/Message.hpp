@@ -874,8 +874,10 @@ class MessageFactory : public LogTagDelegate {
                 traceln(m);
                 return nullptr;
             }
+        } else {
+            traceln("no socket");
+            MessageHelper::seterr(e, MessageHelper::E_STATE, "no socket");
         }
-        traceln("no socket");
         return nullptr;
     }
 
