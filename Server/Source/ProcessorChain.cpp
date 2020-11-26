@@ -131,6 +131,8 @@ void AGProcessor::unload() {
             loadedCount--;
         }
     }
+    // execute the deletion of a plugin on the main thread
+    MessageManager::callAsync([p] {});
 }
 
 void AGProcessor::suspendProcessing(const bool shouldBeSuspended) {
