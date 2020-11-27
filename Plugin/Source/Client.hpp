@@ -160,33 +160,8 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     void reconnect() { m_needsReconnect = true; }
     void close();
 
-    bool audioLock() {
-        traceScope();
-        int retry = 10;
-        bool locked;
-        while ((locked = m_audioMtx.try_lock()) == false && --retry > 0) {
-            sleep(1);
-        }
-        if (locked) {
-            if (isReadyLockFree()) {
-                return true;
-            }
-            m_audioMtx.unlock();
-        } else {
-            logln("warning: failed to lock audio stream, this will cause audio stutter");
-        }
-        return false;
-    }
-
-    void audioUnlock() {
-        traceScope();
-        m_audioMtx.unlock();
-    }
-
-    void sendAudioMessage(AudioBuffer<float>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo);
-    void sendAudioMessage(AudioBuffer<double>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo);
-    void readAudioMessage(AudioBuffer<float>& buffer, MidiBuffer& midi);
-    void readAudioMessage(AudioBuffer<double>& buffer, MidiBuffer& midi);
+    template <typename T>
+    std::shared_ptr<AudioStreamer<T>> getStreamer();
 
     const auto& getPlugins() const { return m_plugins; }
     Image getPluginScreen();  // create copy
@@ -402,8 +377,8 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     StreamingSocket* accept(StreamingSocket& sock) const;
 
     std::mutex m_audioMtx;
-    std::unique_ptr<AudioStreamer<float>> m_audioStreamerF;
-    std::unique_ptr<AudioStreamer<double>> m_audioStreamerD;
+    std::shared_ptr<AudioStreamer<float>> m_audioStreamerF;
+    std::shared_ptr<AudioStreamer<double>> m_audioStreamerD;
 
     bool audioConnectionOk();
 };

@@ -13,6 +13,7 @@
 #include "Version.hpp"
 #include "Signals.hpp"
 #include "CoreDump.hpp"
+#include "AudioStreamer.hpp"
 
 #if !defined(JUCE_WINDOWS)
 #include <signal.h>
@@ -296,10 +297,10 @@ void AudioGridderAudioProcessor::processBlockReal(AudioBuffer<T>& buffer, MidiBu
     }
 
     if ((buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) || midiMessages.getNumEvents() > 0) {
-        if (m_client->audioLock()) {
-            m_client->sendAudioMessage(buffer, midiMessages, posInfo);
-            m_client->readAudioMessage(buffer, midiMessages);
-            m_client->audioUnlock();
+        auto streamer = m_client->getStreamer<T>();
+        if (nullptr != streamer) {
+            streamer->send(buffer, midiMessages, posInfo);
+            streamer->read(buffer, midiMessages);
             if (m_client->getLatencySamples() != getLatencySamples()) {
                 updateLatency(m_client->getLatencySamples());
             }

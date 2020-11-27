@@ -247,10 +247,10 @@ void Client::init() {
             logln("audio connection established");
             std::lock_guard<std::mutex> audiolck(m_audioMtx);
             if (m_doublePrecission) {
-                m_audioStreamerD = std::make_unique<AudioStreamer<double>>(this, audioSock);
+                m_audioStreamerD = std::make_shared<AudioStreamer<double>>(this, audioSock);
                 m_audioStreamerD->startThread(Thread::realtimeAudioPriority);
             } else {
-                m_audioStreamerF = std::make_unique<AudioStreamer<float>>(this, audioSock);
+                m_audioStreamerF = std::make_shared<AudioStreamer<float>>(this, audioSock);
                 m_audioStreamerF->startThread(Thread::realtimeAudioPriority);
             }
         } else {
@@ -953,26 +953,16 @@ String Client::getLoadedPluginsString() {
     return m_processor->getLoadedPluginsString();
 }
 
-void Client::sendAudioMessage(AudioBuffer<float>& buffer, MidiBuffer& midi,
-                              AudioPlayHead::CurrentPositionInfo& posInfo) {
-    traceScope();
-    m_audioStreamerF->send(buffer, midi, posInfo);
+template <>
+std::shared_ptr<AudioStreamer<float>> Client::getStreamer() {
+    std::lock_guard<std::mutex> lock(m_audioMtx);
+    return m_audioStreamerF;
 }
 
-void Client::sendAudioMessage(AudioBuffer<double>& buffer, MidiBuffer& midi,
-                              AudioPlayHead::CurrentPositionInfo& posInfo) {
-    traceScope();
-    m_audioStreamerD->send(buffer, midi, posInfo);
-}
-
-void Client::readAudioMessage(AudioBuffer<float>& buffer, MidiBuffer& midi) {
-    traceScope();
-    m_audioStreamerF->read(buffer, midi);
-}
-
-void Client::readAudioMessage(AudioBuffer<double>& buffer, MidiBuffer& midi) {
-    traceScope();
-    m_audioStreamerD->read(buffer, midi);
+template <>
+std::shared_ptr<AudioStreamer<double>> Client::getStreamer() {
+    std::lock_guard<std::mutex> lock(m_audioMtx);
+    return m_audioStreamerD;
 }
 
 bool Client::audioConnectionOk() {

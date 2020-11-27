@@ -29,13 +29,14 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
 
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
 
+    template <typename T>
+    void processBlockReal(AudioBuffer<T>& buf, MidiBuffer& midi);
+
     void processBlock(AudioBuffer<float>& buf, MidiBuffer& midi) override { processBlockReal(buf, midi); }
     void processBlock(AudioBuffer<double>& buf, MidiBuffer& midi) override { processBlockReal(buf, midi); }
+
     void processBlockBypassed(AudioBuffer<float>& buf, MidiBuffer& midi) override;
     void processBlockBypassed(AudioBuffer<double>& buf, MidiBuffer& midi) override;
-
-    template <typename T>
-    void processBlockReal(AudioBuffer<T>&, MidiBuffer&);
 
     void updateLatency(int samples);
 
