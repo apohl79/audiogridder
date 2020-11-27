@@ -12,7 +12,7 @@
 #include "NumberConversion.hpp"
 #include "Version.hpp"
 
-using namespace e47;
+namespace e47 {
 
 AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderAudioProcessor& p)
     : AudioProcessorEditor(&p), m_processor(p), m_newPluginButton("", "newPlug", false), m_genericEditor(p) {
@@ -863,3 +863,5 @@ void AudioGridderAudioProcessorEditor::hideStatistics() {
     traceScope();
     m_statsWindow.reset();
 }
+
+}  // namespace e47

@@ -10,6 +10,8 @@
 
 #include <JuceHeader.h>
 
+namespace e47 {
+
 class ServerPlugin {
   public:
     ServerPlugin() noexcept {}
@@ -57,5 +59,7 @@ class ServerPlugin {
     String m_type;
     String m_category;
 };
+
+}  // namespace e47
 
 #endif /* ServerPlugin_hpp */

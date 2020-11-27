@@ -8,7 +8,8 @@
 #include <JuceHeader.h>
 #include "GenericEditor.hpp"
 
-//==============================================================================
+namespace e47 {
+
 GenericEditor::GenericEditor(AudioGridderAudioProcessor& processor) : LogTag("editor"), m_processor(processor) {
     traceScope();
 }
@@ -133,3 +134,5 @@ void GenericEditor::updateParameter(int paramIdx) {
     m_processor.getClient().setParameterValue(m_processor.getActivePlugin(), paramIdx,
                                               getParameter(paramIdx).currentValue);
 }
+
+}  // namespace e47

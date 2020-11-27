@@ -12,9 +12,9 @@
 
 #include "Utils.hpp"
 
-class AudioGridderAudioProcessorEditor;
-
 namespace e47 {
+
+class AudioGridderAudioProcessorEditor;
 
 class StatisticsWindow : public DocumentWindow, public LogTag {
   public:

@@ -14,6 +14,8 @@
 #include "StatisticsWindow.hpp"
 #include "Utils.hpp"
 
+namespace e47 {
+
 class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
                                          public PluginButton::Listener,
                                          public Button::Listener,
@@ -82,3 +84,5 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioGridderAudioProcessorEditor)
 };
+
+}  // namespace e47

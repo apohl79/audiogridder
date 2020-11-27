@@ -18,6 +18,8 @@
 #include <signal.h>
 #endif
 
+namespace e47 {
+
 AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     : AudioProcessor(BusesProperties()
 #if !JucePlugin_IsSynth && !JucePlugin_IsMidiEffect
@@ -868,6 +870,8 @@ String AudioGridderAudioProcessor::Parameter::getName(int maximumStringLength) c
     }
 }
 
+}  // namespace e47
+
 //==============================================================================
 // This creates new instances of the plugin..
-AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new AudioGridderAudioProcessor(); }
+AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new e47::AudioGridderAudioProcessor(); }

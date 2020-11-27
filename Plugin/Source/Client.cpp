@@ -10,6 +10,7 @@
 #include "PluginProcessor.hpp"
 #include "NumberConversion.hpp"
 #include "ServiceReceiver.hpp"
+#include "AudioStreamer.hpp"
 
 #ifdef JUCE_WINDOWS
 #include "windows.h"
@@ -246,10 +247,10 @@ void Client::init() {
             logln("audio connection established");
             std::lock_guard<std::mutex> audiolck(m_audioMtx);
             if (m_doublePrecission) {
-                m_audioStreamerD.reset(new AudioStreamer<double>(this, audioSock));
+                m_audioStreamerD = std::make_unique<AudioStreamer<double>>(this, audioSock);
                 m_audioStreamerD->startThread(Thread::realtimeAudioPriority);
             } else {
-                m_audioStreamerF.reset(new AudioStreamer<float>(this, audioSock));
+                m_audioStreamerF = std::make_unique<AudioStreamer<float>>(this, audioSock);
                 m_audioStreamerF->startThread(Thread::realtimeAudioPriority);
             }
         } else {
@@ -950,6 +951,35 @@ StreamingSocket* Client::accept(StreamingSocket& sock) const {
 String Client::getLoadedPluginsString() {
     traceScope();
     return m_processor->getLoadedPluginsString();
+}
+
+void Client::sendAudioMessage(AudioBuffer<float>& buffer, MidiBuffer& midi,
+                              AudioPlayHead::CurrentPositionInfo& posInfo) {
+    traceScope();
+    m_audioStreamerF->send(buffer, midi, posInfo);
+}
+
+void Client::sendAudioMessage(AudioBuffer<double>& buffer, MidiBuffer& midi,
+                              AudioPlayHead::CurrentPositionInfo& posInfo) {
+    traceScope();
+    m_audioStreamerD->send(buffer, midi, posInfo);
+}
+
+void Client::readAudioMessage(AudioBuffer<float>& buffer, MidiBuffer& midi) {
+    traceScope();
+    m_audioStreamerF->read(buffer, midi);
+}
+
+void Client::readAudioMessage(AudioBuffer<double>& buffer, MidiBuffer& midi) {
+    traceScope();
+    m_audioStreamerD->read(buffer, midi);
+}
+
+bool Client::audioConnectionOk() {
+    traceScope();
+    std::lock_guard<std::mutex> lock(m_audioMtx);
+    return (nullptr != m_audioStreamerF && m_audioStreamerF->isOk()) ||
+           (nullptr != m_audioStreamerD && m_audioStreamerD->isOk());
 }
 
 }  // namespace e47

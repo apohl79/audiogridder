@@ -9,6 +9,8 @@
 
 #include <JuceHeader.h>
 
+namespace e47 {
+
 class NewServerWindow : public TopLevelWindow, public TextButton::Listener {
   public:
     NewServerWindow(float x, float y);
@@ -32,3 +34,5 @@ class NewServerWindow : public TopLevelWindow, public TextButton::Listener {
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(NewServerWindow)
 };
+
+}  // namespace e47

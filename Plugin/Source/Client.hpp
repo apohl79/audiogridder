@@ -20,9 +20,12 @@
 #include <boost/lockfree/spsc_queue.hpp>
 #include <memory>
 
+namespace e47 {
+
 class AudioGridderAudioProcessor;
 
-namespace e47 {
+template <typename T>
+class AudioStreamer;
 
 class Client : public Thread, public LogTag, public MouseListener, public KeyListener {
   public:
@@ -148,6 +151,8 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     int getLatencySamples() const { return m_latency + NUM_OF_BUFFERS * m_samplesPerBlock; }
     double isUsingDoublePrecission() const { return m_doublePrecission; }
 
+    void setLatency(int i) { m_latency = i; }
+
     bool isReady(int timeout = 1000);
     bool isReadyLockFree();
     void init(int channelsIn, int channelsOut, double rate, int samplesPerBlock, bool doublePrecission);
@@ -178,25 +183,10 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
         m_audioMtx.unlock();
     }
 
-    void sendAudioMessage(AudioBuffer<float>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
-        traceScope();
-        m_audioStreamerF->send(buffer, midi, posInfo);
-    }
-
-    void sendAudioMessage(AudioBuffer<double>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
-        traceScope();
-        m_audioStreamerD->send(buffer, midi, posInfo);
-    }
-
-    void readAudioMessage(AudioBuffer<float>& buffer, MidiBuffer& midi) {
-        traceScope();
-        m_audioStreamerF->read(buffer, midi);
-    }
-
-    void readAudioMessage(AudioBuffer<double>& buffer, MidiBuffer& midi) {
-        traceScope();
-        m_audioStreamerD->read(buffer, midi);
-    }
+    void sendAudioMessage(AudioBuffer<float>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo);
+    void sendAudioMessage(AudioBuffer<double>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo);
+    void readAudioMessage(AudioBuffer<float>& buffer, MidiBuffer& midi);
+    void readAudioMessage(AudioBuffer<double>& buffer, MidiBuffer& midi);
 
     const auto& getPlugins() const { return m_plugins; }
     Image getPluginScreen();  // create copy
@@ -257,7 +247,14 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     // KeyListener
     bool keyPressed(const KeyPress& kp, Component* originatingComponent) override;
 
+    String getLoadedPluginsString();
+
+    void setError() { m_error = true; }
+
   private:
+    friend AudioStreamer<float>;
+    friend AudioStreamer<double>;
+
     AudioGridderAudioProcessor* m_processor;
     std::mutex m_srvMtx;
     String m_srvHost = "";
@@ -404,20 +401,11 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
 
     StreamingSocket* accept(StreamingSocket& sock) const;
 
-    String getLoadedPluginsString();
-
-#include "AudioStreamer.hpp"
-
     std::mutex m_audioMtx;
     std::unique_ptr<AudioStreamer<float>> m_audioStreamerF;
     std::unique_ptr<AudioStreamer<double>> m_audioStreamerD;
 
-    bool audioConnectionOk() {
-        traceScope();
-        std::lock_guard<std::mutex> lock(m_audioMtx);
-        return (nullptr != m_audioStreamerF && m_audioStreamerF->isOk()) ||
-               (nullptr != m_audioStreamerD && m_audioStreamerD->isOk());
-    }
+    bool audioConnectionOk();
 };
 
 }  // namespace e47

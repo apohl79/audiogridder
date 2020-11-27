@@ -16,7 +16,8 @@
 #include "json.hpp"
 
 using json = nlohmann::json;
-using namespace e47;
+
+namespace e47 {
 
 class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate {
   public:
@@ -197,3 +198,5 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioGridderAudioProcessor)
 };
+
+}  // namespace e47

@@ -10,6 +10,8 @@
 
 #include <JuceHeader.h>
 
+namespace e47 {
+
 class PluginButton : public TextButton {
   public:
     PluginButton(const String& id, const String& name, bool extraButtons = true);
@@ -57,5 +59,7 @@ class PluginButton : public TextButton {
         return point.getX() >= area.getX() && point.getX() <= area.getRight();
     }
 };
+
+}  // namespace e47
 
 #endif /* PluginButton_hpp */
