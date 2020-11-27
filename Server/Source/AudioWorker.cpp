@@ -118,6 +118,7 @@ void AudioWorker::run() {
 
     m_chain->setPlayHead(nullptr);
 
+    duration.clear();
     clear();
     signalThreadShouldExit();
     logln("audio processor terminated");

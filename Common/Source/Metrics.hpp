@@ -72,7 +72,12 @@ class TimeStatistic : public BasicStatistic, public LogTag {
             return ms;
         }
 
-        void reset() { m_start = Time::getHighResolutionTicks(); }
+        void reset() {
+            m_start = Time::getHighResolutionTicks();
+            m_finished = false;
+        }
+
+        void clear() { m_finished = true; }
 
         double getMillisecondsPassed() const {
             auto end = Time::getHighResolutionTicks();
