@@ -1,7 +1,7 @@
 # AudioGridder
 
 AudioGridder is a plugin host, that allows you to offload the DSP processing of
-audio plugins to remote computers running OSX or Windows. This can come in handy
+audio plugins to remote computers running macOS or Windows. This can come in handy
 when mixing complex projects or running CPU intensive instruments for instance.
 AudioGridder comes with a plugin and a server and supports VST2, VST3 and
 AudioUnit plugin formats. Plugins can be hosted and accessed across the network:
@@ -26,7 +26,7 @@ Please find the latest binaries to download in the
 
 # Features
 
-- VST2 / VST3 / AudioUnit (OSX only)
+- VST2 / VST3 / AudioUnit (macOS only)
 - Effect & Instrument plugins
 - Latency compensation
 - 32/64 bit float processing
@@ -40,12 +40,13 @@ Please find the latest binaries to download in the
 
 # Compatibility
 
-- Server: OSX 64bit 10.7+, Windows 7+
-- Plugin: OSX 64bit 10.11+, Windows 7+, Linux 64bit
-- The server supports AudioUnit (OSX only) and VST2/VST3 plugins
-- The plugin is available as AudioUnit (OSX only) and VST2/VST3
+- Server: macOS 10.7+, Windows 7+
+- Plugin: macOS 10.11+, Windows 7+, Linux 64bit
+- The server supports AudioUnit (macOS only) and VST2/VST3 plugins
+- The plugin is available as AudioUnit (macOS only) and VST2/VST3
 - Tested DAWs: Cubase 10 Pro, Logic Pro X, Reaper, Ableton Live
-- ProTools is reportedly working via Blue Cat's PatchWork
+- ProTools is reportedly working via wrapper plugins that can host
+non AAX plugins within ProTools
 
 # Reporting of Bugs/Issues
 
