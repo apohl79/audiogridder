@@ -91,10 +91,7 @@ void Client::run() {
         }
 
         // Relax
-        int sleepfor = 20;
-        while (!currentThreadShouldExit() && sleepfor-- > 0) {
-            Thread::sleep(50);
-        }
+        sleepExitAware(1000);
         loops++;
     }
     logln("client loop terminated");
