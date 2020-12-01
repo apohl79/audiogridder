@@ -98,31 +98,33 @@ TimeStatistic::Histogram TimeStatistic::get1minHistogram() {
 }
 
 void TimeStatistic::log(const String& name) {
-    auto hist = get1minHistogram();
-    if (hist.count > 0) {
-        logln(name << ": total " << hist.count << ", rps " << String(m_meter.rate_1min(), 2) << ", 95th "
-                   << String(hist.nintyFifth) << "ms, avg " << String(hist.avg, 2) << "ms, min " << String(hist.min, 2)
-                   << "ms, max " << String(hist.max, 2) << "ms");
-        String out = name;
-        out << ":  dist ";
-        size_t count = 0;
-        for (auto& p : hist.dist) {
-            if (count > 0) {
-                out << ", ";
+    if (m_showLog) {
+        auto hist = get1minHistogram();
+        if (hist.count > 0) {
+            logln(name << ": total " << hist.count << ", rps " << String(m_meter.rate_1min(), 2) << ", 95th "
+                       << String(hist.nintyFifth) << "ms, avg " << String(hist.avg, 2) << "ms, min "
+                       << String(hist.min, 2) << "ms, max " << String(hist.max, 2) << "ms");
+            String out = name;
+            out << ":  dist ";
+            size_t count = 0;
+            for (auto& p : hist.dist) {
+                if (count > 0) {
+                    out << ", ";
+                }
+                double perc = 0;
+                if (hist.count > 0) {
+                    perc = static_cast<double>(p.second) / hist.count * 100;
+                }
+                if (count < hist.dist.size() - 1) {
+                    out << p.first << "-" << p.first + m_binSize << "ms ";
+                } else {
+                    out << ">" << p.first << "ms ";
+                }
+                out << String(perc, 2) << "%";
+                ++count;
             }
-            double perc = 0;
-            if (hist.count > 0) {
-                perc = static_cast<double>(p.second) / hist.count * 100;
-            }
-            if (count < hist.dist.size() - 1) {
-                out << p.first << "-" << p.first + m_binSize << "ms ";
-            } else {
-                out << ">" << p.first << "ms ";
-            }
-            out << String(perc, 2) << "%";
-            ++count;
+            logln(out);
         }
-        logln(out);
     }
 }
 
@@ -163,8 +165,10 @@ void Metrics::run() {
     }
 }
 
-TimeStatistic::Duration TimeStatistic::getDuration(const String& name) {
-    return Duration(Metrics::getStatistic<TimeStatistic>(name));
+TimeStatistic::Duration TimeStatistic::getDuration(const String& name, bool show) {
+    auto ts = Metrics::getStatistic<TimeStatistic>(name);
+    ts->setShowLog(show);
+    return Duration(ts);
 }
 
 Metrics::StatsMap Metrics::getStats() {

@@ -137,10 +137,11 @@ class TimeStatistic : public BasicStatistic, public LogTag {
     Histogram get1minHistogram();
     void run();
     void log(const String& name) override;
+    void setShowLog(bool b) { m_showLog = b; }
 
     Meter& getMeter() { return m_meter; }
 
-    static Duration getDuration(const String& name);
+    static Duration getDuration(const String& name, bool show = true);
 
   private:
     std::vector<double> m_times[2];
@@ -150,6 +151,7 @@ class TimeStatistic : public BasicStatistic, public LogTag {
     size_t m_numOfBins;
     double m_binSize;
     Meter m_meter;
+    bool m_showLog = true;
 };
 
 class Metrics : public Thread, public LogTag, public SharedInstance<Metrics> {
