@@ -26,7 +26,7 @@ class StatisticsWindow : public DocumentWindow, public LogTag {
 
     class HirozontalLine : public Component {
       public:
-        HirozontalLine(Rectangle<int> bounds) { setBounds(bounds); }
+        HirozontalLine(juce::Rectangle<int> bounds) { setBounds(bounds); }
         void paint(Graphics& g) override;
     };
 
@@ -75,7 +75,7 @@ class StatisticsWindow : public DocumentWindow, public LogTag {
     };
     Updater m_updater;
 
-    void addLabel(const String& txt, Rectangle<int> bounds);
+    void addLabel(const String& txt, juce::Rectangle<int> bounds);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StatisticsWindow)
 };

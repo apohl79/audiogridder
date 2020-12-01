@@ -10,6 +10,10 @@
 
 #include <JuceHeader.h>
 
+#ifdef JUCE_WINDOWS
+#include <windows.h>
+#endif
+
 #include "Utils.hpp"
 
 namespace e47 {
@@ -32,7 +36,8 @@ class MemoryFile : LogTagDelegate {
   private:
     File m_file;
 #ifdef JUCE_WINDOWS
-    HANDLE m_fd, m_mapped_hndl;
+    HANDLE m_fd = NULL;
+    HANDLE m_mapped_hndl = NULL;
 #else
     int m_fd = -1;
 #endif

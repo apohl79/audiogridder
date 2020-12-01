@@ -49,13 +49,13 @@ class PluginMonitorWindow : public TopLevelWindow, public LogTagDelegate {
     int m_totalHeight = 32;
     std::vector<std::unique_ptr<Component>> m_components;
 
-    void addLabel(const String& txt, Rectangle<int> bounds, Justification just = Justification::topLeft,
+    void addLabel(const String& txt, juce::Rectangle<int> bounds, Justification just = Justification::topLeft,
                   float alpha = 0.6f);
     void updatePosition();
 
     class Channel : public Component {
       public:
-        Channel(Rectangle<int> bounds, Colour col) : m_col(col) {
+        Channel(juce::Rectangle<int> bounds, Colour col) : m_col(col) {
             setBounds(bounds);
             if (m_col.isTransparent()) {
                 m_col = Colours::white.withAlpha(0.1f);
@@ -69,7 +69,7 @@ class PluginMonitorWindow : public TopLevelWindow, public LogTagDelegate {
 
     class Status : public Component {
       public:
-        Status(Rectangle<int> bounds, bool ok) {
+        Status(juce::Rectangle<int> bounds, bool ok) {
             setBounds(bounds);
             m_col = ok ? Colour(Defaults::PLUGIN_OK_COLOR) : Colour(Defaults::PLUGIN_NOTOK_COLOR);
         }
@@ -82,7 +82,7 @@ class PluginMonitorWindow : public TopLevelWindow, public LogTagDelegate {
 
     class HirozontalLine : public Component {
       public:
-        HirozontalLine(Rectangle<int> bounds) { setBounds(bounds); }
+        HirozontalLine(juce::Rectangle<int> bounds) { setBounds(bounds); }
         void paint(Graphics& g) override;
     };
 };

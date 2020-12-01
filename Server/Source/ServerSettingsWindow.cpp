@@ -41,23 +41,23 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     int saveButtonHeight = 30;
 
     auto getLabelBounds = [&](int r) {
-        return Rectangle<int>(borderLR, borderTB + r * rowHeight, labelWidth, labelHeight);
+        return juce::Rectangle<int>(borderLR, borderTB + r * rowHeight, labelWidth, labelHeight);
     };
     auto getFieldBounds = [&](int r) {
-        return Rectangle<int>(totalWidth - fieldWidth - borderLR, borderTB + r * rowHeight + 3, fieldWidth,
-                              fieldHeight);
+        return juce::Rectangle<int>(totalWidth - fieldWidth - borderLR, borderTB + r * rowHeight + 3, fieldWidth,
+                                    fieldHeight);
     };
     auto getWideFieldBounds = [&](int r) {
-        return Rectangle<int>(totalWidth - wideFieldWidth - borderLR, borderTB + r * rowHeight + 3, wideFieldWidth,
-                              fieldHeight);
+        return juce::Rectangle<int>(totalWidth - wideFieldWidth - borderLR, borderTB + r * rowHeight + 3,
+                                    wideFieldWidth, fieldHeight);
     };
     auto getCheckBoxBounds = [&](int r) {
-        return Rectangle<int>(totalWidth - checkBoxWidth - borderLR, borderTB + r * rowHeight + 3, checkBoxWidth,
-                              checkBoxHeight);
+        return juce::Rectangle<int>(totalWidth - checkBoxWidth - borderLR, borderTB + r * rowHeight + 3, checkBoxWidth,
+                                    checkBoxHeight);
     };
     auto getLargeFieldBounds = [&](int r) {
-        return Rectangle<int>(totalWidth - largeFieldWidth - borderLR, borderTB + r * rowHeight + 3, largeFieldWidth,
-                              largeFieldHeight);
+        return juce::Rectangle<int>(totalWidth - largeFieldWidth - borderLR, borderTB + r * rowHeight + 3,
+                                    largeFieldWidth, largeFieldHeight);
     };
 
     int row = 0;

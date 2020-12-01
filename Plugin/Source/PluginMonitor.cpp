@@ -91,11 +91,11 @@ void PluginMonitorWindow::update(const Array<PluginStatus>& status) {
         for (int i = c; i < c + span; i++) {
             width += colWidth[i];
         }
-        return Rectangle<int>(left, borderTB + r * rowHeight, width, rowHeight);
+        return juce::Rectangle<int>(left, borderTB + r * rowHeight, width, rowHeight);
     };
 
     auto getLineBounds = [&](int r) {
-        return Rectangle<int>(borderLR + 2, borderTB + r * rowHeight - 1, m_totalWidth - borderLR * 2, 1);
+        return juce::Rectangle<int>(borderLR + 2, borderTB + r * rowHeight - 1, m_totalWidth - borderLR * 2, 1);
     };
 
     int row = 1;
@@ -132,7 +132,7 @@ void PluginMonitorWindow::update(const Array<PluginStatus>& status) {
     updatePosition();
 }
 
-void PluginMonitorWindow::addLabel(const String& txt, Rectangle<int> bounds, Justification just, float alpha) {
+void PluginMonitorWindow::addLabel(const String& txt, juce::Rectangle<int> bounds, Justification just, float alpha) {
     auto label = std::make_unique<Label>();
     label->setText(txt, NotificationType::dontSendNotification);
     auto f = label->getFont();
@@ -150,7 +150,7 @@ void PluginMonitorWindow::updatePosition() {
     int x = desktopRect.getWidth() - m_totalWidth - 20;
     int y = 50;
     WindowPositions::PositionType pt = WindowPositions::PluginMonFx;
-    Rectangle<int> upperBounds;
+    juce::Rectangle<int> upperBounds;
 
 #if JucePlugin_IsSynth
     pt = WindowPositions::PluginMonInst;
@@ -176,10 +176,10 @@ void PluginMonitorWindow::Channel::paint(Graphics& g) {
     int x = 4;
     int y = 2;
     g.setColour(m_col);
-    g.fillRoundedRectangle(x, y, len, len, 3);
+    g.fillRoundedRectangle((float)x, (float)y, (float)len, (float)len, 3.0f);
     g.setColour(Colours::white);
     g.setOpacity(0.1f);
-    g.drawRoundedRectangle(x, y, len, len, 3, 1);
+    g.drawRoundedRectangle((float)x, (float)y, (float)len, (float)len, 3.0f, 1.0f);
 }
 
 void PluginMonitorWindow::Status::paint(Graphics& g) {
@@ -187,7 +187,7 @@ void PluginMonitorWindow::Status::paint(Graphics& g) {
     int x = getWidth() / 2 - rad;
     int y = getHeight() / 2 - rad;
     Path p;
-    p.addEllipse(x, y, rad * 2, rad * 2);
+    p.addEllipse((float)x, (float)y, (float)rad * 2, (float)rad * 2);
     g.setColour(m_col);
     g.setOpacity(0.9f);
     g.fillPath(p);

@@ -20,7 +20,7 @@ class WindowPositions : public LogTag, public SharedInstance<WindowPositions> {
   public:
     WindowPositions();
 
-    using Position = Rectangle<int>;
+    using Position = juce::Rectangle<int>;
 
     struct Positions {
         Position ServerSettings;

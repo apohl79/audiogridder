@@ -40,14 +40,14 @@ StatisticsWindow::StatisticsWindow()
     int labelHeight = 30;
 
     auto getLabelBounds = [&](int r, int indent = 0) {
-        return Rectangle<int>(borderLR + indent, borderTB + r * rowHeight, labelWidth, labelHeight);
+        return juce::Rectangle<int>(borderLR + indent, borderTB + r * rowHeight, labelWidth, labelHeight);
     };
     auto getFieldBounds = [&](int r) {
-        return Rectangle<int>(totalWidth - fieldWidth - borderLR, borderTB + r * rowHeight + 3, fieldWidth,
-                              fieldHeight);
+        return juce::Rectangle<int>(totalWidth - fieldWidth - borderLR, borderTB + r * rowHeight + 3, fieldWidth,
+                                    fieldHeight);
     };
     auto getLineBounds = [&](int r) {
-        return Rectangle<int>(5, borderTB + r * rowHeight, totalWidth - borderLR, rowHeight);
+        return juce::Rectangle<int>(5, borderTB + r * rowHeight, totalWidth - borderLR, rowHeight);
     };
 
     int row = 1;
@@ -203,7 +203,7 @@ void StatisticsWindow::closeButtonPressed() {
     hide();
 }
 
-void StatisticsWindow::addLabel(const String& txt, Rectangle<int> bounds) {
+void StatisticsWindow::addLabel(const String& txt, juce::Rectangle<int> bounds) {
     auto label = std::make_unique<Label>();
     label->setText(txt, NotificationType::dontSendNotification);
     label->setBounds(bounds);
@@ -215,7 +215,7 @@ void StatisticsWindow::HirozontalLine::paint(Graphics& g) {
     g.setColour(Colours::white);
     g.setOpacity(0.3f);
     int y = getHeight() / 2 + 3;
-    Rectangle<int> r(getX(), y, getWidth(), 5);
+    juce::Rectangle<int> r(getX(), y, getWidth(), 5);
     Line<float> line(r.toFloat().getTopLeft(), r.toFloat().getTopRight());
     float dashs[] = {6.0, 4.0};
     g.drawDashedLine(line, dashs, 2);

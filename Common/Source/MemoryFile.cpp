@@ -7,9 +7,7 @@
 
 #include "MemoryFile.hpp"
 
-#ifdef JUCE_WINDOWS
-#include <windows.h>
-#else
+#ifndef JUCE_WINDOWS
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/mman.h>
@@ -49,7 +47,7 @@ void MemoryFile::open(bool overwriteIfExists) {
         return;
     }
     m_mapped_hndl = CreateFileMappingA(m_fd, NULL, PAGE_READWRITE, 0, 0, NULL);
-    if (NULL == l_mapped_hndl) {
+    if (NULL == m_mapped_hndl) {
         logln("CreateFileMappingA failed: " << GetLastErrorStr());
         return;
     }
