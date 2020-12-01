@@ -19,7 +19,7 @@ class App;
 class PluginListWindow : public DocumentWindow {
   public:
     PluginListWindow(App* app, KnownPluginList& list, const String& deadMansPedalFile);
-    ~PluginListWindow() override { clearContentComponent(); }
+    ~PluginListWindow() override;
 
     void closeButtonPressed() override;
 

@@ -15,6 +15,7 @@
 #include "Metrics.hpp"
 #include "ServiceResponder.hpp"
 #include "CPUInfo.hpp"
+#include "WindowPositions.hpp"
 
 namespace e47 {
 
@@ -29,6 +30,7 @@ void Server::initialize() {
     loadConfig();
     Metrics::initialize();
     CPUInfo::initialize();
+    WindowPositions::initialize();
 }
 
 void Server::loadConfig() {
@@ -245,6 +247,7 @@ Server::~Server() {
     Metrics::cleanup();
     ServiceResponder::cleanup();
     CPUInfo::cleanup();
+    WindowPositions::cleanup();
     logln("server terminated");
     File runFile(Defaults::getConfigFileName(Defaults::ConfigServerRun));
     runFile.deleteFile();

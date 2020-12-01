@@ -55,11 +55,7 @@ class StatisticsWindow : public DocumentWindow, public LogTag {
             while (!currentThreadShouldExit()) {
                 runOnMsgThreadAsync([this] { m_fn(); });
                 // Relax
-                int sleepstep = 50;
-                int sleepfor = 1000 / sleepstep;
-                while (!currentThreadShouldExit() && sleepfor-- > 0) {
-                    Thread::sleep(sleepstep);
-                }
+                sleepExitAware(1000);
             }
         }
 

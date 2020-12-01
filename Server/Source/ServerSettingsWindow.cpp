@@ -7,6 +7,7 @@
 
 #include "ServerSettingsWindow.hpp"
 #include "App.hpp"
+#include "WindowPositions.hpp"
 
 namespace e47 {
 
@@ -366,8 +367,14 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 
     setResizable(false, false);
     centreWithSize(totalWidth, totalHeight);
+    setBounds(WindowPositions::get(WindowPositions::ServerSettings, getBounds()));
     setVisible(true);
     windowToFront(this);
+}
+
+ServerSettingsWindow::~ServerSettingsWindow() {
+    WindowPositions::set(WindowPositions::ServerSettings, getBounds());
+    clearContentComponent();
 }
 
 void ServerSettingsWindow::closeButtonPressed() {

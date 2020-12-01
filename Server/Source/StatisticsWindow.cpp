@@ -9,6 +9,7 @@
 #include "App.hpp"
 #include "CPUInfo.hpp"
 #include "Metrics.hpp"
+#include "WindowPositions.hpp"
 
 namespace e47 {
 
@@ -225,11 +226,13 @@ StatisticsWindow::StatisticsWindow(App* app)
     m_updater.startThread();
 
     centreWithSize(totalWidth, totalHeight);
+    setBounds(WindowPositions::get(WindowPositions::ServerStats, getBounds()));
     setVisible(true);
     windowToFront(this);
 }
 
 StatisticsWindow::~StatisticsWindow() {
+    WindowPositions::set(WindowPositions::ServerStats, getBounds());
     m_updater.stopThread(-1);
     clearContentComponent();
 }

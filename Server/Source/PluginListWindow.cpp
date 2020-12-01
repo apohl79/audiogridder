@@ -8,6 +8,7 @@
 #include "App.hpp"
 #include "PluginListWindow.hpp"
 #include "Server.hpp"
+#include "WindowPositions.hpp"
 
 namespace e47 {
 
@@ -26,9 +27,15 @@ PluginListWindow::PluginListWindow(App* app, KnownPluginList& list, const String
 
     setResizable(true, false);
     centreWithSize(700, 600);
+    setBounds(WindowPositions::get(WindowPositions::ServerPlugins, getBounds()));
 
     setVisible(true);
     windowToFront(this);
+}
+
+PluginListWindow::~PluginListWindow() {
+    WindowPositions::set(WindowPositions::ServerPlugins, getBounds());
+    clearContentComponent();
 }
 
 void PluginListWindow::closeButtonPressed() { m_app->hidePluginList(); }

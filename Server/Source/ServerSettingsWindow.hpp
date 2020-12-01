@@ -19,7 +19,7 @@ class App;
 class ServerSettingsWindow : public DocumentWindow, public LogTag {
   public:
     ServerSettingsWindow(App* app);
-    ~ServerSettingsWindow() override { clearContentComponent(); }
+    ~ServerSettingsWindow() override;
 
     void closeButtonPressed() override;
 
