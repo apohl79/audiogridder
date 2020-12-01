@@ -42,7 +42,7 @@ class SharedInstance {
 
     static std::shared_ptr<T> getInstance() {
         std::lock_guard<std::mutex> lock(m_instMtx);
-        return m_inst->m_instInternal;
+        return m_inst;
     }
 
     static size_t getRefCount() {
