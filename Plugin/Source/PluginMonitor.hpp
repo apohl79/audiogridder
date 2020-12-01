@@ -47,6 +47,8 @@ class PluginMonitorWindow : public TopLevelWindow, public LogTagDelegate {
     Label m_title;
     int m_totalWidth = 415;
     int m_totalHeight = 32;
+    int m_channelColWidth = 20;
+    int m_channelNameWidth = 100;
     std::vector<std::unique_ptr<Component>> m_components;
 
     void addLabel(const String& txt, juce::Rectangle<int> bounds, Justification just = Justification::topLeft,
@@ -128,11 +130,44 @@ class PluginMonitor : public Thread, public LogTag, public SharedInstance<Plugin
         }
     }
 
+    static bool getShowChannelName() {
+        auto inst = getInstance();
+        if (nullptr != inst) {
+            return inst->m_showChannelName;
+        }
+        return false;
+    }
+
+    static void setShowChannelName(bool b) {
+        auto inst = getInstance();
+        if (nullptr != inst) {
+            inst->m_showChannelName = b;
+        }
+    }
+
+    static bool getShowChannelColor() {
+        auto inst = getInstance();
+        if (nullptr != inst) {
+            return inst->m_showChannelColor;
+        }
+        return false;
+    }
+
+    static void setShowChannelColor(bool b) {
+        auto inst = getInstance();
+        if (nullptr != inst) {
+            inst->m_showChannelColor = b;
+        }
+    }
+
     void hideWindow() { m_windowWantsHide = true; }
 
   private:
     static std::mutex m_pluginMtx;
     static Array<AudioGridderAudioProcessor*> m_plugins;
+
+    static std::atomic_bool m_showChannelName;
+    static std::atomic_bool m_showChannelColor;
 
     std::unique_ptr<PluginMonitorWindow> m_window;
     std::atomic_bool m_windowAutoShow{true};

@@ -369,6 +369,17 @@ inline json configParseFile(const String& configFile) {
     return {};
 }
 
+inline void configWriteFile(const String& configFile, const json& j) {
+    File cfg(configFile);
+    if (cfg.exists()) {
+        cfg.deleteFile();
+    } else {
+        cfg.create();
+    }
+    FileOutputStream fos(cfg);
+    fos.writeText(j.dump(4), false, false, "\n");
+}
+
 inline bool jsonHasValue(const json& cfg, const String& name) { return cfg.find(name.toStdString()) != cfg.end(); }
 
 template <typename T>

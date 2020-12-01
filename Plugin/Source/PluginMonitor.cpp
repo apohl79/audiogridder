@@ -64,10 +64,27 @@ PluginMonitorWindow::~PluginMonitorWindow() {
     WindowPositions::set(pt, {});
 }
 
-void PluginMonitorWindow::mouseUp(const MouseEvent& /*event*/) {
-    setVisible(false);
-    PluginMonitor::setAlwaysShow(false);
-    m_mon->hideWindow();
+void PluginMonitorWindow::mouseUp(const MouseEvent& event) {
+    if (event.mods.isLeftButtonDown()) {
+        setVisible(false);
+        PluginMonitor::setAlwaysShow(false);
+        m_mon->hideWindow();
+    } else {
+        PopupMenu m;
+        m.addItem("Show Channel Color", true, PluginMonitor::getShowChannelColor(), [] {
+            PluginMonitor::setShowChannelColor(!PluginMonitor::getShowChannelColor());
+            auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigPlugin));
+            cfg["PluginMonChanColor"] = PluginMonitor::getShowChannelColor();
+            configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), cfg);
+        });
+        m.addItem("Show Channel Name", true, PluginMonitor::getShowChannelName(), [] {
+            PluginMonitor::setShowChannelName(!PluginMonitor::getShowChannelName());
+            auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigPlugin));
+            cfg["PluginMonChanName"] = PluginMonitor::getShowChannelName();
+            configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), cfg);
+        });
+        m.show();
+    }
 }
 
 void PluginMonitorWindow::update(const Array<PluginStatus>& status) {
@@ -80,7 +97,15 @@ void PluginMonitorWindow::update(const Array<PluginStatus>& status) {
     int borderTB = 15;  // top/bottom border
     int rowHeight = 18;
 
-    int colWidth[] = {20, 100, 190, 65, 10};
+    int colWidth[] = {m_channelColWidth, m_channelNameWidth, 190, 65, 10};
+
+    if (!PluginMonitor::getShowChannelColor()) {
+        colWidth[0] = 0;
+    }
+
+    if (!PluginMonitor::getShowChannelName()) {
+        colWidth[1] = 0;
+    }
 
     auto getLabelBounds = [&](int r, int c, int span = 1) {
         int left = borderLR;
@@ -95,12 +120,16 @@ void PluginMonitorWindow::update(const Array<PluginStatus>& status) {
     };
 
     auto getLineBounds = [&](int r) {
-        return juce::Rectangle<int>(borderLR + 2, borderTB + r * rowHeight - 1, m_totalWidth - borderLR * 2, 1);
+        return juce::Rectangle<int>(borderLR + 2, borderTB + r * rowHeight - 1, getWidth() - borderLR * 2, 1);
     };
 
     int row = 1;
 
-    addLabel("Channel", getLabelBounds(row, 0, 2), Justification::topLeft, 1.0f);
+    if (PluginMonitor::getShowChannelName()) {
+        addLabel("Channel", getLabelBounds(row, 0, 2), Justification::topLeft, 1.0f);
+    } else if (PluginMonitor::getShowChannelColor()) {
+        addLabel("Ch", getLabelBounds(row, 0, 2), Justification::topLeft, 1.0f);
+    }
     addLabel("Loaded Chain", getLabelBounds(row, 2), Justification::topLeft, 1.0f);
     addLabel("Perf", getLabelBounds(row, 3), Justification::topRight, 1.0f);
 
@@ -111,10 +140,14 @@ void PluginMonitorWindow::update(const Array<PluginStatus>& status) {
         addChildAndSetID(line.get(), "line");
         m_components.push_back(std::move(line));
 
-        auto chan = std::make_unique<Channel>(getLabelBounds(row, 0), s.channelColour);
-        addChildAndSetID(chan.get(), "led");
-        m_components.push_back(std::move(chan));
-        addLabel(s.channelName, getLabelBounds(row, 1));
+        if (PluginMonitor::getShowChannelColor()) {
+            auto chan = std::make_unique<Channel>(getLabelBounds(row, 0), s.channelColour);
+            addChildAndSetID(chan.get(), "led");
+            m_components.push_back(std::move(chan));
+        }
+        if (PluginMonitor::getShowChannelName()) {
+            addLabel(s.channelName, getLabelBounds(row, 1));
+        }
         addLabel(s.loadedPlugins, getLabelBounds(row, 2));
         addLabel(String(s.perf95th, 2) + " ms", getLabelBounds(row, 3), Justification::topRight);
         auto led = std::make_unique<Status>(getLabelBounds(row, 4), s.ok);
@@ -146,8 +179,16 @@ void PluginMonitorWindow::addLabel(const String& txt, juce::Rectangle<int> bound
 }
 
 void PluginMonitorWindow::updatePosition() {
+    int width = m_totalWidth;
+    if (!PluginMonitor::getShowChannelColor()) {
+        width -= m_channelColWidth;
+    }
+    if (!PluginMonitor::getShowChannelName()) {
+        width -= m_channelNameWidth;
+    }
+
     auto desktopRect = Desktop::getInstance().getDisplays().getMainDisplay().totalArea;
-    int x = desktopRect.getWidth() - m_totalWidth - 20;
+    int x = desktopRect.getWidth() - width - 20;
     int y = 50;
     WindowPositions::PositionType pt = WindowPositions::PluginMonFx;
     juce::Rectangle<int> upperBounds;
@@ -167,7 +208,7 @@ void PluginMonitorWindow::updatePosition() {
         y = upperBounds.getBottom() + 20;
     }
 
-    setBounds(x, y, m_totalWidth, m_totalHeight);
+    setBounds(x, y, width, m_totalHeight);
     WindowPositions::set(pt, getBounds());
 }
 
@@ -201,6 +242,9 @@ void PluginMonitorWindow::HirozontalLine::paint(Graphics& g) {
 
 std::mutex PluginMonitor::m_pluginMtx;
 Array<AudioGridderAudioProcessor*> PluginMonitor::m_plugins;
+
+std::atomic_bool PluginMonitor::m_showChannelName{true};
+std::atomic_bool PluginMonitor::m_showChannelColor{true};
 
 void PluginMonitor::run() {
     traceScope();

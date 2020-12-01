@@ -176,6 +176,8 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
     Tracer::setEnabled(jsonGetValue(j, "Tracer", Tracer::isEnabled()));
     AGLogger::setEnabled(jsonGetValue(j, "Logger", AGLogger::isEnabled()));
     PluginMonitor::setAutoShow(jsonGetValue(j, "PluginMonAutoShow", PluginMonitor::getAutoShow()));
+    PluginMonitor::setShowChannelColor(jsonGetValue(j, "PluginMonChanColor", PluginMonitor::getShowChannelColor()));
+    PluginMonitor::setShowChannelName(jsonGetValue(j, "PluginMonChanName", PluginMonitor::getShowChannelName()));
 
     if (!isUpdate) {
         if (jsonHasValue(j, "Servers")) {
@@ -198,13 +200,16 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
 
 void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
     traceScope();
+
     auto jservers = json::array();
     for (auto& srv : m_servers) {
         jservers.push_back(srv.toStdString());
     }
+
     if (numOfBuffers < 0) {
         numOfBuffers = m_client->NUM_OF_BUFFERS;
     }
+
     json jcfg;
     jcfg["_comment_"] = "PLEASE DO NOT CHANGE THIS FILE WHILE YOUR DAW IS RUNNING AND HAS AUDIOGRIDDER PLUGINS LOADED";
     jcfg["Servers"] = jservers;
@@ -219,14 +224,10 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
     jcfg["Tracer"] = Tracer::isEnabled();
     jcfg["Logger"] = AGLogger::isEnabled();
     jcfg["PluginMonAutoShow"] = PluginMonitor::getAutoShow();
-    File cfg(Defaults::getConfigFileName(Defaults::ConfigPlugin));
-    if (cfg.exists()) {
-        cfg.deleteFile();
-    } else {
-        cfg.create();
-    }
-    FileOutputStream fos(cfg);
-    fos.writeText(jcfg.dump(4), false, false, "\n");
+    jcfg["PluginMonChanColor"] = PluginMonitor::getShowChannelColor();
+    jcfg["PluginMonChanName"] = PluginMonitor::getShowChannelName();
+
+    configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), jcfg);
 }
 
 const String AudioGridderAudioProcessor::getName() const { return JucePlugin_Name; }
