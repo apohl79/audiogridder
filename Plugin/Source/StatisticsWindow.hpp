@@ -11,6 +11,7 @@
 #include <JuceHeader.h>
 
 #include "Utils.hpp"
+#include "SharedInstance.hpp"
 
 namespace e47 {
 
@@ -18,7 +19,7 @@ class AudioGridderAudioProcessorEditor;
 
 class StatisticsWindow : public DocumentWindow, public LogTag {
   public:
-    StatisticsWindow(AudioGridderAudioProcessorEditor* editor);
+    StatisticsWindow();
     ~StatisticsWindow() override;
 
     void closeButtonPressed() override;
@@ -29,14 +30,20 @@ class StatisticsWindow : public DocumentWindow, public LogTag {
         void paint(Graphics& g) override;
     };
 
+    static void initialize();
+    static void cleanup();
+    static void show();
+    static void hide();
+
   private:
-    AudioGridderAudioProcessorEditor* m_editor;
     std::vector<std::unique_ptr<Component>> m_components;
     Label m_totalClients, m_audioRPS, m_audioPTavg, m_audioPTmin, m_audioPTmax, m_audioPT95th, m_audioBytesOut,
         m_audioBytesIn;
     int m_blockSize;
     int m_channels;
     bool m_doublePrecission;
+
+    static std::unique_ptr<StatisticsWindow> m_inst;
 
     class Updater : public Thread, public LogTagDelegate {
       public:
@@ -57,11 +64,7 @@ class StatisticsWindow : public DocumentWindow, public LogTag {
             while (!currentThreadShouldExit()) {
                 runOnMsgThreadAsync([this] { m_fn(); });
                 // Relax
-                int sleepstep = 50;
-                int sleepfor = 1000 / sleepstep;
-                while (!currentThreadShouldExit() && sleepfor-- > 0) {
-                    Thread::sleep(sleepstep);
-                }
+                sleepExitAware(1000);
             }
         }
 

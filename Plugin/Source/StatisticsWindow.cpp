@@ -9,18 +9,22 @@
 #include "Client.hpp"
 #include "Metrics.hpp"
 #include "PluginEditor.hpp"
+#include "WindowPositions.hpp"
 
 #include <memory>
 #include <thread>
 
 namespace e47 {
 
-StatisticsWindow::StatisticsWindow(AudioGridderAudioProcessorEditor* editor)
+std::unique_ptr<StatisticsWindow> StatisticsWindow::m_inst = nullptr;
+
+struct Inst : SharedInstance<Inst> {};
+
+StatisticsWindow::StatisticsWindow()
     : DocumentWindow("Plugin Statistics",
                      LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId),
                      DocumentWindow::closeButton),
       LogTag("statistics"),
-      m_editor(editor),
       m_updater(this) {
     traceScope();
 
@@ -57,6 +61,8 @@ StatisticsWindow::StatisticsWindow(AudioGridderAudioProcessorEditor* editor)
 #else
     mode = "FX";
 #endif
+
+    setName(mode + " " + Component::getName());
 
     addLabel("Number of loaded " + mode + " plugins:", getLabelBounds(row));
     m_totalClients.setBounds(getFieldBounds(row));
@@ -167,11 +173,26 @@ StatisticsWindow::StatisticsWindow(AudioGridderAudioProcessorEditor* editor)
     m_updater.startThread();
 
     centreWithSize(totalWidth, totalHeight);
+    auto pt = WindowPositions::PluginStatsFx;
+#if JucePlugin_IsSynth
+    pt = WindowPositions::PluginStatsInst;
+#elif JucePlugin_IsMidiEffect
+    pt = WindowPositions::PluginStatsMidi;
+#endif
+    setBounds(WindowPositions::get(pt, getBounds()));
     setVisible(true);
     windowToFront(this);
 }
 
 StatisticsWindow::~StatisticsWindow() {
+    traceScope();
+    auto pt = WindowPositions::PluginStatsFx;
+#if JucePlugin_IsSynth
+    pt = WindowPositions::PluginStatsInst;
+#elif JucePlugin_IsMidiEffect
+    pt = WindowPositions::PluginStatsMidi;
+#endif
+    WindowPositions::set(pt, getBounds());
     m_updater.stopThread(-1);
     clearContentComponent();
 }
@@ -179,7 +200,7 @@ StatisticsWindow::~StatisticsWindow() {
 void StatisticsWindow::closeButtonPressed() {
     traceScope();
     m_updater.signalThreadShouldExit();
-    m_editor->hideStatistics();
+    hide();
 }
 
 void StatisticsWindow::addLabel(const String& txt, Rectangle<int> bounds) {
@@ -198,6 +219,24 @@ void StatisticsWindow::HirozontalLine::paint(Graphics& g) {
     Line<float> line(r.toFloat().getTopLeft(), r.toFloat().getTopRight());
     float dashs[] = {6.0, 4.0};
     g.drawDashedLine(line, dashs, 2);
+}
+
+void StatisticsWindow::initialize() { Inst::initialize(); }
+
+void StatisticsWindow::cleanup() {
+    Inst::cleanup([](auto) { hide(); });
+}
+
+void StatisticsWindow::show() {
+    if (nullptr == m_inst) {
+        m_inst = std::make_unique<StatisticsWindow>();
+    } else {
+        windowToFront(m_inst.get());
+    }
+}
+
+void StatisticsWindow::hide() {
+    m_inst.reset();
 }
 
 }  // namespace e47

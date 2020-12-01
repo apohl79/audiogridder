@@ -61,6 +61,18 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     void getStateInformation(MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
+    void updateTrackProperties(const TrackProperties& properties) override {
+        traceScope();
+        std::lock_guard<std::mutex> lock(m_trackPropertiesMtx);
+        m_trackProperties = properties;
+    }
+
+    TrackProperties getTrackProperties() {
+        traceScope();
+        std::lock_guard<std::mutex> lock(m_trackPropertiesMtx);
+        return m_trackProperties;
+    }
+
     void loadConfig();
     void loadConfig(const json& j, bool isUpdate = false);
     void saveConfig(int numOfBuffers = -1);
@@ -194,6 +206,9 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     bool m_menuShowCompany = true;
     bool m_genericEditor = false;
     bool m_confirmDelete = true;
+
+    TrackProperties m_trackProperties;
+    std::mutex m_trackPropertiesMtx;
 
     ENABLE_ASYNC_FUNCTORS();
 

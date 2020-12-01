@@ -26,6 +26,7 @@ static const String PLUGIN_CONFIG_FILE = "~/.audiogridder/audiogridderplugin.cfg
 static const String KNOWN_PLUGINS_FILE = "~/.audiogridder/audiogridderserver.cache";
 static const String DEAD_MANS_FILE = "~/.audiogridder/audiogridderserver.crash";
 static const String SERVER_RUN_FILE = "~/.audiogridder/audiogridderserver.running";
+static const String WINDOW_POSITIONS_FILE = "~/.audiogridder/audiogridder.winpos";
 #else
 static const String SERVER_CONFIG_FILE_OLD =
     File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + "\\.audiogridderserver";
@@ -47,11 +48,14 @@ static const String DEAD_MANS_FILE = File::getSpecialLocation(File::userApplicat
                                      "\\AudioGridder\\audiogridderserver.crash";
 static const String SERVER_RUN_FILE = File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
                                       "\\AudioGridder\\audiogridderserver.running";
+static const String WINDOW_POSITIONS_FILE =
+    File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
+    "\\AudioGridder\\audiogridder.winpos";
 #endif
 
 setLogTagStatic("defaults");
 
-static inline String getLogDirName() {
+inline String getLogDirName() {
     auto sep = File::getSeparatorString();
 #ifdef JUCE_LINUX
     String path = "~/.audiogridder/log";
@@ -62,7 +66,7 @@ static inline String getLogDirName() {
     return path;
 }
 
-static inline String getLogFileName(const String& appName, const String& filePrefix, const String& fileExtension) {
+inline String getLogFileName(const String& appName, const String& filePrefix, const String& fileExtension) {
     auto sep = File::getSeparatorString();
     auto path = getLogDirName();
     path << sep << appName << sep << filePrefix << Time::getCurrentTime().formatted("%Y-%m-%d_%H-%M-%S")
@@ -70,9 +74,9 @@ static inline String getLogFileName(const String& appName, const String& filePre
     return path;
 }
 
-enum ConfigFile { ConfigServer, ConfigServerRun, ConfigPlugin, ConfigPluginCache, ConfigDeadMan };
+enum ConfigFile { ConfigServer, ConfigServerRun, ConfigPlugin, ConfigPluginCache, ConfigDeadMan, WindowPositions };
 
-static inline String getConfigFileName(ConfigFile type) {
+inline String getConfigFileName(ConfigFile type) {
     String file;
     String fileOld;
     switch (type) {
@@ -93,6 +97,9 @@ static inline String getConfigFileName(ConfigFile type) {
             break;
         case ConfigDeadMan:
             file = DEAD_MANS_FILE;
+            break;
+        case WindowPositions:
+            file = WINDOW_POSITIONS_FILE;
             break;
     }
     if (fileOld.isNotEmpty()) {
@@ -123,6 +130,8 @@ static constexpr uint32 ACTIVE_COLOR = 0xffffc13b;
 static constexpr uint32 CPU_LOW_COLOR = 0xff00ff00;
 static constexpr uint32 CPU_MEDIUM_COLOR = 0xffffff00;
 static constexpr uint32 CPU_HIGH_COLOR = 0xffff0000;
+static constexpr uint32 PLUGIN_OK_COLOR = 0xff008000;
+static constexpr uint32 PLUGIN_NOTOK_COLOR = 0xff8b0000;
 
 static const String MDNS_SERVICE_NAME = "_audiogridder._tcp.local.";
 

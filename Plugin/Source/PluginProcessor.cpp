@@ -14,6 +14,8 @@
 #include "Signals.hpp"
 #include "CoreDump.hpp"
 #include "AudioStreamer.hpp"
+#include "PluginMonitor.hpp"
+#include "WindowPositions.hpp"
 
 #if !defined(JUCE_WINDOWS)
 #include <signal.h>
@@ -46,6 +48,8 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     Signals::initialize();
     CoreDump::initialize(appName, logName, true);
     Metrics::initialize();
+    WindowPositions::initialize();
+    PluginMonitor::initialize();
 
     m_client = std::make_unique<Client>(this);
     setLogTagSource(m_client.get());
@@ -136,16 +140,21 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     }
 
     m_client->startThread();
+
+    PluginMonitor::add(this);
 }
 
 AudioGridderAudioProcessor::~AudioGridderAudioProcessor() {
     traceScope();
     stopAsyncFunctors();
     logln("plugin shutdown: terminating client");
+    PluginMonitor::remove(this);
     m_client->signalThreadShouldExit();
     m_client->close();
     waitForThreadAndLog(m_client.get(), m_client.get());
     logln("plugin shutdown: cleaning up");
+    PluginMonitor::cleanup();
+    WindowPositions::cleanup();
     Metrics::cleanup();
     ServiceReceiver::cleanup(m_instId.hash());
     logln("plugin unloaded");
@@ -166,6 +175,7 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
 
     Tracer::setEnabled(jsonGetValue(j, "Tracer", Tracer::isEnabled()));
     AGLogger::setEnabled(jsonGetValue(j, "Logger", AGLogger::isEnabled()));
+    PluginMonitor::setAutoShow(jsonGetValue(j, "PluginMonAutoShow", PluginMonitor::getAutoShow()));
 
     if (!isUpdate) {
         if (jsonHasValue(j, "Servers")) {
@@ -208,6 +218,7 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
     jcfg["ConfirmDelete"] = m_confirmDelete;
     jcfg["Tracer"] = Tracer::isEnabled();
     jcfg["Logger"] = AGLogger::isEnabled();
+    jcfg["PluginMonAutoShow"] = PluginMonitor::getAutoShow();
     File cfg(Defaults::getConfigFileName(Defaults::ConfigPlugin));
     if (cfg.exists()) {
         cfg.deleteFile();

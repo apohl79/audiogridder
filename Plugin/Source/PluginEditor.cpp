@@ -11,6 +11,7 @@
 #include "PluginProcessor.hpp"
 #include "NumberConversion.hpp"
 #include "Version.hpp"
+#include "PluginMonitor.hpp"
 
 namespace e47 {
 
@@ -167,7 +168,6 @@ AudioGridderAudioProcessorEditor::~AudioGridderAudioProcessorEditor() {
     traceScope();
     stopAsyncFunctors();
     logln("destroying editor");
-    m_statsWindow.reset();
     m_processor.hidePlugin();
     m_processor.getClient().setPluginScreenUpdateCallback(nullptr);
     logln("editor destroyed");
@@ -712,45 +712,60 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
         m.showAt(&m_srvIcon);
     } else if (event.eventComponent == &m_settingsIcon) {
         PopupMenu m;
-        m.addSectionHeader("Editor");
         m.addItem("Generic Editor", true, m_processor.getGenericEditor(), [this] {
             traceScope();
             m_processor.setGenericEditor(!m_processor.getGenericEditor());
             m_processor.saveConfig();
             editPlugin();
         });
-        m.addSectionHeader("Plugin UI");
-        m.addItem("Show Category", true, m_processor.getMenuShowCategory(), [this] {
-            traceScope();
-            m_processor.setMenuShowCategory(!m_processor.getMenuShowCategory());
-            m_processor.saveConfig();
-        });
-        m.addItem("Show Company", true, m_processor.getMenuShowCompany(), [this] {
-            traceScope();
-            m_processor.setMenuShowCompany(!m_processor.getMenuShowCompany());
-            m_processor.saveConfig();
-        });
         m.addItem("Confirm Delete", true, m_processor.getConfirmDelete(), [this] {
             traceScope();
             m_processor.setConfirmDelete(!m_processor.getConfirmDelete());
             m_processor.saveConfig();
         });
-        m.addSectionHeader("Debugging");
-        m.addItem("Logging", true, AGLogger::isEnabled(), [this] {
+
+        PopupMenu subm;
+        subm.addItem("Show Category", true, m_processor.getMenuShowCategory(), [this] {
+            traceScope();
+            m_processor.setMenuShowCategory(!m_processor.getMenuShowCategory());
+            m_processor.saveConfig();
+        });
+        subm.addItem("Show Company", true, m_processor.getMenuShowCompany(), [this] {
+            traceScope();
+            m_processor.setMenuShowCompany(!m_processor.getMenuShowCompany());
+            m_processor.saveConfig();
+        });
+        m.addSubMenu("Plugin Menu", subm);
+        subm.clear();
+
+        subm.addItem("Show...", true, false, [this] {
+            traceScope();
+            PluginMonitor::setAlwaysShow(true);
+        });
+        subm.addItem("Automatic", true, PluginMonitor::getAutoShow(), [this] {
+            traceScope();
+            PluginMonitor::setAutoShow(!PluginMonitor::getAutoShow());
+            m_processor.saveConfig();
+        });
+        m.addSubMenu("Plugin Monitor", subm);
+        subm.clear();
+
+        subm.addItem("Logging", true, AGLogger::isEnabled(), [this] {
             traceScope();
             AGLogger::setEnabled(!AGLogger::isEnabled());
             m_processor.saveConfig();
         });
-        m.addItem("Tracing", true, Tracer::isEnabled(), [this] {
+        subm.addItem("Tracing", true, Tracer::isEnabled(), [this] {
             traceScope();
             Tracer::setEnabled(!Tracer::isEnabled());
             m_processor.saveConfig();
         });
-        m.addItem("Show Statistics", [this] {
+        m.addSubMenu("Diagnostics", subm);
+        subm.clear();
+
+        m.addItem("Show Statistics...", [this] {
             traceScope();
-            if (nullptr == m_statsWindow) {
-                m_statsWindow = std::make_unique<StatisticsWindow>(this);
-            }
+            StatisticsWindow::show();
         });
         m.showAt(&m_settingsIcon);
     }
@@ -857,11 +872,6 @@ void AudioGridderAudioProcessorEditor::editPlugin(int idx) {
         m_pluginButtons[as<size_t>(active)]->setColour(PluginButton::textColourOffId, Colours::white);
         resized();
     }
-}
-
-void AudioGridderAudioProcessorEditor::hideStatistics() {
-    traceScope();
-    m_statsWindow.reset();
 }
 
 }  // namespace e47

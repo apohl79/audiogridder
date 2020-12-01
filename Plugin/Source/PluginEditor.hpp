@@ -35,8 +35,6 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     void setConnected(bool connected);
     void setCPULoad(float load);
 
-    void hideStatistics();
-
   private:
     AudioGridderAudioProcessor& m_processor;
 
@@ -58,8 +56,6 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     TextButton m_stPlus, m_stMinus, m_stA, m_stB;
     int m_currentActiveAB = -1;
     TextButton* m_hilightedStButton = nullptr;
-
-    std::unique_ptr<StatisticsWindow> m_statsWindow;
 
     PluginButton* addPluginButton(const String& id, const String& name);
     std::vector<PluginButton*> getPluginButtons(const String& id);
