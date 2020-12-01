@@ -270,6 +270,32 @@ inline bool msgThreadExistsAndNotLocked() {
         }                                                                                 \
     } while (0)
 
+#define sleepExitAware(t)                                            \
+    do {                                                             \
+        int __sleepstep = 50;                                        \
+        if (t < __sleepstep) {                                       \
+            Thread::sleep(t);                                        \
+        } else {                                                     \
+            int __sleepfor = t / __sleepstep;                        \
+            while (!currentThreadShouldExit() && __sleepfor-- > 0) { \
+                Thread::sleep(__sleepstep);                          \
+            }                                                        \
+        }                                                            \
+    } while (0)
+
+#define sleepExitAwareWithCondition(t, c)                                    \
+    do {                                                                     \
+        int __sleepstep = 50;                                                \
+        if (t < __sleepstep) {                                               \
+            Thread::sleep(t);                                                \
+        } else {                                                             \
+            int __sleepfor = t / __sleepstep;                                \
+            while (!currentThreadShouldExit() && !c() && __sleepfor-- > 0) { \
+                Thread::sleep(__sleepstep);                                  \
+            }                                                                \
+        }                                                                    \
+    } while (0)
+
 }  // namespace e47
 
 #include "Tracer.hpp"
@@ -308,7 +334,7 @@ inline void runOnMsgThreadSync(std::function<void()> fn) {
         cv.notify_one();
     });
     std::unique_lock<std::mutex> lock(mtx);
-    cv.wait(lock, [&done] { return done; });
+    cv.wait(lock, [&done, &mm] { return done || mm->hasStopMessageBeenSent(); });
 }
 
 inline void waitForThreadAndLog(const LogTag* tag, Thread* t, int millisUntilWarning = 3000) {
