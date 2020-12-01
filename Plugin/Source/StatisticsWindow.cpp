@@ -235,8 +235,6 @@ void StatisticsWindow::show() {
     }
 }
 
-void StatisticsWindow::hide() {
-    m_inst.reset();
-}
+void StatisticsWindow::hide() { m_inst.reset(); }
 
 }  // namespace e47

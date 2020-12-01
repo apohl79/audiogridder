@@ -24,6 +24,8 @@
             file="../../Common/Source/mDNSConnector.cpp"/>
       <FILE id="eU7GCJ" name="mDNSConnector.hpp" compile="0" resource="0"
             file="../../Common/Source/mDNSConnector.hpp"/>
+      <FILE id="jxq4FX" name="MemoryFile.cpp" compile="1" resource="0" file="../../Common/Source/MemoryFile.cpp"/>
+      <FILE id="Re56rt" name="MemoryFile.hpp" compile="0" resource="0" file="../../Common/Source/MemoryFile.hpp"/>
       <FILE id="kZv5lv" name="Message.cpp" compile="1" resource="0" file="../../Common/Source/Message.cpp"/>
       <FILE id="kHdL6a" name="Message.hpp" compile="0" resource="0" file="../../Common/Source/Message.hpp"/>
       <FILE id="vBs8XC" name="Metrics.cpp" compile="1" resource="0" file="../../Common/Source/Metrics.cpp"/>
@@ -39,6 +41,10 @@
       <FILE id="bRrb9s" name="Utils.cpp" compile="1" resource="0" file="../../Common/Source/Utils.cpp"/>
       <FILE id="I8QGZk" name="Utils.hpp" compile="0" resource="0" file="../../Common/Source/Utils.hpp"/>
       <FILE id="VyI0aI" name="Version.hpp" compile="0" resource="0" file="../../Common/Source/Version.hpp"/>
+      <FILE id="dtUlAP" name="WindowPositions.cpp" compile="1" resource="0"
+            file="../../Common/Source/WindowPositions.cpp"/>
+      <FILE id="dBct2e" name="WindowPositions.hpp" compile="0" resource="0"
+            file="../../Common/Source/WindowPositions.hpp"/>
     </GROUP>
     <GROUP id="{A2A08E54-1037-9844-5B73-F16B657A5259}" name="Source">
       <FILE id="FaxY5N" name="AudioStreamer.hpp" compile="0" resource="0"
@@ -65,6 +71,10 @@
             file="../Source/PluginEditor.cpp"/>
       <FILE id="lkGBSv" name="PluginEditor.hpp" compile="0" resource="0"
             file="../Source/PluginEditor.hpp"/>
+      <FILE id="a8ZDsC" name="PluginMonitor.cpp" compile="1" resource="0"
+            file="../Source/PluginMonitor.cpp"/>
+      <FILE id="Ox0U9U" name="PluginMonitor.hpp" compile="0" resource="0"
+            file="../Source/PluginMonitor.hpp"/>
       <FILE id="I1MuaF" name="PluginProcessor.cpp" compile="1" resource="0"
             file="../Source/PluginProcessor.cpp"/>
       <FILE id="sfJS6b" name="PluginProcessor.hpp" compile="0" resource="0"

@@ -27,6 +27,8 @@
             file="../Common/Source/mDNSConnector.cpp"/>
       <FILE id="ZsxIoW" name="mDNSConnector.hpp" compile="0" resource="0"
             file="../Common/Source/mDNSConnector.hpp"/>
+      <FILE id="LMXGwW" name="MemoryFile.cpp" compile="1" resource="0" file="../Common/Source/MemoryFile.cpp"/>
+      <FILE id="HfdVvk" name="MemoryFile.hpp" compile="0" resource="0" file="../Common/Source/MemoryFile.hpp"/>
       <FILE id="ak13em" name="Message.cpp" compile="1" resource="0" file="../Common/Source/Message.cpp"/>
       <FILE id="olKSf7" name="Message.hpp" compile="0" resource="0" file="../Common/Source/Message.hpp"/>
       <FILE id="hFSlhs" name="Metrics.cpp" compile="1" resource="0" file="../Common/Source/Metrics.cpp"/>
@@ -42,6 +44,10 @@
       <FILE id="InHqkk" name="Utils.cpp" compile="1" resource="0" file="../Common/Source/Utils.cpp"/>
       <FILE id="hCUKCJ" name="Utils.hpp" compile="0" resource="0" file="../Common/Source/Utils.hpp"/>
       <FILE id="V3zRoR" name="Version.hpp" compile="0" resource="0" file="../Common/Source/Version.hpp"/>
+      <FILE id="vE0f7Z" name="WindowPositions.cpp" compile="1" resource="0"
+            file="../Common/Source/WindowPositions.cpp"/>
+      <FILE id="NjJWQd" name="WindowPositions.hpp" compile="0" resource="0"
+            file="../Common/Source/WindowPositions.hpp"/>
     </GROUP>
     <GROUP id="{D06A4BA4-CF35-72D8-62D7-9A05D88F919C}" name="Source">
       <FILE id="ynJPyR" name="App.cpp" compile="1" resource="0" file="Source/App.cpp"/>
