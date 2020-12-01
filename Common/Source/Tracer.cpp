@@ -9,14 +9,7 @@
 #include "Utils.hpp"
 #include "SharedInstance.hpp"
 #include "Defaults.hpp"
-
-#ifdef JUCE_WINDOWS
-#include <windows.h>
-#else
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/mman.h>
-#endif
+#include "MemoryFile.hpp"
 
 namespace e47 {
 namespace Tracer {
@@ -25,14 +18,7 @@ namespace Tracer {
 
 std::atomic_bool l_tracerEnabled{false};
 std::atomic_uint64_t l_index{0};
-File l_file;
-#ifdef JUCE_WINDOWS
-HANDLE l_fd, l_mapped_hndl;
-#else
-int l_fd = -1;
-#endif
-char* l_data = nullptr;
-size_t l_size = 0;
+MemoryFile l_file;
 
 struct Inst : SharedInstance<Inst> {};
 
@@ -62,86 +48,12 @@ Scope::Scope(const LogTag* t, const String& f, int l, const String& ff) {
 Scope::Scope(const LogTagDelegate* t, const String& f, int l, const String& ff)
     : Scope(t->getLogTagSource(), f, l, ff) {}
 
-void openTraceFile() {
-    if (nullptr != l_data) {
-        logln("trace file already opened");
-        return;
-    }
-    void* m = nullptr;
-    l_size = NUM_OF_TRACE_RECORDS * sizeof(TraceRecord);
-#ifdef JUCE_WINDOWS
-    l_fd = CreateFileA(l_file.getFullPathName().getCharPointer(), (GENERIC_READ | GENERIC_WRITE), FILE_SHARE_READ, NULL,
-                       CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, NULL);
-    if (l_fd == INVALID_HANDLE_VALUE) {
-        logln("CreateFileA failed: " << GetLastErrorStr());
-        return;
-    }
-    LONG sizeh = (l_size >> (sizeof(LONG) * 8));
-    LONG sizel = (l_size & 0xffffffff);
-    auto res = SetFilePointer(l_fd, sizel, &sizeh, FILE_BEGIN);
-    if (INVALID_SET_FILE_POINTER == res) {
-        logln("SetFilePointer failed: " << GetLastErrorStr());
-        return;
-    }
-    if (!SetEndOfFile(l_fd)) {
-        logln("SetEndOfFile failed: " << GetLastErrorStr());
-        return;
-    }
-    l_mapped_hndl = CreateFileMappingA(l_fd, NULL, PAGE_READWRITE, 0, 0, NULL);
-    if (NULL == l_mapped_hndl) {
-        logln("CreateFileMappingA failed: " << GetLastErrorStr());
-        return;
-    }
-    m = MapViewOfFileEx(l_mapped_hndl, FILE_MAP_WRITE, 0, 0, 0, NULL);
-    if (NULL == m) {
-        logln("MapViewOfFileEx failed: " << GetLastErrorStr());
-        return;
-    }
-#else
-    l_fd = open(l_file.getFullPathName().getCharPointer(), O_CREAT | O_TRUNC | O_RDWR, S_IRWXU);
-    if (l_fd < 0) {
-        logln("open failed: " << strerror(errno));
-        return;
-    }
-    if (ftruncate(l_fd, (off_t)l_size)) {
-        logln("ftruncate failed: " << strerror(errno));
-        return;
-    }
-    m = mmap(nullptr, l_size, PROT_WRITE | PROT_READ, MAP_SHARED, l_fd, 0);
-    if (MAP_FAILED == m) {
-        logln("mmap failed: " << strerror(errno));
-        return;
-    }
-#endif
-    l_data = static_cast<char*>(m);
-    logln("trace file opened");
-}
-
-void closeTraceFile() {
-    if (nullptr == l_data) {
-        return;
-    }
-#ifdef JUCE_WINDOWS
-    UnmapViewOfFile(l_data);
-    CloseHandle(l_mapped_hndl);
-    l_mapped_hndl = NULL;
-    CloseHandle(l_fd);
-    l_fd = NULL;
-#else
-    munmap(l_data, l_size);
-    close(l_fd);
-    l_fd = -1;
-#endif
-    l_data = nullptr;
-    l_size = 0;
-    logln("trace file closed");
-}
-
 void initialize(const String& appName, const String& filePrefix) {
     Inst::initialize([&](auto) {
-        l_file = File(Defaults::getLogFileName(appName, filePrefix, ".trace")).getNonexistentSibling();
+        auto f = File(Defaults::getLogFileName(appName, filePrefix, ".trace")).getNonexistentSibling();
+        l_file = MemoryFile(getLogTagSource(), f, NUM_OF_TRACE_RECORDS * sizeof(TraceRecord));
         // create dir if needed
-        auto d = l_file.getParentDirectory();
+        auto d = f.getParentDirectory();
         if (!d.exists()) {
             d.createDirectory();
         }
@@ -150,12 +62,12 @@ void initialize(const String& appName, const String& filePrefix) {
 }
 
 void cleanup() {
-    Inst::cleanup([](auto) { closeTraceFile(); });
+    Inst::cleanup([](auto) { l_file.close(); });
 }
 
 void setEnabled(bool b) {
-    if (b && nullptr == l_data) {
-        openTraceFile();
+    if (b && !l_file.isOpen()) {
+        l_file.open(true);
     }
     l_tracerEnabled = b;
 }
@@ -163,9 +75,9 @@ void setEnabled(bool b) {
 bool isEnabled() { return l_tracerEnabled; }
 
 TraceRecord* getRecord() {
-    if (nullptr != l_data) {
+    if (l_file.isOpen()) {
         auto offset = (l_index.fetch_add(1, std::memory_order_relaxed) % NUM_OF_TRACE_RECORDS) * sizeof(TraceRecord);
-        return reinterpret_cast<TraceRecord*>(l_data + offset);
+        return reinterpret_cast<TraceRecord*>(l_file.data() + offset);
     }
     return nullptr;
 }
