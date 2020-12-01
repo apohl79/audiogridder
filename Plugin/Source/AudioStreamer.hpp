@@ -19,12 +19,13 @@ class AudioStreamer : public Thread, public LogTagDelegate {
   public:
     AudioStreamer(Client* clnt, StreamingSocket* sock)
         : Thread("AudioStreamer"),
+          LogTagDelegate(clnt),
           m_client(clnt),
           m_socket(std::unique_ptr<StreamingSocket>(sock)),
           m_writeQ(as<size_t>(clnt->NUM_OF_BUFFERS * 2)),
           m_readQ(as<size_t>(clnt->NUM_OF_BUFFERS * 2)),
-          m_duration(TimeStatistic::getDuration("audio")) {
-        setLogTagSource(m_client);
+          m_durationGlobal(TimeStatistic::getDuration("audio")),
+          m_durationLocal(TimeStatistic::getDuration(String("audio.") + String(getId()), false)) {
         traceScope();
 
         for (int i = 0; i < clnt->NUM_OF_BUFFERS; i++) {
@@ -66,7 +67,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
             while (m_writeQ.read_available() > 0) {
                 AudioMidiBuffer buf;
                 m_writeQ.pop(buf);
-                m_duration.reset();
+                m_durationLocal.reset();
+                m_durationGlobal.reset();
                 if (!sendReal(buf)) {
                     logln("error: " << getInstanceString() << ": send failed");
                     setError();
@@ -78,13 +80,15 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                     setError();
                     return;
                 }
-                m_duration.update();
+                m_durationLocal.update();
+                m_durationGlobal.update();
                 m_readQ.push(std::move(buf));
                 notifyRead();
             }
             waitWrite();
         }
-        m_duration.clear();
+        m_durationLocal.clear();
+        m_durationGlobal.clear();
         logln("audio streamer terminated");
     }
 
@@ -146,7 +150,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
             }
             buf.midi.addEvents(midi, 0, buffer.getNumSamples(), 0);
             buf.posInfo = posInfo;
-            m_duration.reset();
+            m_durationLocal.reset();
+            m_durationGlobal.reset();
             if (!sendReal(buf)) {
                 logln("error: " << getInstanceString() << ": send failed");
                 setError();
@@ -202,7 +207,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                 setError();
                 return;
             }
-            m_duration.update();
+            m_durationLocal.update();
+            m_durationGlobal.update();
             buffer.makeCopyOf(buf.audio);
             midi.clear();
             midi.addEvents(buf.midi, 0, buffer.getNumSamples(), 0);
@@ -223,7 +229,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
     boost::lockfree::spsc_queue<AudioMidiBuffer> m_writeQ, m_readQ;
     std::mutex m_writeMtx, m_readMtx, m_sockMtx;
     std::condition_variable m_writeCv, m_readCv;
-    TimeStatistic::Duration m_duration;
+    TimeStatistic::Duration m_durationGlobal, m_durationLocal;
     std::shared_ptr<Meter> m_bytesOutMeter, m_bytesInMeter;
 
     AudioMidiBuffer m_workingSendBuf, m_workingReadBufe;

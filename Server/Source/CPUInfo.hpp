@@ -18,9 +18,9 @@ namespace e47 {
 class CPUInfo : public Thread, public LogTag, public SharedInstance<CPUInfo> {
   public:
     CPUInfo() : Thread("CPUInfo"), LogTag("cpuinfo") { startThread(); }
-    ~CPUInfo() { stopThread(-1); }
+    ~CPUInfo() override { stopThread(-1); }
 
-    void run();
+    void run() override;
 
     static float getUsage() { return m_usage; }
 
