@@ -233,7 +233,7 @@ void Client::init() {
         }
 
         Handshake cfg = {1,      clientPort,        m_channelsIn,       m_channelsOut,
-                         m_rate, m_samplesPerBlock, m_doublePrecission, (uint64)this};
+                         m_rate, m_samplesPerBlock, m_doublePrecission, getId()};
         if (!e47::send(m_cmd_socket.get(), reinterpret_cast<const char*>(&cfg), sizeof(cfg))) {
             m_cmd_socket->close();
             return;
