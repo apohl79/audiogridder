@@ -104,20 +104,22 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
     m_genericEditorView.setViewedComponent(&m_genericEditor, false);
     m_genericEditorView.setVisible(false);
 
-    int idx = 0;
-    for (auto& plug : m_processor.getLoadedPlugins()) {
-        auto* b = addPluginButton(plug.id, plug.name);
-        if (!plug.ok) {
-            b->setEnabled(false);
-        }
-        if (plug.bypassed) {
-            b->setButtonText("( " + m_processor.getLoadedPlugin(idx).name + " )");
-            b->setColour(PluginButton::textColourOffId, Colours::grey);
-        }
+    ;
+    for (int idx = 0; idx < m_processor.getNumOfLoadedPlugins(); idx++) {
+        auto& plug = m_processor.getLoadedPlugin(idx);
+        if (plug.id.isNotEmpty()) {
+            auto* b = addPluginButton(plug.id, plug.name);
+            if (!plug.ok) {
+                b->setEnabled(false);
+            }
+            if (plug.bypassed) {
+                b->setButtonText("( " + m_processor.getLoadedPlugin(idx).name + " )");
+                b->setColour(PluginButton::textColourOffId, Colours::grey);
+            }
 #if JucePlugin_IsSynth
-        m_newPluginButton.setEnabled(false);
+            m_newPluginButton.setEnabled(false);
 #endif
-        idx++;
+        }
     }
 
     auto active = m_processor.getActivePlugin();
@@ -533,9 +535,8 @@ void AudioGridderAudioProcessorEditor::setConnected(bool connected) {
         String srvTxt = m_processor.getActiveServerName();
         srvTxt << " (+" << m_processor.getLatencyMillis() << "ms)";
         m_srvLabel.setText(srvTxt, NotificationType::dontSendNotification);
-        auto& plugins = m_processor.getLoadedPlugins();
         for (size_t i = 0; i < m_pluginButtons.size(); i++) {
-            m_pluginButtons[i]->setEnabled(plugins[i].ok);
+            m_pluginButtons[i]->setEnabled(m_processor.getLoadedPlugin((int)i).ok);
         }
     } else {
         m_srvLabel.setText("not connected", NotificationType::dontSendNotification);
@@ -748,6 +749,24 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
             m_processor.saveConfig();
         });
         m.addSubMenu("Plugin Monitor", subm);
+        subm.clear();
+
+        subm.addItem("Always (every 10s)", true,
+                     m_processor.getSyncRemoteMode() == AudioGridderAudioProcessor::SYNC_ALWAYS, [this] {
+                         m_processor.setSyncRemoteMode(AudioGridderAudioProcessor::SYNC_ALWAYS);
+                         m_processor.saveConfig();
+                     });
+        subm.addItem("When an editor is active (every 10s)", true,
+                     m_processor.getSyncRemoteMode() == AudioGridderAudioProcessor::SYNC_WITH_EDITOR, [this] {
+                         m_processor.setSyncRemoteMode(AudioGridderAudioProcessor::SYNC_WITH_EDITOR);
+                         m_processor.saveConfig();
+                     });
+        subm.addItem("When saving the project", true,
+                     m_processor.getSyncRemoteMode() == AudioGridderAudioProcessor::SYNC_DISABLED, [this] {
+                         m_processor.setSyncRemoteMode(AudioGridderAudioProcessor::SYNC_DISABLED);
+                         m_processor.saveConfig();
+                     });
+        m.addSubMenu("Remote Sync Frequency", subm);
         subm.clear();
 
         subm.addItem("Logging", true, AGLogger::isEnabled(), [this] {

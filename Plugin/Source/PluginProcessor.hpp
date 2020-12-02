@@ -88,15 +88,30 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
         String settings;
         StringArray presets;
         Array<Client::Parameter> params;
-        bool bypassed;
-        bool ok;
+        bool bypassed = false;
+        bool ok = false;
     };
 
-    auto& getLoadedPlugins() const { return m_loadedPlugins; }
-    LoadedPlugin& getLoadedPlugin(int idx) { return idx > -1 ? m_loadedPlugins[as<size_t>(idx)] : m_unusedDummyPlugin; }
+    // Called by the client object to trigger resyncing the remote plugin settings
+    void sync();
+
+    enum SyncRemoteMode { SYNC_ALWAYS, SYNC_WITH_EDITOR, SYNC_DISABLED };
+    SyncRemoteMode getSyncRemoteMode() const { return m_syncRemote; }
+    void setSyncRemoteMode(SyncRemoteMode m) { m_syncRemote = m; }
+
+    // auto& getLoadedPlugins() const { return m_loadedPlugins; }
+    int getNumOfLoadedPlugins() {
+        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+        return (int)m_loadedPlugins.size();
+    }
+    LoadedPlugin& getLoadedPlugin(int idx) {
+        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+        return idx > -1 ? m_loadedPlugins[as<size_t>(idx)] : m_unusedDummyPlugin;
+    }
+
     bool loadPlugin(const String& id, const String& name, String& err);
     void unloadPlugin(int idx);
-    String getLoadedPluginsString() const;
+    String getLoadedPluginsString();
     void editPlugin(int idx);
     void hidePlugin(bool updateServer = true);
     int getActivePlugin() const { return m_activePlugin; }
@@ -140,8 +155,8 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
         return as<int>(lround(m_client->NUM_OF_BUFFERS * getBlockSize() * 1000 / getSampleRate()));
     }
 
-    // It looks like most hosts do not support dynamic parameter creation or changes to existing parameters. Logic at
-    // least allows for the name to be updated. So we create slots at the start.
+    // It looks like most hosts do not support dynamic parameter creation or changes to existing parameters. Logic
+    // at least allows for the name to be updated. So we create slots at the start.
     class Parameter : public AudioProcessorParameter, public LogTagDelegate {
       public:
         Parameter(AudioGridderAudioProcessor& processor, int slot) : m_processor(processor), m_slotId(slot) {
@@ -187,6 +202,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     std::unique_ptr<Client> m_client;
     std::atomic_bool m_prepared{false};
     std::vector<LoadedPlugin> m_loadedPlugins;
+    std::mutex m_loadedPluginsSyncMtx;
     int m_activePlugin = -1;
     StringArray m_servers;
     String m_activeServerFromCfg;
@@ -209,6 +225,8 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
 
     TrackProperties m_trackProperties;
     std::mutex m_trackPropertiesMtx;
+
+    SyncRemoteMode m_syncRemote = SYNC_WITH_EDITOR;
 
     ENABLE_ASYNC_FUNCTORS();
 

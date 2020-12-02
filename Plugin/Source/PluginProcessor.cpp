@@ -196,6 +196,7 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
     m_menuShowCompany = jsonGetValue(j, "MenuShowCompany", m_menuShowCompany);
     m_genericEditor = jsonGetValue(j, "GenericEditor", m_genericEditor);
     m_confirmDelete = jsonGetValue(j, "ConfirmDelete", m_confirmDelete);
+    m_syncRemote = jsonGetValue(j, "SyncRemoteMode", m_syncRemote);
 }
 
 void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
@@ -226,6 +227,7 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
     jcfg["PluginMonAutoShow"] = PluginMonitor::getAutoShow();
     jcfg["PluginMonChanColor"] = PluginMonitor::getShowChannelColor();
     jcfg["PluginMonChanName"] = PluginMonitor::getShowChannelName();
+    jcfg["SyncRemoteMode"] = m_syncRemote;
 
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), jcfg);
 }
@@ -457,7 +459,7 @@ void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData) {
     j["servers"] = jservers;
     j["activeServerStr"] = m_client->getServerHostAndID().toStdString();
     auto jplugs = json::array();
-    for (size_t i = 0; i < m_loadedPlugins.size(); i++) {
+    for (size_t i = 0; i < getNumOfLoadedPlugins(); i++) {
         auto& plug = m_loadedPlugins[i];
         if (plug.ok && m_client->isReadyLockFree()) {
             auto settings = m_client->getPluginSettings(static_cast<int>(i));
@@ -507,6 +509,7 @@ void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeI
         } else if (j.find("activeServer") != j.end()) {
             activeServer = j["activeServer"].get<int>();
         }
+        m_loadedPlugins.clear();
         if (j.find("loadedPlugins") != j.end()) {
             for (auto& plug : j["loadedPlugins"]) {
                 if (version < 1) {
@@ -546,6 +549,24 @@ void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeI
     }
 }
 
+void AudioGridderAudioProcessor::sync() {
+    traceScope();
+    traceln("sync mode is " << m_syncRemote);
+    if ((m_syncRemote == SYNC_ALWAYS) || (m_syncRemote == SYNC_WITH_EDITOR && nullptr != getActiveEditor())) {
+        logln("starting sync...");
+        for (int i = 0; i < getNumOfLoadedPlugins(); i++) {
+            auto& plug = m_loadedPlugins[i];
+            if (plug.ok && m_client->isReadyLockFree()) {
+                auto settings = m_client->getPluginSettings(static_cast<int>(i));
+                if (settings.getSize() > 0) {
+                    plug.settings = settings.toBase64Encoding();
+                }
+            }
+        }
+        logln("...done");
+    }
+}
+
 std::vector<ServerPlugin> AudioGridderAudioProcessor::getPlugins(const String& type) const {
     traceScope();
     std::vector<ServerPlugin> ret;
@@ -581,6 +602,7 @@ bool AudioGridderAudioProcessor::loadPlugin(const String& id, const String& name
     }
     if (success) {
         updateLatency(m_client->getLatencySamples());
+        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
         m_loadedPlugins.push_back({id, name, "", presets, params, false, true});
     }
     return success;
@@ -601,6 +623,7 @@ void AudioGridderAudioProcessor::unloadPlugin(int idx) {
         m_activePlugin--;
     }
 
+    std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
     int i = 0;
     for (auto it = m_loadedPlugins.begin(); it < m_loadedPlugins.end(); it++) {
         if (i++ == idx) {
@@ -610,10 +633,11 @@ void AudioGridderAudioProcessor::unloadPlugin(int idx) {
     }
 }
 
-String AudioGridderAudioProcessor::getLoadedPluginsString() const {
+String AudioGridderAudioProcessor::getLoadedPluginsString() {
     traceScope();
     String ret;
     bool first = true;
+    std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
     for (auto& p : m_loadedPlugins) {
         if (first) {
             first = false;

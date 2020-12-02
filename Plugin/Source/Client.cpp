@@ -39,6 +39,7 @@ void Client::run() {
     traceScope();
     logln("entering client loop");
     uint32 cpuUpdateSeconds = 5;
+    uint32 syncSeconds = 10;
     uint32 loops = 0;
     bool lastState = isReady();
     while (!currentThreadShouldExit()) {
@@ -88,6 +89,11 @@ void Client::run() {
         // CPU load update
         if ((loops % cpuUpdateSeconds == 0) && isReadyLockFree()) {
             updateCPULoad();
+        }
+
+        // Trigger sync
+        if ((loops % syncSeconds == 0) && isReadyLockFree()) {
+            m_processor->sync();
         }
 
         // Relax
