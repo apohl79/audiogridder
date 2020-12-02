@@ -628,7 +628,7 @@ String AudioGridderAudioProcessor::getLoadedPluginsString() const {
 void AudioGridderAudioProcessor::editPlugin(int idx) {
     traceScope();
     logln("edit plugin " << idx);
-    if (!m_genericEditor) {
+    if (!m_genericEditor && getLoadedPlugin(idx).ok) {
         m_client->editPlugin(idx);
     }
     m_activePlugin = idx;
