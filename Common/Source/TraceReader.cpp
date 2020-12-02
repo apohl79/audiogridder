@@ -462,7 +462,7 @@ int main(int argc, char** argv) {
                 if (show > filter.size()) {
                     show = filter.size();
                 }
-                for (auto it2 = (show ? filter.end() - (int)show : filter.begin()); it2 != filter.end(); it++) {
+                for (auto it2 = (show ? filter.end() - (int)show : filter.begin()); it2 != filter.end(); it2++) {
                     if (first) {
                         printThreadHeader(threadNameId.str(), kv.second.size());
                         first = false;
@@ -471,7 +471,7 @@ int main(int argc, char** argv) {
                 }
             } else {
                 for (auto it2 = (show ? kv.second.end() - (int)show : kv.second.begin()); it2 != kv.second.end();
-                     it++) {
+                     it2++) {
                     if (first) {
                         printThreadHeader(threadNameId.str(), kv.second.size());
                         first = false;
