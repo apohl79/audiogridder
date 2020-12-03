@@ -145,13 +145,16 @@ class TimeStatistic : public BasicStatistic, public LogTag {
 
   private:
     std::vector<double> m_times[2];
+    std::mutex m_timesMtx;
     uint8 m_timesIdx = 0;
     std::vector<Histogram> m_1minValues;
-    std::mutex m_mtx;
+    std::mutex m_1minValuesMtx;
     size_t m_numOfBins;
     double m_binSize;
     Meter m_meter;
     bool m_showLog = true;
+
+    std::vector<Histogram> get1minValues();
 };
 
 class Metrics : public Thread, public LogTag, public SharedInstance<Metrics> {

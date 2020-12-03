@@ -17,7 +17,7 @@ std::mutex Metrics::m_statsMtx;
 
 void TimeStatistic::update(double t) {
     m_meter.increment();
-    std::lock_guard<std::mutex> lock(m_mtx);
+    std::lock_guard<std::mutex> lock(m_timesMtx);
     m_times[m_timesIdx].push_back(t);
 }
 
@@ -25,7 +25,7 @@ void TimeStatistic::aggregate() {
     auto& data = m_times[m_timesIdx];
     {
         // switch to the other buffer
-        std::lock_guard<std::mutex> lock(m_mtx);
+        std::lock_guard<std::mutex> lock(m_timesMtx);
         m_timesIdx = (m_timesIdx + 1) % 2;
     }
     Histogram hist(m_numOfBins, m_binSize);
@@ -63,6 +63,7 @@ void TimeStatistic::aggregate() {
         hist.updateBin(i, count);
         data.clear();
     }
+    std::lock_guard<std::mutex> lock(m_1minValuesMtx);
     m_1minValues.push_back(std::move(hist));
     if (m_1minValues.size() > 6) {
         m_1minValues.erase(m_1minValues.begin());
@@ -71,11 +72,17 @@ void TimeStatistic::aggregate() {
 
 void TimeStatistic::aggregate1s() { m_meter.aggregate1s(); }
 
+std::vector<TimeStatistic::Histogram> TimeStatistic::get1minValues() {
+    std::lock_guard<std::mutex> lock(m_1minValuesMtx);
+    return m_1minValues;  // copy
+}
+
 TimeStatistic::Histogram TimeStatistic::get1minHistogram() {
+    auto values = get1minValues();
     Histogram aggregate(m_numOfBins, m_binSize);
-    if (m_1minValues.size() > 0) {
+    if (values.size() > 0) {
         aggregate.min = std::numeric_limits<double>::max();
-        for (auto& hist : m_1minValues) {
+        for (auto& hist : values) {
             aggregate.sum += hist.sum;
             aggregate.count += hist.count;
             aggregate.nintyFifth += hist.nintyFifth;
@@ -92,7 +99,7 @@ TimeStatistic::Histogram TimeStatistic::get1minHistogram() {
         if (aggregate.count > 0) {
             aggregate.avg = aggregate.sum / aggregate.count;
         }
-        aggregate.nintyFifth /= m_1minValues.size();
+        aggregate.nintyFifth /= values.size();
     }
     return aggregate;
 }
