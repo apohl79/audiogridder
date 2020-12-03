@@ -14,12 +14,16 @@
 
 #include <thread>
 
+JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE("-Wsign-conversion", "-Wconversion")
+JUCE_BEGIN_IGNORE_WARNINGS_MSVC(4244)
 extern "C" {
 #include "libavcodec/avcodec.h"
 #include "libavdevice/avdevice.h"
 #include "libavutil/imgutils.h"
 #include "libswscale/swscale.h"
 }
+JUCE_END_IGNORE_WARNINGS_GCC_LIKE
+JUCE_END_IGNORE_WARNINGS_MSVC
 
 #ifdef JUCE_WINDOWS
 #pragma comment(lib, "strmiids.lib")

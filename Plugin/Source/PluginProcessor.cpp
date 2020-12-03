@@ -459,10 +459,10 @@ void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData) {
     j["servers"] = jservers;
     j["activeServerStr"] = m_client->getServerHostAndID().toStdString();
     auto jplugs = json::array();
-    for (size_t i = 0; i < getNumOfLoadedPlugins(); i++) {
-        auto& plug = m_loadedPlugins[i];
+    for (int i = 0; i < getNumOfLoadedPlugins(); i++) {
+        auto& plug = m_loadedPlugins[(size_t)i];
         if (plug.ok && m_client->isReadyLockFree()) {
-            auto settings = m_client->getPluginSettings(static_cast<int>(i));
+            auto settings = m_client->getPluginSettings(i);
             if (settings.getSize() > 0) {
                 plug.settings = settings.toBase64Encoding();
             }
@@ -555,7 +555,7 @@ void AudioGridderAudioProcessor::sync() {
     if ((m_syncRemote == SYNC_ALWAYS) || (m_syncRemote == SYNC_WITH_EDITOR && nullptr != getActiveEditor())) {
         logln("starting sync...");
         for (int i = 0; i < getNumOfLoadedPlugins(); i++) {
-            auto& plug = m_loadedPlugins[i];
+            auto& plug = m_loadedPlugins[(size_t)i];
             if (plug.ok && m_client->isReadyLockFree()) {
                 auto settings = m_client->getPluginSettings(static_cast<int>(i));
                 if (settings.getSize() > 0) {
