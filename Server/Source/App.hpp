@@ -339,20 +339,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
         WindowCaptureCallbackFFmpeg m_callbackFFmpeg;
         Rectangle<int> m_screenCaptureRect, m_totalRect;
 
-        void createEditor() {
-            traceScope();
-            setTitleBarHeight(30);
-            m_totalRect = Desktop::getInstance().getDisplays().getMainDisplay().totalArea;
-            m_editor = m_processor->createEditorIfNeeded();
-            if (nullptr != m_editor) {
-                Component::setVisible(true);
-                setContentNonOwned(m_editor, true);
-                startCapturing();
-            } else {
-                Component::setVisible(false);
-                logln("failed to create editor");
-            }
-        }
+        void createEditor();
 
         void timerCallback() override { captureWindow(); }
 
