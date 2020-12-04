@@ -276,8 +276,8 @@ class AudioMessage : public LogTagDelegate {
                 MessageHelper::seterrstr(e, "request header");
                 return false;
             }
-            // Arbitarry additional channels to support plugins that have more than one input bus. Plugins that don't
-            // need it, should ignore the channels.
+            // Arbitrary additional channels to support plugins that have more than one input bus or stereo plugins
+            // processing a mono channel. Plugins that don't need it, should ignore the channels.
             int totalChannels = jmax(m_reqHeader.channels, m_reqHeader.channelsRequested) + extraChannels;
             int totalSamples = jmax(m_reqHeader.samples, m_reqHeader.samplesRequested);
             int size;

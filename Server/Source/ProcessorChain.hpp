@@ -74,7 +74,7 @@ class AGProcessor : public LogTagDelegate {
         auto p = getPlugin();
         if (nullptr != p) {
             p->prepareToPlay(sampleRate, maximumExpectedSamplesPerBlock);
-            prepared = true;
+            m_prepared = true;
         }
     }
 
@@ -83,7 +83,7 @@ class AGProcessor : public LogTagDelegate {
         auto p = getPlugin();
         if (nullptr != p) {
             p->releaseResources();
-            prepared = false;
+            m_prepared = false;
         }
     }
 
@@ -168,6 +168,13 @@ class AGProcessor : public LogTagDelegate {
 
     void suspendProcessing(const bool shouldBeSuspended);
 
+    int getExtraInChannels() const { return m_extraInChannels; }
+    int getExtraOutChannels() const { return m_extraOutChannels; }
+    void setExtraChannels(int in, int out) {
+        m_extraInChannels = in;
+        m_extraOutChannels = out;
+    }
+
   private:
     ProcessorChain& m_chain;
     String m_id;
@@ -176,8 +183,9 @@ class AGProcessor : public LogTagDelegate {
     std::shared_ptr<AudioPluginInstance> m_plugin;
     std::mutex m_pluginMtx;
     int m_additionalScreenSpace = 0;
-    bool prepared = false;
-
+    bool m_prepared = false;
+    int m_extraInChannels = 0;
+    int m_extraOutChannels = 0;
     // static std::mutex m_pluginLoaderMtx;
 };
 
@@ -219,7 +227,8 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
 
     bool updateChannels(int channelsIn, int channelsOut);
-    bool setProcessorBusesLayout(std::shared_ptr<AudioPluginInstance> proc);
+    void setProcessorBusesLayout(std::shared_ptr<AudioPluginInstance> proc, int& extraInChannels,
+                                 int& extraOutChannels);
     int getExtraChannels();
 
     bool acceptsMidi() const override { return false; }
@@ -234,7 +243,8 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
     void getStateInformation(juce::MemoryBlock& /* destData */) override {}
     void setStateInformation(const void* /* data */, int /* sizeInBytes */) override {}
 
-    bool initPluginInstance(std::shared_ptr<AudioPluginInstance> processor, String& err);
+    bool initPluginInstance(std::shared_ptr<AudioPluginInstance> processor, int& extraInChannels, int& extraOutChannels,
+                            String& err);
     bool addPluginProcessor(const String& id, String& err);
     void addProcessor(std::shared_ptr<AGProcessor> processor);
     size_t getSize() const { return m_processors.size(); }

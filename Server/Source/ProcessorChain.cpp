@@ -106,7 +106,7 @@ bool AGProcessor::load(String& err) {
     if (nullptr == p) {
         p = loadPlugin(m_id, m_sampleRate, m_blockSize, err);
         if (nullptr != p) {
-            if (m_chain.initPluginInstance(p, err)) {
+            if (m_chain.initPluginInstance(p, m_extraInChannels, m_extraOutChannels, err)) {
                 loaded = true;
                 std::lock_guard<std::mutex> lock(m_pluginMtx);
                 m_plugin = p;
@@ -123,7 +123,7 @@ void AGProcessor::unload() {
     {
         std::lock_guard<std::mutex> lock(m_pluginMtx);
         if (nullptr != m_plugin) {
-            if (prepared) {
+            if (m_prepared) {
                 m_plugin->releaseResources();
             }
             p = m_plugin;
@@ -219,46 +219,44 @@ bool ProcessorChain::updateChannels(int channelsIn, int channelsOut) {
     m_extraChannels = 0;
     for (auto& proc : m_processors) {
         auto p = proc->getPlugin();
-        if (nullptr == p || !setProcessorBusesLayout(p)) {
+        if (nullptr == p) {
             return false;
         }
+        int extraInChannels = 0;
+        int extraOutChannels = 0;
+        setProcessorBusesLayout(p, extraInChannels, extraOutChannels);
+        proc->setExtraChannels(extraInChannels, extraOutChannels);
     }
     return true;
 }
 
-bool ProcessorChain::setProcessorBusesLayout(std::shared_ptr<AudioPluginInstance> proc) {
+void ProcessorChain::setProcessorBusesLayout(std::shared_ptr<AudioPluginInstance> proc, int& extraInChannels,
+                                             int& extraOutChannels) {
     traceScope();
+
     auto layout = getBusesLayout();
-    if (proc->checkBusesLayoutSupported(layout)) {
-        return proc->setBusesLayout(layout);
-    } else {
-        // try to figure out if we can add some extra channels to make the plugin work
+
+    if (!proc->checkBusesLayoutSupported(layout)) {
+        // calculate the neede extra channels
         auto procLayout = proc->getBusesLayout();
         // main bus IN
-        int extraInChannels = procLayout.getMainInputChannels() - layout.getMainInputChannels();
+        extraInChannels = procLayout.getMainInputChannels() - layout.getMainInputChannels();
         // check extra busses IN
         for (int busIdx = 1; busIdx < procLayout.inputBuses.size(); busIdx++) {
-            auto bus = procLayout.inputBuses[busIdx];
-            extraInChannels += bus.size();
-            layout.inputBuses.add(bus);
+            extraInChannels += procLayout.inputBuses[busIdx].size();
         }
         // main bus OUT
-        int extraOutChannels = procLayout.getMainOutputChannels() - layout.getMainOutputChannels();
+        extraOutChannels = procLayout.getMainOutputChannels() - layout.getMainOutputChannels();
         // check extra busses OUT
         for (int busIdx = 1; busIdx < procLayout.outputBuses.size(); busIdx++) {
-            auto bus = procLayout.outputBuses[busIdx];
-            extraOutChannels += bus.size();
-            layout.outputBuses.add(bus);
+            extraOutChannels += procLayout.outputBuses[busIdx].size();
         }
 
-        if ((extraInChannels > 0 || extraOutChannels > 0) && proc->checkBusesLayoutSupported(layout) &&
-            proc->setBusesLayout(layout)) {
-            m_extraChannels = jmax(m_extraChannels, extraInChannels, extraOutChannels);
-            logln(extraInChannels << " extra input(s), " << extraOutChannels << " extra output(s)");
-            return true;
-        }
+        m_extraChannels = jmax(m_extraChannels, extraInChannels, extraOutChannels);
+
+        logln(extraInChannels << " extra input(s), " << extraOutChannels << " extra output(s) -> " << m_extraChannels
+                              << " extra channel(s) in total");
     }
-    return false;
 }
 
 int ProcessorChain::getExtraChannels() {
@@ -267,14 +265,10 @@ int ProcessorChain::getExtraChannels() {
     return m_extraChannels;
 }
 
-bool ProcessorChain::initPluginInstance(std::shared_ptr<AudioPluginInstance> inst, String& err) {
+bool ProcessorChain::initPluginInstance(std::shared_ptr<AudioPluginInstance> inst, int& extraInChannels,
+                                        int& extraOutChannels, String& /*err*/) {
     traceScope();
-    if (!setProcessorBusesLayout(inst)) {
-        err = "I/O layout (" + String(getMainBusNumInputChannels()) + "," + String(getMainBusNumOutputChannels()) +
-              " +" + String(m_extraChannels) + ") not supported by plugin: " + inst->getName();
-        logln(err);
-        return false;
-    }
+    setProcessorBusesLayout(inst, extraInChannels, extraOutChannels);
     AudioProcessor::ProcessingPrecision prec = AudioProcessor::singlePrecision;
     if (isUsingDoublePrecision() && supportsDoublePrecisionProcessing()) {
         if (inst->supportsDoublePrecisionProcessing()) {
@@ -342,9 +336,7 @@ void ProcessorChain::updateNoLock() {
             if (!p->supportsDoublePrecisionProcessing()) {
                 supportsDouble = false;
             }
-            int extraInChannels = p->getTotalNumInputChannels() - p->getMainBusNumInputChannels();
-            int extraOutChannels = p->getTotalNumOutputChannels() - p->getMainBusNumOutputChannels();
-            m_extraChannels = jmax(m_extraChannels, extraInChannels, extraOutChannels);
+            m_extraChannels = jmax(m_extraChannels, proc->getExtraInChannels(), proc->getExtraOutChannels());
         }
     }
     if (latency != getLatencySamples()) {
