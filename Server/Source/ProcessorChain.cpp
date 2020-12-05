@@ -236,9 +236,18 @@ void ProcessorChain::setProcessorBusesLayout(std::shared_ptr<AudioPluginInstance
 
     auto layout = getBusesLayout();
 
-    if (!proc->checkBusesLayoutSupported(layout)) {
-        // calculate the neede extra channels
+    bool supported = proc->checkBusesLayoutSupported(layout) && proc->setBusesLayout(layout);
+
+    if (!supported) {
+        logln("standard layout not supported:");
+        printBusesLayout(layout);
+
+        // keep the processor's layout and calculate the neede extra channels
         auto procLayout = proc->getBusesLayout();
+
+        logln("processor layout:");
+        printBusesLayout(procLayout);
+
         // main bus IN
         extraInChannels = procLayout.getMainInputChannels() - layout.getMainInputChannels();
         // check extra busses IN
