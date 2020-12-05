@@ -62,12 +62,21 @@ class AGProcessor : public LogTagDelegate {
     bool processBlock(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
         traceScope();
         auto p = getPlugin();
-        if (nullptr != p && !p->isSuspended()) {
-            p->processBlock(buffer, midiMessages);
+        if (nullptr != p) {
+            if (!p->isSuspended()) {
+                p->processBlock(buffer, midiMessages);
+            } else {
+                if (m_lastKnownLatency > 0) {
+                    processBlockBypassed(buffer);
+                }
+            }
             return true;
         }
         return false;
     }
+
+    void processBlockBypassed(AudioBuffer<float>& buffer);
+    void processBlockBypassed(AudioBuffer<double>& buffer);
 
     void prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock) {
         traceScope();
@@ -91,7 +100,12 @@ class AGProcessor : public LogTagDelegate {
         traceScope();
         auto p = getPlugin();
         if (nullptr != p) {
-            return p->getLatencySamples();
+            int latency = p->getLatencySamples();
+            if (latency != m_lastKnownLatency) {
+                m_lastKnownLatency = latency;
+                updateLatencyBuffers();
+            }
+            return latency;
         }
         return 0;
     }
@@ -167,6 +181,7 @@ class AGProcessor : public LogTagDelegate {
     }
 
     void suspendProcessing(const bool shouldBeSuspended);
+    void updateLatencyBuffers();
 
     int getExtraInChannels() const { return m_extraInChannels; }
     int getExtraOutChannels() const { return m_extraOutChannels; }
@@ -186,7 +201,9 @@ class AGProcessor : public LogTagDelegate {
     bool m_prepared = false;
     int m_extraInChannels = 0;
     int m_extraOutChannels = 0;
-    // static std::mutex m_pluginLoaderMtx;
+    Array<Array<float>> m_bypassBufferF;
+    Array<Array<double>> m_bypassBufferD;
+    int m_lastKnownLatency = 0;
 };
 
 class ProcessorChain : public AudioProcessor, public LogTagDelegate {

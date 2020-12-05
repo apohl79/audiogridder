@@ -135,6 +135,77 @@ void AGProcessor::unload() {
     MessageManager::callAsync([p] {});
 }
 
+    void AGProcessor::processBlockBypassed(AudioBuffer<float>& buffer) {
+        auto totalNumInputChannels = m_chain.getTotalNumInputChannels();
+        auto totalNumOutputChannels = m_chain.getTotalNumOutputChannels();
+
+        if (totalNumInputChannels > buffer.getNumChannels()) {
+            logln("buffer has less channels than main input channels");
+            totalNumInputChannels = buffer.getNumChannels();
+        }
+        if (totalNumOutputChannels > buffer.getNumChannels()) {
+            logln("buffer has less channels than main output channels");
+            totalNumOutputChannels = buffer.getNumChannels();
+        }
+
+        for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
+            buffer.clear(i, 0, buffer.getNumSamples());
+        }
+
+        if (m_bypassBufferF.size() < totalNumOutputChannels) {
+            logln("bypass buffer has less channels than needed, buffer: " << m_bypassBufferF.size()
+                                                                          << ", needed: " << totalNumOutputChannels);
+            for (auto i = 0; i < totalNumOutputChannels; ++i) {
+                buffer.clear(i, 0, buffer.getNumSamples());
+            }
+            return;
+        }
+
+        for (auto c = 0; c < totalNumOutputChannels; ++c) {
+            auto& buf = m_bypassBufferF.getReference(c);
+            for (auto s = 0; s < buffer.getNumSamples(); ++s) {
+                buf.add(buffer.getSample(c, s));
+                buffer.setSample(c, s, buf.getFirst());
+                buf.remove(0);
+            }
+        }
+    }
+
+    void AGProcessor::processBlockBypassed(AudioBuffer<double>& buffer) {
+        auto totalNumInputChannels = m_chain.getTotalNumInputChannels();
+        auto totalNumOutputChannels = m_chain.getTotalNumOutputChannels();
+
+        if (totalNumInputChannels > buffer.getNumChannels()) {
+            logln("buffer has less channels than main input channels");
+            totalNumInputChannels = buffer.getNumChannels();
+        }
+        if (totalNumOutputChannels > buffer.getNumChannels()) {
+            logln("buffer has less channels than main output channels");
+            totalNumOutputChannels = buffer.getNumChannels();
+        }
+
+        for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
+            buffer.clear(i, 0, buffer.getNumSamples());
+        }
+
+        if (m_bypassBufferD.size() < totalNumOutputChannels) {
+            logln("bypass buffer has less channels than needed");
+            for (auto i = 0; i < totalNumOutputChannels; ++i) {
+                buffer.clear(i, 0, buffer.getNumSamples());
+            }
+            return;
+        }
+
+        for (auto c = 0; c < totalNumOutputChannels; ++c) {
+            auto& buf = m_bypassBufferD.getReference(c);
+            for (auto s = 0; s < buffer.getNumSamples(); ++s) {
+                buf.add(buffer.getSample(c, s));
+                buffer.setSample(c, s, buf.getFirst());
+                buf.remove(0);
+            }
+        }
+    }
+
 void AGProcessor::suspendProcessing(const bool shouldBeSuspended) {
     traceScope();
     auto p = getPlugin();
@@ -145,6 +216,43 @@ void AGProcessor::suspendProcessing(const bool shouldBeSuspended) {
         } else {
             p->prepareToPlay(m_chain.getSampleRate(), m_chain.getBlockSize());
             p->suspendProcessing(false);
+        }
+    }
+}
+
+void AGProcessor::updateLatencyBuffers() {
+    traceScope();
+    logln("updating latency buffers for " << m_lastKnownLatency << " samples");
+    auto p = getPlugin();
+    int channels = p->getTotalNumOutputChannels();
+    while (m_bypassBufferF.size() < channels) {
+        Array<float> buf;
+        for (int i = 0; i < m_lastKnownLatency; i++) {
+            buf.add(0);
+        }
+        m_bypassBufferF.add(std::move(buf));
+    }
+    while (m_bypassBufferD.size() < channels) {
+        Array<double> buf;
+        for (int i = 0; i < m_lastKnownLatency; i++) {
+            buf.add(0);
+        }
+        m_bypassBufferD.add(std::move(buf));
+    }
+    for (int c = 0; c < channels; c++) {
+        auto& bufF = m_bypassBufferF.getReference(c);
+        while (bufF.size() > m_lastKnownLatency) {
+            bufF.remove(0);
+        }
+        while (bufF.size() < m_lastKnownLatency) {
+            bufF.add(0);
+        }
+        auto& bufD = m_bypassBufferD.getReference(c);
+        while (bufD.size() > m_lastKnownLatency) {
+            bufD.remove(0);
+        }
+        while (bufD.size() < m_lastKnownLatency) {
+            bufD.add(0);
         }
     }
 }
@@ -340,7 +448,7 @@ void ProcessorChain::updateNoLock() {
     m_extraChannels = 0;
     for (auto& proc : m_processors) {
         auto p = proc->getPlugin();
-        if (nullptr != p && !p->isSuspended()) {
+        if (nullptr != p) {
             latency += p->getLatencySamples();
             if (!p->supportsDoublePrecisionProcessing()) {
                 supportsDouble = false;
