@@ -15,6 +15,8 @@
 
 #include "mDNS.hpp"
 
+#include <JuceHeader.h>
+
 #include <fcntl.h>
 #ifdef JUCE_WINDOWS
 #include <Winsock2.h>

@@ -1,28 +1,26 @@
 @echo archiving files...
-copy /B ..\Server\Builds\VisualStudio2019\x64\Release\App\AudioGridderServer.exe ..\..\Archive\Builds\#STR_VER#\win
-copy /B ..\Server\Builds\VisualStudio2019\x64\Release\App\AudioGridderServer.pdb ..\..\Archive\Builds\#STR_VER#\win
+copy /B ..\build-win-10-x86_64\Server\AudioGridderServer_artefacts\RelWithDebInfo\AudioGridderServer.exe ..\..\Archive\Builds\#STR_VER#\win
+copy /B ..\build-win-10-x86_64\Server\AudioGridderServer_artefacts\RelWithDebInfo\AudioGridderServer.pdb ..\..\Archive\Builds\#STR_VER#\win
 
-copy /B ..\Plugin\Fx\Builds\VisualStudio2019\x64\Release\VST3\AudioGridder.vst3 ..\..\Archive\Builds\#STR_VER#\win
-copy /B ..\Plugin\Fx\Builds\VisualStudio2019\x64\Release\VST3\AudioGridder.pdb ..\..\Archive\Builds\#STR_VER#\win\vst3
-copy /B ..\Plugin\Fx\Builds\VisualStudio2019\x64\Release\VST\AudioGridder.dll ..\..\Archive\Builds\#STR_VER#\win
-copy /B ..\Plugin\Fx\Builds\VisualStudio2019\x64\Release\VST\AudioGridder.pdb ..\..\Archive\Builds\#STR_VER#\win\vst
-copy /B "..\Plugin\Fx\Builds\VisualStudio2019\x64\Release\Shared Code\AudioGridder_SharedCode.pdb" ..\..\Archive\Builds\#STR_VER#\win
+copy /B ..\build-win-10-x86_64\Plugin\AudioGridderFx_artefacts\RelWithDebInfo\VST3\AudioGridder.vst3\Contents\x86_64-win\AudioGridder.vst3 ..\..\Archive\Builds\#STR_VER#\win
+copy /B ..\build-win-10-x86_64\Plugin\AudioGridderFx_artefacts\RelWithDebInfo\VST3\AudioGridder.vst3\Contents\x86_64-win\AudioGridder.pdb ..\..\Archive\Builds\#STR_VER#\win\vst3
+copy /B ..\build-win-10-x86_64\Plugin\AudioGridderFx_artefacts\RelWithDebInfo\VST\AudioGridder.dll ..\..\Archive\Builds\#STR_VER#\win
+copy /B ..\build-win-10-x86_64\Plugin\AudioGridderFx_artefacts\RelWithDebInfo\VST\AudioGridder.pdb ..\..\Archive\Builds\#STR_VER#\win\vst
 
-copy /B ..\Plugin\Inst\Builds\VisualStudio2019\x64\Release\VST3\AudioGridderInst.vst3 ..\..\Archive\Builds\#STR_VER#\win
-copy /B ..\Plugin\Inst\Builds\VisualStudio2019\x64\Release\VST3\AudioGridderInst.pdb ..\..\Archive\Builds\#STR_VER#\win\vst3
-copy /B ..\Plugin\Inst\Builds\VisualStudio2019\x64\Release\VST\AudioGridderInst.dll ..\..\Archive\Builds\#STR_VER#\win
-copy /B ..\Plugin\Inst\Builds\VisualStudio2019\x64\Release\VST\AudioGridderInst.pdb ..\..\Archive\Builds\#STR_VER#\win\vst
-copy /B "..\Plugin\Inst\Builds\VisualStudio2019\x64\Release\Shared Code\AudioGridderInst_SharedCode.pdb" ..\..\Archive\Builds\#STR_VER#\win
+copy /B ..\build-win-10-x86_64\Plugin\AudioGridderInst_artefacts\RelWithDebInfo\VST3\AudioGridderInst.vst3\Contents\x86_64-win\AudioGridderInst.vst3 ..\..\Archive\Builds\#STR_VER#\win
+copy /B ..\build-win-10-x86_64\Plugin\AudioGridderInst_artefacts\RelWithDebInfo\VST3\AudioGridderInst.vst3\Contents\x86_64-win\AudioGridderInst.pdb ..\..\Archive\Builds\#STR_VER#\win\vst3
+copy /B ..\build-win-10-x86_64\Plugin\AudioGridderInst_artefacts\RelWithDebInfo\VST\AudioGridderInst.dll ..\..\Archive\Builds\#STR_VER#\win
+copy /B ..\build-win-10-x86_64\Plugin\AudioGridderInst_artefacts\RelWithDebInfo\VST\AudioGridderInst.pdb ..\..\Archive\Builds\#STR_VER#\win\vst
 
-copy /B ..\Plugin\Midi\Builds\VisualStudio2019\x64\Release\VST3\AudioGridderMidi.vst3 ..\..\Archive\Builds\#STR_VER#\win
-copy /B ..\Plugin\Midi\Builds\VisualStudio2019\x64\Release\VST3\AudioGridderMidi.pdb ..\..\Archive\Builds\#STR_VER#\win\vst3
-copy /B ..\Plugin\Midi\Builds\VisualStudio2019\x64\Release\VST\AudioGridderMidi.dll ..\..\Archive\Builds\#STR_VER#\win
-copy /B ..\Plugin\Midi\Builds\VisualStudio2019\x64\Release\VST\AudioGridderMidi.pdb ..\..\Archive\Builds\#STR_VER#\win\vst
-copy /B "..\Plugin\Midi\Builds\VisualStudio2019\x64\Release\Shared Code\AudioGridderMidi_SharedCode.pdb" ..\..\Archive\Builds\#STR_VER#\win
+copy /B ..\build-win-10-x86_64\Plugin\AudioGridderMidi_artefacts\RelWithDebInfo\VST3\AudioGridderMidi.vst3\Contents\x86_64-win\AudioGridderMidi.vst3 ..\..\Archive\Builds\#STR_VER#\win
+copy /B ..\build-win-10-x86_64\Plugin\AudioGridderMidi_artefacts\RelWithDebInfo\VST3\AudioGridderMidi.vst3\Contents\x86_64-win\AudioGridderMidi.pdb ..\..\Archive\Builds\#STR_VER#\win\vst3
+copy /B ..\build-win-10-x86_64\Plugin\AudioGridderMidi_artefacts\RelWithDebInfo\VST\AudioGridderMidi.dll ..\..\Archive\Builds\#STR_VER#\win
+copy /B ..\build-win-10-x86_64\Plugin\AudioGridderMidi_artefacts\RelWithDebInfo\VST\AudioGridderMidi.pdb ..\..\Archive\Builds\#STR_VER#\win\vst
 
 @echo compressing package...
 cd build
-powershell "Compress-Archive -Path AudioGridderPlugin_#STR_VER#.exe,AudioGridderServer_#STR_VER#.exe -DestinationPath AudioGridder_#STR_VER#-win.zip"
+del AudioGridder_#STR_VER#-Windows.zip
+powershell "Compress-Archive -Path AudioGridderPlugin_#STR_VER#.exe,AudioGridderServer_#STR_VER#.exe -DestinationPath AudioGridder_#STR_VER#-Windows.zip"
 
 @echo cleaning up...
 del AudioGridderPlugin_#STR_VER#.exe AudioGridderServer_#STR_VER#.exe

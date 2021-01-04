@@ -79,7 +79,7 @@
 															<key>GID</key>
 															<integer>0</integer>
 															<key>PATH</key>
-															<string>../Plugin/Fx/Builds/MacOSX/build/Release/AudioGridder.component</string>
+															<string>../build-macos-11.1-arm64/Plugin/AudioGridderFx_artefacts/RelWithDebInfo/AU/AudioGridder.component</string>
 															<key>PATH_TYPE</key>
 															<integer>1</integer>
 															<key>PERMISSIONS</key>
@@ -107,7 +107,7 @@
 															<key>GID</key>
 															<integer>0</integer>
 															<key>PATH</key>
-															<string>../Plugin/Inst/Builds/MacOSX/build/Release/AudioGridderInst.component</string>
+															<string>../build-macos-11.1-arm64/Plugin/AudioGridderInst_artefacts/RelWithDebInfo/AU/AudioGridderInst.component</string>
 															<key>PATH_TYPE</key>
 															<integer>1</integer>
 															<key>PERMISSIONS</key>
@@ -135,7 +135,7 @@
 															<key>GID</key>
 															<integer>0</integer>
 															<key>PATH</key>
-															<string>../Plugin/Midi/Builds/MacOSX/build/Release/AudioGridderMidi.component</string>
+															<string>../build-macos-11.1-arm64/Plugin/AudioGridderMidi_artefacts/RelWithDebInfo/AU/AudioGridderMidi.component</string>
 															<key>PATH_TYPE</key>
 															<integer>1</integer>
 															<key>PERMISSIONS</key>
@@ -570,9 +570,9 @@
 				<key>POSTINSTALL_PATH</key>
 				<dict>
 					<key>PATH</key>
-					<string>/Users/pohlandr/audio/AudioGridder/package/coresPerms.sh</string>
+					<string>coresPerms.sh</string>
 					<key>PATH_TYPE</key>
-					<integer>0</integer>
+					<integer>1</integer>
 				</dict>
 				<key>PREINSTALL_PATH</key>
 				<dict>
@@ -689,7 +689,7 @@
 															<key>GID</key>
 															<integer>0</integer>
 															<key>PATH</key>
-															<string>../Plugin/Fx/Builds/MacOSX/build/Release/AudioGridder.vst3</string>
+															<string>../build-macos-11.1-arm64/Plugin/AudioGridderFx_artefacts/RelWithDebInfo/VST3/AudioGridder.vst3</string>
 															<key>PATH_TYPE</key>
 															<integer>1</integer>
 															<key>PERMISSIONS</key>
@@ -717,7 +717,7 @@
 															<key>GID</key>
 															<integer>0</integer>
 															<key>PATH</key>
-															<string>../Plugin/Inst/Builds/MacOSX/build/Release/AudioGridderInst.vst3</string>
+															<string>../build-macos-11.1-arm64/Plugin/AudioGridderInst_artefacts/RelWithDebInfo/VST3/AudioGridderInst.vst3</string>
 															<key>PATH_TYPE</key>
 															<integer>1</integer>
 															<key>PERMISSIONS</key>
@@ -745,7 +745,7 @@
 															<key>GID</key>
 															<integer>0</integer>
 															<key>PATH</key>
-															<string>../Plugin/Midi/Builds/MacOSX/build/Release/AudioGridderMidi.vst3</string>
+															<string>../build-macos-11.1-arm64/Plugin/AudioGridderMidi_artefacts/RelWithDebInfo/VST3/AudioGridderMidi.vst3</string>
 															<key>PATH_TYPE</key>
 															<integer>1</integer>
 															<key>PERMISSIONS</key>
@@ -1297,7 +1297,7 @@
 															<key>GID</key>
 															<integer>0</integer>
 															<key>PATH</key>
-															<string>../Plugin/Fx/Builds/MacOSX/build/Release/AudioGridder.vst</string>
+															<string>../build-macos-11.1-arm64/Plugin/AudioGridderFx_artefacts/RelWithDebInfo/VST/AudioGridder.vst</string>
 															<key>PATH_TYPE</key>
 															<integer>1</integer>
 															<key>PERMISSIONS</key>
@@ -1325,7 +1325,7 @@
 															<key>GID</key>
 															<integer>0</integer>
 															<key>PATH</key>
-															<string>../Plugin/Inst/Builds/MacOSX/build/Release/AudioGridderInst.vst</string>
+															<string>../build-macos-11.1-arm64/Plugin/AudioGridderInst_artefacts/RelWithDebInfo/VST/AudioGridderInst.vst</string>
 															<key>PATH_TYPE</key>
 															<integer>1</integer>
 															<key>PERMISSIONS</key>
@@ -1353,7 +1353,7 @@
 															<key>GID</key>
 															<integer>0</integer>
 															<key>PATH</key>
-															<string>../Plugin/Midi/Builds/MacOSX/build/Release/AudioGridderMidi.vst</string>
+															<string>../build-macos-11.1-arm64/Plugin/AudioGridderMidi_artefacts/RelWithDebInfo/VST/AudioGridderMidi.vst</string>
 															<key>PATH_TYPE</key>
 															<integer>1</integer>
 															<key>PERMISSIONS</key>

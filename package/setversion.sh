@@ -39,12 +39,11 @@ if [ "$STR_VER" != "$VERSION_NOW" ]; then
 
     if [ ! -x $projucer ]; then
         echo "Projucer not found, please set the PROJUCER env variable to the Projucer binary"
-        exit 1
+    else
+        $projucer --set-version $NUM_VER Server/AudioGridderServer.jucer
+        $projucer --set-version $NUM_VER Plugin/Fx/AudioGridder.jucer
+        $projucer --set-version $NUM_VER Plugin/Inst/AudioGridder.jucer
     fi
-
-    $projucer --set-version $NUM_VER Server/AudioGridderServer.jucer
-    $projucer --set-version $NUM_VER Plugin/Fx/AudioGridder.jucer
-    $projucer --set-version $NUM_VER Plugin/Inst/AudioGridder.jucer
 fi
 
 cat package/Version.hpp.in | sed "s/#STR_VER#/$STR_VER/" | sed "s/#STR_BUILD_DATE#/$DATE/" > Common/Source/Version.hpp
@@ -53,12 +52,14 @@ cat package/AudioGridderServer.iss.in | sed "s/#STR_VER#/$STR_VER/" > package/Au
 cat package/archiveWin.bat.in | sed "s/#STR_VER#/$STR_VER/g" > package/archiveWin.bat
 
 echo $STR_VER > package/VERSION
+echo $NUM_VER > package/VERSION.num
 
 if [ "$STR_VER" != "dev-build" ]; then
     mkdir -p ../Archive/Builds/$STR_VER/win/vst
     mkdir -p ../Archive/Builds/$STR_VER/win/vst3
-    mkdir -p ../Archive/Builds/$STR_VER/osx
-    mkdir -p ../Archive/Builds/$STR_VER/osx10.7
+    mkdir -p ../Archive/Builds/$STR_VER/macos-x86_64
+    mkdir -p ../Archive/Builds/$STR_VER/macos-10.7-x86_64
+    mkdir -p ../Archive/Builds/$STR_VER/macos-arm64
     mkdir -p ../Archive/Builds/$STR_VER/linux
     sudo chmod -R g+rw ../Archive/Builds
 fi

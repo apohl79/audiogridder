@@ -1,185 +1,84 @@
 #!/bin/bash
 
-PROJECT=all
-PRETTIFY=0
+sudo xcode-select -s /Applications/Xcode10.3.app/Contents/Developer
 
-case "$1" in
-    "-help")
-        echo "Usage: $0 [-server|-plugins|-fx|-inst|-midi|-compiledb] [-clean] [-keeptc]"
-        exit
-        ;;
-    "-server")
-        PROJECT=server
-        shift
-        ;;
-    "-plugins")
-        PROJECT=plugins
-        shift
-        ;;
-    "-fx")
-        PROJECT=fx
-        shift
-        ;;
-    "-inst")
-        PROJECT=inst
-        shift
-        ;;
-    "-midi")
-        PROJECT=midi
-        shift
-        ;;
-    "-compiledb")
-        PROJECT=compiledb
-        PRETTIFY=1
-        CLEAN=y
-        shift
-        ;;
-esac
+# macOS 10.8 X86_64
+os=macos
+arch=x86_64
+target=10.8
+rm -rf build-$os-$target-$arch
+cmake -B build-$os-$target-$arch -DCMAKE_BUILD_TYPE=RelWithDebInfo -DFFMPEG_ROOT=$HOME/audio/ag-deps-$os-$arch -DCMAKE_OSX_ARCHITECTURES=$arch -DAG_MACOS_TARGET=$target
+cmake --build build-$os-$target-$arch -j8
 
-if [ "$1" == "-clean" ]; then
-    CLEAN=y
-    shift
-fi
+# macOS 10.7 X86_64
+os=macos
+arch=x86_64
+target=10.7
+rm -rf build-$os-$target-$arch
+cmake -B build-$os-$target-$arch -DCMAKE_BUILD_TYPE=RelWithDebInfo -DFFMPEG_ROOT=$HOME/audio/ag-deps-$os-10.7-$arch -DCMAKE_OSX_ARCHITECTURES=$arch -DAG_MACOS_TARGET=$target
+cmake --build build-$os-$target-$arch -j8
 
-UPDATE_TOOLCHAIN=1
-if [ "$1" == "-keeptc" ]; then
-    UPDATE_TOOLCHAIN=0
-    shift
-fi
+sudo xcode-select -s /Library/Developer/CommandLineTools
+xcode-select -p
 
-TOOLCHAIN=/Applications/Xcode10.3.app/Contents/Developer
-LAST_TC=$(xcode-select -p)
-
-if [ $UPDATE_TOOLCHAIN -gt 0 ]; then
-    echo "setting toolchain to $TOOLCHAIN"
-    sudo xcode-select -s $TOOLCHAIN
-fi
-
-rm -rf xcodebuild.log
-
-if [ -z "$CONFIG" ]; then
-    CONFIG=Debug
-    package/setversion.sh
-fi
-
-COMPDBENABLED=1
-COMPDBFILE=""
-XCPROJECT=""
-COMPDBPARAM="-r json-compilation-database"
-
-function xc() {
-    if [ $PRETTIFY -gt 0 ]; then
-        xcodebuild -project $1 -arch x86_64 -alltargets -configuration $2 $3 | $4
-    else
-        esc=$(printf '\033')
-        xcodebuild -project $1 -arch x86_64 -alltargets -configuration $2 $3 \
-            | egrep --line-buffered -v "^[{}]?$|ARCHS|Prepare|Clean\.Remove|CopyPlistFile|CpResource|Touch|Entitlements|Create |Rez " \
-            | egrep --line-buffered -v "Build|Write|ProcessInfoPlistFile|RegisterWithLaunchServices|ProcessProductPackaging|StripNIB " \
-            | egrep --line-buffered -v "clang -x|clang\+\+ |export |cd |mkdir |builtin-|note|Signing |security\.get-task-allow|touch " \
-            | egrep --line-buffered -v "ResMergerCollector |ResMergerProduct |codesign |Check |SymLink " \
-            | sed -l -E "s,^(CompileC).*\.o (.*) normal.*$,${esc}[32m\1${esc}[0m \2," \
-            | sed -l -E "s,^(Ld|Libtool) (.*) normal.*$,${esc}[32m\1${esc}[0m \2," \
-            | sed -l -E "s,^(CodeSign) (.*)$,${esc}[32m\1${esc}[0m \2,"
-    fi
-}
-
-function build() {
-    PRETTYCMD=""
-    PRETTYCMD_WITH_COMPDB=$PRETTYCMD
-    if [ $PRETTIFY -gt 0 ]; then
-        PRETTYCMD="xcpretty"
-        PRETTYCMD_WITH_COMPDB=$PRETTYCMD
-    fi
-    if [ "$CONFIG" == "Release" ] || [ -n "$CLEAN" ]; then
-        xc $XCPROJECT $CONFIG clean $PRETTYCMD
-    fi
-    if [ $PRETTIFY -gt 0 ] && [ $COMPDBENABLED -gt 0 ]; then
-        PRETTYCMD_WITH_COMPDB="$PRETTYCMD $COMPDBPARAM"
-    fi
-    xc $XCPROJECT $CONFIG build "$PRETTYCMD_WITH_COMPDB"
-    if [ -n "$COMPDBFILE" ] && [ -e build/reports/compilation_db.json ]; then
-        mv build/reports/compilation_db.json $COMPDBFILE
-    fi
-}
-
-if [ "$PROJECT" == "all" ] || [ "$PROJECT" == "server" ] || [ "$PROJECT" == "compiledb" ]; then
-    XCPROJECT=Server/Builds/MacOSX/AudioGridderServer.xcodeproj
-    COMPDBENABLED=1
-    COMPDBFILE=Server/compile_commands.json
-    build
-fi
-if [ "$PROJECT" == "all" ] || [ "$PROJECT" == "server10.7" ]; then
-    XCPROJECT=Server/Builds/MacOSX10.7/AudioGridderServer.xcodeproj
-    COMPDBENABLED=0
-    COMPDBFILE=""
-    build
-fi
-if [ "$PROJECT" == "all" ] || [ "$PROJECT" == "fx" ] || [ "$PROJECT" == "plugins" ] || [ "$PROJECT" == "compiledb" ]; then
-    XCPROJECT=Plugin/Fx/Builds/MacOSX/AudioGridder.xcodeproj
-    COMPDBENABLED=1
-    COMPDBFILE=Plugin/compile_commands.json
-    build
-fi
-if [ "$PROJECT" == "all" ] || [ "$PROJECT" == "inst" ] || [ "$PROJECT" == "plugins" ]; then
-    XCPROJECT=Plugin/Inst/Builds/MacOSX/AudioGridderInst.xcodeproj
-    COMPDBENABLED=0
-    COMPDBFILE=""
-    build
-fi
-if [ "$PROJECT" == "all" ] || [ "$PROJECT" == "midi" ] || [ "$PROJECT" == "plugins" ]; then
-    XCPROJECT=Plugin/Midi/Builds/MacOSX/AudioGridderMidi.xcodeproj
-    COMPDBENABLED=0
-    COMPDBFILE=""
-    build
-fi
-
-if [ $UPDATE_TOOLCHAIN -gt 0 ]; then
-    echo "setting toolchain back to $LAST_TC"
-    sudo xcode-select -s $LAST_TC
-fi
-
-if [ -e Plugin/compile_commands.json ] && [ -e Server/compile_commands.json ]; then
-    echo "merging compile commands"
-    echo "[" > compile_commands.json
-    cat Plugin/compile_commands.json | json_pp | egrep -v '^\[|\]$' >> compile_commands.json
-    echo "," >> compile_commands.json
-    cat Server/compile_commands.json | json_pp | egrep -v '^\[|\]$' >> compile_commands.json
-    echo "]" >> compile_commands.json
-    rm Plugin/compile_commands.json Server/compile_commands.json
-fi
-
-if [ "$CONFIG" == "Debug" ]; then
-    exit
-fi
+# macOS 11.1 ARM64
+os=macos
+arch=arm64
+target=11.1
+rm -rf build-$os-$target-$arch
+cmake -B build-$os-$target-$arch -DCMAKE_BUILD_TYPE=RelWithDebInfo -DFFMPEG_ROOT=$HOME/audio/ag-deps-$os-$arch -DCMAKE_OSX_ARCHITECTURES=$arch -DAG_MACOS_TARGET=$target
+cmake --build build-$os-$target-$arch -j8
 
 VERSION=$(cat package/VERSION)
 
 if [ -n "$(which packagesbuild)" ]; then
     echo
 
-    TARGET=package/build/AudioGridderPlugin_${VERSION}.pkg
-    packagesbuild --package-version "$VERSION" package/AudioGridderPlugin.pkgproj
+    TARGET=package/build/AudioGridderPlugin_${VERSION}_macOS-x86_64.pkg
+    packagesbuild --package-version "$VERSION" package/AudioGridderPlugin-x86_64.pkgproj
     mv package/build/AudioGridderPlugin.pkg $TARGET
     echo "Created $TARGET"
 
-    TARGET=package/build/AudioGridderServer_${VERSION}.pkg
-    packagesbuild --package-version "$VERSION" package/AudioGridderServer.pkgproj
+    TARGET=package/build/AudioGridderServer_${VERSION}_macOS-x86_64.pkg
+    packagesbuild --package-version "$VERSION" package/AudioGridderServer-x86_64.pkgproj
     mv package/build/AudioGridderServer.pkg $TARGET
     echo "Created $TARGET"
 
-    TARGET=package/build/AudioGridderServer10.7_${VERSION}.pkg
-    packagesbuild --package-version "$VERSION" package/AudioGridderServer10.7.pkgproj
+    TARGET=package/build/AudioGridderPlugin_${VERSION}_macOS-10.7-x86_64.pkg
+    packagesbuild --package-version "$VERSION" package/AudioGridderPlugin10.7-x86_64.pkgproj
+    mv package/build/AudioGridderPlugin.pkg $TARGET
+    echo "Created $TARGET"
+
+    TARGET=package/build/AudioGridderServer_${VERSION}_macOS-10.7-x86_64.pkg
+    packagesbuild --package-version "$VERSION" package/AudioGridderServer10.7-x86_64.pkgproj
     mv package/build/AudioGridderServer10.7.pkg $TARGET
+    echo "Created $TARGET"
+
+    TARGET=package/build/AudioGridderPlugin_${VERSION}_macOS-arm64.pkg
+    packagesbuild --package-version "$VERSION" package/AudioGridderPlugin-arm64.pkgproj
+    mv package/build/AudioGridderPlugin.pkg $TARGET
+    echo "Created $TARGET"
+
+    TARGET=package/build/AudioGridderServer_${VERSION}_macOS-arm64.pkg
+    packagesbuild --package-version "$VERSION" package/AudioGridderServer-arm64.pkgproj
+    mv package/build/AudioGridderServer.pkg $TARGET
     echo "Created $TARGET"
 fi
 
-cp -r Server/Builds/MacOSX/build/Release/AudioGridderServer.app ../Archive/Builds/$VERSION/osx/
-cp -r Server/Builds/MacOSX10.7/build/Release/AudioGridderServer.app ../Archive/Builds/$VERSION/osx10.7/
-cp -r Plugin/Fx/Builds/MacOSX/build/Release/AudioGridder.* ../Archive/Builds/$VERSION/osx/
-cp -r Plugin/Inst/Builds/MacOSX/build/Release/AudioGridderInst.* ../Archive/Builds/$VERSION/osx/
-cp -r Plugin/Midi/Builds/MacOSX/build/Release/AudioGridderMidi.* ../Archive/Builds/$VERSION/osx/
+cp -r build-macos-10.8-x86_64/Server/AudioGridderServer_artefacts/RelWithDebInfo/AudioGridderServer.app ../Archive/Builds/$VERSION/macos-x86_64/
+cp -r build-macos-11.1-arm64/Server/AudioGridderServer_artefacts/RelWithDebInfo/AudioGridderServer.app ../Archive/Builds/$VERSION/macos-arm64/
+cp -r build-macos-10.7-x86_64/Server/AudioGridderServer_artefacts/RelWithDebInfo/AudioGridderServer.app ../Archive/Builds/$VERSION/macos-10.7-x86_64/
+cp -r build-macos-10.8-x86_64/Plugin/AudioGridderFx_artefacts/RelWithDebInfo/* ../Archive/Builds/$VERSION/macos-x86_64/
+cp -r build-macos-10.8-x86_64/Plugin/AudioGridderInst_artefacts/RelWithDebInfo/* ../Archive/Builds/$VERSION/macos-x86_64/
+cp -r build-macos-10.8-x86_64/Plugin/AudioGridderMidi_artefacts/RelWithDebInfo/* ../Archive/Builds/$VERSION/macos-x86_64/
+cp -r build-macos-11.1-arm64/Plugin/AudioGridderFx_artefacts/RelWithDebInfo/* ../Archive/Builds/$VERSION/macos-arm64/
+cp -r build-macos-11.1-arm64/Plugin/AudioGridderInst_artefacts/RelWithDebInfo/* ../Archive/Builds/$VERSION/macos-arm64/
+cp -r build-macos-11.1-arm64/Plugin/AudioGridderMidi_artefacts/RelWithDebInfo/* ../Archive/Builds/$VERSION/macos-arm64/
+cp -r build-macos-10.7-x86_64/Plugin/AudioGridderFx_artefacts/RelWithDebInfo/* ../Archive/Builds/$VERSION/macos-10.7-x86_64/
+cp -r build-macos-10.7-x86_64/Plugin/AudioGridderInst_artefacts/RelWithDebInfo/* ../Archive/Builds/$VERSION/macos-10.7-x86_64/
+cp -r build-macos-10.7-x86_64/Plugin/AudioGridderMidi_artefacts/RelWithDebInfo/* ../Archive/Builds/$VERSION/macos-10.7-x86_64/
 
 cd package/build
-zip AudioGridder_$VERSION-osx.zip AudioGridderPlugin_$VERSION.pkg AudioGridderServer10.7_$VERSION.pkg AudioGridderServer_$VERSION.pkg
-rm AudioGridderPlugin_$VERSION.pkg AudioGridderServer10.7_$VERSION.pkg AudioGridderServer_$VERSION.pkg
+zip AudioGridder_$VERSION-MacOS.zip AudioGridderPlugin_$VERSION_*.pkg AudioGridderServer_$VERSION_*.pkg
+rm AudioGridderPlugin_$VERSION_*.pkg AudioGridderServer_$VERSION_*.pkg
 cd -

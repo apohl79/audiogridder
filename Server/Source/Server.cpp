@@ -5,10 +5,6 @@
  * Author: Andreas Pohl
  */
 
-#ifdef JUCE_MAC
-#include <sys/socket.h>
-#endif
-
 #include "Server.hpp"
 #include "Version.hpp"
 #include "App.hpp"
@@ -16,6 +12,11 @@
 #include "ServiceResponder.hpp"
 #include "CPUInfo.hpp"
 #include "WindowPositions.hpp"
+
+
+#ifdef JUCE_MAC
+#include <sys/socket.h>
+#endif
 
 namespace e47 {
 

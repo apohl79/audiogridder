@@ -39,9 +39,6 @@ class StatisticsWindow : public DocumentWindow, public LogTag {
     std::vector<std::unique_ptr<Component>> m_components;
     Label m_totalClients, m_audioRPS, m_audioPTavg, m_audioPTmin, m_audioPTmax, m_audioPT95th, m_audioBytesOut,
         m_audioBytesIn;
-    int m_blockSize;
-    int m_channels;
-    bool m_doublePrecission;
 
     static std::unique_ptr<StatisticsWindow> m_inst;
 

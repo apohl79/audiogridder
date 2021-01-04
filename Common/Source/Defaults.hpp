@@ -56,10 +56,10 @@ static const String WINDOW_POSITIONS_FILE =
 setLogTagStatic("defaults");
 
 inline String getLogDirName() {
-    auto sep = File::getSeparatorString();
 #ifdef JUCE_LINUX
     String path = "~/.audiogridder/log";
 #else
+    auto sep = File::getSeparatorString();
     String path = FileLogger::getSystemLogFileFolder().getFullPathName();
     path << sep << "AudioGridder";
 #endif

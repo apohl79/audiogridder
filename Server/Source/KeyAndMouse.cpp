@@ -5,10 +5,10 @@
  * Author: Andreas Pohl
  */
 
-#if defined(JUCE_MAC)
+#if defined(__APPLE__)
 #include <ApplicationServices/ApplicationServices.h>
 #include <CoreFoundation/CoreFoundation.h>
-#elif JUCE_WINDOWS
+#elif defined (_WIN32) || defined (_WIN64)
 #include <windows.h>
 #endif
 

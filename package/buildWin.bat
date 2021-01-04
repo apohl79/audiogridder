@@ -1,14 +1,9 @@
-call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\Tools\VsDevCmd.bat"
+cd ..
+del /F /Q build-win-10-x86_64
+cmake -B build-win-10-x86_64 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DFFMPEG_ROOT=z:/ag-deps-win-x86_64
+cmake --build build-win-10-x86_64 --config RelWithDebInfo --clean-first -j4
 
-msbuild ..\Server\Builds\VisualStudio2019\AudioGridderServer.sln /nologo /p:Configuration=Release /p:Platform=x64 /t:Clean
-msbuild ..\Server\Builds\VisualStudio2019\AudioGridderServer.sln /nologo /p:Configuration=Release /p:Platform=x64
-msbuild ..\Plugin\Fx\Builds\VisualStudio2019\AudioGridder.sln /nologo /p:Configuration=Release /p:Platform=x64 /t:Clean
-msbuild ..\Plugin\Fx\Builds\VisualStudio2019\AudioGridder.sln /nologo /p:Configuration=Release /p:Platform=x64
-msbuild ..\Plugin\Inst\Builds\VisualStudio2019\AudioGridderInst.sln /nologo /p:Configuration=Release /p:Platform=x64 /t:Clean
-msbuild ..\Plugin\Inst\Builds\VisualStudio2019\AudioGridderInst.sln /nologo /p:Configuration=Release /p:Platform=x64
-msbuild ..\Plugin\Midi\Builds\VisualStudio2019\AudioGridderMidi.sln /nologo /p:Configuration=Release /p:Platform=x64 /t:Clean
-msbuild ..\Plugin\Midi\Builds\VisualStudio2019\AudioGridderMidi.sln /nologo /p:Configuration=Release /p:Platform=x64
-
+cd package
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /Obuild AudioGridderPlugin.iss
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /Obuild AudioGridderServer.iss
 

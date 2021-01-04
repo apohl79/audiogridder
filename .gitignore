@@ -7,6 +7,8 @@ package/build/*
 package/AudioGridder*.iss
 package/VERSION
 package/archiveWin.bat
+build*
+JUCE
 GPATH
 GRTAGS
 GTAGS

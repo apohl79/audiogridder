@@ -38,7 +38,7 @@
 									<key>GID</key>
 									<integer>80</integer>
 									<key>PATH</key>
-									<string>../Server/Builds/MacOSX10.7/build/Release/AudioGridderServer.app</string>
+									<string>../build-macos-10.8-x86_64/Server/AudioGridderServer_artefacts/RelWithDebInfo/AudioGridderServer.app</string>
 									<key>PATH_TYPE</key>
 									<integer>1</integer>
 									<key>PERMISSIONS</key>
@@ -464,9 +464,9 @@
 				<key>POSTINSTALL_PATH</key>
 				<dict>
 					<key>PATH</key>
-					<string>/Users/pohlandr/audio/AudioGridder/package/coresPerms.sh</string>
+					<string>coresPerms.sh</string>
 					<key>PATH_TYPE</key>
-					<integer>0</integer>
+					<integer>1</integer>
 				</dict>
 				<key>PREINSTALL_PATH</key>
 				<dict>
@@ -863,7 +863,7 @@
 				</dict>
 			</array>
 			<key>NAME</key>
-			<string>AudioGridderServer10.7</string>
+			<string>AudioGridderServer</string>
 			<key>PAYLOAD_ONLY</key>
 			<false/>
 			<key>TREAT_MISSING_PRESENTATION_DOCUMENTS_AS_WARNING</key>

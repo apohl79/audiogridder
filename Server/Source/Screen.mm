@@ -5,6 +5,8 @@
  * Author: Andreas Pohl
  */
 
+#ifdef __APPLE__
+
 #import <AVFoundation/AVFoundation.h>
 
 #include "Screen.h"
@@ -83,3 +85,5 @@ bool askForAccessibilityPermission() {
 }
 
 }
+
+#endif

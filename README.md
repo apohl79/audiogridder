@@ -19,6 +19,12 @@ For more information and intstallation instructions, please visit
 <img src="https://raw.githubusercontent.com/apohl79/audiogridder/master/images/overview.jpg" width="600" />
 </p>
 
+# Discussions
+
+Please report bugs, discuss ideas or ask questions in the
+[discussions](https://github.com/apohl79/audiogridder/discussions) area!
+Issues will only be created as a result of a discussion going forward.
+
 # Downloads
 
 Please find the latest binaries to download in the
@@ -61,3 +67,4 @@ provide. [Please follow these steps...](https://audiogridder.com/bug-reports/)
 If you like AudioGridder and want to support its further development, you are welcome to donate. :-)
 
 [![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=MF9TGYY8P8GG4)
+[![donorbox](https://d1iczxrky3cnb2.cloudfront.net/button-small-blue.png)](https://donorbox.org/audiogridder?default_interval=o)
