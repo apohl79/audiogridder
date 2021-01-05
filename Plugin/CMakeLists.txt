@@ -5,8 +5,7 @@ project(AUDIOGRIDDER_PLUGIN VERSION 1.0.0)
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/Source AG_SOURCES_PLUGIN)
 
 macro(ag_add_plugin type)
-  set(vals "")
-  cmake_parse_arguments(AG "" "PLUGIN_CODE IS_SYNTH IS_MIDI_EFFECT VST3_CATEGORY" "" ${ARGN})
+  cmake_parse_arguments(AG "" "PLUGIN_CODE;IS_SYNTH;IS_MIDI_EFFECT;VST3_CATEGORY" "" ${ARGN})
 
   set(pluginname "AGridder")
   set(productname "AudioGridder")
@@ -35,7 +34,7 @@ macro(ag_add_plugin type)
     VST_NUM_MIDI_INS 16
     VST_NUM_MIDI_OUTS 16
     VST2_CATEGORY kPlugCategEffect
-    VST3_CATEGORIES Network,${AG_VST3_CATEGORY}
+    VST3_CATEGORIES Network ${AG_VST3_CATEGORY}
     AU_MAIN_TYPE kAudioUnitType_Effect
     COPY_PLUGIN_AFTER_BUILD FALSE)
 
