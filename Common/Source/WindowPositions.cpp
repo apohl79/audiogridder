@@ -53,6 +53,10 @@ WindowPositions::Position WindowPositions::getPosition(WindowPositions::Position
                 break;
         }
     }
+    if (!ret.isEmpty()) {
+        ret.setHeight(def.getHeight());
+        ret.setWidth(def.getWidth());
+    }
     return ret.isEmpty() ? def : ret;
 }
 
