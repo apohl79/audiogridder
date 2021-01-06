@@ -8,7 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(AG_VST2_SDK_DEFAULT "")
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  option(AG_MACOS_TARGET "macOS target, default is 10.8" 10.8)
+  set(AG_MACOS_TARGET 10.8 CACHE STRING "macOS target, default is 10.8")
   set(AG_VST2_SDK_DEFAULT "$ENV{HOME}/audio/vstsdk2.4")
   set(CMAKE_OSX_DEPLOYMENT_TARGET ${AG_MACOS_TARGET})
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
