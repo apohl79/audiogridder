@@ -81,13 +81,37 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     addChildAndSetID(label.get(), "lbl");
     m_components.push_back(std::move(label));
 
+    int idConfig = m_app->getServer().getId(true);
     String id;
-    id << m_app->getServer().getId(true);
+    id << idConfig;
     m_idText.setText(id);
     m_idText.setBounds(getFieldBounds(row));
     addChildAndSetID(&m_idText, "id");
 
     row++;
+
+    int idReal = m_app->getServer().getId();
+    if (idConfig != idReal) {
+        // server started with -id where the passed id is different from the config
+        label = std::make_unique<Label>();
+        label->setText("Server ID (commandline override):", NotificationType::dontSendNotification);
+        label->setBounds(getLabelBounds(row));
+        label->setAlpha(0.5f);
+        addChildAndSetID(label.get(), "lbl");
+        m_components.push_back(std::move(label));
+
+        String idOverride;
+        idOverride << idReal;
+
+        label = std::make_unique<Label>();
+        label->setText(idOverride, NotificationType::dontSendNotification);
+        label->setBounds(getFieldBounds(row));
+        label->setAlpha(0.5f);
+        addChildAndSetID(label.get(), "lbl");
+        m_components.push_back(std::move(label));
+
+        row++;
+    }
 
 #ifdef JUCE_MAC
     label = std::make_unique<Label>();
