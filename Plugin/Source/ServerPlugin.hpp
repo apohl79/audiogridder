@@ -60,6 +60,11 @@ class ServerPlugin {
     String m_category;
 };
 
+struct MenuLevel {
+    std::unique_ptr<std::map<String, ServerPlugin>> entryMap;
+    std::unique_ptr<std::map<String, MenuLevel>> subMap;
+};
+
 }  // namespace e47
 
 #endif /* ServerPlugin_hpp */

@@ -206,6 +206,8 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     void rescan(bool wipe = false);
     void restart();
 
+    void updatePluginList(bool sendRequest = false);
+
     void updateCPULoad();
     float getCPULoad() const { return m_srvLoad; }
 
@@ -281,7 +283,8 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
         RESTART,
         UPDATECPULOAD1,
         UPDATECPULOAD2,
-        GETLOADEDPLUGINSSTRING
+        GETLOADEDPLUGINSSTRING,
+        UPDATEPLUGINLIST
     };
 
     struct LockByID : public LogTagDelegate {

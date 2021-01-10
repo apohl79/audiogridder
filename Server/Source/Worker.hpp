@@ -52,6 +52,7 @@ class Worker : public Thread, public LogTag {
     void handleMessage(std::shared_ptr<Message<Rescan>> msg);
     void handleMessage(std::shared_ptr<Message<Restart>> msg);
     void handleMessage(std::shared_ptr<Message<CPULoad>> msg);
+    void handleMessage(std::shared_ptr<Message<PluginList>> msg);
 
   private:
     std::unique_ptr<StreamingSocket> m_client;
@@ -60,6 +61,8 @@ class Worker : public Thread, public LogTag {
     bool m_shouldHideEditor = false;
     std::atomic_bool m_shutdown{false};
     MessageFactory m_msgFactory;
+
+    bool m_noPluginListFilter = false;
 
     ENABLE_ASYNC_FUNCTORS();
 };

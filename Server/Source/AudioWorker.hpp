@@ -41,6 +41,9 @@ class AudioWorker : public Thread, public LogTagDelegate {
     void shutdown();
     void clear();
 
+    int getChannelsIn() const { return m_channelsIn; }
+    int getChannelsOut() const { return m_channelsOut; }
+
     bool addPlugin(const String& id, String& err);
     void delPlugin(int idx);
     void exchangePlugins(int idxA, int idxB);

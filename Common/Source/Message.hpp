@@ -90,10 +90,15 @@ struct Handshake {
     int samplesPerBlock;
     bool doublePrecission;
     uint64 clientId;
-    int unused1;
-    int unused2;
-    int unused3;
-    int unused4;
+    uint8 flags;
+    uint8 unused1;
+    uint16 unused2;
+    uint32 unused3;
+    uint32 unused4;
+
+    enum FLAGS : uint8 { NO_PLUGINLIST_FILTER = 1 };
+    void setFlag(uint8 f) { flags |= f; }
+    bool isFlag(uint8 f) { return (flags & f) == f; }
 };
 
 /*

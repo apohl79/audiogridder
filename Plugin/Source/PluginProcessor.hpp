@@ -111,7 +111,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
 
     bool loadPlugin(const String& id, const String& name, String& err);
     void unloadPlugin(int idx);
-    String getLoadedPluginsString();
+    String getLoadedPluginsString() const;
     void editPlugin(int idx);
     void hidePlugin(bool updateServer = true);
     int getActivePlugin() const { return m_activePlugin; }
@@ -141,6 +141,8 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     void setGenericEditor(bool b) { m_genericEditor = b; }
     bool getConfirmDelete() const { return m_confirmDelete; }
     void setConfirmDelete(bool b) { m_confirmDelete = b; }
+    bool getNoSrvPluginListFilter() const { return m_noSrvPluginListFilter; }
+    void setNoSrvPluginListFilter(bool b) { m_noSrvPluginListFilter = b; }
 
     auto& getServers() const { return m_servers; }
     void addServer(const String& s) { m_servers.add(s); }
@@ -202,7 +204,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     std::unique_ptr<Client> m_client;
     std::atomic_bool m_prepared{false};
     std::vector<LoadedPlugin> m_loadedPlugins;
-    std::mutex m_loadedPluginsSyncMtx;
+    mutable std::mutex m_loadedPluginsSyncMtx;
     int m_activePlugin = -1;
     StringArray m_servers;
     String m_activeServerFromCfg;
@@ -222,6 +224,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     bool m_menuShowCompany = true;
     bool m_genericEditor = false;
     bool m_confirmDelete = true;
+    bool m_noSrvPluginListFilter = false;
 
     TrackProperties m_trackProperties;
     std::mutex m_trackPropertiesMtx;

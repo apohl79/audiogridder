@@ -197,6 +197,11 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
     m_genericEditor = jsonGetValue(j, "GenericEditor", m_genericEditor);
     m_confirmDelete = jsonGetValue(j, "ConfirmDelete", m_confirmDelete);
     m_syncRemote = jsonGetValue(j, "SyncRemoteMode", m_syncRemote);
+    auto noSrvPluginListFilter = jsonGetValue(j, "NoSrvPluginListFilter", m_noSrvPluginListFilter);
+    if (noSrvPluginListFilter != m_noSrvPluginListFilter) {
+        m_noSrvPluginListFilter = noSrvPluginListFilter;
+        m_client->reconnect();
+    }
 }
 
 void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
@@ -228,11 +233,19 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
     jcfg["PluginMonChanColor"] = PluginMonitor::getShowChannelColor();
     jcfg["PluginMonChanName"] = PluginMonitor::getShowChannelName();
     jcfg["SyncRemoteMode"] = m_syncRemote;
+    jcfg["NoSrvPluginListFilter"] = m_noSrvPluginListFilter;
 
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), jcfg);
 }
 
-const String AudioGridderAudioProcessor::getName() const { return JucePlugin_Name; }
+const String AudioGridderAudioProcessor::getName() const {
+    auto pluginStr = getLoadedPluginsString();
+    if (pluginStr.isNotEmpty()) {
+        return "AG: " + pluginStr;
+    } else {
+        return JucePlugin_Name;
+    }
+}
 
 bool AudioGridderAudioProcessor::acceptsMidi() const { return true; }
 
@@ -633,7 +646,7 @@ void AudioGridderAudioProcessor::unloadPlugin(int idx) {
     }
 }
 
-String AudioGridderAudioProcessor::getLoadedPluginsString() {
+String AudioGridderAudioProcessor::getLoadedPluginsString() const {
     traceScope();
     String ret;
     bool first = true;

@@ -67,13 +67,6 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     void hilightStButton(TextButton* b);
     bool isHilightedStButton(TextButton* b);
 
-    struct MenuLevel {
-        std::unique_ptr<std::map<String, ServerPlugin>> entryMap;
-        std::unique_ptr<std::map<String, MenuLevel>> subMap;
-    };
-
-    PopupMenu createPluginMenu(MenuLevel& level, std::function<void(const ServerPlugin& plug)> addFn);
-
     void editPlugin(int idx = -1);
 
     ENABLE_ASYNC_FUNCTORS();

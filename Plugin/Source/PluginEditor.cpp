@@ -12,6 +12,7 @@
 #include "NumberConversion.hpp"
 #include "Version.hpp"
 #include "PluginMonitor.hpp"
+#include "PluginSearchWindow.hpp"
 
 namespace e47 {
 
@@ -29,6 +30,7 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
     lf.setColour(TextEditor::backgroundColourId, Colour(Defaults::BUTTON_COLOR));
     lf.setColour(TextButton::buttonColourId, Colour(Defaults::BUTTON_COLOR));
     lf.setColour(ComboBox::backgroundColourId, Colour(Defaults::BUTTON_COLOR));
+    lf.setColour(PopupMenu::highlightedBackgroundColourId, Colour(Defaults::ACTIVE_COLOR).withAlpha(0.05f));
     lf.setColour(Slider::thumbColourId, Colour(Defaults::SLIDERTHUMB_COLOR));
     lf.setColour(Slider::trackColourId, Colour(Defaults::SLIDERTRACK_COLOR));
     lf.setColour(Slider::backgroundColourId, Colour(Defaults::SLIDERBG_COLOR));
@@ -177,22 +179,33 @@ AudioGridderAudioProcessorEditor::~AudioGridderAudioProcessorEditor() {
 
 void AudioGridderAudioProcessorEditor::paint(Graphics& g) {
     traceScope();
-    g.fillAll(getLookAndFeel().findColour(ResizableWindow::backgroundColourId));
+    FillType ft;
+    auto colBG = getLookAndFeel().findColour(ResizableWindow::backgroundColourId);
+    auto tp = m_processor.getTrackProperties();
+    if (!tp.colour.isTransparent()) {
+        auto gradient = ColourGradient::horizontal(colBG.interpolatedWith(tp.colour, 0.05f), 0, colBG, 100);
+        g.setGradientFill(gradient);
+        g.fillAll();
+        g.setColour(tp.colour);
+        g.fillRect(0, 0, 2, getHeight());
+    } else {
+        g.fillAll(colBG);
+    }
 }
 
 void AudioGridderAudioProcessorEditor::resized() {
     traceScope();
-    int buttonWidth = 197;
+    int buttonWidth = 196;
     int buttonHeight = 20;
     int logoHeight = m_logo.getHeight();
     int num = 0;
     int top = 30;
     for (auto& b : m_pluginButtons) {
-        b->setBounds(1, top, buttonWidth, buttonHeight);
+        b->setBounds(2, top, buttonWidth, buttonHeight);
         top += buttonHeight + 2;
         num++;
     }
-    m_newPluginButton.setBounds(1, top, buttonWidth, buttonHeight);
+    m_newPluginButton.setBounds(2, top, buttonWidth, buttonHeight);
     top += buttonHeight + logoHeight + 6;
     int windowHeight = jmax(100, top);
     int leftBarWidth = 200;
@@ -237,7 +250,7 @@ void AudioGridderAudioProcessorEditor::resized() {
     if (getWidth() != windowWidth || getHeight() != windowHeight) {
         setSize(windowWidth, windowHeight);
     }
-    m_logo.setBounds(3, windowHeight - logoHeight - 3, m_logo.getWidth(), m_logo.getHeight());
+    m_logo.setBounds(4, windowHeight - logoHeight - 4, m_logo.getWidth(), m_logo.getHeight());
     m_versionLabel.setBounds(logoHeight + 3, windowHeight - 15, m_versionLabel.getWidth(), m_versionLabel.getHeight());
     m_cpuIcon.setBounds(200 - 45, windowHeight - logoHeight - 3, m_cpuIcon.getWidth(), m_cpuIcon.getHeight());
     m_cpuLabel.setBounds(200 - 45 + logoHeight - 2, windowHeight - 15, m_cpuLabel.getWidth(), m_cpuLabel.getHeight());
@@ -261,47 +274,15 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
                                                  "Failed to add " + plug.getName() + " plugin!\n\nError: " + err, "OK");
             }
         };
-        PopupMenu m;
-        auto recents = m_processor.getClient().getRecents();
-        for (const auto& plug : recents) {
-            m.addItem(plug.getName(), [addFn, plug] { addFn(plug); });
-        }
-        if (recents.size() > 0) {
-            m.addSeparator();
-        }
-        // ceate menu structure: type -> [category] -> [company] -> plugin
-        std::map<String, MenuLevel> menuMap;
-        for (const auto& type : m_processor.getPluginTypes()) {
-            for (const auto& plug : m_processor.getPlugins(type)) {
-                auto& typeEntry = menuMap[type];
-                if (nullptr == typeEntry.subMap) {
-                    typeEntry.subMap = std::make_unique<std::map<String, MenuLevel>>();
-                }
-                auto* level = &typeEntry;
-                if (m_processor.getMenuShowCategory()) {
-                    if (nullptr == level->subMap) {
-                        level->subMap = std::make_unique<std::map<String, MenuLevel>>();
-                    }
-                    auto& entry = (*level->subMap)[plug.getCategory()];
-                    level = &entry;
-                }
-                if (m_processor.getMenuShowCompany()) {
-                    if (nullptr == level->subMap) {
-                        level->subMap = std::make_unique<std::map<String, MenuLevel>>();
-                    }
-                    auto& entry = (*level->subMap)[plug.getCompany()];
-                    level = &entry;
-                }
-                if (nullptr == level->entryMap) {
-                    level->entryMap = std::make_unique<std::map<String, ServerPlugin>>();
-                }
-                (*level->entryMap)[plug.getName()] = plug;
-            }
-        }
-        for (auto& type : menuMap) {
-            m.addSubMenu(type.first, createPluginMenu(type.second, addFn));
-        }
-        m.showAt(button);
+
+        auto bounds = button->getScreenBounds().toFloat();
+        auto w = new PluginSearchWindow(bounds.getX(), bounds.getBottom(), m_processor);
+        w->onClick([this, addFn](ServerPlugin plugin) {
+            traceScope();
+            addFn(plugin);
+        });
+        w->setAlwaysOnTop(true);
+        w->runModalLoop();
     } else {
         int idx = getPluginIndex(button->getName());
         int active = m_processor.getActivePlugin();
@@ -736,6 +717,13 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
             m_processor.setMenuShowCompany(!m_processor.getMenuShowCompany());
             m_processor.saveConfig();
         });
+        subm.addItem("Disable Server Filter", true, m_processor.getNoSrvPluginListFilter(), [this] {
+            traceScope();
+            m_processor.setNoSrvPluginListFilter(!m_processor.getNoSrvPluginListFilter());
+            m_processor.saveConfig();
+            m_processor.getClient().reconnect();
+        });
+
         m.addSubMenu("Plugin Menu", subm);
         subm.clear();
 
@@ -820,24 +808,6 @@ void AudioGridderAudioProcessorEditor::hilightStButton(TextButton* b) {
 bool AudioGridderAudioProcessorEditor::isHilightedStButton(TextButton* b) {
     traceScope();
     return b == m_hilightedStButton;
-}
-
-PopupMenu AudioGridderAudioProcessorEditor::createPluginMenu(MenuLevel& level,
-                                                             std::function<void(const ServerPlugin& plug)> addFn) {
-    traceScope();
-    PopupMenu m;
-    if (nullptr != level.entryMap) {
-        for (auto& pair : *level.entryMap) {
-            auto& plug = pair.second;
-            m.addItem(pair.first, [addFn, plug] { addFn(plug); });
-        }
-    }
-    if (nullptr != level.subMap) {
-        for (auto& pair : *level.subMap) {
-            m.addSubMenu(pair.first, createPluginMenu(pair.second, addFn));
-        }
-    }
-    return m;
 }
 
 void AudioGridderAudioProcessorEditor::editPlugin(int idx) {

@@ -238,8 +238,12 @@ void Client::init() {
             logln("failed to set master socket non-blocking");
         }
 
-        Handshake cfg = {1,      clientPort,        m_channelsIn,       m_channelsOut,
+        Handshake cfg = {2,      clientPort,        m_channelsIn,       m_channelsOut,
                          m_rate, m_samplesPerBlock, m_doublePrecission, getId()};
+        if (m_processor->getNoSrvPluginListFilter()) {
+            cfg.setFlag(Handshake::NO_PLUGINLIST_FILTER);
+        }
+
         if (!e47::send(m_cmd_socket.get(), reinterpret_cast<const char*>(&cfg), sizeof(cfg))) {
             m_cmd_socket->close();
             return;
@@ -270,21 +274,8 @@ void Client::init() {
         }
 
         // receive plugin list
-        m_plugins.clear();
-        Message<PluginList> msg(this);
-        MessageHelper::Error err;
-        if (!msg.read(m_cmd_socket.get(), &err, 5000)) {
-            logln("failed reading plugin list: " << err.toString());
-            return;
-        }
-        String listChunk(PLD(msg).str, as<size_t>(*PLD(msg).size));
-        auto list = StringArray::fromLines(listChunk);
-        for (auto& line : list) {
-            if (!line.isEmpty()) {
-                auto parts = StringArray::fromTokens(line, "|", "");
-                m_plugins.push_back(ServerPlugin::fromString(line));
-            }
-        }
+        updatePluginList();
+
         m_ready = true;
         m_error = false;
         m_needsReconnect = false;
@@ -904,6 +895,29 @@ void Client::restart() {
     Message<Restart> msg(this);
     LockByID lock(*this, RESTART);
     msg.send(m_cmd_socket.get());
+}
+
+void Client::updatePluginList(bool sendRequest) {
+    traceScope();
+    Message<PluginList> msg(this);
+    LockByID lock(*this, UPDATEPLUGINLIST, false);  // NOT enforcing the lock as this is called from init()
+    if (sendRequest) {
+        msg.send(m_cmd_socket.get());
+    }
+    m_plugins.clear();
+    MessageHelper::Error err;
+    if (!msg.read(m_cmd_socket.get(), &err, 5000)) {
+        logln("failed reading plugin list: " << err.toString());
+        return;
+    }
+    String listChunk(PLD(msg).str, as<size_t>(*PLD(msg).size));
+    auto list = StringArray::fromLines(listChunk);
+    for (auto& line : list) {
+        if (!line.isEmpty()) {
+            auto parts = StringArray::fromTokens(line, "|", "");
+            m_plugins.push_back(ServerPlugin::fromString(line));
+        }
+    }
 }
 
 void Client::updateCPULoad() {

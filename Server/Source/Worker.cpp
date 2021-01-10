@@ -53,14 +53,19 @@ void Worker::run() {
     if (len > 0) {
         setLogTagExtra("client:" + String::toHexString(cfg.clientId));
 
-        logln("  version          = " << cfg.version);
-        logln("  clientId         = " << String::toHexString(cfg.clientId));
-        logln("  clientPort       = " << cfg.clientPort);
-        logln("  channelsIn       = " << cfg.channelsIn);
-        logln("  channelsOut      = " << cfg.channelsOut);
-        logln("  rate             = " << cfg.rate);
-        logln("  samplesPerBlock  = " << cfg.samplesPerBlock);
-        logln("  doublePrecission = " << static_cast<int>(cfg.doublePrecission));
+        logln("  version                  = " << cfg.version);
+        logln("  clientId                 = " << String::toHexString(cfg.clientId));
+        logln("  clientPort               = " << cfg.clientPort);
+        logln("  channelsIn               = " << cfg.channelsIn);
+        logln("  channelsOut              = " << cfg.channelsOut);
+        logln("  rate                     = " << cfg.rate);
+        logln("  samplesPerBlock          = " << cfg.samplesPerBlock);
+        logln("  doublePrecission         = " << static_cast<int>(cfg.doublePrecission));
+
+        if (cfg.version >= 2) {
+            logln("  flags.NoPluginListFilter = " << (int)cfg.isFlag(Handshake::NO_PLUGINLIST_FILTER));
+            m_noPluginListFilter = cfg.isFlag(Handshake::NO_PLUGINLIST_FILTER);
+        }
 
         // start audio processing
         sock = std::make_unique<StreamingSocket>();
@@ -88,27 +93,8 @@ void Worker::run() {
         }
 
         // send list of plugins
-        auto& pluginList = getApp()->getPluginList();
-        String list;
-        for (auto& plugin : pluginList.getTypes()) {
-            bool inputMatch = false;
-            // exact match is fine
-            inputMatch = (cfg.channelsIn == plugin.numInputChannels) || inputMatch;
-            // hide plugins with no inputs if we have inputs
-            inputMatch = (cfg.channelsIn > 0 && plugin.numInputChannels > 0) || inputMatch;
-            // for instruments (no inputs) allow any plugin with the isInstrument flag
-            inputMatch = (cfg.channelsIn == 0 && plugin.isInstrument) || inputMatch;
-            if (inputMatch) {
-                list += AGProcessor::createString(plugin) + "\n";
-            }
-        }
-        Message<PluginList> msgPL(this);
-        PLD(msgPL).setString(list);
-        if (!msgPL.send(m_client.get())) {
-            logln("failed to send plugin list");
-            m_client->close();
-            signalThreadShouldExit();
-        }
+        auto msgPL = std::make_shared<Message<PluginList>>(this);
+        handleMessage(msgPL);
 
         // enter message loop
         logln("command processor started");
@@ -180,6 +166,9 @@ void Worker::run() {
                         break;
                     case CPULoad::Type:
                         handleMessage(Message<Any>::convert<CPULoad>(msg));
+                        break;
+                    case PluginList::Type:
+                        handleMessage(Message<Any>::convert<PluginList>(msg));
                         break;
                     default:
                         logln("unknown message type " << msg->getType());
@@ -520,6 +509,31 @@ void Worker::handleMessage(std::shared_ptr<Message<Restart>> /*msg*/) {
 void Worker::handleMessage(std::shared_ptr<Message<CPULoad>> msg) {
     traceScope();
     pPLD(msg).setFloat(CPUInfo::getUsage());
+    msg->send(m_client.get());
+}
+
+void Worker::handleMessage(std::shared_ptr<Message<PluginList>> msg) {
+    traceScope();
+    String filterStr = pPLD(msg).getString();
+    auto& pluginList = getApp()->getPluginList();
+    String list;
+    for (auto& plugin : pluginList.getTypes()) {
+        bool inputMatch = m_noPluginListFilter;
+        // exact match is fine
+        inputMatch = (m_audio->getChannelsIn() == plugin.numInputChannels) || inputMatch;
+        // hide plugins with no inputs if we have inputs
+        inputMatch = (m_audio->getChannelsIn() > 0 && plugin.numInputChannels > 0) || inputMatch;
+        // for instruments (no inputs) allow any plugin with the isInstrument flag
+        inputMatch = (m_audio->getChannelsIn() == 0 && plugin.isInstrument) || inputMatch;
+        // match filter string
+        if (inputMatch && filterStr.isNotEmpty()) {
+            inputMatch = plugin.descriptiveName.containsIgnoreCase(filterStr);
+        }
+        if (inputMatch) {
+            list += AGProcessor::createString(plugin) + "\n";
+        }
+    }
+    pPLD(msg).setString(list);
     msg->send(m_client.get());
 }
 

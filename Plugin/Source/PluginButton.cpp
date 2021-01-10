@@ -16,7 +16,7 @@ PluginButton::PluginButton(const String& id, const String& name, bool extraButto
 void PluginButton::paintButton(Graphics& g, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) {
     auto bgcol = findColour(getToggleState() ? buttonOnColourId : buttonColourId);
     auto baseColour = bgcol.withMultipliedSaturation(hasKeyboardFocus(true) ? 1.3f : 0.9f)
-                          .withMultipliedAlpha(isEnabled() ? 1.0f : 0.5f);
+                          .withMultipliedAlpha(isEnabled() ? 0.5f : 0.7f);
     if (shouldDrawButtonAsDown || shouldDrawButtonAsHighlighted) {
         baseColour = baseColour.contrasting(shouldDrawButtonAsDown ? 0.2f : 0.05f);
     }

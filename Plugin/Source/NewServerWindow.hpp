@@ -5,7 +5,7 @@
  * Author: Andreas Pohl
  */
 
-#pragma once
+#ifndef NewServerWindow_hpp
 
 #include <JuceHeader.h>
 
@@ -36,3 +36,5 @@ class NewServerWindow : public TopLevelWindow, public TextButton::Listener {
 };
 
 }  // namespace e47
+
+#endif  // NewServerWindow_hpp
