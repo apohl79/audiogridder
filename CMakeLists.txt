@@ -48,6 +48,26 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   set(AG_WITH_SERVER off)
 endif()
 
+macro(ag_bundle_sign target_name)
+  add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}
+    COMMAND
+      ${CMAKE_COMMAND} -E echo "Signing bundle $<TARGET_BUNDLE_DIR:${target_name}>"
+    COMMAND
+      /usr/bin/codesign --force --sign AudioGridder --timestamp=none $<TARGET_BUNDLE_DIR:${target_name}>
+  )
+endmacro()
+
+macro(ag_bundle_copy target_name dst_dir)
+  add_custom_target(${target_name}_COPY ALL DEPENDS ${target_name}_SIGN
+    COMMAND
+      ${CMAKE_COMMAND} -E echo "Copying bundle $<TARGET_BUNDLE_DIR:${target_name}> to ${dst_dir}"
+    COMMAND
+      rm -rf ${dst_dir}/`basename $<TARGET_BUNDLE_DIR:${target_name}>`
+    COMMAND
+      cp -a $<TARGET_BUNDLE_DIR:${target_name}> ${dst_dir}
+  )
+endmacro()
+
 if(AG_WITH_PLUGIN)
   message(STATUS "Plugin enabled. Use -DAG_WITH_PLUGIN=OFF to deactivate building the plugins.")
   add_subdirectory(Plugin)

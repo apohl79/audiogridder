@@ -57,14 +57,6 @@ target_link_libraries(AudioGridderServer PRIVATE
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   target_link_libraries(AudioGridderServer PRIVATE
     "-framework AVFoundation -framework CoreMedia -framework VideoToolbox")
-  add_custom_command(TARGET AudioGridderServer POST_BUILD
-    COMMAND
-      ${CMAKE_COMMAND} -E echo "Signing Server..."
-    COMMAND
-      /usr/bin/codesign
-        --force
-        --sign 9C3F3877D2425F0B67062A05E1B39D38BAF68D6E
-        --timestamp=none
-        $<TARGET_BUNDLE_DIR:AudioGridderServer>
-    )
+  ag_bundle_sign(AudioGridderServer)
+  ag_bundle_copy(AudioGridderServer /Applications/Debug)
 endif()

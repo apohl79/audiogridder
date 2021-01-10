@@ -66,66 +66,18 @@ macro(ag_add_plugin type)
     juce::juce_recommended_warning_flags)
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    get_target_property(AG_AU_DEST AudioGridder${type} JUCE_AU_COPY_DIR)
-    get_target_property(AG_VST_DEST AudioGridder${type} JUCE_VST_COPY_DIR)
-    get_target_property(AG_VST3_DEST AudioGridder${type} JUCE_VST3_COPY_DIR)
-    if(CMAKE_BUILD_TYPE MATCHES "Release")
-      set(AG_AU_DEST "${CMAKE_BINARY_DIR}/release")
-      set(AG_VST_DEST "${CMAKE_BINARY_DIR}/release")
-      set(AG_VST3_DEST "${CMAKE_BINARY_DIR}/release")
+    ag_bundle_sign(AudioGridder${type}_AU)
+    ag_bundle_sign(AudioGridder${type}_VST)
+    ag_bundle_sign(AudioGridder${type}_VST3)
+    if(CMAKE_BUILD_TYPE MATCHES "Debug")
+      get_target_property(AG_AU_DEST AudioGridder${type} JUCE_AU_COPY_DIR)
+      get_target_property(AG_VST_DEST AudioGridder${type} JUCE_VST_COPY_DIR)
+      get_target_property(AG_VST3_DEST AudioGridder${type} JUCE_VST3_COPY_DIR)
+      ag_bundle_copy(AudioGridder${type}_AU ${AG_AU_DEST})
+      ag_bundle_copy(AudioGridder${type}_VST ${AG_VST_DEST})
+      ag_bundle_copy(AudioGridder${type}_VST3 ${AG_VST3_DEST})
     endif()
-
-    add_custom_command(TARGET AudioGridder${type}_AU POST_BUILD
-      COMMAND
-        ${CMAKE_COMMAND} -E echo "Signing AU plugin..."
-      COMMAND
-        /usr/bin/codesign
-        --force
-        --sign 9C3F3877D2425F0B67062A05E1B39D38BAF68D6E
-        --timestamp=none
-        $<TARGET_BUNDLE_DIR:AudioGridder${type}_AU>
-      COMMAND
-        ${CMAKE_COMMAND} -E echo "Copying AU plugin..."
-      COMMAND
-        cp -r
-          $<TARGET_BUNDLE_DIR:AudioGridder${type}_AU>
-          ${AG_AU_DEST}
-      )
-
-    add_custom_command(TARGET AudioGridder${type}_VST POST_BUILD
-      COMMAND
-        ${CMAKE_COMMAND} -E echo "Signing VST plugin..."
-      COMMAND
-        /usr/bin/codesign
-        --force
-        --sign 9C3F3877D2425F0B67062A05E1B39D38BAF68D6E
-        --timestamp=none
-        $<TARGET_BUNDLE_DIR:AudioGridder${type}_VST>
-      COMMAND
-        ${CMAKE_COMMAND} -E echo "Copying VST plugin..."
-      COMMAND
-        cp -r
-          $<TARGET_BUNDLE_DIR:AudioGridder${type}_VST>
-          ${AG_VST_DEST}
-      )
-
-    add_custom_command(TARGET AudioGridder${type}_VST3 POST_BUILD
-      COMMAND
-        ${CMAKE_COMMAND} -E echo "Signing VST3 plugin..."
-      COMMAND
-        /usr/bin/codesign
-        --force
-        --sign 9C3F3877D2425F0B67062A05E1B39D38BAF68D6E
-        --timestamp=none
-        $<TARGET_BUNDLE_DIR:AudioGridder${type}_VST3>
-      COMMAND
-        ${CMAKE_COMMAND} -E echo "Copying VST3 plugin..."
-      COMMAND
-        cp -r
-          $<TARGET_BUNDLE_DIR:AudioGridder${type}_VST3>
-          ${AG_VST3_DEST}
-      )
-    endif()
+  endif()
 endmacro()
 
 ag_add_plugin(Fx

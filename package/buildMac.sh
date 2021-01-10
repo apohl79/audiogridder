@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sudo xcode-select -s /Applications/Xcode10.3.app/Contents/Developer
+sudo xcode-select -s /Library/Developer/10/CommandLineTools
 
 # macOS 10.8 X86_64
 os=macos
@@ -8,7 +8,7 @@ arch=x86_64
 target=10.8
 rm -rf build-$os-$target-$arch
 cmake -B build-$os-$target-$arch -DCMAKE_BUILD_TYPE=RelWithDebInfo -DFFMPEG_ROOT=$HOME/audio/ag-deps-$os-$arch -DCMAKE_OSX_ARCHITECTURES=$arch -DAG_MACOS_TARGET=$target
-cmake --build build-$os-$target-$arch -j8
+cmake --build build-$os-$target-$arch -j12
 
 # macOS 10.7 X86_64
 os=macos
@@ -16,7 +16,7 @@ arch=x86_64
 target=10.7
 rm -rf build-$os-$target-$arch
 cmake -B build-$os-$target-$arch -DCMAKE_BUILD_TYPE=RelWithDebInfo -DFFMPEG_ROOT=$HOME/audio/ag-deps-$os-10.7-$arch -DCMAKE_OSX_ARCHITECTURES=$arch -DAG_MACOS_TARGET=$target
-cmake --build build-$os-$target-$arch -j8
+cmake --build build-$os-$target-$arch -j12
 
 sudo xcode-select -s /Library/Developer/CommandLineTools
 xcode-select -p
