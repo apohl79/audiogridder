@@ -11,7 +11,6 @@ namespace e47 {
 
 PluginSearchWindow::PluginSearchWindow(float x, float y, AudioGridderAudioProcessor& p)
     : TopLevelWindow("New Server", true), LogTagDelegate(&p.getClient()), m_processor(p) {
-
     setWantsKeyboardFocus(false);
 
     int totalWidth = 250;
@@ -65,18 +64,17 @@ bool PluginSearchWindow::keyPressed(const KeyPress& kp, Component*) {
     return false;
 }
 
-void PluginSearchWindow::mouseMove(const MouseEvent& e){
+void PluginSearchWindow::mouseMove(const MouseEvent&) {
     if (m_tree.isMouseOver(true)) {
-        auto* item = m_tree.getItemAt(e.getPosition().getY());
+        auto vp = m_tree.getViewport();
+        auto* item = m_tree.getItemAt(vp->getMouseXYRelative().y);
         if (nullptr != item && !item->isSelected()) {
             item->setSelected(true, true);
         }
     }
 }
 
-void PluginSearchWindow::mouseExit(const MouseEvent&) {
-    m_tree.clearSelectedItems();
-}
+void PluginSearchWindow::mouseExit(const MouseEvent&) { m_tree.clearSelectedItems(); }
 
 void PluginSearchWindow::updateHeight() {
     int items = m_tree.getNumRowsInTree();

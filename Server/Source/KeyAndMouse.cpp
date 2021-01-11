@@ -8,7 +8,7 @@
 #if defined(__APPLE__)
 #include <ApplicationServices/ApplicationServices.h>
 #include <CoreFoundation/CoreFoundation.h>
-#elif defined (_WIN32) || defined (_WIN64)
+#elif defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 #endif
 

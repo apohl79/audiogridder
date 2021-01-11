@@ -48,7 +48,8 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
     ClickFuction m_onClick;
 
     void updateTree(const String& filter = "");
-    TreeViewItem* createPluginMenu(const String& name, MenuLevel& level, std::function<void(const ServerPlugin& plug)> addFn);
+    TreeViewItem* createPluginMenu(const String& name, MenuLevel& level,
+                                   std::function<void(const ServerPlugin& plug)> addFn);
 
     void updateHeight();
 
@@ -122,9 +123,7 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
             g.drawLine(Line<float>(p3, p1), thickness);
         }
 
-        void itemClicked(const MouseEvent&) override {
-            setOpen(!isOpen());
-        }
+        void itemClicked(const MouseEvent&) override { setOpen(!isOpen()); }
 
         void itemOpennessChanged(bool) override {
             if (m_onOpenClose) {
