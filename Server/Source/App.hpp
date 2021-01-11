@@ -78,7 +78,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
                     }
                     app->hideSplashWindow();
                 });
-                String info = "Copyright (c) 2020 by Andreas Pohl, https://audiogridder.com (MIT license)";
+                String info = L"© 2020-2021 Andreas Pohl, https://audiogridder.com (MIT license)";
                 app->setSplashInfo(info);
             });
             const char* logoNoMac = Images::logowintray_png;
@@ -108,13 +108,6 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
         }
 
         void mouseUp(const MouseEvent& /* event */) override {
-#ifdef JUCE_MAC
-            auto menu = m_app->getMenuForIndex(0, "Tray");
-            menu.addSeparator();
-            menu.addItem("Restart", [this] { m_app->prepareShutdown(App::EXIT_RESTART); });
-            menu.addItem("Quit", [this] { m_app->prepareShutdown(); });
-            showDropdownMenu(menu);
-#else
             auto menu = m_app->getMenuForIndex(0, "Tray");
             menu.addSeparator();
             menu.addItem("About AudioGridder", [this] {
@@ -124,11 +117,14 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
                     }
                     m_app->hideSplashWindow();
                 });
-                String info = "Copyright (c) 2020 by Andreas Pohl, https://audiogridder.com (MIT license)";
+                String info = L"© 2020-2021 Andreas Pohl, https://audiogridder.com (MIT license)";
                 m_app->setSplashInfo(info);
             });
             menu.addItem("Restart", [this] { m_app->prepareShutdown(App::EXIT_RESTART); });
             menu.addItem("Quit", [this] { m_app->prepareShutdown(); });
+#ifdef JUCE_MAC
+            showDropdownMenu(menu);
+#else
             menu.show();
 #endif
         }

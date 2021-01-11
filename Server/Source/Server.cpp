@@ -13,7 +13,6 @@
 #include "CPUInfo.hpp"
 #include "WindowPositions.hpp"
 
-
 #ifdef JUCE_MAC
 #include <sys/socket.h>
 #endif

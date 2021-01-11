@@ -321,16 +321,16 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
 
     void printBusesLayout(const AudioProcessor::BusesLayout& l) {
         logln("input buses: " << l.inputBuses.size());
-        for (int i=0; i< l.inputBuses.size();i++) {
+        for (int i = 0; i < l.inputBuses.size(); i++) {
             logln("  [" << i << "] " << l.inputBuses[i].size() << " channel(s)");
-            for (auto ct:l.inputBuses[i].getChannelTypes()) {
+            for (auto ct : l.inputBuses[i].getChannelTypes()) {
                 logln("    <- " << AudioChannelSet::getAbbreviatedChannelTypeName(ct));
             }
         }
         logln("output buses: " << l.outputBuses.size());
-        for (int i=0; i< l.outputBuses.size();i++) {
+        for (int i = 0; i < l.outputBuses.size(); i++) {
             logln("  [" << i << "] " << l.outputBuses[i].size() << " channel(s)");
-            for (auto ct:l.outputBuses[i].getChannelTypes()) {
+            for (auto ct : l.outputBuses[i].getChannelTypes()) {
                 logln("    <- " << AudioChannelSet::getAbbreviatedChannelTypeName(ct));
             }
         }

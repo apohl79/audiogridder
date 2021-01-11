@@ -70,8 +70,9 @@ std::shared_ptr<AudioPluginInstance> AGProcessor::loadPlugin(PluginDescription& 
     std::shared_ptr<AudioPluginInstance> inst;
     runOnMsgThreadSync([&] {
         traceScope();
-        inst =
-            std::shared_ptr<AudioPluginInstance>(plugmgr.createPluginInstance(plugdesc, sampleRate, blockSize, err2));
+        inst = std::shared_ptr<AudioPluginInstance>(
+            plugmgr.createPluginInstance(plugdesc, sampleRate, blockSize, err2).release(),
+            [](AudioPluginInstance* p) { MessageManager::callAsync([p] { delete p; }); });
     });
     if (nullptr == inst) {
         err = "failed loading plugin ";
@@ -131,80 +132,78 @@ void AGProcessor::unload() {
             loadedCount--;
         }
     }
-    // execute the deletion of a plugin on the main thread
-    MessageManager::callAsync([p] {});
 }
 
-    void AGProcessor::processBlockBypassed(AudioBuffer<float>& buffer) {
-        auto totalNumInputChannels = m_chain.getTotalNumInputChannels();
-        auto totalNumOutputChannels = m_chain.getTotalNumOutputChannels();
+void AGProcessor::processBlockBypassed(AudioBuffer<float>& buffer) {
+    auto totalNumInputChannels = m_chain.getTotalNumInputChannels();
+    auto totalNumOutputChannels = m_chain.getTotalNumOutputChannels();
 
-        if (totalNumInputChannels > buffer.getNumChannels()) {
-            logln("buffer has less channels than main input channels");
-            totalNumInputChannels = buffer.getNumChannels();
-        }
-        if (totalNumOutputChannels > buffer.getNumChannels()) {
-            logln("buffer has less channels than main output channels");
-            totalNumOutputChannels = buffer.getNumChannels();
-        }
-
-        for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
-            buffer.clear(i, 0, buffer.getNumSamples());
-        }
-
-        if (m_bypassBufferF.size() < totalNumOutputChannels) {
-            logln("bypass buffer has less channels than needed, buffer: " << m_bypassBufferF.size()
-                                                                          << ", needed: " << totalNumOutputChannels);
-            for (auto i = 0; i < totalNumOutputChannels; ++i) {
-                buffer.clear(i, 0, buffer.getNumSamples());
-            }
-            return;
-        }
-
-        for (auto c = 0; c < totalNumOutputChannels; ++c) {
-            auto& buf = m_bypassBufferF.getReference(c);
-            for (auto s = 0; s < buffer.getNumSamples(); ++s) {
-                buf.add(buffer.getSample(c, s));
-                buffer.setSample(c, s, buf.getFirst());
-                buf.remove(0);
-            }
-        }
+    if (totalNumInputChannels > buffer.getNumChannels()) {
+        logln("buffer has less channels than main input channels");
+        totalNumInputChannels = buffer.getNumChannels();
+    }
+    if (totalNumOutputChannels > buffer.getNumChannels()) {
+        logln("buffer has less channels than main output channels");
+        totalNumOutputChannels = buffer.getNumChannels();
     }
 
-    void AGProcessor::processBlockBypassed(AudioBuffer<double>& buffer) {
-        auto totalNumInputChannels = m_chain.getTotalNumInputChannels();
-        auto totalNumOutputChannels = m_chain.getTotalNumOutputChannels();
+    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
+        buffer.clear(i, 0, buffer.getNumSamples());
+    }
 
-        if (totalNumInputChannels > buffer.getNumChannels()) {
-            logln("buffer has less channels than main input channels");
-            totalNumInputChannels = buffer.getNumChannels();
-        }
-        if (totalNumOutputChannels > buffer.getNumChannels()) {
-            logln("buffer has less channels than main output channels");
-            totalNumOutputChannels = buffer.getNumChannels();
-        }
-
-        for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
+    if (m_bypassBufferF.size() < totalNumOutputChannels) {
+        logln("bypass buffer has less channels than needed, buffer: " << m_bypassBufferF.size()
+                                                                      << ", needed: " << totalNumOutputChannels);
+        for (auto i = 0; i < totalNumOutputChannels; ++i) {
             buffer.clear(i, 0, buffer.getNumSamples());
         }
+        return;
+    }
 
-        if (m_bypassBufferD.size() < totalNumOutputChannels) {
-            logln("bypass buffer has less channels than needed");
-            for (auto i = 0; i < totalNumOutputChannels; ++i) {
-                buffer.clear(i, 0, buffer.getNumSamples());
-            }
-            return;
-        }
-
-        for (auto c = 0; c < totalNumOutputChannels; ++c) {
-            auto& buf = m_bypassBufferD.getReference(c);
-            for (auto s = 0; s < buffer.getNumSamples(); ++s) {
-                buf.add(buffer.getSample(c, s));
-                buffer.setSample(c, s, buf.getFirst());
-                buf.remove(0);
-            }
+    for (auto c = 0; c < totalNumOutputChannels; ++c) {
+        auto& buf = m_bypassBufferF.getReference(c);
+        for (auto s = 0; s < buffer.getNumSamples(); ++s) {
+            buf.add(buffer.getSample(c, s));
+            buffer.setSample(c, s, buf.getFirst());
+            buf.remove(0);
         }
     }
+}
+
+void AGProcessor::processBlockBypassed(AudioBuffer<double>& buffer) {
+    auto totalNumInputChannels = m_chain.getTotalNumInputChannels();
+    auto totalNumOutputChannels = m_chain.getTotalNumOutputChannels();
+
+    if (totalNumInputChannels > buffer.getNumChannels()) {
+        logln("buffer has less channels than main input channels");
+        totalNumInputChannels = buffer.getNumChannels();
+    }
+    if (totalNumOutputChannels > buffer.getNumChannels()) {
+        logln("buffer has less channels than main output channels");
+        totalNumOutputChannels = buffer.getNumChannels();
+    }
+
+    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
+        buffer.clear(i, 0, buffer.getNumSamples());
+    }
+
+    if (m_bypassBufferD.size() < totalNumOutputChannels) {
+        logln("bypass buffer has less channels than needed");
+        for (auto i = 0; i < totalNumOutputChannels; ++i) {
+            buffer.clear(i, 0, buffer.getNumSamples());
+        }
+        return;
+    }
+
+    for (auto c = 0; c < totalNumOutputChannels; ++c) {
+        auto& buf = m_bypassBufferD.getReference(c);
+        for (auto s = 0; s < buffer.getNumSamples(); ++s) {
+            buf.add(buffer.getSample(c, s));
+            buffer.setSample(c, s, buf.getFirst());
+            buf.remove(0);
+        }
+    }
+}
 
 void AGProcessor::suspendProcessing(const bool shouldBeSuspended) {
     traceScope();
