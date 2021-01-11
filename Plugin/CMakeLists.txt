@@ -5,7 +5,7 @@ project(AUDIOGRIDDER_PLUGIN VERSION 1.0.0)
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/Source AG_SOURCES_PLUGIN)
 
 macro(ag_add_plugin type)
-  cmake_parse_arguments(AG "" "PLUGIN_CODE;IS_SYNTH;IS_MIDI_EFFECT;VST3_CATEGORY" "" ${ARGN})
+  cmake_parse_arguments(AG "" "PLUGIN_CODE;IS_SYNTH;IS_MIDI_EFFECT;VST3_CATEGORY;VST_CATEGORY;AU_TYPE" "" ${ARGN})
 
   set(pluginname "AGridder")
   set(productname "AudioGridder")
@@ -33,9 +33,9 @@ macro(ag_add_plugin type)
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
     VST_NUM_MIDI_INS 16
     VST_NUM_MIDI_OUTS 16
-    VST2_CATEGORY kPlugCategEffect
+    VST2_CATEGORY ${AG_VST_CATEGORY}
     VST3_CATEGORIES Network ${AG_VST3_CATEGORY}
-    AU_MAIN_TYPE kAudioUnitType_Effect
+    AU_MAIN_TYPE ${AG_AU_TYPE}
     COPY_PLUGIN_AFTER_BUILD FALSE)
 
   juce_generate_juce_header(AudioGridder${type})
@@ -84,16 +84,22 @@ ag_add_plugin(Fx
   PLUGIN_CODE E401
   IS_SYNTH FALSE
   IS_MIDI_EFFECT FALSE
-  VST3_CATEGORY Fx)
+  VST3_CATEGORY Fx
+  VST_CATEGORY kPlugCategEffect
+  AU_TYPE kAudioUnitType_Effect)
 
 ag_add_plugin(Inst
   PLUGIN_CODE E402
   IS_SYNTH TRUE
   IS_MIDI_EFFECT FALSE
-  VST3_CATEGORY Instrument)
+  VST3_CATEGORY Instrument
+  VST_CATEGORY kPlugCategSynth
+  AU_TYPE kAudioUnitType_MusicDevice)
 
 ag_add_plugin(Midi
   PLUGIN_CODE E403
   IS_SYNTH FALSE
   IS_MIDI_EFFECT TRUE
-  VST3_CATEGORY Fx)
+  VST3_CATEGORY Fx
+  VST_CATEGORY kPlugCategEffect
+  AU_TYPE kAudioUnitType_MIDIProcessor)
