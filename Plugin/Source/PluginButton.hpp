@@ -46,6 +46,9 @@ class PluginButton : public TextButton {
     void clicked(const ModifierKeys& modifiers) override;
     void drawText(Graphics& g, int left, int right);
 
+    // Avoid hidden overload warning
+    using Button::clicked;
+
   private:
     Listener* m_listener = nullptr;
     bool m_active = false;

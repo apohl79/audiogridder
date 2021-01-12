@@ -69,7 +69,7 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
         int getItemHeight() const override { return PluginSearchWindow::SEPARATOR_HEIGHT; }
 
         void paintItem(Graphics& g, int w, int) override {
-            Line<float> line(0, 5, w - 12, 5);
+            Line<float> line(0, 5, (float)w - 12, 5);
             float dashs[] = {2.0, 1.5};
             g.setColour(Colours::white.withAlpha(0.1f));
             g.drawDashedLine(line, dashs, 2);

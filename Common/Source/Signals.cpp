@@ -24,25 +24,18 @@ namespace Signals {
 setLogTagStatic("signals");
 
 typedef void (*sigAction)(int);
-sigAction l_orgAbrtAction = nullptr;
-sigAction l_orgSegvAction = nullptr;
-sigAction l_orgFpeAction = nullptr;
 
 void signalHandler(int signum) {
     traceScope();
-    sigAction orgAction = nullptr;
     switch (signum) {
         case SIGABRT:
             traceln("SIGABRT");
-            orgAction = l_orgAbrtAction;
             break;
         case SIGSEGV:
             traceln("SIGSEGV");
-            orgAction = l_orgSegvAction;
             break;
         case SIGFPE:
             traceln("SIGFPE");
-            orgAction = l_orgFpeAction;
             break;
         default:
             traceln("signum=" << signum);
@@ -62,10 +55,10 @@ void signalHandler(int signum) {
 }
 
 void initialize() {
-    l_orgAbrtAction = signal(SIGABRT, signalHandler);
-    l_orgFpeAction = signal(SIGFPE, signalHandler);
+    signal(SIGABRT, signalHandler);
+    signal(SIGFPE, signalHandler);
 #ifdef JUCE_WINDOWS
-    l_orgSegvAction = signal(SIGSEGV, signalHandler);
+    signal(SIGSEGV, signalHandler);
 #else
     signal(SIGPIPE, SIG_IGN);
 #endif

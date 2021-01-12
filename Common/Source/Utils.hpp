@@ -160,6 +160,15 @@ class ServerInfo {
         refresh();
     }
 
+    ServerInfo& operator=(const ServerInfo& other) {
+        m_host = other.m_host;
+        m_name = other.m_name;
+        m_id = other.m_id;
+        m_load = other.m_load;
+        refresh();
+        return *this;
+    }
+
     bool operator==(const ServerInfo& other) const {
         return m_host == other.m_host && m_name == other.m_name && m_id == other.m_id;
     }

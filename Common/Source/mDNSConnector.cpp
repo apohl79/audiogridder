@@ -236,8 +236,15 @@ void mDNSConnector::sendQuery(const String& service) {
             logln("failed to send query: " << strerror(e));
 #else
             char errstr[64];
-            if (0 == strerror_r(e, errstr, sizeof(errstr))) {
-                logln("failed to send query: " << errstr);
+#ifdef JUCE_MAC
+            const char* estrp = errstr;
+            int foundErrStr = strerror_r(e, errstr, sizeof(errstr));
+#elif JUCE_LINUX
+            const char* estrp = strerror_r(e, errstr, sizeof(errstr));
+            bool foundErrStr = nullptr != estrp;
+#endif
+            if (foundErrStr) {
+                logln("failed to send query: " << estrp);
             } else {
                 logln("failed to send query: errno=" << e);
             }
