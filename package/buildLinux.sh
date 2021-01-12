@@ -2,7 +2,7 @@
 
 rm -rf build-linux-x86_64
 cmake -B build-linux-x86_64 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DFFMPEG_ROOT=/mnt/audio/ag-deps-linux-x86_64
-cmake --build build-linux-x86_64 -j3
+cmake --build build-linux-x86_64 -j6
 
 VERSION=$(cat package/VERSION)
 
