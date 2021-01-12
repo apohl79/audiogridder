@@ -79,6 +79,6 @@ cp -r build-macos-10.7-x86_64/Plugin/AudioGridderInst_artefacts/RelWithDebInfo/*
 cp -r build-macos-10.7-x86_64/Plugin/AudioGridderMidi_artefacts/RelWithDebInfo/* ../Archive/Builds/$VERSION/macos-10.7-x86_64/
 
 cd package/build
-zip AudioGridder_$VERSION-MacOS.zip AudioGridderPlugin_$VERSION_*.pkg AudioGridderServer_$VERSION_*.pkg
+zip AudioGridder_$VERSION-MacOS-Installers.zip AudioGridderPlugin_$VERSION_*.pkg AudioGridderServer_$VERSION_*.pkg
 rm AudioGridderPlugin_$VERSION_*.pkg AudioGridderServer_$VERSION_*.pkg
 cd -
