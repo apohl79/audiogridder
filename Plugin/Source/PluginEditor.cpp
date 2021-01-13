@@ -276,13 +276,12 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
         };
 
         auto bounds = button->getScreenBounds().toFloat();
-        auto w = new PluginSearchWindow(bounds.getX(), bounds.getBottom(), m_processor);
-        w->onClick([this, addFn](ServerPlugin plugin) {
+        auto searchWin = new PluginSearchWindow(bounds.getX(), bounds.getBottom(), m_processor);
+        searchWin->onClick([this, addFn](ServerPlugin plugin) {
             traceScope();
             addFn(plugin);
         });
-        w->setAlwaysOnTop(true);
-        w->runModalLoop();
+        searchWin->runModalLoop();
     } else {
         int idx = getPluginIndex(button->getName());
         int active = m_processor.getActivePlugin();

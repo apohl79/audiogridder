@@ -6,12 +6,16 @@
  */
 
 #include "PluginSearchWindow.hpp"
+#include "PluginEditor.hpp"
 
 namespace e47 {
 
 PluginSearchWindow::PluginSearchWindow(float x, float y, AudioGridderAudioProcessor& p)
-    : TopLevelWindow("New Server", true), LogTagDelegate(&p.getClient()), m_processor(p) {
+    : TopLevelWindow("Search", true), LogTagDelegate(&p.getClient()), m_processor(p) {
+    traceScope();
+
     setWantsKeyboardFocus(false);
+    setAlwaysOnTop(true);
 
     int totalWidth = 250;
     int totalHeight = 35;
@@ -20,7 +24,6 @@ PluginSearchWindow::PluginSearchWindow(float x, float y, AudioGridderAudioProces
 
     m_search.setBounds(5, 5, totalWidth - 10, 25);
     m_search.setWantsKeyboardFocus(true);
-    m_search.setExplicitFocusOrder(1);
     m_search.addKeyListener(this);
     m_search.onTextChange = [this] {
         updateTree(m_search.getText());
@@ -28,7 +31,6 @@ PluginSearchWindow::PluginSearchWindow(float x, float y, AudioGridderAudioProces
     };
     addAndMakeVisible(&m_search);
 
-    m_tree.setExplicitFocusOrder(2);
     m_tree.addKeyListener(this);
     m_tree.addMouseListener(this, true);
     m_tree.setIndentSize(10);
@@ -47,24 +49,59 @@ PluginSearchWindow::PluginSearchWindow(float x, float y, AudioGridderAudioProces
 }
 
 PluginSearchWindow::~PluginSearchWindow() {
+    traceScope();
     m_search.removeKeyListener(this);
     m_tree.removeKeyListener(this);
     m_tree.removeMouseListener(this);
+}
+
+void PluginSearchWindow::hide() {
+    traceScope();
+    delete this;
 }
 
 void PluginSearchWindow::paint(Graphics& g) {
     g.fillAll(getLookAndFeel().findColour(ResizableWindow::backgroundColourId));  // clear the background
 }
 
-bool PluginSearchWindow::keyPressed(const KeyPress& kp, Component*) {
+bool PluginSearchWindow::keyPressed(const KeyPress& kp, Component* c) {
+    traceScope();
     if (kp.isKeyCurrentlyDown(KeyPress::escapeKey)) {
-        delete this;
+        hide();
+        return true;
+    } else if (kp.isKeyCurrentlyDown(KeyPress::returnKey)) {
+        int num = m_tree.getNumSelectedItems();
+        if (num > 0) {
+            auto item = dynamic_cast<TreePlugin*>(m_tree.getSelectedItem(0));
+            if (nullptr != item) {
+                item->itemClicked();
+            }
+        }
+        return true;
+    } else if (kp.isKeyCurrentlyDown(KeyPress::tabKey)) {
+        if (m_tree.hasKeyboardFocus(true)) {
+            m_tree.clearSelectedItems();
+            m_search.grabKeyboardFocus();
+        } else {
+            auto* root = m_tree.getRootItem();
+            if (nullptr != root) {
+                for (int i = 0; i < root->getNumSubItems(); i++) {
+                    auto* item = root->getSubItem(i);
+                    if (nullptr != item && item->canBeSelected()) {
+                        item->setSelected(true, true);
+                        break;
+                    }
+                }
+            }
+            m_tree.grabKeyboardFocus();
+        }
         return true;
     }
     return false;
 }
 
 void PluginSearchWindow::mouseMove(const MouseEvent&) {
+    traceScope();
     if (m_tree.isMouseOver(true)) {
         auto vp = m_tree.getViewport();
         auto* item = m_tree.getItemAt(vp->getMouseXYRelative().y);
@@ -74,9 +111,13 @@ void PluginSearchWindow::mouseMove(const MouseEvent&) {
     }
 }
 
-void PluginSearchWindow::mouseExit(const MouseEvent&) { m_tree.clearSelectedItems(); }
+void PluginSearchWindow::mouseExit(const MouseEvent&) {
+    traceScope();
+    m_tree.clearSelectedItems();
+}
 
 void PluginSearchWindow::updateHeight() {
+    traceScope();
     int items = m_tree.getNumRowsInTree();
     if (items > MAX_ITEMS_VISIBLE) {
         items = MAX_ITEMS_VISIBLE;
@@ -92,23 +133,15 @@ void PluginSearchWindow::updateHeight() {
     }
 }
 
-void PluginSearchWindow::activeWindowStatusChanged() {
-    TopLevelWindow::activeWindowStatusChanged();
-    if (!isActiveWindow()) {
-        delete this;
-    }
-}
-
 void PluginSearchWindow::updateTree(const String& filter) {
     traceScope();
-    logln("filter = " << filter);
 
     auto addFn = [this](const ServerPlugin& p) {
         traceScope();
         if (m_onClick) {
             m_onClick(p);
         }
-        delete this;
+        hide();
     };
 
     auto* root = m_tree.getRootItem();

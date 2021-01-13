@@ -26,10 +26,23 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
     using ClickFuction = std::function<void(ServerPlugin s)>;
     void onClick(ClickFuction f) { m_onClick = f; }
 
-    void activeWindowStatusChanged() override;
+    void hide();
 
     // Component
     using Component::keyPressed;
+
+    void inputAttemptWhenModal() override {
+        if (!isMouseOver(true)) {
+            hide();
+        }
+    }
+
+    // TopLevelWindow
+    void activeWindowStatusChanged() override {
+        if (!isActiveWindow()) {
+            hide();
+        }
+    }
 
     // KeyListener
     bool keyPressed(const KeyPress& kp, Component*) override;
@@ -61,11 +74,13 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
       public:
         TreeRoot() { setOpen(true); }
         bool mightContainSubItems() override { return true; }
+        bool canBeSelected() const override { return false; }
     };
 
     class TreeSeparator : public TreeViewItem {
       public:
         bool mightContainSubItems() override { return false; }
+        bool canBeSelected() const override { return false; }
         int getItemHeight() const override { return PluginSearchWindow::SEPARATOR_HEIGHT; }
 
         void paintItem(Graphics& g, int w, int) override {
@@ -152,7 +167,9 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
             g.drawText(m_plugin.getName(), 8, 0, width, height, Justification::bottomLeft);
         }
 
-        void itemClicked(const MouseEvent&) override {
+        void itemClicked(const MouseEvent&) override { itemClicked(); }
+
+        void itemClicked() {
             if (m_onClick) {
                 m_onClick(m_plugin);
             }
