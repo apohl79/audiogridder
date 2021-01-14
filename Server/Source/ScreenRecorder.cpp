@@ -47,8 +47,13 @@ void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode) {
         return;
     }
 
-    m_scale = Desktop::getInstance().getDisplays().getMainDisplay().scale;
-    // m_quality = (int)(BASE_QUALITY / m_scale);
+    auto disp = Desktop::getInstance().getDisplays().getPrimaryDisplay();
+    if (nullptr != disp) {
+        m_scale = disp->scale;
+    }else {
+        m_scale = 1.0;
+    }
+    // m_quality  (int)(BASE_QUALITY / m_scale);
     m_quality = BASE_QUALITY;
 
     avdevice_register_all();
@@ -58,7 +63,7 @@ void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode) {
     m_inputFmtName = "avfoundation";
     m_inputStreamUrl = String(getCaptureDeviceIndex()) + ":none";
 #else
-    if (m_scale != 1) {
+    if (m_scale != 1.0) {
         AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Warning",
                                          "You have set scaling to more than 100%. This is not recommended, as some "
                                          "plugins might not render properly.",

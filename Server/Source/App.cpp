@@ -353,7 +353,10 @@ Point<float> App::localPointToGlobal(Point<float> lp) {
 void App::ProcessorWindow::createEditor() {
     traceScope();
     setTitleBarHeight(30);
-    m_totalRect = Desktop::getInstance().getDisplays().getMainDisplay().totalArea;
+    auto disp = Desktop::getInstance().getDisplays().getPrimaryDisplay();
+    if (nullptr != disp) {
+        m_totalRect = disp->totalArea;
+    }
     m_editor = m_processor->createEditorIfNeeded();
     if (nullptr != m_editor) {
 #ifdef JUCE_WINDOWS
