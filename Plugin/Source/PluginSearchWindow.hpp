@@ -69,6 +69,7 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
     const static int ITEM_HEIGHT = 20;
     const static int SEPARATOR_HEIGHT = 5;
     const static int MAX_ITEMS_VISIBLE = 30;
+    const static int MIN_ITEMS_VISIBLE = 5;
 
     class TreeRoot : public TreeViewItem {
       public:

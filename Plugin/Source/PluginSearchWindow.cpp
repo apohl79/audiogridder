@@ -64,7 +64,7 @@ void PluginSearchWindow::paint(Graphics& g) {
     g.fillAll(getLookAndFeel().findColour(ResizableWindow::backgroundColourId));  // clear the background
 }
 
-bool PluginSearchWindow::keyPressed(const KeyPress& kp, Component* c) {
+bool PluginSearchWindow::keyPressed(const KeyPress& kp, Component*) {
     traceScope();
     if (kp.isKeyCurrentlyDown(KeyPress::escapeKey)) {
         hide();
@@ -123,13 +123,28 @@ void PluginSearchWindow::updateHeight() {
         items = MAX_ITEMS_VISIBLE;
     }
     int totalHeight = 40 + ITEM_HEIGHT * items;
+    int minHeight = 40 + ITEM_HEIGHT * MIN_ITEMS_VISIBLE;
     if (m_search.isEmpty() && !m_recents.empty()) {
         // remove some pixels, as the separator is not using the full height
         totalHeight += SEPARATOR_HEIGHT - ITEM_HEIGHT;
+        minHeight += SEPARATOR_HEIGHT - ITEM_HEIGHT;
+    }
+    int distMoveUp = 0;
+    auto disp = Desktop::getInstance().getDisplays().getPrimaryDisplay();
+    if (nullptr != disp) {
+        auto totalArea = disp->totalArea;
+        int screenBottom = getScreenY() + totalHeight;
+        if (screenBottom > totalArea.getBottom()) {
+            totalHeight -= screenBottom - totalArea.getBottom();
+            if (totalHeight < minHeight) {
+                distMoveUp = minHeight - totalHeight;
+                totalHeight = minHeight;
+            }
+        }
     }
     if (totalHeight != getHeight()) {
         m_tree.setBounds(5, 35, getWidth() - 10, totalHeight - 40);
-        setBounds(getX(), getY(), getWidth(), totalHeight);
+        setBounds(getX(), getY() - distMoveUp, getWidth(), totalHeight);
     }
 }
 
