@@ -566,7 +566,6 @@ void AudioGridderAudioProcessor::sync() {
     traceScope();
     traceln("sync mode is " << m_syncRemote);
     if ((m_syncRemote == SYNC_ALWAYS) || (m_syncRemote == SYNC_WITH_EDITOR && nullptr != getActiveEditor())) {
-        logln("starting sync...");
         for (int i = 0; i < getNumOfLoadedPlugins(); i++) {
             auto& plug = m_loadedPlugins[(size_t)i];
             if (plug.ok && m_client->isReadyLockFree()) {
@@ -576,7 +575,6 @@ void AudioGridderAudioProcessor::sync() {
                 }
             }
         }
-        logln("...done");
     }
 }
 
