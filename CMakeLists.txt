@@ -28,7 +28,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 find_package(FFmpeg REQUIRED)
 find_package(WebP REQUIRED)
-find_package(Boost 1.70.0 REQUIRED)
+find_package(Boost 1.70.0 REQUIRED COMPONENTS program_options)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/Common/Source)
 include_directories(${FFMPEG_INCLUDE_DIRS})
@@ -43,6 +43,11 @@ list(REMOVE_ITEM AG_SOURCES_COMMON "${CMAKE_CURRENT_SOURCE_DIR}/Common/Source/Tr
 
 option(AG_WITH_PLUGIN "Enable Plugin build." on)
 option(AG_WITH_SERVER "Enable Server build." on)
+option(AG_WITH_TRACEREADER "Enable tracereader build." off)
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(AG_WITH_TRACEREADER on)
+endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   set(AG_WITH_SERVER off)
@@ -80,4 +85,12 @@ if(AG_WITH_SERVER)
   add_subdirectory(Server)
 else()
   message(STATUS "Server disabled.")
+endif()
+
+if(AG_WITH_TRACEREADER)
+  message(STATUS "Tracereader enabled.")
+  add_executable(tracereader "${CMAKE_CURRENT_SOURCE_DIR}/Common/Source/TraceReader.cpp")
+  target_compile_features(tracereader PRIVATE cxx_std_14)
+  target_link_libraries(tracereader ${Boost_LIBRARIES})
+  install(TARGETS tracereader DESTINATION $ENV{HOME}/bin)
 endif()
