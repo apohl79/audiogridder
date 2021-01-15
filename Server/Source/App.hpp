@@ -140,6 +140,13 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
         return names;
     }
 
+    void updateDockIcon() {
+#ifdef JUCE_MAC
+        bool show = nullptr != m_srvSettingsWindow || nullptr != m_statsWindow || nullptr != m_pluginListWindow;
+        Process::setDockIconVisible(show);
+#endif
+    }
+
     PopupMenu getMenuForIndex(int topLevelMenuIndex, const String& /* menuName */) override {
         PopupMenu menu;
         if (topLevelMenuIndex == 0) {  // Settings
@@ -147,16 +154,19 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
                 if (nullptr == m_pluginListWindow) {
                     m_pluginListWindow = std::make_unique<PluginListWindow>(
                         this, m_server->getPluginList(), Defaults::getConfigFileName(Defaults::ConfigDeadMan));
+                    updateDockIcon();
                 }
             });
             menu.addItem("Server Settings", [this] {
                 if (nullptr == m_srvSettingsWindow) {
                     m_srvSettingsWindow = std::make_unique<ServerSettingsWindow>(this);
+                    updateDockIcon();
                 }
             });
             menu.addItem("Statistics", [this] {
                 if (nullptr == m_statsWindow) {
                     m_statsWindow = std::make_unique<StatisticsWindow>(this);
+                    updateDockIcon();
                 }
             });
             menu.addSeparator();
@@ -175,16 +185,19 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     void hidePluginList() {
         traceScope();
         m_pluginListWindow.reset();
+        updateDockIcon();
     }
 
     void hideServerSettings() {
         traceScope();
         m_srvSettingsWindow.reset();
+        updateDockIcon();
     }
 
     void hideStatistics() {
         traceScope();
         m_statsWindow.reset();
+        updateDockIcon();
     }
 
     void showSplashWindow(std::function<void(bool)> onClick = nullptr) {
