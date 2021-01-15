@@ -111,6 +111,7 @@ void Server::loadConfig() {
         }
     }
     m_scanForPlugins = jsonGetValue(cfg, "ScanForPlugins", m_scanForPlugins);
+    m_parallelPluginLoad = jsonGetValue(cfg, "ParallelPluginLoad", m_parallelPluginLoad);
     m_useJucePluginIDs = jsonGetValue(cfg, "UseJucePluginIDs", m_useJucePluginIDs);
     logln("identify plugins by JUCE IDs: " << (m_useJucePluginIDs ? "enabled" : "disabled"));
 }
@@ -155,6 +156,7 @@ void Server::saveConfig() {
         j["ExcludePlugins"].push_back(p.toStdString());
     }
     j["ScanForPlugins"] = m_scanForPlugins;
+    j["ParallelPluginLoad"] = m_parallelPluginLoad;
     j["UseJucePluginIDs"] = m_useJucePluginIDs;
 
     File cfg(Defaults::getConfigFileName(Defaults::ConfigServer));

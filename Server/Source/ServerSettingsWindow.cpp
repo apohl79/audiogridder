@@ -309,6 +309,18 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     row++;
 
     label = std::make_unique<Label>();
+    label->setText("Allow Plugins to be loaded in parallel:", NotificationType::dontSendNotification);
+    label->setBounds(getLabelBounds(row));
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
+
+    m_parallelPluginLoad.setBounds(getCheckBoxBounds(row));
+    m_parallelPluginLoad.setToggleState(m_app->getServer().getParallelPluginLoad(), NotificationType::dontSendNotification);
+    addChildAndSetID(&m_parallelPluginLoad, "pload");
+
+    row++;
+
+    label = std::make_unique<Label>();
     label->setText("Logging:", NotificationType::dontSendNotification);
     label->setBounds(getLabelBounds(row));
     addChildAndSetID(label.get(), "lbl");
@@ -348,6 +360,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
         appCpy->getServer().setEnableVST3(m_vst3Support.getToggleState());
         appCpy->getServer().setEnableVST2(m_vst2Support.getToggleState());
         appCpy->getServer().setScanForPlugins(m_scanForPlugins.getToggleState());
+        appCpy->getServer().setParallelPluginLoad(m_parallelPluginLoad.getToggleState());
         switch (m_screenCapturingMode.getSelectedId()) {
             case 1:
                 appCpy->getServer().setScreenCapturingFFmpeg(true);

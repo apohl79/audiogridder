@@ -13,6 +13,7 @@ namespace e47 {
 
 std::atomic_uint32_t AGProcessor::count{0};
 std::atomic_uint32_t AGProcessor::loadedCount{0};
+std::mutex AGProcessor::m_pluginLoaderMtx;
 
 AGProcessor::AGProcessor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize)
     : LogTagDelegate(chain.getLogTagSource()),
@@ -66,7 +67,6 @@ std::shared_ptr<AudioPluginInstance> AGProcessor::loadPlugin(PluginDescription& 
     String err2;
     AudioPluginFormatManager plugmgr;
     plugmgr.addDefaultFormats();
-    // std::lock_guard<std::mutex> lock(m_pluginLoaderMtx);  // don't load plugins in parallel
     std::shared_ptr<AudioPluginInstance> inst;
     runOnMsgThreadSync([&] {
         traceScope();
@@ -105,6 +105,10 @@ bool AGProcessor::load(String& err) {
         p = m_plugin;
     }
     if (nullptr == p) {
+        bool parallelAllowed = getApp()->getServer().getParallelPluginLoad();
+        if (!parallelAllowed) {
+            m_pluginLoaderMtx.lock();
+        }
         p = loadPlugin(m_id, m_sampleRate, m_blockSize, err);
         if (nullptr != p) {
             if (m_chain.initPluginInstance(p, m_extraInChannels, m_extraOutChannels, err)) {
@@ -113,6 +117,9 @@ bool AGProcessor::load(String& err) {
                 m_plugin = p;
                 loadedCount++;
             }
+        }
+        if (!parallelAllowed) {
+            m_pluginLoaderMtx.unlock();
         }
     }
     return loaded;

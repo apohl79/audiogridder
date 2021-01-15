@@ -61,6 +61,8 @@ class Server : public Thread, public LogTag {
     void setScanForPlugins(bool b) { m_scanForPlugins = b; }
     bool getUseJucePluginIDs() const { return m_useJucePluginIDs; }
     void setUseJucePluginIDs(bool b) { m_useJucePluginIDs = b; }
+    bool getParallelPluginLoad() const { return m_parallelPluginLoad; }
+    void setParallelPluginLoad(bool b) { m_parallelPluginLoad = b; }
     void run();
     const KnownPluginList& getPluginList() const { return m_pluginlist; }
     KnownPluginList& getPluginList() { return m_pluginlist; }
@@ -97,6 +99,7 @@ class Server : public Thread, public LogTag {
     bool m_vstNoStandardFolders;
     bool m_scanForPlugins = true;
     bool m_useJucePluginIDs = false;
+    bool m_parallelPluginLoad = false;
 
     void scanNextPlugin(const String& id, const String& fmt);
     void scanForPlugins();
