@@ -35,10 +35,6 @@ bool send(StreamingSocket* socket, const char* data, int size, MessageHelper::Er
                     MessageHelper::seterr(e, MessageHelper::E_SYSCALL);
                     traceln("write failed: E_SYSCALL");
                     return false;
-                } else {
-                    if (size > 800000) {
-                        logln("sent " << len << " bytes");
-                    }
                 }
                 offset += len;
                 toWrite -= len;

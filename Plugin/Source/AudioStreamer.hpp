@@ -54,8 +54,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
     bool isOk() {
         traceScope();
         if (!m_error) {
-            std::lock_guard<std::mutex> lock(m_sockMtx);
-            return nullptr != m_socket && m_socket->isConnected();
+            return m_socket->isConnected();
         }
         return false;
     }
@@ -341,27 +340,18 @@ class AudioStreamer : public Thread, public LogTagDelegate {
     bool sendReal(AudioMidiBuffer& buffer) {
         traceScope();
         AudioMessage msg(m_client);
-        if (nullptr != m_socket) {
-            std::lock_guard<std::mutex> lock(m_sockMtx);
-            return msg.sendToServer(m_socket.get(), buffer.audio, buffer.midi, buffer.posInfo, buffer.channelsRequested,
-                                    buffer.samplesRequested, nullptr, *m_bytesOutMeter);
-        } else {
-            return false;
-        }
+        return msg.sendToServer(m_socket.get(), buffer.audio, buffer.midi, buffer.posInfo, buffer.channelsRequested,
+                                buffer.samplesRequested, nullptr, *m_bytesOutMeter);
     }
 
     bool readReal(AudioMidiBuffer& buffer, MessageHelper::Error* e) {
         traceScope();
         AudioMessage msg(m_client);
-        bool success = false;
-        if (nullptr != m_socket) {
-            if (buffer.audio.getNumChannels() < buffer.channelsRequested ||
-                buffer.audio.getNumSamples() < buffer.samplesRequested) {
-                buffer.audio.setSize(buffer.channelsRequested, buffer.samplesRequested);
-            }
-            std::lock_guard<std::mutex> lock(m_sockMtx);
-            success = msg.readFromServer(m_socket.get(), buffer.audio, buffer.midi, e, *m_bytesInMeter);
+        if (buffer.audio.getNumChannels() < buffer.channelsRequested ||
+            buffer.audio.getNumSamples() < buffer.samplesRequested) {
+            buffer.audio.setSize(buffer.channelsRequested, buffer.samplesRequested);
         }
+        bool success = msg.readFromServer(m_socket.get(), buffer.audio, buffer.midi, e, *m_bytesInMeter);
         if (success) {
             m_client->setLatency(msg.getLatencySamples());
         }
