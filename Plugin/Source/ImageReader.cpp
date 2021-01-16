@@ -94,6 +94,9 @@ std::shared_ptr<Image> ImageReader::read(const char* data, size_t size, int widt
 
 bool ImageReader::initCodec() {
     traceScope();
+
+    av_log_set_level(AV_LOG_QUIET);
+
     m_inputCodec = avcodec_find_decoder_by_name("webp");
     if (nullptr == m_inputCodec) {
         logln("unable to find webp codec");

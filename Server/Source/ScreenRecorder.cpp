@@ -27,6 +27,8 @@ void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode) {
     setLogTagStatic("screenrec");
     traceScope();
 
+    av_log_set_level(AV_LOG_QUIET);
+
     m_encMode = encMode;
     const char* encName = "unset";
     switch (m_encMode) {
