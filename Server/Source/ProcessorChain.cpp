@@ -172,6 +172,14 @@ void AGProcessor::unload() {
             loadedCount--;
         }
     }
+    bool parallelAllowed = getApp()->getServer().getParallelPluginLoad();
+    if (!parallelAllowed) {
+        m_pluginLoaderMtx.lock();
+    }
+    p.reset();
+    if (!parallelAllowed) {
+        m_pluginLoaderMtx.unlock();
+    }
 }
 
 void AGProcessor::processBlockBypassed(AudioBuffer<float>& buffer) {
