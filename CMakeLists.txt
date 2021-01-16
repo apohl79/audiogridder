@@ -73,6 +73,15 @@ macro(ag_bundle_copy target_name dst_dir)
   )
 endmacro()
 
+macro(ag_file_copy target_name dst_dir)
+  add_custom_target(${target_name}_COPY ALL DEPENDS ${target_name}
+    COMMAND
+      ${CMAKE_COMMAND} -E echo "Copying file $<TARGET_FILE:${target_name}> to ${dst_dir}"
+    COMMAND
+      ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${target_name}> ${dst_dir}
+  )
+endmacro()
+
 if(AG_WITH_PLUGIN)
   message(STATUS "Plugin enabled. Use -DAG_WITH_PLUGIN=OFF to deactivate building the plugins.")
   add_subdirectory(Plugin)
@@ -92,5 +101,5 @@ if(AG_WITH_TRACEREADER)
   add_executable(tracereader "${CMAKE_CURRENT_SOURCE_DIR}/Common/Source/TraceReader.cpp")
   target_compile_features(tracereader PRIVATE cxx_std_14)
   target_link_libraries(tracereader ${Boost_LIBRARIES})
-  install(TARGETS tracereader DESTINATION $ENV{HOME}/bin)
+  ag_file_copy(tracereader $ENV{HOME}/bin)
 endif()
