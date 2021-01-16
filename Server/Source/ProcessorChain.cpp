@@ -29,29 +29,62 @@ AGProcessor::~AGProcessor() {
     count--;
 }
 
-String AGProcessor::createPluginID(const PluginDescription& d, bool useJuce) {
-    if (useJuce) {
-        return d.createIdentifierString();
-    } else {
-        return d.pluginFormatName + "-" + d.name + "-" + String::toHexString(d.uid);
-    }
+String AGProcessor::createPluginID(const PluginDescription& d) {
+    return d.pluginFormatName + "-" + d.name + "-" + String::toHexString(d.uid);
 }
 
-String AGProcessor::createPluginID(const PluginDescription& d) {
-    return createPluginID(d, getApp()->getServer().getUseJucePluginIDs());
+String AGProcessor::convertJUCEtoAGPluginID(const String& id) {
+    // JUCE uses the fromat: <AU|VST|VST3>-<Name>-<File Name Hash>-<Plugin ID>
+    int pos;
+    String format, name, fileHash, pluginId;
+
+    if ((pos = id.indexOfChar(0, '-')) > -1) {
+        format = id.substring(0, pos);
+        if (format != "AudioUnit" && format != "VST" && format != "VST3") {
+            return {};
+        }
+        name = id.substring(pos + 1);
+    } else {
+        return {};
+    }
+    if ((pos = name.lastIndexOfChar('-')) > -1) {
+        pluginId = name.substring(pos + 1);
+        name = name.substring(0, pos);
+    } else {
+        return {};
+    }
+    if ((pos = name.lastIndexOfChar('-')) > -1) {
+        fileHash = name.substring(pos + 1).toLowerCase();
+        name = name.substring(0, pos);
+    } else {
+        return {};
+    }
+
+    for (auto c : fileHash) {
+        // only hex chars allowed
+        if (c < '0' || (c > '9' && c < 'a') || c > 'f') {
+            return {};
+        }
+    }
+
+    auto convertedId = format + "-" + name + "-" + pluginId;
+
+    setLogTagStatic("agprocessor");
+    logln("sucessfully converted JUCE ID " << id << " to AG ID " << convertedId);
+
+    return convertedId;
 }
 
 std::unique_ptr<PluginDescription> AGProcessor::findPluginDescritpion(const String& id) {
     auto& pluglist = getApp()->getPluginList();
     std::unique_ptr<PluginDescription> plugdesc;
+    // the passed ID could be a JUCE ID, lets try to convert it to an AG ID
+    auto convertedId = convertJUCEtoAGPluginID(id);
     for (auto& desc : pluglist.getTypes()) {
-        if (createPluginID(desc, false) == id) {
+        auto descId = createPluginID(desc);
+        if (descId == id || descId == convertedId) {
             plugdesc = std::make_unique<PluginDescription>(desc);
         }
-    }
-    // fallback with juce ID
-    if (nullptr == plugdesc) {
-        plugdesc = pluglist.getTypeForIdentifierString(id);
     }
     // fallback with filename
     if (nullptr == plugdesc) {

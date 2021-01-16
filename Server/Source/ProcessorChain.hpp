@@ -24,8 +24,8 @@ class AGProcessor : public LogTagDelegate {
     AGProcessor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize);
     ~AGProcessor();
 
-    static String createPluginID(const PluginDescription& d, bool useJuce);
     static String createPluginID(const PluginDescription& d);
+    static String convertJUCEtoAGPluginID(const String& id);
 
     inline static String createString(const PluginDescription& d) {
         return d.name + ";" + d.manufacturerName + ";" + createPluginID(d) + ";" + d.pluginFormatName + ";" +

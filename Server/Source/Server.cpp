@@ -112,8 +112,6 @@ void Server::loadConfig() {
     }
     m_scanForPlugins = jsonGetValue(cfg, "ScanForPlugins", m_scanForPlugins);
     m_parallelPluginLoad = jsonGetValue(cfg, "ParallelPluginLoad", m_parallelPluginLoad);
-    m_useJucePluginIDs = jsonGetValue(cfg, "UseJucePluginIDs", m_useJucePluginIDs);
-    logln("identify plugins by JUCE IDs: " << (m_useJucePluginIDs ? "enabled" : "disabled"));
 }
 
 void Server::saveConfig() {
@@ -157,7 +155,6 @@ void Server::saveConfig() {
     }
     j["ScanForPlugins"] = m_scanForPlugins;
     j["ParallelPluginLoad"] = m_parallelPluginLoad;
-    j["UseJucePluginIDs"] = m_useJucePluginIDs;
 
     File cfg(Defaults::getConfigFileName(Defaults::ConfigServer));
     if (cfg.exists()) {
@@ -179,24 +176,43 @@ int Server::getId(bool ignoreOpts) const {
 void Server::loadKnownPluginList() {
     traceScope();
     loadKnownPluginList(m_pluginlist);
-    if (!m_pluginexclude.empty()) {
-        for (auto& desc : m_pluginlist.getTypes()) {
-            std::unique_ptr<AudioPluginFormat> fmt;
-            if (desc.pluginFormatName == "AudioUnit") {
+    std::map<String, PluginDescription> dedupMap;
+    for (auto& desc : m_pluginlist.getTypes()) {
+        std::unique_ptr<AudioPluginFormat> fmt;
+        if (desc.pluginFormatName == "AudioUnit") {
 #ifdef JUCE_MAC
-                fmt = std::make_unique<AudioUnitPluginFormat>();
+            fmt = std::make_unique<AudioUnitPluginFormat>();
 #endif
-            } else if (desc.pluginFormatName == "VST") {
-                fmt = std::make_unique<VSTPluginFormat>();
-            } else if (desc.pluginFormatName == "VST3") {
-                fmt = std::make_unique<VST3PluginFormat>();
+        } else if (desc.pluginFormatName == "VST") {
+            fmt = std::make_unique<VSTPluginFormat>();
+        } else if (desc.pluginFormatName == "VST3") {
+            fmt = std::make_unique<VST3PluginFormat>();
+        }
+        if (nullptr != fmt) {
+            auto name = fmt->getNameOfPluginFromIdentifier(desc.fileOrIdentifier);
+            if (shouldExclude(name)) {
+                m_pluginlist.removeType(desc);
             }
-            if (nullptr != fmt) {
-                auto name = fmt->getNameOfPluginFromIdentifier(desc.fileOrIdentifier);
-                if (shouldExclude(name)) {
-                    m_pluginlist.removeType(desc);
-                }
+        }
+        String id = AGProcessor::createPluginID(desc);
+        bool updateDedupMap = true;
+        auto it = dedupMap.find(id);
+        if (it != dedupMap.end()) {
+            auto& descExists = it->second;
+            if (desc.version.compare(descExists.version) < 0) {
+                // existing one is newer, remove current
+                updateDedupMap = false;
+                m_pluginlist.removeType(desc);
+                logln("  info: ignoring " << desc.descriptiveName << " (" << desc.version << ") due to newer version");
+            } else {
+                // existing one is older, keep current
+                m_pluginlist.removeType(descExists);
+                logln("  info: ignoring " << descExists.descriptiveName << " (" << descExists.version
+                                          << ") due to newer version");
             }
+        }
+        if (updateDedupMap) {
+            dedupMap[id] = desc;
         }
     }
     File deadmanfile(Defaults::getConfigFileName(Defaults::ConfigDeadMan));
@@ -360,8 +376,7 @@ bool Server::scanPlugin(const String& id, const String& format) {
         logln("adding plugin description:");
         logln("  name            = " << t.name << " (" << t.descriptiveName << ")");
         logln("  uid             = " << t.uid);
-        logln("  id string       = " << AGProcessor::createPluginID(t, false));
-        logln("  juce id string  = " << AGProcessor::createPluginID(t, true));
+        logln("  id string       = " << AGProcessor::createPluginID(t));
         logln("  manufacturer    = " << t.manufacturerName);
         logln("  category        = " << t.category);
         logln("  shell           = " << (int)t.hasSharedContainer);
@@ -509,29 +524,17 @@ void Server::run() {
     }
 
     logln("available plugins:");
-    std::set<String> knownIDs;
-    bool fallbackToJuceIDs = false;
     for (auto& desc : m_pluginlist.getTypes()) {
-        auto id = AGProcessor::createPluginID(desc);
-        bool exists = knownIDs.find(id) != knownIDs.end();
-        if (exists) {
-            logln("plugin ID collision! falling back to JUCE plugin IDs.");
-            fallbackToJuceIDs = true;
-        } else {
-            knownIDs.insert(id);
-        }
         logln("  " << desc.name << " [" << AGProcessor::createPluginID(desc) << "]"
-                   << " format=" << desc.pluginFormatName << " ins=" << desc.numInputChannels
-                   << " outs=" << desc.numOutputChannels << " instrument=" << (int)desc.isInstrument
-                   << (exists ? " !ID collision" : ""));
-    }
-    if (fallbackToJuceIDs) {
-        m_useJucePluginIDs = true;
+                   << " version=" << desc.version << " format=" << desc.pluginFormatName
+                   << " ins=" << desc.numInputChannels << " outs=" << desc.numOutputChannels
+                   << " instrument=" << (int)desc.isInstrument);
     }
 
 #ifdef JUCE_MAC
-    // Waves is spawning a WavesLocalServer on OSX that inherits the AG master socket and binds to the AG port. Trying
-    // to automatically kill any process, that binds to the AG server port before creating the master socket.
+    // Waves is spawning a WavesLocalServer on macOS, that inherits the AG master socket and thus blocks the AG
+    // server port. Trying to automatically kill any process, that binds to the AG server port before creating the
+    // master socket.
     int port = m_port + getId();
     ChildProcess proc;
     StringArray args;

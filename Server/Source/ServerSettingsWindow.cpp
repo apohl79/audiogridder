@@ -315,7 +315,8 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_components.push_back(std::move(label));
 
     m_parallelPluginLoad.setBounds(getCheckBoxBounds(row));
-    m_parallelPluginLoad.setToggleState(m_app->getServer().getParallelPluginLoad(), NotificationType::dontSendNotification);
+    m_parallelPluginLoad.setToggleState(m_app->getServer().getParallelPluginLoad(),
+                                        NotificationType::dontSendNotification);
     addChildAndSetID(&m_parallelPluginLoad, "pload");
 
     row++;
