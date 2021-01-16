@@ -56,7 +56,10 @@ int getCaptureDeviceIndex() {
     int ret = -1;
     logln("iterating over available capture devices...");
     if (numScreens > 0) {
-        CGDirectDisplayID screens[numScreens];
+        CGDirectDisplayID screens[32];
+        if (numScreens > 32) {
+            numScreens = 32;
+        }
         CGGetActiveDisplayList(numScreens, screens, &numScreens);
         for (uint32_t i = 0; i < numScreens; i++) {
             auto idx = numVideoDevices + i;

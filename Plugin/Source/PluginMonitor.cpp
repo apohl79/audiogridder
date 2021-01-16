@@ -187,7 +187,12 @@ void PluginMonitorWindow::updatePosition() {
         width -= m_channelNameWidth;
     }
 
-    auto desktopRect = Desktop::getInstance().getDisplays().getMainDisplay().totalArea;
+    auto disp = Desktop::getInstance().getDisplays().getPrimaryDisplay();
+    if (nullptr == disp) {
+        logln("error: no primary display");
+        return;
+    }
+    auto desktopRect = disp->totalArea;
     int x = desktopRect.getWidth() - width - 20;
     int y = 50;
     WindowPositions::PositionType pt = WindowPositions::PluginMonFx;
