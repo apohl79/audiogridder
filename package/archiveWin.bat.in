@@ -19,7 +19,7 @@ copy /B ..\build-win-10-x86_64\Plugin\AudioGridderMidi_artefacts\RelWithDebInfo\
 
 @echo compressing package...
 cd build
-del AudioGridder_#STR_VER#-Windows.zip
+del AudioGridder_#STR_VER#-Windows-Installers.zip
 powershell "Compress-Archive -Path AudioGridderPlugin_#STR_VER#.exe,AudioGridderServer_#STR_VER#.exe -DestinationPath AudioGridder_#STR_VER#-Windows-Installers.zip"
 
 @echo cleaning up...
