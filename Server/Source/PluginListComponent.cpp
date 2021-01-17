@@ -152,15 +152,8 @@ class AudioGridderPluginListComponent::TableModel : public TableListBoxModel {
 
 AudioGridderPluginListComponent::AudioGridderPluginListComponent(AudioPluginFormatManager& manager,
                                                                  KnownPluginList& listToEdit, std::set<String>& exList,
-                                                                 const File& deadMansPedal, PropertiesFile* const props,
-                                                                 bool allowPluginsWhichRequireAsynchronousInstantiation)
-    : formatManager(manager),
-      list(listToEdit),
-      excludeList(exList),
-      deadMansPedalFile(deadMansPedal),
-      propertiesToUse(props),
-      allowAsync(allowPluginsWhichRequireAsynchronousInstantiation),
-      numThreads(allowAsync ? 1 : 0) {
+                                                                 const File& deadMansPedal)
+    : formatManager(manager), list(listToEdit), excludeList(exList), deadMansPedalFile(deadMansPedal) {
     tableModel.reset(new TableModel(*this, listToEdit, exList));
 
     TableHeaderComponent& header = table.getHeader();

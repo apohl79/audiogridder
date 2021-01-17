@@ -18,9 +18,7 @@ namespace e47 {
 class AudioGridderPluginListComponent : public Component, public FileDragAndDropTarget, private ChangeListener {
   public:
     AudioGridderPluginListComponent(AudioPluginFormatManager& formatManager, KnownPluginList& listToRepresent,
-                                    std::set<String>& exList, const File& deadMansPedalFile,
-                                    PropertiesFile* propertiesToUse,
-                                    bool allowPluginsWhichRequireAsynchronousInstantiation = false);
+                                    std::set<String>& exList, const File& deadMansPedalFile);
 
     ~AudioGridderPluginListComponent() override;
 
@@ -38,10 +36,7 @@ class AudioGridderPluginListComponent : public Component, public FileDragAndDrop
     std::set<String>& excludeList;
     File deadMansPedalFile;
     TableListBox table;
-    PropertiesFile* propertiesToUse;
     String dialogTitle, dialogText;
-    bool allowAsync;
-    int numThreads;
 
     class TableModel;
     std::unique_ptr<TableListBoxModel> tableModel;

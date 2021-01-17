@@ -22,7 +22,7 @@ PluginListWindow::PluginListWindow(App* app, KnownPluginList& list, const String
     setUsingNativeTitleBar(true);
     m_plugmgr.addDefaultFormats();
     setContentOwned(new AudioGridderPluginListComponent(m_plugmgr, m_pluginlist, m_app->getServer().getExcludeList(),
-                                                        m_deadMansPedalFile, nullptr, false),
+                                                        m_deadMansPedalFile),
                     true);
 
     setResizable(true, false);
