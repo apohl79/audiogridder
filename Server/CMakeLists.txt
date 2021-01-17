@@ -60,5 +60,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   target_link_libraries(AudioGridderServer PRIVATE
     "-framework AVFoundation -framework CoreMedia -framework VideoToolbox")
   ag_bundle_sign(AudioGridderServer)
-  ag_bundle_copy(AudioGridderServer /Applications/Debug)
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    ag_bundle_copy(AudioGridderServer /Applications/Debug)
+  endif()
 endif()
