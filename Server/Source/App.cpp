@@ -47,7 +47,7 @@ void App::initialise(const String& commandLineParameters) {
         case SCAN:
             appName = "Scan";
             logName = fileToScan + "_";
-            logName = logName.replaceCharacters(":/\\|. ", "------");
+            logName = logName.replaceCharacters(":/\\|. ", "------").trimCharactersAtStart("-");
             break;
         case SERVER:
             appName = "Server";
