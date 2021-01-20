@@ -133,7 +133,6 @@ void AudioWorker::shutdown() {
 void AudioWorker::clear() {
     traceScope();
     if (nullptr != m_chain) {
-        m_chain->releaseResources();
         m_chain->clear();
     }
 }
