@@ -81,7 +81,7 @@ bool read(StreamingSocket* socket, void* data, int size, int timeoutMilliseconds
 /*
  * Client/Server handshake
  */
-struct Handshake {
+struct HandshakeRequest {
     int version;
     int clientPort;
     int channelsIn;
@@ -99,6 +99,48 @@ struct Handshake {
     enum FLAGS : uint8 { NO_PLUGINLIST_FILTER = 1 };
     void setFlag(uint8 f) { flags |= f; }
     bool isFlag(uint8 f) { return (flags & f) == f; }
+
+    json toJson() const {
+        json j;
+        j["version"] = version;
+        j["clientPort"] = clientPort;
+        j["channelsIn"] = channelsIn;
+        j["channelsOut"] = channelsOut;
+        j["rate"] = rate;
+        j["samplesPerBlock"] = samplesPerBlock;
+        j["doublePrecission"] = doublePrecission;
+        j["clientId"] = clientId;
+        j["flags"] = flags;
+        return j;
+    }
+
+    void fromJson(const json& j) {
+        version = j["version"].get<int>();
+        clientPort = j["clientPort"].get<int>();
+        channelsIn = j["channelsIn"].get<int>();
+        channelsOut = j["channelsOut"].get<int>();
+        rate = j["rate"].get<double>();
+        samplesPerBlock = j["samplesPerBlock"].get<int>();
+        doublePrecission = j["doublePrecission"].get<bool>();
+        clientId = j["clientId"].get<uint64>();
+        flags = j["flags"].get<uint8>();
+    }
+};
+
+struct HandshakeResponse {
+    int version;
+    uint32 flags;
+    int sandboxPort;
+    uint32 unused1;
+    uint32 unused2;
+    uint32 unused3;
+    uint32 unused4;
+    uint32 unused5;
+    uint32 unused6;
+
+    enum FLAGS : uint32 { SANDBOX_ENABLED = 1 };
+    void setFlag(uint32 f) { flags |= f; }
+    bool isFlag(uint32 f) { return (flags & f) == f; }
 };
 
 /*

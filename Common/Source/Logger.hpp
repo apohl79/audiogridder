@@ -22,6 +22,7 @@ class AGLogger : public Thread {
     static void log(String msg);
 
     static void initialize(const String& appName, const String& filePrefix, const String& configFile);
+    static void deleteFileAtFinish();
     static std::shared_ptr<AGLogger> getInstance();
     static void cleanup();
 
@@ -31,6 +32,7 @@ class AGLogger : public Thread {
   private:
     File m_file;
     std::ofstream m_outstream;
+    bool m_deleteFile = false;
     std::queue<String> m_msgQ[2];
     size_t m_msgQIdx = 0;
     std::mutex m_mtx;

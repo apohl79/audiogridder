@@ -19,6 +19,7 @@ namespace Tracer {
 std::atomic_bool l_tracerEnabled{false};
 std::atomic_uint64_t l_index{0};
 MemoryFile l_file;
+bool l_deleteFile = false;
 
 struct Inst : SharedInstance<Inst> {};
 
@@ -35,8 +36,8 @@ Scope::Scope(const LogTag* t, const String& f, int l, const String& ff) {
     if (l_tracerEnabled) {
         enabled = true;
         tagId = t->getId();
-        tagName = t->getName();
-        tagExtra = t->getExtra();
+        tagName = t->getLogTagName();
+        tagExtra = t->getLogTagExtra();
         file = f;
         line = l;
         func = ff;
@@ -62,8 +63,15 @@ void initialize(const String& appName, const String& filePrefix) {
 }
 
 void cleanup() {
-    Inst::cleanup([](auto) { l_file.close(); });
+    Inst::cleanup([](auto) {
+        l_file.close();
+        if (l_deleteFile) {
+            l_file.deleteFile();
+        }
+    });
 }
+
+void deleteFileAtFinish() { l_deleteFile = true; }
 
 void setEnabled(bool b) {
     if (b && !l_file.isOpen()) {
@@ -84,7 +92,7 @@ TraceRecord* getRecord() {
 
 void traceMessage(const LogTag* tag, const String& file, int line, const String& func, const String& msg) {
     if (l_tracerEnabled) {
-        traceMessage(tag->getId(), tag->getName(), tag->getExtra(), file, line, func, msg);
+        traceMessage(tag->getId(), tag->getLogTagName(), tag->getLogTagExtra(), file, line, func, msg);
     }
 }
 

@@ -238,18 +238,54 @@ void Client::init() {
             logln("failed to set master socket non-blocking");
         }
 
-        Handshake cfg = {2,      clientPort,        m_channelsIn,       m_channelsOut,
-                         m_rate, m_samplesPerBlock, m_doublePrecission, getId()};
+        HandshakeRequest cfg = {3,      clientPort,        m_channelsIn,       m_channelsOut,
+                                m_rate, m_samplesPerBlock, m_doublePrecission, getId()};
         if (m_processor->getNoSrvPluginListFilter()) {
-            cfg.setFlag(Handshake::NO_PLUGINLIST_FILTER);
+            cfg.setFlag(HandshakeRequest::NO_PLUGINLIST_FILTER);
         }
 
-        if (!e47::send(m_cmd_socket.get(), reinterpret_cast<const char*>(&cfg), sizeof(cfg))) {
+        if (!send(m_cmd_socket.get(), reinterpret_cast<const char*>(&cfg), sizeof(cfg))) {
             m_cmd_socket->close();
             return;
         }
 
-        auto* audioSock = accept(sock);
+        HandshakeResponse resp;
+        MessageHelper::Error err;
+        if (!read(m_cmd_socket.get(), &resp, sizeof(resp), 5000, &err)) {
+            logln("handshake error: " << err.toString());
+            m_cmd_socket->close();
+            return;
+        }
+
+        StreamingSocket* audioSock = nullptr;
+
+        if (resp.isFlag(HandshakeResponse::SANDBOX_ENABLED)) {
+            // connect to the sendbox process
+            m_cmd_socket->close();
+            logln("connecting sandbox process " << host << ":" << resp.sandboxPort);
+            if (!m_cmd_socket->connect(host, resp.sandboxPort, 1000)) {
+                logln("connection to sanbox failed");
+                m_cmd_socket->close();
+                return;
+            }
+
+            audioSock = new StreamingSocket;
+            if (!audioSock->connect(host, resp.sandboxPort, 1000)) {
+                logln("failed to setup audio connection");
+                delete audioSock;
+                audioSock = nullptr;
+            }
+
+            m_screen_socket = std::make_unique<StreamingSocket>();
+            if (!m_screen_socket->connect(host, resp.sandboxPort)) {
+                logln("failed to setup screen connection");
+                m_screen_socket.reset();
+            }
+        } else {
+            audioSock = accept(sock);
+            m_screen_socket = std::unique_ptr<StreamingSocket>(accept(sock));
+        }
+
         if (nullptr != audioSock) {
             logln("audio connection established");
             std::lock_guard<std::mutex> audiolck(m_audioMtx);
@@ -264,7 +300,6 @@ void Client::init() {
             return;
         }
 
-        m_screen_socket = std::unique_ptr<StreamingSocket>(accept(sock));
         if (nullptr != m_screen_socket) {
             logln("screen connection established");
             m_screenWorker = std::make_unique<ScreenReceiver>(this, m_screen_socket.get());

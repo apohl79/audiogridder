@@ -24,7 +24,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     int totalHeight = 80;
     int borderLR = 15;  // left/right border
     int borderTB = 15;  // top/bottom border
-    int rowHeight = 35;
+    int rowHeight = 30;
 
     int fieldWidth = 50;
     int wideFieldWidth = 250;
@@ -112,6 +112,18 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 
         row++;
     }
+
+    label = std::make_unique<Label>();
+    label->setText("Client Sandboxing:", NotificationType::dontSendNotification);
+    label->setBounds(getLabelBounds(row));
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
+
+    m_sandbox.setBounds(getCheckBoxBounds(row));
+    m_sandbox.setToggleState(m_app->getServer().getSandboxing(), NotificationType::dontSendNotification);
+    addChildAndSetID(&m_sandbox, "sandbox");
+
+    row++;
 
 #ifdef JUCE_MAC
     label = std::make_unique<Label>();
@@ -362,6 +374,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
         appCpy->getServer().setEnableVST2(m_vst2Support.getToggleState());
         appCpy->getServer().setScanForPlugins(m_scanForPlugins.getToggleState());
         appCpy->getServer().setParallelPluginLoad(m_parallelPluginLoad.getToggleState());
+        appCpy->getServer().setSandboxing(m_sandbox.getToggleState());
         switch (m_screenCapturingMode.getSelectedId()) {
             case 1:
                 appCpy->getServer().setScreenCapturingFFmpeg(true);

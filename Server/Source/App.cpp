@@ -23,10 +23,12 @@ void App::initialise(const String& commandLineParameters) {
 #ifdef JUCE_MAC
     Process::setDockIconVisible(false);
 #endif
+    String error;
     auto args = getCommandLineParameterArray();
-    enum Modes { SCAN, MASTER, SERVER };
+    enum Modes { SCAN, MASTER, SERVER, SANDBOX };
     Modes mode = MASTER;
     String fileToScan = "";
+    json clientCfg;
     int srvid = -1;
     for (int i = 0; i < args.size(); i++) {
         if (!args[i].compare("-scan") && args.size() >= i + 2) {
@@ -34,6 +36,8 @@ void App::initialise(const String& commandLineParameters) {
             mode = SCAN;
         } else if (!args[i].compare("-server")) {
             mode = SERVER;
+        } else if (args[i].startsWith("--" + Defaults::SANDBOX_CMD_PREFIX)) {
+            mode = SANDBOX;
         } else if (!args[i].compare("-id")) {
             srvid = args[i + 1].getIntValue();
         }
@@ -52,12 +56,22 @@ void App::initialise(const String& commandLineParameters) {
         case SERVER:
             appName = "Server";
             break;
+        case SANDBOX:
+            appName = "Sandbox";
+            break;
     }
     AGLogger::initialize(appName, logName, Defaults::getConfigFileName(Defaults::ConfigServer));
     Tracer::initialize(appName, logName);
     Signals::initialize();
 
     logln("commandline: " << commandLineParameters);
+
+    if (error.isNotEmpty()) {
+        logln("error: " << error);
+        quit();
+        return;
+    }
+
     switch (mode) {
         case SCAN:
             AGLogger::setEnabled(true);
@@ -96,6 +110,19 @@ void App::initialise(const String& commandLineParameters) {
             if (srvid > -1) {
                 opts["ID"] = srvid;
             }
+            m_server = std::make_shared<Server>(opts);
+            m_server->initialize();
+            m_server->startThread();
+            break;
+        }
+        case SANDBOX: {
+            traceScope();
+            CoreDump::initialize(appName, logName, false);
+            AGLogger::deleteFileAtFinish();
+            Tracer::deleteFileAtFinish();
+            json opts;
+            opts["sandboxMode"] = true;
+            opts["commandLine"] = commandLineParameters.toStdString();
             m_server = std::make_shared<Server>(opts);
             m_server->initialize();
             m_server->startThread();

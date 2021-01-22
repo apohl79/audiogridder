@@ -29,6 +29,7 @@ class MemoryFile : LogTagDelegate {
     bool isOpen() const { return nullptr != m_data; }
     void open(bool overwriteIfExists = false);
     void close();
+    void deleteFile() const { m_file.deleteFile(); }
 
     char* data() { return m_data; }
     size_t size() { return m_size; }

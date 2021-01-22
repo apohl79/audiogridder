@@ -18,6 +18,7 @@
 #include "Utils.hpp"
 #include "json.hpp"
 #include "ScreenRecorder.hpp"
+#include "Sandbox.hpp"
 
 namespace e47 {
 
@@ -26,11 +27,15 @@ using json = nlohmann::json;
 class Server : public Thread, public LogTag {
   public:
     Server(json opts = {});
-    ~Server();
+    ~Server() override;
+
     void initialize();
     void shutdown();
+    void run() override;
+
     void loadConfig();
     void saveConfig();
+
     int getId(bool ignoreOpts = false) const;
     void setId(int i) { m_id = i; }
     const String& getName() const { return m_name; }
@@ -61,7 +66,8 @@ class Server : public Thread, public LogTag {
     void setScanForPlugins(bool b) { m_scanForPlugins = b; }
     bool getParallelPluginLoad() const { return m_parallelPluginLoad; }
     void setParallelPluginLoad(bool b) { m_parallelPluginLoad = b; }
-    void run();
+    bool getSandboxing() const { return m_sandboxing; }
+    void setSandboxing(bool b) { m_sandboxing = b; }
     const KnownPluginList& getPluginList() const { return m_pluginlist; }
     KnownPluginList& getPluginList() { return m_pluginlist; }
     bool shouldExclude(const String& name);
@@ -71,6 +77,15 @@ class Server : public Thread, public LogTag {
     void saveKnownPluginList();
 
     static bool scanPlugin(const String& id, const String& format);
+
+    // SandboxMaster
+    void handleMessageFromSandbox(SandboxMaster&, const SandboxMessage&);
+    void handleDisconnectFromSandbox(SandboxMaster&);
+
+    // SandboxSlave
+    void handleMessageFromMaster(const SandboxMessage&);
+    void handleDisconnectedFromMaster();
+    void handleConnectedToMaster();
 
   private:
     json m_opts;
@@ -97,6 +112,13 @@ class Server : public Thread, public LogTag {
     bool m_vstNoStandardFolders;
     bool m_scanForPlugins = true;
     bool m_parallelPluginLoad = false;
+    bool m_sandboxing = true;
+
+    HashMap<String, std::shared_ptr<SandboxMaster>, DefaultHashFunctions, CriticalSection> m_sandboxes;
+    std::unique_ptr<SandboxSlave> m_sandboxSlave;
+
+    std::atomic_bool m_sandboxReady{true};
+    HandshakeRequest m_sandboxConfig;
 
     void scanNextPlugin(const String& id, const String& fmt);
     void scanForPlugins();
@@ -105,6 +127,11 @@ class Server : public Thread, public LogTag {
     void loadKnownPluginList();
     static void loadKnownPluginList(KnownPluginList& plist);
     static void saveKnownPluginList(KnownPluginList& plist);
+
+    void runServer();
+    void runSandbox();
+
+    bool sendHandshakeResponse(StreamingSocket* sock, bool sandboxEnabled = false, int sandboxPort = 0);
 
     template <typename T>
     inline T getOpt(const String& name, T def) const {

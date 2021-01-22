@@ -43,6 +43,9 @@ AGLogger::~AGLogger() {
     if (m_outstream.is_open()) {
         m_outstream.close();
     }
+    if (m_deleteFile) {
+        m_file.deleteFile();
+    }
 }
 
 void AGLogger::run() {
@@ -104,11 +107,18 @@ void AGLogger::initialize(const String& appName, const String& filePrefix, const
 
 std::shared_ptr<AGLogger> AGLogger::getInstance() { return m_inst; }
 
+void AGLogger::deleteFileAtFinish() {
+    std::lock_guard<std::mutex> lock(m_instMtx);
+    if (nullptr != m_inst) {
+        m_inst->m_deleteFile = true;
+    }
+}
+
 void AGLogger::cleanup() {
     std::lock_guard<std::mutex> lock(m_instMtx);
     m_instRefCount--;
     if (m_instRefCount == 0) {
-        if (m_inst->isThreadRunning()) {
+        if (nullptr != m_inst && m_inst->isThreadRunning()) {
             m_inst->signalThreadShouldExit();
             m_inst->logReal("");
         }

@@ -25,7 +25,9 @@ class Worker : public Thread, public LogTag {
     static std::atomic_uint32_t count;
     static std::atomic_uint32_t runCount;
 
-    Worker(StreamingSocket* clnt);
+    Worker(StreamingSocket* clntSocket, const HandshakeRequest& cfg);
+    Worker(StreamingSocket* clntSocket, StreamingSocket* audioSocket, StreamingSocket* screenSocket,
+           const HandshakeRequest& cfg);
     ~Worker() override;
     void run() override;
 
@@ -55,7 +57,8 @@ class Worker : public Thread, public LogTag {
     void handleMessage(std::shared_ptr<Message<PluginList>> msg);
 
   private:
-    std::unique_ptr<StreamingSocket> m_client;
+    std::unique_ptr<StreamingSocket> m_client, m_audioSocket, m_screenSocket;
+    HandshakeRequest m_cfg;
     std::shared_ptr<AudioWorker> m_audio;
     std::shared_ptr<ScreenWorker> m_screen;
     bool m_shouldHideEditor = false;

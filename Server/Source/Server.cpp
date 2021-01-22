@@ -23,10 +23,17 @@ Server::Server(json opts) : Thread("Server"), LogTag("server"), m_opts(opts) { i
 
 void Server::initialize() {
     traceScope();
-    logln("starting server (version: " << AUDIOGRIDDER_VERSION << ", build date: " << AUDIOGRIDDER_BUILD_DATE
-                                       << ")...");
-    File runFile(Defaults::getConfigFileName(Defaults::ConfigServerRun));
-    runFile.create();
+    String mode;
+    if (getOpt("sandboxMode", false)) {
+        mode = "sandbox";
+    } else {
+        mode = "server";
+        File runFile(Defaults::getConfigFileName(Defaults::ConfigServerRun));
+        runFile.create();
+    }
+    setLogTagName(mode);
+    logln("starting " << mode << " (version: " << AUDIOGRIDDER_VERSION << ", build date: " << AUDIOGRIDDER_BUILD_DATE
+                      << ")...");
     loadConfig();
     Metrics::initialize();
     CPUInfo::initialize();
@@ -112,6 +119,7 @@ void Server::loadConfig() {
     }
     m_scanForPlugins = jsonGetValue(cfg, "ScanForPlugins", m_scanForPlugins);
     m_parallelPluginLoad = jsonGetValue(cfg, "ParallelPluginLoad", m_parallelPluginLoad);
+    m_sandboxing = jsonGetValue(cfg, "Sandboxing", m_sandboxing);
 }
 
 void Server::saveConfig() {
@@ -155,6 +163,7 @@ void Server::saveConfig() {
     }
     j["ScanForPlugins"] = m_scanForPlugins;
     j["ParallelPluginLoad"] = m_parallelPluginLoad;
+    j["Sandboxing"] = m_sandboxing;
 
     File cfg(Defaults::getConfigFileName(Defaults::ConfigServer));
     if (cfg.exists()) {
@@ -267,8 +276,10 @@ Server::~Server() {
     CPUInfo::cleanup();
     WindowPositions::cleanup();
     logln("server terminated");
-    File runFile(Defaults::getConfigFileName(Defaults::ConfigServerRun));
-    runFile.deleteFile();
+    if (getOpt("sandboxMode", false)) {
+        File runFile(Defaults::getConfigFileName(Defaults::ConfigServerRun));
+        runFile.deleteFile();
+    }
 }
 
 void Server::shutdown() {
@@ -500,6 +511,14 @@ void Server::scanForPlugins(const std::vector<String>& include) {
 }
 
 void Server::run() {
+    if (getOpt("sandboxMode", false)) {
+        runSandbox();
+    } else {
+        runServer();
+    }
+}
+
+void Server::runServer() {
     traceScope();
     if ((m_scanForPlugins || getOpt("ScanForPlugins", false)) && !getOpt("NoScanForPlugins", false)) {
         scanForPlugins();
@@ -564,29 +583,83 @@ void Server::run() {
         while (!currentThreadShouldExit()) {
             auto* clnt = m_masterSocket.waitForNextConnection();
             if (nullptr != clnt) {
-                logln("new client " << clnt->getHostName());
-                auto w = std::make_shared<Worker>(clnt);
-                w->startThread();
-                m_workers.add(w);
-                // lazy cleanup
-                std::shared_ptr<WorkerList> deadWorkers = std::make_shared<WorkerList>();
-                for (int i = 0; i < m_workers.size();) {
-                    if (!m_workers.getReference(i)->isThreadRunning()) {
-                        deadWorkers->add(m_workers.getReference(i));
-                        m_workers.remove(i);
-                    } else {
-                        i++;
+                HandshakeRequest cfg;
+                int len = clnt->read(&cfg, sizeof(cfg), true);
+                if (len > 0) {
+                    logln("new client " << clnt->getHostName());
+                    logln("  version                  = " << cfg.version);
+                    logln("  clientId                 = " << String::toHexString(cfg.clientId));
+                    logln("  clientPort               = " << cfg.clientPort);
+                    logln("  channelsIn               = " << cfg.channelsIn);
+                    logln("  channelsOut              = " << cfg.channelsOut);
+                    logln("  rate                     = " << cfg.rate);
+                    logln("  samplesPerBlock          = " << cfg.samplesPerBlock);
+                    logln("  doublePrecission         = " << static_cast<int>(cfg.doublePrecission));
+                    if (cfg.version >= 2) {
+                        logln(
+                            "  flags.NoPluginListFilter = " << (int)cfg.isFlag(HandshakeRequest::NO_PLUGINLIST_FILTER));
                     }
+                } else {
+                    clnt->close();
+                    delete clnt;
+                    continue;
                 }
-                traceln("about to remove " << deadWorkers->size() << " dead workers");
-                deadWorkers->clear();
+
+                if (m_sandboxing) {
+                    // Spawn a sandbox child process for a new client and tell the client the port to connect to
+                    auto sandbox = std::make_shared<SandboxMaster>(*this, String::toHexString(cfg.clientId));
+                    logln("creating sandbox " << sandbox->id);
+                    if (sandbox->launchSlaveProcess(File::getSpecialLocation(File::currentExecutableFile),
+                                                    Defaults::SANDBOX_CMD_PREFIX)) {
+                        sandbox->onPortReceived = [this, sandbox, clnt](int sandboxPort) {
+                            traceScope();
+                            if (!sendHandshakeResponse(clnt, true, sandboxPort)) {
+                                logln("failed to send handshake response for sandbox " << sandbox->id);
+                                m_sandboxes.remove(sandbox->id);
+                            }
+                            clnt->close();
+                            delete clnt;
+                        };
+                        if (sandbox->send(SandboxMessage(SandboxMessage::CONFIG, cfg.toJson()))) {
+                            m_sandboxes.set(sandbox->id, sandbox);
+                        } else {
+                            logln("failed to send message to sandbox");
+                        }
+                    } else {
+                        logln("failed to launch sandbox");
+                    }
+                } else {
+                    // Create a new worker thread for a new client
+                    logln("creating worker");
+                    if (!sendHandshakeResponse(clnt)) {
+                        logln("failed to send handshake response");
+                        clnt->close();
+                        continue;
+                    }
+
+                    auto w = std::make_shared<Worker>(clnt, cfg);
+                    w->startThread();
+                    m_workers.add(w);
+                    // lazy cleanup
+                    std::shared_ptr<WorkerList> deadWorkers = std::make_shared<WorkerList>();
+                    for (int i = 0; i < m_workers.size();) {
+                        if (!m_workers.getReference(i)->isThreadRunning()) {
+                            deadWorkers->add(m_workers.getReference(i));
+                            m_workers.remove(i);
+                        } else {
+                            i++;
+                        }
+                    }
+                    traceln("about to remove " << deadWorkers->size() << " dead workers");
+                    deadWorkers->clear();
+                }
             }
         }
     } else {
         logln("failed to create listener");
         runOnMsgThreadAsync([this] {
             traceScope();
-            uint32 ec = 0;
+            uint32 ec = App::EXIT_OK;
             if (AlertWindow::showOkCancelBox(AlertWindow::WarningIcon, "Error",
                                              "AudioGridder failed to bind to the server port " +
                                                  String(m_port + getId()) +
@@ -598,6 +671,110 @@ void Server::run() {
             }
             getApp()->prepareShutdown(ec);
         });
+    }
+}
+
+void Server::runSandbox() {
+    traceScope();
+
+    m_sandboxSlave = std::make_unique<SandboxSlave>(*this);
+
+    if (!m_sandboxSlave->initialiseFromCommandLine(getOpt("commandLine", String()), Defaults::SANDBOX_CMD_PREFIX)) {
+        logln("failed to initialize sandbox process");
+        getApp()->prepareShutdown(App::EXIT_SANDBOX_INIT_ERROR);
+        return;
+    }
+
+#ifndef JUCE_WINDOWS
+    setsockopt(m_masterSocket.getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
+#endif
+
+    m_port = Defaults::SANDBOX_PORT;
+    while (!m_masterSocket.createListener(m_port, m_host)) {
+        m_port++;
+    }
+
+    loadKnownPluginList();
+    m_pluginlist.sort(KnownPluginList::sortAlphabetically, true);
+
+    logln("sandbox started: PORT=" << m_port << ", NAME=" << m_name);
+
+    auto* clnt = m_masterSocket.waitForNextConnection();
+    if (nullptr != clnt) {
+        logln("client connected " << clnt->getHostName());
+        while (!m_sandboxReady && !currentThreadShouldExit()) {
+            // wait for the master to send the config
+            sleep(10);
+        }
+
+        auto* audioSocket = m_masterSocket.waitForNextConnection();
+        auto* screenSocket = m_masterSocket.waitForNextConnection();
+        m_masterSocket.close();
+
+#ifdef JUCE_MAC
+        setsockopt(audioSocket->getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
+        setsockopt(screenSocket->getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
+#endif
+
+        if (m_sandboxReady && nullptr != audioSocket && nullptr != screenSocket) {
+            logln("creating worker");
+            auto w = std::make_shared<Worker>(clnt, audioSocket, screenSocket, m_sandboxConfig);
+            w->startThread();
+            m_workers.add(w);
+            w->waitForThreadToExit(-1);
+        } else {
+            logln("failed to setup worker");
+            getApp()->prepareShutdown();
+            return;
+        }
+    }
+
+    getApp()->prepareShutdown();
+
+    // Closing the log and trace here, as we will delete them on clean shutdowns. JUCE does not let the child process
+    // shutdown properly unfortunately, if the ChildProcessMaster gets deleted.
+    AGLogger::cleanup();
+    Tracer::cleanup();
+}
+
+bool Server::sendHandshakeResponse(StreamingSocket* sock, bool sandboxEnabled, int sandboxPort) {
+    HandshakeResponse resp = {3, 0, 0};
+    if (sandboxEnabled) {
+        resp.setFlag(HandshakeResponse::SANDBOX_ENABLED);
+        resp.sandboxPort = sandboxPort;
+    }
+    return send(sock, reinterpret_cast<const char*>(&resp), sizeof(resp));
+}
+
+void Server::handleMessageFromSandbox(SandboxMaster& sandbox, const SandboxMessage& msg) {
+    logln("received unhandled message from sandbox " << sandbox.id << ": " << msg.data.dump());
+}
+
+void Server::handleDisconnectFromSandbox(SandboxMaster& sandbox) {
+    if (m_sandboxes.contains(sandbox.id)) {
+        logln("disconnected from sandbox " << sandbox.id);
+        m_sandboxes.remove(sandbox.id);
+    }
+}
+
+void Server::handleConnectedToMaster() {
+    logln("connected to sandbox master");
+    if (!m_sandboxSlave->send(SandboxMessage(SandboxMessage::SANDBOX_PORT, {{"port", m_port}}))) {
+        logln("failed to send sendbox port");
+        getApp()->prepareShutdown();
+    }
+}
+
+void Server::handleDisconnectedFromMaster() {
+    logln("disconnected from sandbox master");
+    getApp()->prepareShutdown();
+}
+
+void Server::handleMessageFromMaster(const SandboxMessage& msg) {
+    if (msg.type == SandboxMessage::CONFIG) {
+        logln("config message from sandbox master: " << msg.data.dump());
+        m_sandboxConfig.fromJson(msg.data);
+        m_sandboxReady = true;
     }
 }
 

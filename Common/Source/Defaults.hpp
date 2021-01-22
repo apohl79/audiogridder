@@ -15,6 +15,9 @@ namespace Defaults {
 
 static constexpr int CLIENT_PORT = 55055;
 static constexpr int SERVER_PORT = 55056;
+static constexpr int SANDBOX_PORT = 55088;
+
+static const String SANDBOX_CMD_PREFIX = "sandbox";
 
 #ifndef JUCE_WINDOWS
 static const String SERVER_CONFIG_FILE_OLD = "~/.audiogridderserver";

@@ -21,16 +21,24 @@ namespace e47 {
 std::atomic_uint32_t Worker::count{0};
 std::atomic_uint32_t Worker::runCount{0};
 
-Worker::Worker(StreamingSocket* clnt)
+Worker::Worker(StreamingSocket* clnt, const HandshakeRequest& cfg)
     : Thread("Worker"),
       LogTag("worker"),
       m_client(clnt),
+      m_cfg(cfg),
       m_audio(std::make_shared<AudioWorker>(this)),
       m_screen(std::make_shared<ScreenWorker>(this)),
       m_msgFactory(this) {
     traceScope();
     initAsyncFunctors();
     count++;
+}
+
+Worker::Worker(StreamingSocket* clntSocket, StreamingSocket* audioSocket, StreamingSocket* screenSocket,
+               const HandshakeRequest& cfg)
+    : Worker(clntSocket, cfg) {
+    m_audioSocket.reset(audioSocket);
+    m_screenSocket.reset(screenSocket);
 }
 
 Worker::~Worker() {
@@ -46,141 +54,135 @@ Worker::~Worker() {
 void Worker::run() {
     traceScope();
     runCount++;
-    Handshake cfg;
     std::unique_ptr<StreamingSocket> sock;
-    int len;
-    len = m_client->read(&cfg, sizeof(cfg), true);
-    if (len > 0) {
-        setLogTagExtra("client:" + String::toHexString(cfg.clientId));
+    setLogTagExtra("client:" + String::toHexString(m_cfg.clientId));
 
-        logln("  version                  = " << cfg.version);
-        logln("  clientId                 = " << String::toHexString(cfg.clientId));
-        logln("  clientPort               = " << cfg.clientPort);
-        logln("  channelsIn               = " << cfg.channelsIn);
-        logln("  channelsOut              = " << cfg.channelsOut);
-        logln("  rate                     = " << cfg.rate);
-        logln("  samplesPerBlock          = " << cfg.samplesPerBlock);
-        logln("  doublePrecission         = " << static_cast<int>(cfg.doublePrecission));
-
-        if (cfg.version >= 2) {
-            logln("  flags.NoPluginListFilter = " << (int)cfg.isFlag(Handshake::NO_PLUGINLIST_FILTER));
-            m_noPluginListFilter = cfg.isFlag(Handshake::NO_PLUGINLIST_FILTER);
-        }
-
-        // start audio processing
-        sock = std::make_unique<StreamingSocket>();
-#ifdef JUCE_MAC
-        setsockopt(sock->getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
-#endif
-        if (sock->connect(m_client->getHostName(), cfg.clientPort)) {
-            m_audio->init(std::move(sock), cfg.channelsIn, cfg.channelsOut, cfg.rate, cfg.samplesPerBlock,
-                          cfg.doublePrecission);
-            m_audio->startThread(Thread::realtimeAudioPriority);
-        } else {
-            logln("failed to establish audio connection to " << m_client->getHostName() << ":" << cfg.clientPort);
-        }
-
-        // start screen capturing
-        sock = std::make_unique<StreamingSocket>();
-#ifdef JUCE_MAC
-        setsockopt(sock->getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
-#endif
-        if (sock->connect(m_client->getHostName(), cfg.clientPort)) {
-            m_screen->init(std::move(sock));
-            m_screen->startThread();
-        } else {
-            logln("failed to establish screen connection to " << m_client->getHostName() << ":" << cfg.clientPort);
-        }
-
-        // send list of plugins
-        auto msgPL = std::make_shared<Message<PluginList>>(this);
-        handleMessage(msgPL);
-
-        // enter message loop
-        logln("command processor started");
-        while (!currentThreadShouldExit() && nullptr != m_client && m_client->isConnected() &&
-               m_audio->isThreadRunning() && m_screen->isThreadRunning()) {
-            MessageHelper::Error e;
-            auto msg = m_msgFactory.getNextMessage(m_client.get(), &e);
-            if (nullptr != msg) {
-                switch (msg->getType()) {
-                    case Quit::Type:
-                        handleMessage(Message<Any>::convert<Quit>(msg));
-                        break;
-                    case AddPlugin::Type:
-                        handleMessage(Message<Any>::convert<AddPlugin>(msg));
-                        break;
-                    case DelPlugin::Type:
-                        handleMessage(Message<Any>::convert<DelPlugin>(msg));
-                        break;
-                    case EditPlugin::Type:
-                        handleMessage(Message<Any>::convert<EditPlugin>(msg));
-                        break;
-                    case HidePlugin::Type:
-                        handleMessage(Message<Any>::convert<HidePlugin>(msg));
-                        break;
-                    case Mouse::Type:
-                        handleMessage(Message<Any>::convert<Mouse>(msg));
-                        break;
-                    case Key::Type:
-                        handleMessage(Message<Any>::convert<Key>(msg));
-                        break;
-                    case GetPluginSettings::Type:
-                        handleMessage(Message<Any>::convert<GetPluginSettings>(msg));
-                        break;
-                    case SetPluginSettings::Type:
-                        handleMessage(Message<Any>::convert<SetPluginSettings>(msg));
-                        break;
-                    case BypassPlugin::Type:
-                        handleMessage(Message<Any>::convert<BypassPlugin>(msg));
-                        break;
-                    case UnbypassPlugin::Type:
-                        handleMessage(Message<Any>::convert<UnbypassPlugin>(msg));
-                        break;
-                    case ExchangePlugins::Type:
-                        handleMessage(Message<Any>::convert<ExchangePlugins>(msg));
-                        break;
-                    case RecentsList::Type:
-                        handleMessage(Message<Any>::convert<RecentsList>(msg));
-                        break;
-                    case Preset::Type:
-                        handleMessage(Message<Any>::convert<Preset>(msg));
-                        break;
-                    case ParameterValue::Type:
-                        handleMessage(Message<Any>::convert<ParameterValue>(msg));
-                        break;
-                    case GetParameterValue::Type:
-                        handleMessage(Message<Any>::convert<GetParameterValue>(msg));
-                        break;
-                    case GetAllParameterValues::Type:
-                        handleMessage(Message<Any>::convert<GetAllParameterValues>(msg));
-                        break;
-                    case UpdateScreenCaptureArea::Type:
-                        handleMessage(Message<Any>::convert<UpdateScreenCaptureArea>(msg));
-                        break;
-                    case Rescan::Type:
-                        handleMessage(Message<Any>::convert<Rescan>(msg));
-                        break;
-                    case Restart::Type:
-                        handleMessage(Message<Any>::convert<Restart>(msg));
-                        break;
-                    case CPULoad::Type:
-                        handleMessage(Message<Any>::convert<CPULoad>(msg));
-                        break;
-                    case PluginList::Type:
-                        handleMessage(Message<Any>::convert<PluginList>(msg));
-                        break;
-                    default:
-                        logln("unknown message type " << msg->getType());
-                }
-            } else if (e.code != MessageHelper::E_TIMEOUT) {
-                logln("failed to get next message: " << e.toString());
-                break;
-            }
-        }
-    } else {
-        logln("handshake error with client " << m_client->getHostName());
+    if (m_cfg.version >= 2) {
+        m_noPluginListFilter = m_cfg.isFlag(HandshakeRequest::NO_PLUGINLIST_FILTER);
     }
+
+    // start audio processing
+    if (nullptr != m_audioSocket) {
+        sock = std::move(m_audioSocket);
+    } else {
+        sock = std::make_unique<StreamingSocket>();
+#ifdef JUCE_MAC
+        setsockopt(sock->getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
+#endif
+        sock->connect(m_client->getHostName(), m_cfg.clientPort);
+    }
+    if (sock->isConnected()) {
+        m_audio->init(std::move(sock), m_cfg.channelsIn, m_cfg.channelsOut, m_cfg.rate, m_cfg.samplesPerBlock,
+                      m_cfg.doublePrecission);
+        m_audio->startThread(Thread::realtimeAudioPriority);
+    } else {
+        logln("failed to establish audio connection to " << m_client->getHostName() << ":" << m_cfg.clientPort);
+    }
+
+    // start screen capturing
+    if (nullptr != m_screenSocket) {
+        sock = std::move(m_screenSocket);
+    } else {
+        sock = std::make_unique<StreamingSocket>();
+#ifdef JUCE_MAC
+        setsockopt(sock->getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
+#endif
+        sock->connect(m_client->getHostName(), m_cfg.clientPort);
+    }
+    if (sock->isConnected()) {
+        m_screen->init(std::move(sock));
+        m_screen->startThread();
+    } else {
+        logln("failed to establish screen connection to " << m_client->getHostName() << ":" << m_cfg.clientPort);
+    }
+
+    // send list of plugins
+    auto msgPL = std::make_shared<Message<PluginList>>(this);
+    handleMessage(msgPL);
+
+    // enter message loop
+    logln("command processor started");
+    while (!currentThreadShouldExit() && nullptr != m_client && m_client->isConnected() && m_audio->isThreadRunning() &&
+           m_screen->isThreadRunning()) {
+        MessageHelper::Error e;
+        auto msg = m_msgFactory.getNextMessage(m_client.get(), &e);
+        if (nullptr != msg) {
+            switch (msg->getType()) {
+                case Quit::Type:
+                    handleMessage(Message<Any>::convert<Quit>(msg));
+                    break;
+                case AddPlugin::Type:
+                    handleMessage(Message<Any>::convert<AddPlugin>(msg));
+                    break;
+                case DelPlugin::Type:
+                    handleMessage(Message<Any>::convert<DelPlugin>(msg));
+                    break;
+                case EditPlugin::Type:
+                    handleMessage(Message<Any>::convert<EditPlugin>(msg));
+                    break;
+                case HidePlugin::Type:
+                    handleMessage(Message<Any>::convert<HidePlugin>(msg));
+                    break;
+                case Mouse::Type:
+                    handleMessage(Message<Any>::convert<Mouse>(msg));
+                    break;
+                case Key::Type:
+                    handleMessage(Message<Any>::convert<Key>(msg));
+                    break;
+                case GetPluginSettings::Type:
+                    handleMessage(Message<Any>::convert<GetPluginSettings>(msg));
+                    break;
+                case SetPluginSettings::Type:
+                    handleMessage(Message<Any>::convert<SetPluginSettings>(msg));
+                    break;
+                case BypassPlugin::Type:
+                    handleMessage(Message<Any>::convert<BypassPlugin>(msg));
+                    break;
+                case UnbypassPlugin::Type:
+                    handleMessage(Message<Any>::convert<UnbypassPlugin>(msg));
+                    break;
+                case ExchangePlugins::Type:
+                    handleMessage(Message<Any>::convert<ExchangePlugins>(msg));
+                    break;
+                case RecentsList::Type:
+                    handleMessage(Message<Any>::convert<RecentsList>(msg));
+                    break;
+                case Preset::Type:
+                    handleMessage(Message<Any>::convert<Preset>(msg));
+                    break;
+                case ParameterValue::Type:
+                    handleMessage(Message<Any>::convert<ParameterValue>(msg));
+                    break;
+                case GetParameterValue::Type:
+                    handleMessage(Message<Any>::convert<GetParameterValue>(msg));
+                    break;
+                case GetAllParameterValues::Type:
+                    handleMessage(Message<Any>::convert<GetAllParameterValues>(msg));
+                    break;
+                case UpdateScreenCaptureArea::Type:
+                    handleMessage(Message<Any>::convert<UpdateScreenCaptureArea>(msg));
+                    break;
+                case Rescan::Type:
+                    handleMessage(Message<Any>::convert<Rescan>(msg));
+                    break;
+                case Restart::Type:
+                    handleMessage(Message<Any>::convert<Restart>(msg));
+                    break;
+                case CPULoad::Type:
+                    handleMessage(Message<Any>::convert<CPULoad>(msg));
+                    break;
+                case PluginList::Type:
+                    handleMessage(Message<Any>::convert<PluginList>(msg));
+                    break;
+                default:
+                    logln("unknown message type " << msg->getType());
+            }
+        } else if (e.code != MessageHelper::E_TIMEOUT) {
+            logln("failed to get next message: " << e.toString());
+            break;
+        }
+    }
+
     shutdown();
     m_audio->waitForThreadToExit(-1);
     m_audio.reset();
