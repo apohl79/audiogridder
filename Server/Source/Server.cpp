@@ -86,6 +86,7 @@ void Server::loadConfig() {
         }
     }
     m_screenCapturingOff = jsonGetValue(cfg, "ScreenCapturingOff", m_screenCapturingOff);
+    m_screenCapturingFFmpegQuality = jsonGetValue(cfg, "ScreenCapturingFFmpegQual", m_screenCapturingFFmpegQuality);
     String scmode;
     if (m_screenCapturingOff) {
         scmode = "off";
@@ -93,7 +94,7 @@ void Server::loadConfig() {
         scmode = "ffmpeg (" + encoder + ")";
         runOnMsgThreadAsync([this] {
             traceScope();
-            ScreenRecorder::initialize(m_screenCapturingFFmpegEncMode);
+            ScreenRecorder::initialize(m_screenCapturingFFmpegEncMode, m_screenCapturingFFmpegQuality);
         });
     } else {
         scmode = "native";
@@ -147,6 +148,7 @@ void Server::saveConfig() {
     }
     j["ScreenCapturingFFmpeg"] = m_screenCapturingFFmpeg;
     j["ScreenCapturingOff"] = m_screenCapturingOff;
+    j["ScreenCapturingFFmpegQual"] = m_screenCapturingFFmpegQuality;
     j["ScreenQuality"] = m_screenJpgQuality;
     j["ScreenDiffDetection"] = m_screenDiffDetection;
     j["ExcludePlugins"] = json::array();

@@ -19,11 +19,13 @@ AVCodec* ScreenRecorder::m_outputCodec = nullptr;
 bool ScreenRecorder::m_initialized = false;
 
 ScreenRecorder::EncoderMode ScreenRecorder::m_encMode = ScreenRecorder::WEBP;
-const int ScreenRecorder::BASE_QUALITY = 8000;
 double ScreenRecorder::m_scale;
 int ScreenRecorder::m_quality;
 
-void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode) {
+int WEBP_QUALITY[3] = {4000, 8000, 12000};
+int MJPEG_QUALITY[3] = {9000000, 14000000, 19000000};
+
+void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode, EncoderQuality quality) {
     setLogTagStatic("screenrec");
     traceScope();
 
@@ -34,9 +36,11 @@ void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode) {
     switch (m_encMode) {
         case WEBP:
             encName = "libwebp";
+            m_quality = WEBP_QUALITY[quality];
             break;
         case MJPEG:
             encName = "mjpeg";
+            m_quality = MJPEG_QUALITY[quality];
             break;
     }
     m_outputCodec = avcodec_find_encoder_by_name(encName);
@@ -55,8 +59,6 @@ void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode) {
     } else {
         m_scale = 1.0;
     }
-    // m_quality  (int)(BASE_QUALITY / m_scale);
-    m_quality = BASE_QUALITY;
 
     avdevice_register_all();
 
@@ -349,7 +351,7 @@ bool ScreenRecorder::prepareOutput() {
             av_dict_set(&opts, "global_quality", String(m_quality).getCharPointer(), 0);
             break;
         case MJPEG:
-            av_dict_set(&opts, "b", "14000000", 0);
+            av_dict_set(&opts, "b", String(m_quality).getCharPointer(), 0);
             break;
     }
     int ret = avcodec_open2(m_outputCodecCtx, m_outputCodec, &opts);
