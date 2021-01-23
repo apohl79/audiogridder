@@ -28,8 +28,10 @@ class AGProcessor : public LogTagDelegate {
     static String convertJUCEtoAGPluginID(const String& id);
 
     inline static String createString(const PluginDescription& d) {
-        return d.name + ";" + d.manufacturerName + ";" + createPluginID(d) + ";" + d.pluginFormatName + ";" +
-               d.category + "\n";
+        json j = {{"name", d.name.toStdString()},          {"company", d.manufacturerName.toStdString()},
+                  {"id", createPluginID(d).toStdString()}, {"type", d.pluginFormatName.toStdString()},
+                  {"category", d.category.toStdString()},  {"isInstrument", d.isInstrument}};
+        return String(j.dump()) + "\n";
     }
 
     static std::unique_ptr<PluginDescription> findPluginDescritpion(const String& id);
