@@ -124,8 +124,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     void getAllParameterValues(int idx);
     void increaseSCArea();
     void decreaseSCArea();
-
-    const int SCAREA_STEPS = 30;
+    void toggleFullscreenSCArea();
 
     void storeSettingsA();
     void storeSettingsB();

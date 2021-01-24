@@ -11,6 +11,7 @@
 #include <JuceHeader.h>
 
 #include "Utils.hpp"
+#include "Defaults.hpp"
 
 namespace e47 {
 
@@ -44,12 +45,21 @@ class AGProcessor : public LogTagDelegate {
 
     void updateScreenCaptureArea(int val) {
         traceScope();
-        m_additionalScreenSpace = m_additionalScreenSpace + val > 0 ? m_additionalScreenSpace + val : 0;
+        if (val == Defaults::SCAREA_FULLSCREEN) {
+            m_fullscreen = !m_fullscreen;
+        } else {
+            m_additionalScreenSpace = m_additionalScreenSpace + val > 0 ? m_additionalScreenSpace + val : 0;
+        }
     }
 
     int getAdditionalScreenCapturingSpace() {
         traceScope();
         return m_additionalScreenSpace;
+    }
+
+    bool isFullscreen() {
+        traceScope();
+        return m_fullscreen;
     }
 
     static std::shared_ptr<AudioPluginInstance> loadPlugin(PluginDescription& plugdesc, double sampleRate,
@@ -201,6 +211,7 @@ class AGProcessor : public LogTagDelegate {
     std::shared_ptr<AudioPluginInstance> m_plugin;
     std::mutex m_pluginMtx;
     int m_additionalScreenSpace = 0;
+    bool m_fullscreen = false;
     bool m_prepared = false;
     int m_extraInChannels = 0;
     int m_extraOutChannels = 0;

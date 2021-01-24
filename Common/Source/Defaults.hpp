@@ -16,6 +16,9 @@ namespace Defaults {
 static constexpr int CLIENT_PORT = 55055;
 static constexpr int SERVER_PORT = 55056;
 
+static constexpr int SCAREA_STEPS = 30;
+static constexpr int SCAREA_FULLSCREEN = 0xFFFF;
+
 #ifndef JUCE_WINDOWS
 static const String SERVER_CONFIG_FILE_OLD = "~/.audiogridderserver";
 static const String PLUGIN_CONFIG_FILE_OLD = "~/.audiogridder";

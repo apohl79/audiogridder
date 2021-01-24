@@ -804,14 +804,20 @@ void AudioGridderAudioProcessor::delServer(const String& s) {
 
 void AudioGridderAudioProcessor::increaseSCArea() {
     traceScope();
-    logln("increasing screen capturing area by +" << SCAREA_STEPS << "px");
-    m_client->updateScreenCaptureArea(SCAREA_STEPS);
+    logln("increasing screen capturing area by +" << Defaults::SCAREA_STEPS << "px");
+    m_client->updateScreenCaptureArea(Defaults::SCAREA_STEPS);
 }
 
 void AudioGridderAudioProcessor::decreaseSCArea() {
     traceScope();
-    logln("decreasing screen capturing area by -" << SCAREA_STEPS << "px");
-    m_client->updateScreenCaptureArea(-SCAREA_STEPS);
+    logln("decreasing screen capturing area by -" << Defaults::SCAREA_STEPS << "px");
+    m_client->updateScreenCaptureArea(-Defaults::SCAREA_STEPS);
+}
+
+void AudioGridderAudioProcessor::toggleFullscreenSCArea() {
+    traceScope();
+    logln("toggle fullscreen for screen capturing area");
+    m_client->updateScreenCaptureArea(Defaults::SCAREA_FULLSCREEN);
 }
 
 void AudioGridderAudioProcessor::storeSettingsA() {

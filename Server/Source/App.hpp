@@ -287,14 +287,17 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
         Rectangle<int> getScreenCaptureRect() {
             traceScope();
             if (nullptr != m_editor && nullptr != m_processor) {
-                auto rect = m_editor->getScreenBounds();
-                rect.setSize(rect.getWidth() + m_processor->getAdditionalScreenCapturingSpace(),
-                             rect.getHeight() + m_processor->getAdditionalScreenCapturingSpace());
-                if (rect.getRight() > m_totalRect.getRight()) {
-                    rect.setRight(m_totalRect.getRight());
-                }
-                if (rect.getBottom() > m_totalRect.getBottom()) {
-                    rect.setBottom(m_totalRect.getBottom());
+                bool fullscreen = m_processor->isFullscreen();
+                auto rect = fullscreen ? m_totalRect : m_editor->getScreenBounds();
+                if (!fullscreen) {
+                    rect.setSize(rect.getWidth() + m_processor->getAdditionalScreenCapturingSpace(),
+                                 rect.getHeight() + m_processor->getAdditionalScreenCapturingSpace());
+                    if (rect.getRight() > m_totalRect.getRight()) {
+                        rect.setRight(m_totalRect.getRight());
+                    }
+                    if (rect.getBottom() > m_totalRect.getBottom()) {
+                        rect.setBottom(m_totalRect.getBottom());
+                    }
                 }
                 return rect;
             }

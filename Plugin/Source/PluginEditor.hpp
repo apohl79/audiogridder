@@ -38,6 +38,7 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
   private:
     AudioGridderAudioProcessor& m_processor;
 
+    const int SCREENTOOLS_WIDTH = 17;
     const int SCREENTOOLS_HEIGHT = 17;
     const int SCREENTOOLS_MARGIN = 3;
     const int SCREENTOOLS_AB_WIDTH = 12;
@@ -52,8 +53,13 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     ImageComponent m_logo;
     bool m_connected = false;
 
+    struct ToolsButton : TextButton {
+        void paintButton(Graphics& g, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override;
+    };
+
     // screen tools
-    TextButton m_stPlus, m_stMinus, m_stA, m_stB;
+    ToolsButton m_stPlus, m_stMinus, m_stFullscreen;
+    TextButton m_stA, m_stB;
     int m_currentActiveAB = -1;
     TextButton* m_hilightedStButton = nullptr;
 

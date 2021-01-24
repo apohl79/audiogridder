@@ -129,6 +129,14 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
         m_pluginButtons[as<size_t>(active)]->setActive(true);
     }
 
+    m_stFullscreen.setButtonText("fs");
+    m_stFullscreen.setBounds(201, 1, 1, 1);
+    m_stFullscreen.setColour(ComboBox::outlineColourId, Colour(Defaults::BUTTON_COLOR));
+    m_stFullscreen.setConnectedEdges(Button::ConnectedOnLeft | Button::ConnectedOnRight | Button::ConnectedOnTop |
+                                     Button::ConnectedOnBottom);
+    m_stFullscreen.addListener(this);
+    addAndMakeVisible(&m_stFullscreen);
+
     m_stPlus.setButtonText("+");
     m_stPlus.setBounds(201, 1, 1, 1);
     m_stPlus.setColour(ComboBox::outlineColourId, Colour(Defaults::BUTTON_COLOR));
@@ -136,6 +144,7 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
                                Button::ConnectedOnBottom);
     m_stPlus.addListener(this);
     addAndMakeVisible(&m_stPlus);
+
     m_stMinus.setButtonText("-");
     m_stMinus.setBounds(201, 1, 1, 1);
     m_stMinus.setColour(ComboBox::outlineColourId, Colour(Defaults::BUTTON_COLOR));
@@ -193,6 +202,31 @@ void AudioGridderAudioProcessorEditor::paint(Graphics& g) {
     }
 }
 
+void AudioGridderAudioProcessorEditor::ToolsButton::paintButton(Graphics& g, bool shouldDrawButtonAsHighlighted,
+                                                                bool shouldDrawButtonAsDown) {
+    auto& lf = getLookAndFeel();
+    lf.drawButtonBackground(g, *this, findColour(getToggleState() ? buttonOnColourId : buttonColourId),
+                            shouldDrawButtonAsHighlighted, shouldDrawButtonAsDown);
+    Path p;
+    if (getButtonText() == "+") {
+        p.addLineSegment(Line<float>(3, getHeight() / 2 + 1, getWidth() - 2, getHeight() / 2 + 1), 1.5f);
+        p.addLineSegment(Line<float>(getWidth() / 2 + 1, 3, getWidth() / 2 + 1, getHeight() - 2), 1.5f);
+    } else if (getButtonText() == "-") {
+        p.addLineSegment(Line<float>(2, getHeight() / 2 + 1, getWidth() - 2, getHeight() / 2 + 1), 1.5f);
+    } else if (getButtonText() == "fs") {
+        p.addLineSegment(Line<float>(2, 2, 6, 2), 1.5f);
+        p.addLineSegment(Line<float>(2, 2, 2, 6), 1.5f);
+        p.addLineSegment(Line<float>(getWidth() - 2, 2, getWidth() - 6, 2), 1.5f);
+        p.addLineSegment(Line<float>(getWidth() - 2, 2, getWidth() - 2, 6), 1.5f);
+        p.addLineSegment(Line<float>(2, getHeight() - 2, 6, getHeight() - 2), 1.5f);
+        p.addLineSegment(Line<float>(2, getHeight() - 2, 2, getHeight() - 6), 1.5f);
+        p.addLineSegment(Line<float>(getWidth() - 2, getHeight() - 2, getWidth() - 6, getHeight() - 2), 1.5f);
+        p.addLineSegment(Line<float>(getWidth() - 2, getHeight() - 2, getWidth() - 2, getHeight() - 6), 1.5f);
+    }
+    g.setColour(Colours::white.withAlpha(0.8f));
+    g.fillPath(p);
+}
+
 void AudioGridderAudioProcessorEditor::resized() {
     traceScope();
     int buttonWidth = 196;
@@ -238,6 +272,8 @@ void AudioGridderAudioProcessorEditor::resized() {
                                 SCREENTOOLS_HEIGHT, SCREENTOOLS_HEIGHT);
             m_stPlus.setBounds(windowWidth - SCREENTOOLS_HEIGHT * 2 - SCREENTOOLS_MARGIN * 3, SCREENTOOLS_MARGIN,
                                SCREENTOOLS_HEIGHT, SCREENTOOLS_HEIGHT);
+            m_stFullscreen.setBounds(windowWidth - SCREENTOOLS_HEIGHT * 3 - SCREENTOOLS_MARGIN * 4, SCREENTOOLS_MARGIN,
+                                     SCREENTOOLS_HEIGHT, SCREENTOOLS_HEIGHT);
         }
         m_stA.setBounds(leftBarWidth + SCREENTOOLS_MARGIN, SCREENTOOLS_MARGIN, SCREENTOOLS_AB_WIDTH,
                         SCREENTOOLS_HEIGHT);
@@ -438,6 +474,8 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button) {
         m_processor.increaseSCArea();
     } else if (tb == &m_stMinus) {
         m_processor.decreaseSCArea();
+    } else if (tb == &m_stFullscreen) {
+        m_processor.toggleFullscreenSCArea();
     } else if (tb == &m_stA || tb == &m_stB) {
         m_currentActiveAB = m_processor.getActivePlugin();
         if (isHilightedStButton(&m_stB)) {
