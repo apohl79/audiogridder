@@ -28,7 +28,17 @@ class SplashWindow : public TopLevelWindow {
         lf.setColour(ListBox::backgroundColourId, Colour(Defaults::BG_COLOR));
         lf.setColour(AlertWindow::backgroundColourId, Colour(Defaults::BG_COLOR));
 
-        centreWithSize(640, 300);
+        int w = 640;
+        int h = 300;
+
+        auto disp = Desktop::getInstance().getDisplays().getPrimaryDisplay();
+        Rectangle<int> totalRect;
+        if (nullptr != disp) {
+            totalRect = disp->totalArea;
+            setBounds(totalRect.getCentreX() - w / 2, totalRect.getCentreY() - h, w, h);
+        } else {
+            centreWithSize(w, h);
+        }
 
         m_logo.setImage(ImageCache::getFromMemory(Images::logo_png, Images::logo_pngSize));
         m_logo.setBounds(70, 70, 74, 74);
