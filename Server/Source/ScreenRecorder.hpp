@@ -83,6 +83,7 @@ class ScreenRecorder : public LogTag {
     static EncoderMode m_encMode;
     static double m_scale;
     static int m_quality;
+    static bool m_downScale;
 
     std::unique_ptr<std::thread> m_thread;
     std::atomic_bool m_threadRunning{false};

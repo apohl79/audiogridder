@@ -21,9 +21,10 @@ bool ScreenRecorder::m_initialized = false;
 ScreenRecorder::EncoderMode ScreenRecorder::m_encMode = ScreenRecorder::WEBP;
 double ScreenRecorder::m_scale;
 int ScreenRecorder::m_quality;
+bool ScreenRecorder::m_downScale;
 
-int WEBP_QUALITY[3] = {4000, 8000, 12000};
-int MJPEG_QUALITY[3] = {9000000, 14000000, 19000000};
+int WEBP_QUALITY[3] = {4000, 8000, 16000};
+int MJPEG_QUALITY[3] = {9000000, 14000000, 20000000};
 
 void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode, EncoderQuality quality) {
     setLogTagStatic("screenrec");
@@ -48,6 +49,8 @@ void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode, EncoderQual
         logln("unable to find output codec " << encName);
         return;
     }
+
+    m_downScale = quality != ENC_QUALITY_HIGH;
 
     if (m_initialized) {
         return;
@@ -341,8 +344,13 @@ bool ScreenRecorder::prepareOutput() {
     }
     m_outputCodecCtx->time_base.num = 1;
     m_outputCodecCtx->time_base.den = 30;
-    m_outputCodecCtx->width = (int)(m_captureRect.getWidth() / m_scale);
-    m_outputCodecCtx->height = (int)(m_captureRect.getHeight() / m_scale);
+    if (m_downScale) {
+        m_outputCodecCtx->width = (int)(m_captureRect.getWidth() / m_scale);
+        m_outputCodecCtx->height = (int)(m_captureRect.getHeight() / m_scale);
+    } else {
+        m_outputCodecCtx->width = (int)(m_captureRect.getWidth());
+        m_outputCodecCtx->height = (int)(m_captureRect.getHeight());
+    }
     AVDictionary* opts = nullptr;
     switch (m_encMode) {
         case WEBP:
@@ -466,7 +474,7 @@ void ScreenRecorder::record() {
                             if (retRCP == 0) {
                                 if (initalFramesToSkip == 0) {
                                     m_callback(m_outputPacket->data, m_outputPacket->size, m_outputFrame->width,
-                                               m_outputFrame->height, 1 /*m_scale*/);
+                                               m_outputFrame->height, m_downScale ? 1 : m_scale);
                                 } else {
                                     initalFramesToSkip--;
                                 }
