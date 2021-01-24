@@ -202,6 +202,11 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
         m_noSrvPluginListFilter = noSrvPluginListFilter;
         m_client->reconnect();
     }
+    float scale = m_scale;
+    m_scale = jsonGetValue(j, "ZoomFactor", m_scale);
+    if (m_scale != scale) {
+        Desktop::getInstance().setGlobalScaleFactor(m_scale);
+    }
 }
 
 void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
@@ -234,6 +239,7 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
     jcfg["PluginMonChanName"] = PluginMonitor::getShowChannelName();
     jcfg["SyncRemoteMode"] = m_syncRemote;
     jcfg["NoSrvPluginListFilter"] = m_noSrvPluginListFilter;
+    jcfg["ZoomFactor"] = m_scale;
 
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), jcfg);
 }

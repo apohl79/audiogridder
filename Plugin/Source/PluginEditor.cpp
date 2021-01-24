@@ -774,34 +774,24 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
         subm.clear();
 
         float sf = Desktop::getInstance().getGlobalScaleFactor();
-        subm.addItem("50%", true, sf == 0.5f, [this] {
+        auto updateZoom = [this, sf](float f) -> std::function<void()> {
             traceScope();
-            Desktop::getInstance().setGlobalScaleFactor(0.5f);
-        });
-        subm.addItem("75%", true, sf == 0.75f, [this] {
-            traceScope();
-            Desktop::getInstance().setGlobalScaleFactor(0.75f);
-        });
-        subm.addItem("100%", true, sf == 1.0f, [this] {
-            traceScope();
-            Desktop::getInstance().setGlobalScaleFactor(1.0f);
-        });
-        subm.addItem("125%", true, sf == 1.25f, [this] {
-            traceScope();
-            Desktop::getInstance().setGlobalScaleFactor(1.25f);
-        });
-        subm.addItem("150%", true, sf == 1.5f, [this] {
-            traceScope();
-            Desktop::getInstance().setGlobalScaleFactor(1.5f);
-        });
-        subm.addItem("175%", true, sf == 1.75f, [this] {
-            traceScope();
-            Desktop::getInstance().setGlobalScaleFactor(1.75f);
-        });
-        subm.addItem("200%", true, sf == 2.0f, [this] {
-            traceScope();
-            Desktop::getInstance().setGlobalScaleFactor(2.0f);
-        });
+            return [this, sf, f] {
+                if (f != sf) {
+                    logln("updating scale factor to " << f);
+                    Desktop::getInstance().setGlobalScaleFactor(f);
+                    m_processor.setScaleFactor(f);
+                    m_processor.saveConfig();
+                }
+            };
+        };
+        subm.addItem("50%", true, sf == 0.5f, updateZoom(0.5f));
+        subm.addItem("75%", true, sf == 0.75f, updateZoom(0.75f));
+        subm.addItem("100%", true, sf == 1.0f, updateZoom(1.0f));
+        subm.addItem("125%", true, sf == 1.25f, updateZoom(1.25f));
+        subm.addItem("150%", true, sf == 1.5f, updateZoom(1.5f));
+        subm.addItem("175%", true, sf == 1.75f, updateZoom(1.75f));
+        subm.addItem("200%", true, sf == 2.0f, updateZoom(2.0f));
         m.addSubMenu("Zoom", subm);
         subm.clear();
 
