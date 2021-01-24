@@ -57,6 +57,9 @@ void App::initialise(const String& commandLineParameters) {
     logln("commandline: " << commandLineParameters);
     switch (mode) {
         case SCAN:
+#ifdef JUCE_MAC
+            Process::setDockIconVisible(false);
+#endif
             AGLogger::setEnabled(true);
             if (fileToScan.length() > 0) {
                 auto parts = StringArray::fromTokens(fileToScan, "|", "");
@@ -99,6 +102,9 @@ void App::initialise(const String& commandLineParameters) {
             break;
         }
         case MASTER:
+#ifdef JUCE_MAC
+            Process::setDockIconVisible(false);
+#endif
             m_child = std::make_unique<std::thread>([this, srvid] {
                 ChildProcess proc;
                 StringArray proc_args;
