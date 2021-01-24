@@ -1,6 +1,6 @@
 cd ..
-del /F /Q build-win-10-x86_64
-cmake -B build-win-10-x86_64 -DFFMPEG_ROOT=z:/ag-deps-win-x86_64
+del /F /S /Q build-win-10-x86_64
+cmake -B build-win-10-x86_64 -A x64 -DFFMPEG_ROOT=z:/ag-deps-win-x86_64
 cmake --build build-win-10-x86_64 --config RelWithDebInfo -j6
 
 cd package
