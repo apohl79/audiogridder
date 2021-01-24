@@ -512,7 +512,7 @@ void Server::run() {
     saveConfig();
     saveKnownPluginList();
 
-    getApp()->hideSplashWindow();
+    getApp()->hideSplashWindow(1000);
 
 #ifndef JUCE_WINDOWS
     setsockopt(m_masterSocket.getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);

@@ -20,9 +20,6 @@
 namespace e47 {
 
 void App::initialise(const String& commandLineParameters) {
-#ifdef JUCE_MAC
-    Process::setDockIconVisible(false);
-#endif
     auto args = getCommandLineParameterArray();
     enum Modes { SCAN, MASTER, SERVER };
     Modes mode = MASTER;
