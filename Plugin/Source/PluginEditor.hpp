@@ -38,7 +38,6 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
   private:
     AudioGridderAudioProcessor& m_processor;
 
-    const int SCREENTOOLS_WIDTH = 17;
     const int SCREENTOOLS_HEIGHT = 17;
     const int SCREENTOOLS_MARGIN = 3;
     const int SCREENTOOLS_AB_WIDTH = 12;
