@@ -106,7 +106,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     }
     LoadedPlugin& getLoadedPlugin(int idx) {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
-        return idx > -1 ? m_loadedPlugins[as<size_t>(idx)] : m_unusedDummyPlugin;
+        return idx > -1 && idx < (int)m_loadedPlugins.size() ? m_loadedPlugins[(size_t)idx] : m_unusedDummyPlugin;
     }
 
     bool loadPlugin(const String& id, const String& name, String& err);
@@ -119,7 +119,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     void bypassPlugin(int idx);
     void unbypassPlugin(int idx);
     void exchangePlugins(int idxA, int idxB);
-    bool enableParamAutomation(int idx, int paramIdx, int slot = -1);
+    bool enableParamAutomation(int idx, int paramIdx, int slot = -1, bool needsLock = true);
     void disableParamAutomation(int idx, int paramIdx);
     void getAllParameterValues(int idx);
     void increaseSCArea();

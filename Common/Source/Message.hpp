@@ -404,7 +404,12 @@ class StringPayload : public Payload {
         memcpy(str, s.getCharPointer(), as<size_t>(s.length()));
     }
 
-    String getString() const { return String(str, static_cast<size_t>(*size)); }
+    String getString() const {
+        if (nullptr != str && nullptr != size && *size > 0) {
+            return String(str, static_cast<size_t>(*size));
+        }
+        return {};
+    }
 
     virtual void realign() override {
         size = reinterpret_cast<int*>(payloadBuffer.data());
@@ -443,6 +448,9 @@ class JsonPayload : public BinaryPayload {
     }
 
     json getJson() {
+        if (nullptr == data) {
+            return {};
+        }
         try {
             return json::parse(data, data + *size);
         } catch (json::parse_error& e) {
@@ -755,6 +763,7 @@ class Message : public LogTagDelegate {
                         traceln(estr);
                     } else {
                         payload.setType(hdr.type);
+                        traceln("size=" << hdr.size);
                         if (hdr.size > 0) {
                             if (hdr.size > MAX_SIZE) {
                                 success = false;
