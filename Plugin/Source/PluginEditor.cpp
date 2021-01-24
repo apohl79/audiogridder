@@ -699,11 +699,8 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
             m_processor.saveConfig();
             editPlugin();
         });
-        m.addItem("Confirm Delete", true, m_processor.getConfirmDelete(), [this] {
-            traceScope();
-            m_processor.setConfirmDelete(!m_processor.getConfirmDelete());
-            m_processor.saveConfig();
-        });
+
+        m.addSeparator();
 
         PopupMenu subm;
         subm.addItem("Show Category", true, m_processor.getMenuShowCategory(), [this] {
@@ -738,6 +735,46 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
         m.addSubMenu("Plugin Monitor", subm);
         subm.clear();
 
+        float sf = Desktop::getInstance().getGlobalScaleFactor();
+        subm.addItem("50%", true, sf == 0.5f, [this] {
+            traceScope();
+            Desktop::getInstance().setGlobalScaleFactor(0.5f);
+        });
+        subm.addItem("75%", true, sf == 0.75f, [this] {
+            traceScope();
+            Desktop::getInstance().setGlobalScaleFactor(0.75f);
+        });
+        subm.addItem("100%", true, sf == 1.0f, [this] {
+            traceScope();
+            Desktop::getInstance().setGlobalScaleFactor(1.0f);
+        });
+        subm.addItem("125%", true, sf == 1.25f, [this] {
+            traceScope();
+            Desktop::getInstance().setGlobalScaleFactor(1.25f);
+        });
+        subm.addItem("150%", true, sf == 1.5f, [this] {
+            traceScope();
+            Desktop::getInstance().setGlobalScaleFactor(1.5f);
+        });
+        subm.addItem("175%", true, sf == 1.75f, [this] {
+            traceScope();
+            Desktop::getInstance().setGlobalScaleFactor(1.75f);
+        });
+        subm.addItem("200%", true, sf == 2.0f, [this] {
+            traceScope();
+            Desktop::getInstance().setGlobalScaleFactor(2.0f);
+        });
+        m.addSubMenu("Zoom", subm);
+        subm.clear();
+
+        m.addSeparator();
+
+        m.addItem("Confirm Delete", true, m_processor.getConfirmDelete(), [this] {
+            traceScope();
+            m_processor.setConfirmDelete(!m_processor.getConfirmDelete());
+            m_processor.saveConfig();
+        });
+
         subm.addItem("Always (every 10s)", true,
                      m_processor.getSyncRemoteMode() == AudioGridderAudioProcessor::SYNC_ALWAYS, [this] {
                          m_processor.setSyncRemoteMode(AudioGridderAudioProcessor::SYNC_ALWAYS);
@@ -755,6 +792,8 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
                      });
         m.addSubMenu("Remote Sync Frequency", subm);
         subm.clear();
+
+        m.addSeparator();
 
         subm.addItem("Logging", true, AGLogger::isEnabled(), [this] {
             traceScope();
