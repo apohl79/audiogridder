@@ -287,9 +287,9 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
         Rectangle<int> getScreenCaptureRect() {
             traceScope();
             if (nullptr != m_editor && nullptr != m_processor) {
-                bool fullscreen = m_processor->isFullscreen();
-                auto rect = fullscreen ? m_totalRect : m_editor->getScreenBounds();
-                if (!fullscreen) {
+                bool fs = m_processor->isFullscreen();
+                auto rect = fs ? m_totalRect : m_editor->getScreenBounds();
+                if (!fs) {
                     rect.setSize(rect.getWidth() + m_processor->getAdditionalScreenCapturingSpace(),
                                  rect.getHeight() + m_processor->getAdditionalScreenCapturingSpace());
                     if (rect.getRight() > m_totalRect.getRight()) {

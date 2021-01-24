@@ -209,19 +209,19 @@ void AudioGridderAudioProcessorEditor::ToolsButton::paintButton(Graphics& g, boo
                             shouldDrawButtonAsHighlighted, shouldDrawButtonAsDown);
     Path p;
     if (getButtonText() == "+") {
-        p.addLineSegment(Line<float>(3, getHeight() / 2 + 1, getWidth() - 2, getHeight() / 2 + 1), 1.5f);
-        p.addLineSegment(Line<float>(getWidth() / 2 + 1, 3, getWidth() / 2 + 1, getHeight() - 2), 1.5f);
+        p.addLineSegment(Line<int>(3, getHeight() / 2 + 1, getWidth() - 2, getHeight() / 2 + 1).toFloat(), 1.5f);
+        p.addLineSegment(Line<int>(getWidth() / 2 + 1, 3, getWidth() / 2 + 1, getHeight() - 2).toFloat(), 1.5f);
     } else if (getButtonText() == "-") {
-        p.addLineSegment(Line<float>(2, getHeight() / 2 + 1, getWidth() - 2, getHeight() / 2 + 1), 1.5f);
+        p.addLineSegment(Line<int>(2, getHeight() / 2 + 1, getWidth() - 2, getHeight() / 2 + 1).toFloat(), 1.5f);
     } else if (getButtonText() == "fs") {
-        p.addLineSegment(Line<float>(2, 2, 6, 2), 1.5f);
-        p.addLineSegment(Line<float>(2, 2, 2, 6), 1.5f);
-        p.addLineSegment(Line<float>(getWidth() - 2, 2, getWidth() - 6, 2), 1.5f);
-        p.addLineSegment(Line<float>(getWidth() - 2, 2, getWidth() - 2, 6), 1.5f);
-        p.addLineSegment(Line<float>(2, getHeight() - 2, 6, getHeight() - 2), 1.5f);
-        p.addLineSegment(Line<float>(2, getHeight() - 2, 2, getHeight() - 6), 1.5f);
-        p.addLineSegment(Line<float>(getWidth() - 2, getHeight() - 2, getWidth() - 6, getHeight() - 2), 1.5f);
-        p.addLineSegment(Line<float>(getWidth() - 2, getHeight() - 2, getWidth() - 2, getHeight() - 6), 1.5f);
+        p.addLineSegment(Line<int>(2, 2, 6, 2).toFloat(), 1.5f);
+        p.addLineSegment(Line<int>(2, 2, 2, 6).toFloat(), 1.5f);
+        p.addLineSegment(Line<int>(getWidth() - 2, 2, getWidth() - 6, 2).toFloat(), 1.5f);
+        p.addLineSegment(Line<int>(getWidth() - 2, 2, getWidth() - 2, 6).toFloat(), 1.5f);
+        p.addLineSegment(Line<int>(2, getHeight() - 2, 6, getHeight() - 2).toFloat(), 1.5f);
+        p.addLineSegment(Line<int>(2, getHeight() - 2, 2, getHeight() - 6).toFloat(), 1.5f);
+        p.addLineSegment(Line<int>(getWidth() - 2, getHeight() - 2, getWidth() - 6, getHeight() - 2).toFloat(), 1.5f);
+        p.addLineSegment(Line<int>(getWidth() - 2, getHeight() - 2, getWidth() - 2, getHeight() - 6).toFloat(), 1.5f);
     }
     g.setColour(Colours::white.withAlpha(0.8f));
     g.fillPath(p);

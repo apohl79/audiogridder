@@ -60,7 +60,7 @@ class ServerPlugin {
             return ServerPlugin(j["name"].get<std::string>(), j["company"].get<std::string>(),
                                 j["id"].get<std::string>(), j["type"].get<std::string>(),
                                 j["category"].get<std::string>(), j["isInstrument"].get<bool>());
-        } catch (json::parse_error& e) {
+        } catch (json::parse_error&) {
             auto parts = StringArray::fromTokens(s, ";", "");
             return ServerPlugin(parts[0], parts[1], parts[2], parts[3], parts[4], false);
         }
