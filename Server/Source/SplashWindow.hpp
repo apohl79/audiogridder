@@ -18,7 +18,7 @@ namespace e47 {
 
 class SplashWindow : public TopLevelWindow {
   public:
-    SplashWindow() : TopLevelWindow("Splash", true) {
+    SplashWindow() : TopLevelWindow("AudioGridderServer", true) {
         auto& lf = getLookAndFeel();
         lf.setColour(ResizableWindow::backgroundColourId, Colour(Defaults::BG_COLOR));
         lf.setColour(PopupMenu::backgroundColourId, Colour(Defaults::BG_COLOR));
