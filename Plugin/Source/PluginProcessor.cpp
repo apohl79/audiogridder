@@ -637,6 +637,7 @@ bool AudioGridderAudioProcessor::loadPlugin(const String& id, const String& name
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
         m_loadedPlugins.push_back({id, name, "", presets, params, false, true});
     }
+    m_client->setLoadedPluginsString(getLoadedPluginsString());
     return success;
 }
 
@@ -655,14 +656,17 @@ void AudioGridderAudioProcessor::unloadPlugin(int idx) {
         m_activePlugin--;
     }
 
-    std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
-    int i = 0;
-    for (auto it = m_loadedPlugins.begin(); it < m_loadedPlugins.end(); it++) {
-        if (i++ == idx) {
-            m_loadedPlugins.erase(it);
-            return;
+    {
+        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+        int i = 0;
+        for (auto it = m_loadedPlugins.begin(); it < m_loadedPlugins.end(); it++) {
+            if (i++ == idx) {
+                m_loadedPlugins.erase(it);
+                break;
+            }
         }
     }
+    m_client->setLoadedPluginsString(getLoadedPluginsString());
 }
 
 String AudioGridderAudioProcessor::getLoadedPluginsString() const {
