@@ -186,6 +186,8 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
     PluginMonitor::setShowChannelColor(jsonGetValue(j, "PluginMonChanColor", PluginMonitor::getShowChannelColor()));
     PluginMonitor::setShowChannelName(jsonGetValue(j, "PluginMonChanName", PluginMonitor::getShowChannelName()));
 
+    m_scale = jsonGetValue(j, "ZoomFactor", m_scale);
+
     if (!isUpdate) {
         if (jsonHasValue(j, "Servers")) {
             for (auto& srv : j["Servers"]) {
@@ -196,6 +198,10 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
         m_activeServerLegacyFromCfg = jsonGetValue(j, "Last", m_activeServerLegacyFromCfg);
         m_client->NUM_OF_BUFFERS = jsonGetValue(j, "NumberOfBuffers", m_client->NUM_OF_BUFFERS.load());
         m_client->LOAD_PLUGIN_TIMEOUT = jsonGetValue(j, "LoadPluginTimeoutMS", m_client->LOAD_PLUGIN_TIMEOUT.load());
+
+        if (m_scale != Desktop::getInstance().getGlobalScaleFactor()) {
+            Desktop::getInstance().setGlobalScaleFactor(m_scale);
+        }
     }
 
     m_numberOfAutomationSlots = jsonGetValue(j, "NumberOfAutomationSlots", m_numberOfAutomationSlots);
@@ -208,11 +214,6 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
     if (noSrvPluginListFilter != m_noSrvPluginListFilter) {
         m_noSrvPluginListFilter = noSrvPluginListFilter;
         m_client->reconnect();
-    }
-    m_scale = jsonGetValue(j, "ZoomFactor", m_scale);
-
-    if (m_scale != Desktop::getInstance().getGlobalScaleFactor()) {
-        Desktop::getInstance().setGlobalScaleFactor(m_scale);
     }
 }
 
