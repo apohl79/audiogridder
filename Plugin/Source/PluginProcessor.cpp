@@ -118,12 +118,16 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
                 idx++;
             }
         }
+        m_client->setLoadedPluginsString(getLoadedPluginsString());
+
         for (auto& ap : automationParams) {
             enableParamAutomation(std::get<0>(ap), std::get<1>(ap), std::get<2>(ap));
         }
+
         if (updLatency) {
             updateLatency(m_client->getLatencySamples());
         }
+
         runOnMsgThreadAsync([this] {
             traceScope();
             auto* editor = getActiveEditor();
