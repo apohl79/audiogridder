@@ -14,16 +14,17 @@
 namespace e47 {
 
 PluginStatus::PluginStatus(AudioGridderAudioProcessor* plugin) {
-    ok = plugin->getClient().isReadyLockFree();
+    auto& client = plugin->getClient();
+    ok = client.isReadyLockFree();
     auto track = plugin->getTrackProperties();
     channelName = track.name;
     channelColour = track.colour;
-    loadedPlugins = plugin->getLoadedPluginsString();
+    loadedPlugins = client.getLoadedPluginsString();
     String statId = "audio.";
     statId << plugin->getId();
     auto ts = Metrics::getStatistic<TimeStatistic>(statId);
     perf95th = ts->get1minHistogram().nintyFifth;
-    blocks = plugin->getClient().NUM_OF_BUFFERS;
+    blocks = client.NUM_OF_BUFFERS;
 }
 
 PluginMonitorWindow::PluginMonitorWindow(PluginMonitor* mon, const String& mode)
