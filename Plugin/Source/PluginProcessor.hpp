@@ -119,7 +119,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     void bypassPlugin(int idx);
     void unbypassPlugin(int idx);
     void exchangePlugins(int idxA, int idxB);
-    bool enableParamAutomation(int idx, int paramIdx, int slot = -1, bool needsLock = true);
+    bool enableParamAutomation(int idx, int paramIdx, int slot = -1);
     void disableParamAutomation(int idx, int paramIdx);
     void getAllParameterValues(int idx);
     void increaseSCArea();

@@ -87,6 +87,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
         traceScope();
         logln("connected");
         bool updLatency = false;
+        std::vector<std::tuple<int, int, int>> automationParams;
         int idx = 0;
         {
             std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
@@ -107,7 +108,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
                     for (auto& param : p.params) {
                         if (param.automationSlot > -1) {
                             if (param.automationSlot < m_numberOfAutomationSlots) {
-                                enableParamAutomation(idx, param.idx, param.automationSlot, false);
+                                automationParams.push_back({idx, param.idx, param.automationSlot});
                             } else {
                                 param.automationSlot = -1;
                             }
@@ -116,6 +117,9 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
                 }
                 idx++;
             }
+        }
+        for (auto& ap : automationParams) {
+            enableParamAutomation(std::get<0>(ap), std::get<1>(ap), std::get<2>(ap));
         }
         if (updLatency) {
             updateLatency(m_client->getLatencySamples());
@@ -787,15 +791,12 @@ void AudioGridderAudioProcessor::exchangePlugins(int idxA, int idxB) {
     }
 }
 
-bool AudioGridderAudioProcessor::enableParamAutomation(int idx, int paramIdx, int slot, bool needsLock) {
+bool AudioGridderAudioProcessor::enableParamAutomation(int idx, int paramIdx, int slot) {
     traceScope();
     logln("enabling automation for plugin " << idx << ", parameter " << paramIdx << ", slot " << slot);
     bool updateHost = false;
     {
-        std::unique_ptr<std::lock_guard<std::mutex>> lock;
-        if (needsLock) {  // Refactor this.... ugly
-            lock = std::make_unique<std::lock_guard<std::mutex>>(m_loadedPluginsSyncMtx);
-        }
+        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
         auto& param = m_loadedPlugins[(size_t)idx].params.getReference(paramIdx);
         Parameter* pparam = nullptr;
         if (slot == -1) {
