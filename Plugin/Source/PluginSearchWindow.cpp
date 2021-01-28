@@ -133,7 +133,7 @@ void PluginSearchWindow::updateHeight() {
         minHeight += SEPARATOR_HEIGHT - ITEM_HEIGHT;
     }
     int distMoveUp = 0;
-    auto disp = Desktop::getInstance().getDisplays().getPrimaryDisplay();
+    auto disp = Desktop::getInstance().getDisplays().getDisplayForRect(getBounds());
     if (nullptr != disp) {
         auto totalArea = disp->totalArea;
         int screenBottom = getScreenY() + totalHeight;

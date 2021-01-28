@@ -136,6 +136,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
             }
         });
     }));
+
     // handle connection close
     m_client->setOnCloseCallback(safeLambda([this] {
         traceScope();
@@ -148,6 +149,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
             }
         });
     }));
+
     if (m_activeServerFromCfg.isNotEmpty()) {
         m_client->setServer(m_activeServerFromCfg);
     } else if (m_activeServerLegacyFromCfg > -1 && m_activeServerLegacyFromCfg < m_servers.size()) {
