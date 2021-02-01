@@ -30,8 +30,8 @@ class ServerSettingsWindow : public DocumentWindow, public LogTag {
     ToggleButton m_auSupport, m_vst3Support, m_vst2Support, m_screenDiffDetection, m_scanForPlugins, m_tracer, m_logger,
         m_vstNoStandardFolders, m_parallelPluginLoad, m_sandbox;
     TextButton m_saveButton;
-    Label m_screenJpgQualityLbl, m_screenDiffDetectionLbl;
-    ComboBox m_screenCapturingMode;
+    Label m_screenJpgQualityLbl, m_screenDiffDetectionLbl, m_screenCapturingQualityLbl;
+    ComboBox m_screenCapturingMode, m_screenCapturingQuality;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ServerSettingsWindow)
 };

@@ -60,6 +60,8 @@ class Server : public Thread, public LogTag {
     void setScreenCapturingFFmpeg(bool b) { m_screenCapturingFFmpeg = b; }
     ScreenRecorder::EncoderMode getScreenCapturingFFmpegEncoder() const { return m_screenCapturingFFmpegEncMode; }
     void setScreenCapturingFFmpegEncoder(ScreenRecorder::EncoderMode m) { m_screenCapturingFFmpegEncMode = m; }
+    ScreenRecorder::EncoderQuality getScreenCapturingFFmpegQuality() const { return m_screenCapturingFFmpegQuality; }
+    void setScreenCapturingFFmpegQuality(ScreenRecorder::EncoderQuality q) { m_screenCapturingFFmpegQuality = q; }
     bool getScreenCapturingOff() const { return m_screenCapturingOff; }
     void setScreenCapturingOff(bool b) { m_screenCapturingOff = b; }
     bool getScanForPlugins() const { return m_scanForPlugins; }
@@ -107,6 +109,7 @@ class Server : public Thread, public LogTag {
     bool m_screenCapturingFFmpeg = true;
     bool m_screenCapturingOff = false;
     ScreenRecorder::EncoderMode m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
+    ScreenRecorder::EncoderQuality m_screenCapturingFFmpegQuality = ScreenRecorder::ENC_QUALITY_MEDIUM;
     StringArray m_vst3Folders;
     StringArray m_vst2Folders;
     bool m_vstNoStandardFolders;

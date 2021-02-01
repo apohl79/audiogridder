@@ -11,13 +11,16 @@
 namespace e47 {
 
 PluginSearchWindow::PluginSearchWindow(float x, float y, AudioGridderAudioProcessor& p)
-    : TopLevelWindow("Search", true), LogTagDelegate(&p.getClient()), m_processor(p) {
+    : TopLevelWindow("Search", true),
+      LogTagDelegate(&p.getClient()),
+      m_processor(p),
+      m_showType(m_processor.getNoSrvPluginListFilter()) {
     traceScope();
 
     setWantsKeyboardFocus(false);
     setAlwaysOnTop(true);
 
-    int totalWidth = 250;
+    int totalWidth = m_showType ? 300 : 270;
     int totalHeight = 35;
 
     setBounds((int)lroundf(x), (int)lroundf(y), totalWidth, totalHeight);
@@ -130,7 +133,7 @@ void PluginSearchWindow::updateHeight() {
         minHeight += SEPARATOR_HEIGHT - ITEM_HEIGHT;
     }
     int distMoveUp = 0;
-    auto disp = Desktop::getInstance().getDisplays().getPrimaryDisplay();
+    auto disp = Desktop::getInstance().getDisplays().getDisplayForRect(getBounds());
     if (nullptr != disp) {
         auto totalArea = disp->totalArea;
         int screenBottom = getScreenY() + totalHeight;
@@ -166,17 +169,28 @@ void PluginSearchWindow::updateTree(const String& filter) {
 
     if (filter.isEmpty() && !m_recents.empty()) {
         for (const auto& plug : m_recents) {
-            root->addSubItem(new TreePlugin(plug, addFn));
+            root->addSubItem(new TreePlugin(plug, addFn, m_showType));
         }
         root->addSubItem(new TreeSeparator());
     }
+
+    auto filterParts = StringArray::fromTokens(filter, " ", "");
 
     // ceate menu structure: type -> [category] -> [company] -> plugin
     std::map<String, MenuLevel> menuMap;
     for (const auto& type : m_processor.getPluginTypes()) {
         for (const auto& plug : m_processor.getPlugins(type)) {
-            if (filter.isNotEmpty() && !plug.getName().containsIgnoreCase(filter)) {
-                continue;
+            if (filterParts.size() > 0) {
+                bool match = true;
+                for (auto& f : filterParts) {
+                    if (f.isNotEmpty() && !plug.getName().containsIgnoreCase(f) &&
+                        !plug.getCompany().containsIgnoreCase(f) && !plug.getCategory().containsIgnoreCase(f)) {
+                        match = false;
+                    }
+                }
+                if (!match) {
+                    continue;
+                }
             }
             auto& typeEntry = menuMap[type];
             if (nullptr == typeEntry.subMap) {
@@ -215,7 +229,7 @@ TreeViewItem* PluginSearchWindow::createPluginMenu(const String& name, MenuLevel
     if (nullptr != level.entryMap) {
         for (auto& pair : *level.entryMap) {
             auto& plug = pair.second;
-            m->addSubItem(new TreePlugin(plug, addFn));
+            m->addSubItem(new TreePlugin(plug, addFn, m_showType));
         }
     }
     if (nullptr != level.subMap) {

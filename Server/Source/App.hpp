@@ -78,7 +78,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
                     }
                     app->hideSplashWindow();
                 });
-                String info = L"© 2020-2021 Andreas Pohl, https://audiogridder.com (MIT license)";
+                String info = L"© 2020-2021 Andreas Pohl, https://audiogridder.com";
                 app->setSplashInfo(info);
             });
             const char* logoNoMac = Images::logowintray_png;
@@ -117,7 +117,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
                     }
                     m_app->hideSplashWindow();
                 });
-                String info = L"© 2020-2021 Andreas Pohl, https://audiogridder.com (MIT license)";
+                String info = L"© 2020-2021 Andreas Pohl, https://audiogridder.com";
                 m_app->setSplashInfo(info);
             });
             menu.addItem("Restart", [this] { m_app->prepareShutdown(App::EXIT_RESTART); });
@@ -142,7 +142,8 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
 
     void updateDockIcon() {
 #ifdef JUCE_MAC
-        bool show = nullptr != m_srvSettingsWindow || nullptr != m_statsWindow || nullptr != m_pluginListWindow;
+        bool show = nullptr != m_srvSettingsWindow || nullptr != m_statsWindow || nullptr != m_pluginListWindow ||
+                    nullptr != m_splashWindow;
         Process::setDockIconVisible(show);
 #endif
     }
@@ -204,6 +205,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
         traceScope();
         if (nullptr == m_splashWindow) {
             m_splashWindow = std::make_shared<SplashWindow>();
+            updateDockIcon();
         }
         if (onClick) {
             m_splashWindow->onClick = onClick;
@@ -211,11 +213,20 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     }
 
     // called from the server thread
-    void hideSplashWindow() {
+    void hideSplashWindow(int wait = 0) {
         traceScope();
         auto ptrcpy = m_splashWindow;
         m_splashWindow.reset();
-        runOnMsgThreadAsync([ptrcpy] {});
+        std::thread([this, ptrcpy, wait] {
+            Thread::sleep(wait);
+            int step = 10;
+            while (step-- > 0) {
+                float alpha = 1.0f * (float)step / 10.0f;
+                runOnMsgThreadAsync([ptrcpy, alpha] { ptrcpy->setAlpha(alpha); });
+                Thread::sleep(40);
+            }
+            runOnMsgThreadAsync([this, ptrcpy] { updateDockIcon(); });
+        }).detach();
     }
 
     void setSplashInfo(const String& txt) {
@@ -276,14 +287,17 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
         Rectangle<int> getScreenCaptureRect() {
             traceScope();
             if (nullptr != m_editor && nullptr != m_processor) {
-                auto rect = m_editor->getScreenBounds();
-                rect.setSize(rect.getWidth() + m_processor->getAdditionalScreenCapturingSpace(),
-                             rect.getHeight() + m_processor->getAdditionalScreenCapturingSpace());
-                if (rect.getRight() > m_totalRect.getRight()) {
-                    rect.setRight(m_totalRect.getRight());
-                }
-                if (rect.getBottom() > m_totalRect.getBottom()) {
-                    rect.setBottom(m_totalRect.getBottom());
+                bool fs = m_processor->isFullscreen();
+                auto rect = fs ? m_totalRect : m_editor->getScreenBounds();
+                if (!fs) {
+                    rect.setSize(rect.getWidth() + m_processor->getAdditionalScreenCapturingSpace(),
+                                 rect.getHeight() + m_processor->getAdditionalScreenCapturingSpace());
+                    if (rect.getRight() > m_totalRect.getRight()) {
+                        rect.setRight(m_totalRect.getRight());
+                    }
+                    if (rect.getBottom() > m_totalRect.getBottom()) {
+                        rect.setBottom(m_totalRect.getBottom());
+                    }
                 }
                 return rect;
             }

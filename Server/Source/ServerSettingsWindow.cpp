@@ -30,7 +30,8 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     int wideFieldWidth = 250;
     int fieldHeight = 25;
     int labelWidth = 250;
-    int labelHeight = 30;
+    int labelHeight = 35;
+    int headerHeight = 18;
     int checkBoxWidth = 25;
     int checkBoxHeight = 25;
     int largeFieldRows = 2;
@@ -58,6 +59,9 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     auto getLargeFieldBounds = [&](int r) {
         return juce::Rectangle<int>(totalWidth - largeFieldWidth - borderLR, borderTB + r * rowHeight + 3,
                                     largeFieldWidth, largeFieldHeight);
+    };
+    auto getHeaderBounds = [&](int r) {
+        return juce::Rectangle<int>(borderLR, borderTB + r * rowHeight + 7, totalWidth - borderLR * 2, headerHeight);
     };
 
     int row = 0;
@@ -122,6 +126,18 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_sandbox.setBounds(getCheckBoxBounds(row));
     m_sandbox.setToggleState(m_app->getServer().getSandboxing(), NotificationType::dontSendNotification);
     addChildAndSetID(&m_sandbox, "sandbox");
+
+    row++;
+
+    label = std::make_unique<Label>();
+    label->setText("Plugin Formats", NotificationType::dontSendNotification);
+    label->setJustificationType(Justification::centredTop);
+    label->setBounds(getHeaderBounds(row));
+    label->setColour(Label::backgroundColourId, Colours::white.withAlpha(0.08f));
+    label->setColour(Label::outlineColourId, Colours::white.withAlpha(0.03f));
+    label->setAlpha(0.6f);
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
 
     row++;
 
@@ -219,6 +235,18 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     row++;
 
     label = std::make_unique<Label>();
+    label->setText("Screen Capturing", NotificationType::dontSendNotification);
+    label->setJustificationType(Justification::centredTop);
+    label->setBounds(getHeaderBounds(row));
+    label->setColour(Label::backgroundColourId, Colours::white.withAlpha(0.08f));
+    label->setColour(Label::outlineColourId, Colours::white.withAlpha(0.03f));
+    label->setAlpha(0.6f);
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
+
+    row++;
+
+    label = std::make_unique<Label>();
     label->setText("Screen Capturing Mode:", NotificationType::dontSendNotification);
     label->setBounds(getLabelBounds(row));
     addChildAndSetID(label.get(), "lbl");
@@ -253,6 +281,10 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
             m_screenJpgQualityLbl.setAlpha(0.5);
             m_screenJpgQuality.setEnabled(false);
             m_screenJpgQuality.setAlpha(0.5);
+
+            m_screenCapturingQualityLbl.setAlpha(1);
+            m_screenCapturingQuality.setAlpha(1);
+            m_screenCapturingQuality.setEnabled(true);
         } else {
             m_screenDiffDetectionLbl.setAlpha(1);
             m_screenDiffDetection.setEnabled(true);
@@ -260,6 +292,11 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
             m_screenJpgQualityLbl.setAlpha(1);
             m_screenJpgQuality.setEnabled(true);
             m_screenJpgQuality.setAlpha(1);
+
+            m_screenCapturingQualityLbl.setAlpha(0.5);
+            m_screenCapturingQuality.setAlpha(0.5);
+            m_screenCapturingQuality.setEnabled(false);
+
             if (nullptr != m_screenDiffDetection.onClick) {
                 m_screenDiffDetection.onClick();
             }
@@ -271,7 +308,21 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     row++;
 
     label = std::make_unique<Label>();
-    m_screenDiffDetectionLbl.setText("Screen Capture Diff Detection:", NotificationType::dontSendNotification);
+    m_screenCapturingQualityLbl.setText("Screen Capturing Quality:", NotificationType::dontSendNotification);
+    m_screenCapturingQualityLbl.setBounds(getLabelBounds(row));
+    addChildAndSetID(&m_screenCapturingQualityLbl, "lbl");
+
+    m_screenCapturingQuality.setBounds(getWideFieldBounds(row));
+    m_screenCapturingQuality.addItem("High", ScreenRecorder::ENC_QUALITY_HIGH + 1);
+    m_screenCapturingQuality.addItem("Medium", ScreenRecorder::ENC_QUALITY_MEDIUM + 1);
+    m_screenCapturingQuality.addItem("Low", ScreenRecorder::ENC_QUALITY_LOW + 1);
+    m_screenCapturingQuality.setSelectedId(m_app->getServer().getScreenCapturingFFmpegQuality() + 1);
+
+    addChildAndSetID(&m_screenCapturingQuality, "captqual");
+
+    row++;
+
+    m_screenDiffDetectionLbl.setText("Legacy Diff Detection:", NotificationType::dontSendNotification);
     m_screenDiffDetectionLbl.setBounds(getLabelBounds(row));
     addChildAndSetID(&m_screenDiffDetectionLbl, "lbl");
 
@@ -296,7 +347,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 
     row++;
 
-    m_screenJpgQualityLbl.setText("Screen Capture Quality (0.1-1.0):", NotificationType::dontSendNotification);
+    m_screenJpgQualityLbl.setText("Legacy Quality (0.1-1.0):", NotificationType::dontSendNotification);
     m_screenJpgQualityLbl.setBounds(getLabelBounds(row));
     addChildAndSetID(&m_screenJpgQualityLbl, "lbl");
 
@@ -305,6 +356,18 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_screenJpgQuality.setText(q);
     m_screenJpgQuality.setBounds(getFieldBounds(row));
     addChildAndSetID(&m_screenJpgQuality, "qual");
+
+    row++;
+
+    label = std::make_unique<Label>();
+    label->setText("Startup", NotificationType::dontSendNotification);
+    label->setJustificationType(Justification::centredTop);
+    label->setBounds(getHeaderBounds(row));
+    label->setColour(Label::backgroundColourId, Colours::white.withAlpha(0.08f));
+    label->setColour(Label::outlineColourId, Colours::white.withAlpha(0.03f));
+    label->setAlpha(0.6f);
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
 
     row++;
 
@@ -330,6 +393,18 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_parallelPluginLoad.setToggleState(m_app->getServer().getParallelPluginLoad(),
                                         NotificationType::dontSendNotification);
     addChildAndSetID(&m_parallelPluginLoad, "pload");
+
+    row++;
+
+    label = std::make_unique<Label>();
+    label->setText("Diagnostics", NotificationType::dontSendNotification);
+    label->setJustificationType(Justification::centredTop);
+    label->setBounds(getHeaderBounds(row));
+    label->setColour(Label::backgroundColourId, Colours::white.withAlpha(0.08f));
+    label->setColour(Label::outlineColourId, Colours::white.withAlpha(0.03f));
+    label->setAlpha(0.6f);
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
 
     row++;
 
@@ -395,6 +470,8 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
                 appCpy->getServer().setScreenCapturingOff(true);
                 break;
         }
+        appCpy->getServer().setScreenCapturingFFmpegQuality(
+            (ScreenRecorder::EncoderQuality)(m_screenCapturingQuality.getSelectedId() - 1));
         appCpy->getServer().setScreenDiffDetection(m_screenDiffDetection.getToggleState());
         float qual = m_screenJpgQuality.getText().getFloatValue();
         if (qual < 0.1) {

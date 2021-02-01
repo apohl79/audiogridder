@@ -227,7 +227,8 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     // KeyListener
     bool keyPressed(const KeyPress& kp, Component* originatingComponent) override;
 
-    String getLoadedPluginsString();
+    void setLoadedPluginsString(const String& s) { m_loadedPluginsString = s; }
+    String getLoadedPluginsString() const { return m_loadedPluginsString; }
 
     void setError() { m_error = true; }
 
@@ -236,6 +237,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     friend AudioStreamer<double>;
 
     AudioGridderAudioProcessor* m_processor;
+    String m_loadedPluginsString;
     std::mutex m_srvMtx;
     String m_srvHost = "";
     int m_srvPort = Defaults::SERVER_PORT;

@@ -106,7 +106,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     }
     LoadedPlugin& getLoadedPlugin(int idx) {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
-        return idx > -1 ? m_loadedPlugins[as<size_t>(idx)] : m_unusedDummyPlugin;
+        return idx > -1 && idx < (int)m_loadedPlugins.size() ? m_loadedPlugins[(size_t)idx] : m_unusedDummyPlugin;
     }
 
     bool loadPlugin(const String& id, const String& name, String& err);
@@ -124,8 +124,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     void getAllParameterValues(int idx);
     void increaseSCArea();
     void decreaseSCArea();
-
-    const int SCAREA_STEPS = 30;
+    void toggleFullscreenSCArea();
 
     void storeSettingsA();
     void storeSettingsB();
@@ -143,6 +142,8 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     void setConfirmDelete(bool b) { m_confirmDelete = b; }
     bool getNoSrvPluginListFilter() const { return m_noSrvPluginListFilter; }
     void setNoSrvPluginListFilter(bool b) { m_noSrvPluginListFilter = b; }
+    float getScaleFactor() const { return m_scale; }
+    void setScaleFactor(float f) { m_scale = f; }
 
     auto& getServers() const { return m_servers; }
     void addServer(const String& s) { m_servers.add(s); }
@@ -225,6 +226,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     bool m_genericEditor = false;
     bool m_confirmDelete = true;
     bool m_noSrvPluginListFilter = false;
+    float m_scale = 1.0;
 
     TrackProperties m_trackProperties;
     std::mutex m_trackPropertiesMtx;

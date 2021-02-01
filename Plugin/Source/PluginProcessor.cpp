@@ -86,33 +86,48 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     m_client->setOnConnectCallback(safeLambda([this] {
         traceScope();
         logln("connected");
+        bool updLatency = false;
+        std::vector<std::tuple<int, int, int>> automationParams;
         int idx = 0;
-        for (auto& p : m_loadedPlugins) {
-            logln("loading " << p.name << " (" << p.id << ") [on connect]... ");
-            String err;
-            p.ok = m_client->addPlugin(p.id, p.presets, p.params, p.settings, err);
-            if (p.ok) {
-                logln("...ok");
-            } else {
-                logln("...failed: " << err);
-            }
-            if (p.ok) {
-                updateLatency(m_client->getLatencySamples());
-                if (p.bypassed) {
-                    m_client->bypassPlugin(idx);
+        {
+            std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+            for (auto& p : m_loadedPlugins) {
+                logln("loading " << p.name << " (" << p.id << ") [on connect]... ");
+                String err;
+                p.ok = m_client->addPlugin(p.id, p.presets, p.params, p.settings, err);
+                if (p.ok) {
+                    logln("...ok");
+                } else {
+                    logln("...failed: " << err);
                 }
-                for (auto& param : p.params) {
-                    if (param.automationSlot > -1) {
-                        if (param.automationSlot < m_numberOfAutomationSlots) {
-                            enableParamAutomation(idx, param.idx, param.automationSlot);
-                        } else {
-                            param.automationSlot = -1;
+                if (p.ok) {
+                    updLatency = true;
+                    if (p.bypassed) {
+                        m_client->bypassPlugin(idx);
+                    }
+                    for (auto& param : p.params) {
+                        if (param.automationSlot > -1) {
+                            if (param.automationSlot < m_numberOfAutomationSlots) {
+                                automationParams.push_back({idx, param.idx, param.automationSlot});
+                            } else {
+                                param.automationSlot = -1;
+                            }
                         }
                     }
                 }
+                idx++;
             }
-            idx++;
         }
+        m_client->setLoadedPluginsString(getLoadedPluginsString());
+
+        for (auto& ap : automationParams) {
+            enableParamAutomation(std::get<0>(ap), std::get<1>(ap), std::get<2>(ap));
+        }
+
+        if (updLatency) {
+            updateLatency(m_client->getLatencySamples());
+        }
+
         runOnMsgThreadAsync([this] {
             traceScope();
             auto* editor = getActiveEditor();
@@ -121,6 +136,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
             }
         });
     }));
+
     // handle connection close
     m_client->setOnCloseCallback(safeLambda([this] {
         traceScope();
@@ -133,6 +149,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
             }
         });
     }));
+
     if (m_activeServerFromCfg.isNotEmpty()) {
         m_client->setServer(m_activeServerFromCfg);
     } else if (m_activeServerLegacyFromCfg > -1 && m_activeServerLegacyFromCfg < m_servers.size()) {
@@ -179,6 +196,8 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
     PluginMonitor::setShowChannelColor(jsonGetValue(j, "PluginMonChanColor", PluginMonitor::getShowChannelColor()));
     PluginMonitor::setShowChannelName(jsonGetValue(j, "PluginMonChanName", PluginMonitor::getShowChannelName()));
 
+    m_scale = jsonGetValue(j, "ZoomFactor", m_scale);
+
     if (!isUpdate) {
         if (jsonHasValue(j, "Servers")) {
             for (auto& srv : j["Servers"]) {
@@ -189,6 +208,10 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
         m_activeServerLegacyFromCfg = jsonGetValue(j, "Last", m_activeServerLegacyFromCfg);
         m_client->NUM_OF_BUFFERS = jsonGetValue(j, "NumberOfBuffers", m_client->NUM_OF_BUFFERS.load());
         m_client->LOAD_PLUGIN_TIMEOUT = jsonGetValue(j, "LoadPluginTimeoutMS", m_client->LOAD_PLUGIN_TIMEOUT.load());
+
+        if (m_scale != Desktop::getInstance().getGlobalScaleFactor()) {
+            Desktop::getInstance().setGlobalScaleFactor(m_scale);
+        }
     }
 
     m_numberOfAutomationSlots = jsonGetValue(j, "NumberOfAutomationSlots", m_numberOfAutomationSlots);
@@ -234,6 +257,7 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
     jcfg["PluginMonChanName"] = PluginMonitor::getShowChannelName();
     jcfg["SyncRemoteMode"] = m_syncRemote;
     jcfg["NoSrvPluginListFilter"] = m_noSrvPluginListFilter;
+    jcfg["ZoomFactor"] = m_scale;
 
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), jcfg);
 }
@@ -472,24 +496,27 @@ void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData) {
     j["servers"] = jservers;
     j["activeServerStr"] = m_client->getServerHostAndID().toStdString();
     auto jplugs = json::array();
-    for (int i = 0; i < getNumOfLoadedPlugins(); i++) {
-        auto& plug = m_loadedPlugins[(size_t)i];
-        if (plug.ok && m_client->isReadyLockFree()) {
-            auto settings = m_client->getPluginSettings(i);
-            if (settings.getSize() > 0) {
-                plug.settings = settings.toBase64Encoding();
+    {
+        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+        for (int i = 0; i < (int)m_loadedPlugins.size(); i++) {
+            auto& plug = m_loadedPlugins[(size_t)i];
+            if (plug.ok && m_client->isReadyLockFree()) {
+                auto settings = m_client->getPluginSettings(i);
+                if (settings.getSize() > 0) {
+                    plug.settings = settings.toBase64Encoding();
+                }
             }
+            auto jpresets = json::array();
+            for (auto& p : plug.presets) {
+                jpresets.push_back(p.toStdString());
+            }
+            auto jparams = json::array();
+            for (auto& p : plug.params) {
+                jparams.push_back(p.toJson());
+            }
+            jplugs.push_back({plug.id.toStdString(), plug.name.toStdString(), plug.settings.toStdString(), jpresets,
+                              jparams, plug.bypassed});
         }
-        auto jpresets = json::array();
-        for (auto& p : plug.presets) {
-            jpresets.push_back(p.toStdString());
-        }
-        auto jparams = json::array();
-        for (auto& p : plug.params) {
-            jparams.push_back(p.toJson());
-        }
-        jplugs.push_back({plug.id.toStdString(), plug.name.toStdString(), plug.settings.toStdString(), jpresets,
-                          jparams, plug.bypassed});
     }
     j["loadedPlugins"] = jplugs;
 
@@ -522,31 +549,35 @@ void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeI
         } else if (j.find("activeServer") != j.end()) {
             activeServer = j["activeServer"].get<int>();
         }
-        m_loadedPlugins.clear();
-        if (j.find("loadedPlugins") != j.end()) {
-            for (auto& plug : j["loadedPlugins"]) {
-                if (version < 1) {
-                    StringArray dummy;
-                    Array<Client::Parameter> dummy2;
-                    m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
-                                               plug[2].get<std::string>(), dummy, dummy2, false, false});
-                } else if (version == 1) {
-                    StringArray dummy;
-                    Array<Client::Parameter> dummy2;
-                    m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
-                                               plug[2].get<std::string>(), dummy, dummy2, plug[3].get<bool>(), false});
-                } else {
-                    StringArray presets;
-                    for (auto& p : plug[3]) {
-                        presets.add(p.get<std::string>());
+        {
+            std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+            m_loadedPlugins.clear();
+            if (j.find("loadedPlugins") != j.end()) {
+                for (auto& plug : j["loadedPlugins"]) {
+                    if (version < 1) {
+                        StringArray dummy;
+                        Array<Client::Parameter> dummy2;
+                        m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
+                                                   plug[2].get<std::string>(), dummy, dummy2, false, false});
+                    } else if (version == 1) {
+                        StringArray dummy;
+                        Array<Client::Parameter> dummy2;
+                        m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
+                                                   plug[2].get<std::string>(), dummy, dummy2, plug[3].get<bool>(),
+                                                   false});
+                    } else {
+                        StringArray presets;
+                        for (auto& p : plug[3]) {
+                            presets.add(p.get<std::string>());
+                        }
+                        Array<e47::Client::Parameter> params;
+                        for (auto& p : plug[4]) {
+                            params.add(e47::Client::Parameter::fromJson(p));
+                        }
+                        m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
+                                                   plug[2].get<std::string>(), presets, params, plug[5].get<bool>(),
+                                                   false});
                     }
-                    Array<e47::Client::Parameter> params;
-                    for (auto& p : plug[4]) {
-                        params.add(e47::Client::Parameter::fromJson(p));
-                    }
-                    m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
-                                               plug[2].get<std::string>(), presets, params, plug[5].get<bool>(),
-                                               false});
                 }
             }
         }
@@ -566,7 +597,8 @@ void AudioGridderAudioProcessor::sync() {
     traceScope();
     traceln("sync mode is " << m_syncRemote);
     if ((m_syncRemote == SYNC_ALWAYS) || (m_syncRemote == SYNC_WITH_EDITOR && nullptr != getActiveEditor())) {
-        for (int i = 0; i < getNumOfLoadedPlugins(); i++) {
+        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+        for (int i = 0; i < (int)m_loadedPlugins.size(); i++) {
             auto& plug = m_loadedPlugins[(size_t)i];
             if (plug.ok && m_client->isReadyLockFree()) {
                 auto settings = m_client->getPluginSettings(static_cast<int>(i));
@@ -616,6 +648,7 @@ bool AudioGridderAudioProcessor::loadPlugin(const String& id, const String& name
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
         m_loadedPlugins.push_back({id, name, "", presets, params, false, true});
     }
+    m_client->setLoadedPluginsString(getLoadedPluginsString());
     return success;
 }
 
@@ -634,14 +667,17 @@ void AudioGridderAudioProcessor::unloadPlugin(int idx) {
         m_activePlugin--;
     }
 
-    std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
-    int i = 0;
-    for (auto it = m_loadedPlugins.begin(); it < m_loadedPlugins.end(); it++) {
-        if (i++ == idx) {
-            m_loadedPlugins.erase(it);
-            return;
+    {
+        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+        int i = 0;
+        for (auto it = m_loadedPlugins.begin(); it < m_loadedPlugins.end(); it++) {
+            if (i++ == idx) {
+                m_loadedPlugins.erase(it);
+                break;
+            }
         }
     }
+    m_client->setLoadedPluginsString(getLoadedPluginsString());
 }
 
 String AudioGridderAudioProcessor::getLoadedPluginsString() const {
@@ -684,43 +720,65 @@ void AudioGridderAudioProcessor::hidePlugin(bool updateServer) {
 
 bool AudioGridderAudioProcessor::isBypassed(int idx) {
     traceScope();
-    if (idx > -1 && as<size_t>(idx) < m_loadedPlugins.size()) {
-        return m_loadedPlugins[as<size_t>(idx)].bypassed;
+    std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+    if (idx > -1 && idx < (int)m_loadedPlugins.size()) {
+        return m_loadedPlugins[(size_t)idx].bypassed;
     }
     return false;
 }
 
 void AudioGridderAudioProcessor::bypassPlugin(int idx) {
     traceScope();
-    if (idx > -1 && as<size_t>(idx) < m_loadedPlugins.size()) {
-        logln("bypassing plugin " << idx);
+    bool updateServer = false;
+    {
+        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+        if (idx > -1 && idx < (int)m_loadedPlugins.size()) {
+            logln("bypassing plugin " << idx);
+            m_loadedPlugins[(size_t)idx].bypassed = true;
+            updateServer = true;
+        } else {
+            logln("failed to bypass plugin " << idx << ": out of range");
+        }
+    }
+    if (updateServer) {
         m_client->bypassPlugin(idx);
-        m_loadedPlugins[as<size_t>(idx)].bypassed = true;
-    } else {
-        logln("failed to bypass plugin " << idx << ": out of range");
     }
 }
 
 void AudioGridderAudioProcessor::unbypassPlugin(int idx) {
     traceScope();
-    if (idx > -1 && as<size_t>(idx) < m_loadedPlugins.size()) {
-        logln("unbypassing plugin " << idx);
+    bool updateServer = false;
+    {
+        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+        if (idx > -1 && idx < (int)m_loadedPlugins.size()) {
+            logln("unbypassing plugin " << idx);
+            m_loadedPlugins[(size_t)idx].bypassed = false;
+            updateServer = true;
+        } else {
+            logln("failed to unbypass plugin " << idx << ": out of range");
+        }
+    }
+    if (updateServer) {
         m_client->unbypassPlugin(idx);
-        m_loadedPlugins[as<size_t>(idx)].bypassed = false;
-    } else {
-        logln("failed to unbypass plugin " << idx << ": out of range");
     }
 }
 
 void AudioGridderAudioProcessor::exchangePlugins(int idxA, int idxB) {
     traceScope();
-    if (idxA > -1 && as<size_t>(idxA) < m_loadedPlugins.size() && idxB > -1 &&
-        as<size_t>(idxB) < m_loadedPlugins.size()) {
+    bool idxOk = false;
+    {
+        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+        idxOk = idxA > -1 && idxA < (int)m_loadedPlugins.size() && idxB > -1 && idxB < (int)m_loadedPlugins.size();
+    }
+    if (idxOk) {
         logln("exchanging plugins " << idxA << " and " << idxB);
         suspendProcessing(true);
         m_client->exchangePlugins(idxA, idxB);
         suspendProcessing(false);
-        std::swap(m_loadedPlugins[as<size_t>(idxA)], m_loadedPlugins[as<size_t>(idxB)]);
+        {
+            std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+            std::swap(m_loadedPlugins[(size_t)idxA], m_loadedPlugins[(size_t)idxB]);
+        }
         if (idxA == m_activePlugin) {
             m_activePlugin = idxB;
         } else if (idxB == m_activePlugin) {
@@ -742,22 +800,29 @@ void AudioGridderAudioProcessor::exchangePlugins(int idxA, int idxB) {
 bool AudioGridderAudioProcessor::enableParamAutomation(int idx, int paramIdx, int slot) {
     traceScope();
     logln("enabling automation for plugin " << idx << ", parameter " << paramIdx << ", slot " << slot);
-    auto& param = m_loadedPlugins[as<size_t>(idx)].params.getReference(paramIdx);
-    Parameter* pparam = nullptr;
-    if (slot == -1) {
-        for (slot = 0; slot < m_numberOfAutomationSlots; slot++) {
-            pparam = dynamic_cast<Parameter*>(getParameters()[slot]);
-            if (pparam->m_idx == -1) {
-                break;
+    bool updateHost = false;
+    {
+        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+        auto& param = m_loadedPlugins[(size_t)idx].params.getReference(paramIdx);
+        Parameter* pparam = nullptr;
+        if (slot == -1) {
+            for (slot = 0; slot < m_numberOfAutomationSlots; slot++) {
+                pparam = dynamic_cast<Parameter*>(getParameters()[slot]);
+                if (pparam->m_idx == -1) {
+                    break;
+                }
             }
+        } else {
+            pparam = dynamic_cast<Parameter*>(getParameters()[slot]);
         }
-    } else {
-        pparam = dynamic_cast<Parameter*>(getParameters()[slot]);
+        if (slot < m_numberOfAutomationSlots) {
+            pparam->m_idx = idx;
+            pparam->m_paramIdx = paramIdx;
+            param.automationSlot = slot;
+            updateHost = true;
+        }
     }
-    if (slot < m_numberOfAutomationSlots) {
-        pparam->m_idx = idx;
-        pparam->m_paramIdx = paramIdx;
-        param.automationSlot = slot;
+    if (updateHost) {
         updateHostDisplay();
         return true;
     }
@@ -769,17 +834,21 @@ bool AudioGridderAudioProcessor::enableParamAutomation(int idx, int paramIdx, in
 void AudioGridderAudioProcessor::disableParamAutomation(int idx, int paramIdx) {
     traceScope();
     logln("disabling automation for plugin " << idx << ", parameter " << paramIdx);
-    auto& param = m_loadedPlugins[as<size_t>(idx)].params.getReference(paramIdx);
-    auto* pparam = dynamic_cast<Parameter*>(getParameters()[param.automationSlot]);
-    pparam->reset();
+    {
+        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+        auto& param = m_loadedPlugins[(size_t)idx].params.getReference(paramIdx);
+        auto* pparam = dynamic_cast<Parameter*>(getParameters()[param.automationSlot]);
+        pparam->reset();
+        param.automationSlot = -1;
+    }
     updateHostDisplay();
-    param.automationSlot = -1;
 }
 
 void AudioGridderAudioProcessor::getAllParameterValues(int idx) {
     traceScope();
     logln("reading all parameter values for plugin " << idx);
-    auto& params = m_loadedPlugins[as<size_t>(idx)].params;
+    std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+    auto& params = m_loadedPlugins[(size_t)idx].params;
     for (auto& res : m_client->getAllParameterValues(idx, params.size())) {
         if (res.idx > -1 && res.idx < params.size()) {
             auto& param = params.getReference(res.idx);
@@ -804,14 +873,20 @@ void AudioGridderAudioProcessor::delServer(const String& s) {
 
 void AudioGridderAudioProcessor::increaseSCArea() {
     traceScope();
-    logln("increasing screen capturing area by +" << SCAREA_STEPS << "px");
-    m_client->updateScreenCaptureArea(SCAREA_STEPS);
+    logln("increasing screen capturing area by +" << Defaults::SCAREA_STEPS << "px");
+    m_client->updateScreenCaptureArea(Defaults::SCAREA_STEPS);
 }
 
 void AudioGridderAudioProcessor::decreaseSCArea() {
     traceScope();
-    logln("decreasing screen capturing area by -" << SCAREA_STEPS << "px");
-    m_client->updateScreenCaptureArea(-SCAREA_STEPS);
+    logln("decreasing screen capturing area by -" << Defaults::SCAREA_STEPS << "px");
+    m_client->updateScreenCaptureArea(-Defaults::SCAREA_STEPS);
+}
+
+void AudioGridderAudioProcessor::toggleFullscreenSCArea() {
+    traceScope();
+    logln("toggle fullscreen for screen capturing area");
+    m_client->updateScreenCaptureArea(Defaults::SCAREA_FULLSCREEN);
 }
 
 void AudioGridderAudioProcessor::storeSettingsA() {

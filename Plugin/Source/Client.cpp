@@ -1000,11 +1000,6 @@ StreamingSocket* Client::accept(StreamingSocket& sock) const {
     return clnt;
 }
 
-String Client::getLoadedPluginsString() {
-    traceScope();
-    return m_processor->getLoadedPluginsString();
-}
-
 template <>
 std::shared_ptr<AudioStreamer<float>> Client::getStreamer() {
     std::lock_guard<std::mutex> lock(m_audioMtx);

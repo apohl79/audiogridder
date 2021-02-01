@@ -50,7 +50,9 @@ class ScreenRecorder : public LogTag {
 
     bool isRecording() const { return m_capture; }
 
-    static void initialize(EncoderMode encMode = WEBP);
+    enum EncoderQuality : int { ENC_QUALITY_LOW = 0, ENC_QUALITY_MEDIUM = 1, ENC_QUALITY_HIGH = 2 };
+
+    static void initialize(EncoderMode encMode = WEBP, EncoderQuality quality = ENC_QUALITY_MEDIUM);
 
   private:
     static String m_inputFmtName;
@@ -79,9 +81,9 @@ class ScreenRecorder : public LogTag {
     int m_pxSize = 0;
 
     static EncoderMode m_encMode;
-    static const int BASE_QUALITY;
     static double m_scale;
     static int m_quality;
+    static bool m_downScale;
 
     std::unique_ptr<std::thread> m_thread;
     std::atomic_bool m_threadRunning{false};

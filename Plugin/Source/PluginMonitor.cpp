@@ -14,15 +14,17 @@
 namespace e47 {
 
 PluginStatus::PluginStatus(AudioGridderAudioProcessor* plugin) {
-    ok = plugin->getClient().isReadyLockFree();
+    auto& client = plugin->getClient();
+    ok = client.isReadyLockFree();
     auto track = plugin->getTrackProperties();
     channelName = track.name;
     channelColour = track.colour;
-    loadedPlugins = plugin->getLoadedPluginsString();
+    loadedPlugins = client.getLoadedPluginsString();
     String statId = "audio.";
     statId << plugin->getId();
     auto ts = Metrics::getStatistic<TimeStatistic>(statId);
     perf95th = ts->get1minHistogram().nintyFifth;
+    blocks = client.NUM_OF_BUFFERS;
 }
 
 PluginMonitorWindow::PluginMonitorWindow(PluginMonitor* mon, const String& mode)
@@ -97,7 +99,7 @@ void PluginMonitorWindow::update(const Array<PluginStatus>& status) {
     int borderTB = 15;  // top/bottom border
     int rowHeight = 18;
 
-    int colWidth[] = {m_channelColWidth, m_channelNameWidth, 190, 65, 10};
+    int colWidth[] = {m_channelColWidth, m_channelNameWidth, 190, 30, 65, 10};
 
     if (!PluginMonitor::getShowChannelColor()) {
         colWidth[0] = 0;
@@ -131,7 +133,8 @@ void PluginMonitorWindow::update(const Array<PluginStatus>& status) {
         addLabel("Ch", getLabelBounds(row, 0, 2), Justification::topLeft, 1.0f);
     }
     addLabel("Loaded Chain", getLabelBounds(row, 2), Justification::topLeft, 1.0f);
-    addLabel("Perf", getLabelBounds(row, 3), Justification::topRight, 1.0f);
+    addLabel("Buf", getLabelBounds(row, 3), Justification::topRight, 1.0f);
+    addLabel("Perf", getLabelBounds(row, 4), Justification::topRight, 1.0f);
 
     row++;
 
@@ -149,8 +152,9 @@ void PluginMonitorWindow::update(const Array<PluginStatus>& status) {
             addLabel(s.channelName, getLabelBounds(row, 1));
         }
         addLabel(s.loadedPlugins, getLabelBounds(row, 2));
-        addLabel(String(s.perf95th, 2) + " ms", getLabelBounds(row, 3), Justification::topRight);
-        auto led = std::make_unique<Status>(getLabelBounds(row, 4), s.ok);
+        addLabel(String(s.blocks), getLabelBounds(row, 3), Justification::topRight);
+        addLabel(String(s.perf95th, 2) + " ms", getLabelBounds(row, 4), Justification::topRight);
+        auto led = std::make_unique<Status>(getLabelBounds(row, 5), s.ok);
         addChildAndSetID(led.get(), "led");
         m_components.push_back(std::move(led));
 

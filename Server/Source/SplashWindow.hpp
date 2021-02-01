@@ -18,7 +18,7 @@ namespace e47 {
 
 class SplashWindow : public TopLevelWindow {
   public:
-    SplashWindow() : TopLevelWindow("Splash", true) {
+    SplashWindow() : TopLevelWindow("AudioGridderServer", true) {
         auto& lf = getLookAndFeel();
         lf.setColour(ResizableWindow::backgroundColourId, Colour(Defaults::BG_COLOR));
         lf.setColour(PopupMenu::backgroundColourId, Colour(Defaults::BG_COLOR));
@@ -28,51 +28,62 @@ class SplashWindow : public TopLevelWindow {
         lf.setColour(ListBox::backgroundColourId, Colour(Defaults::BG_COLOR));
         lf.setColour(AlertWindow::backgroundColourId, Colour(Defaults::BG_COLOR));
 
-        centreWithSize(450, 180);
+        int w = 640;
+        int h = 300;
+
+        auto disp = Desktop::getInstance().getDisplays().getPrimaryDisplay();
+        Rectangle<int> totalRect;
+        if (nullptr != disp) {
+            totalRect = disp->totalArea;
+            setBounds(totalRect.getCentreX() - w / 2, totalRect.getCentreY() - h, w, h);
+        } else {
+            centreWithSize(w, h);
+        }
 
         m_logo.setImage(ImageCache::getFromMemory(Images::logo_png, Images::logo_pngSize));
-        m_logo.setBounds(10, 10, 100, 100);
+        m_logo.setBounds(70, 70, 74, 74);
         m_logo.setAlpha(0.9f);
         addChildAndSetID(&m_logo, "logo");
 
         m_logotxt.setImage(ImageCache::getFromMemory(Images::logotxt_png, Images::logotxt_pngSize));
-        m_logotxt.setBounds(125, 10, 320, 60);
+        m_logotxt.setBounds(160, 70, 420, 79);
         m_logotxt.setAlpha(0.9f);
         addChildAndSetID(&m_logotxt, "logotxt");
 
         Font font;
 
-        m_title2.setText("SERVER", NotificationType::dontSendNotification);
-        font.setHeight(25);
-        font.setStyleFlags(Font::plain);
-        m_title2.setFont(font);
-        m_title2.setJustificationType(Justification::right);
-        m_title2.setAlpha(0.4f);
-        m_title2.setBounds(200, 60, 240, 40);
-        addChildAndSetID(&m_title2, "title2");
+        // m_title2.setText("SERVER", NotificationType::dontSendNotification);
+        // font.setHeight(35);
+        // font.setStyleFlags(Font::plain);
+        // m_title2.setFont(font);
+        // m_title2.setJustificationType(Justification::right);
+        // m_title2.setAlpha(0.4f);
+        // m_title2.setBounds(160, 130, 410, 40);
+        // addChildAndSetID(&m_title2, "title2");
 
-        m_version.setText(AUDIOGRIDDER_VERSION, NotificationType::dontSendNotification);
-        font.setHeight(15);
-        font.setStyleFlags(Font::bold);
+        m_version.setText(String("Version: ") + AUDIOGRIDDER_VERSION, NotificationType::dontSendNotification);
+        font.setHeight(14);
+        font.setStyleFlags(Font::plain);
         m_version.setFont(font);
-        m_version.setJustificationType(Justification::right);
-        m_version.setAlpha(0.2f);
-        m_version.setBounds(200, 85, 240, 40);
+        m_version.setJustificationType(Justification::left);
+        m_version.setAlpha(0.4f);
+        m_version.setBounds(5, getHeight() - 23, 200, 20);
         addChildAndSetID(&m_version, "version");
 
         m_date.setText(String("Build date: ") + AUDIOGRIDDER_BUILD_DATE, NotificationType::dontSendNotification);
-        font.setHeight(13);
+        font.setHeight(14);
         font.setStyleFlags(Font::plain);
         m_date.setFont(font);
         m_date.setJustificationType(Justification::right);
-        m_date.setAlpha(0.1f);
-        m_date.setBounds(200, 110, 240, 40);
+        m_date.setAlpha(0.2f);
+        m_date.setBounds(getWidth() - 400, getHeight() - 23, 395, 20);
         addChildAndSetID(&m_date, "date");
 
-        m_info.setBounds(10, 140, 430, 25);
+        m_info.setBounds(160, 190, 410, 25);
         font.setHeight(15);
         font.setStyleFlags(Font::plain);
-        m_info.setAlpha(0.5);
+        m_info.setAlpha(0.8f);
+        m_info.setJustificationType(Justification::left);
         addChildAndSetID(&m_info, "info");
 
         for (auto* c : getChildren()) {

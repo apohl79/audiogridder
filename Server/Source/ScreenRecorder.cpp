@@ -19,11 +19,14 @@ AVCodec* ScreenRecorder::m_outputCodec = nullptr;
 bool ScreenRecorder::m_initialized = false;
 
 ScreenRecorder::EncoderMode ScreenRecorder::m_encMode = ScreenRecorder::WEBP;
-const int ScreenRecorder::BASE_QUALITY = 8000;
 double ScreenRecorder::m_scale;
 int ScreenRecorder::m_quality;
+bool ScreenRecorder::m_downScale;
 
-void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode) {
+int WEBP_QUALITY[3] = {4000, 8000, 16000};
+int MJPEG_QUALITY[3] = {9000000, 14000000, 20000000};
+
+void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode, EncoderQuality quality) {
     setLogTagStatic("screenrec");
     traceScope();
 
@@ -34,9 +37,11 @@ void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode) {
     switch (m_encMode) {
         case WEBP:
             encName = "libwebp";
+            m_quality = WEBP_QUALITY[quality];
             break;
         case MJPEG:
             encName = "mjpeg";
+            m_quality = MJPEG_QUALITY[quality];
             break;
     }
     m_outputCodec = avcodec_find_encoder_by_name(encName);
@@ -44,6 +49,8 @@ void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode) {
         logln("unable to find output codec " << encName);
         return;
     }
+
+    m_downScale = quality != ENC_QUALITY_HIGH;
 
     if (m_initialized) {
         return;
@@ -55,8 +62,6 @@ void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode) {
     } else {
         m_scale = 1.0;
     }
-    // m_quality  (int)(BASE_QUALITY / m_scale);
-    m_quality = BASE_QUALITY;
 
     avdevice_register_all();
 
@@ -339,8 +344,13 @@ bool ScreenRecorder::prepareOutput() {
     }
     m_outputCodecCtx->time_base.num = 1;
     m_outputCodecCtx->time_base.den = 30;
-    m_outputCodecCtx->width = (int)(m_captureRect.getWidth() / m_scale);
-    m_outputCodecCtx->height = (int)(m_captureRect.getHeight() / m_scale);
+    if (m_downScale) {
+        m_outputCodecCtx->width = (int)(m_captureRect.getWidth() / m_scale);
+        m_outputCodecCtx->height = (int)(m_captureRect.getHeight() / m_scale);
+    } else {
+        m_outputCodecCtx->width = (int)(m_captureRect.getWidth());
+        m_outputCodecCtx->height = (int)(m_captureRect.getHeight());
+    }
     AVDictionary* opts = nullptr;
     switch (m_encMode) {
         case WEBP:
@@ -349,7 +359,7 @@ bool ScreenRecorder::prepareOutput() {
             av_dict_set(&opts, "global_quality", String(m_quality).getCharPointer(), 0);
             break;
         case MJPEG:
-            av_dict_set(&opts, "b", "14000000", 0);
+            av_dict_set(&opts, "b", String(m_quality).getCharPointer(), 0);
             break;
     }
     int ret = avcodec_open2(m_outputCodecCtx, m_outputCodec, &opts);
@@ -464,7 +474,7 @@ void ScreenRecorder::record() {
                             if (retRCP == 0) {
                                 if (initalFramesToSkip == 0) {
                                     m_callback(m_outputPacket->data, m_outputPacket->size, m_outputFrame->width,
-                                               m_outputFrame->height, 1 /*m_scale*/);
+                                               m_outputFrame->height, m_downScale ? 1 : m_scale);
                                 } else {
                                     initalFramesToSkip--;
                                 }

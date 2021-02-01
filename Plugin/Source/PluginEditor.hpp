@@ -52,8 +52,13 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     ImageComponent m_logo;
     bool m_connected = false;
 
+    struct ToolsButton : TextButton {
+        void paintButton(Graphics& g, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override;
+    };
+
     // screen tools
-    TextButton m_stPlus, m_stMinus, m_stA, m_stB;
+    ToolsButton m_stPlus, m_stMinus, m_stFullscreen;
+    TextButton m_stA, m_stB;
     int m_currentActiveAB = -1;
     TextButton* m_hilightedStButton = nullptr;
 

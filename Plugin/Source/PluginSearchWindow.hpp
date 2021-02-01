@@ -55,6 +55,7 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
     AudioGridderAudioProcessor& m_processor;
     TextEditor m_search;
     TreeView m_tree;
+    bool m_showType;
 
     std::vector<ServerPlugin> m_recents;
 
@@ -85,7 +86,7 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
         int getItemHeight() const override { return PluginSearchWindow::SEPARATOR_HEIGHT; }
 
         void paintItem(Graphics& g, int w, int) override {
-            Line<float> line(0, 5, (float)w - 12, 5);
+            Line<float> line(0, 5, (float)w - 5, 5);
             float dashs[] = {2.0, 1.5};
             g.setColour(Colours::white.withAlpha(0.1f));
             g.drawDashedLine(line, dashs, 2);
@@ -154,18 +155,25 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
 
     class TreePlugin : public TreeViewItem {
       public:
-        TreePlugin(const ServerPlugin& p, ClickFuction f) : m_plugin(p), m_onClick(f) {}
+        TreePlugin(const ServerPlugin& p, ClickFuction f, bool st) : m_plugin(p), m_onClick(f), m_showType(st) {}
 
         bool mightContainSubItems() override { return false; }
         int getItemHeight() const override { return PluginSearchWindow::ITEM_HEIGHT; }
 
         void paintItem(Graphics& g, int width, int height) override {
+            Colour col;
             if (isSelected()) {
-                g.setColour(Colour(Defaults::ACTIVE_COLOR).withAlpha(0.8f));
+                col = Colour(Defaults::ACTIVE_COLOR);
             } else {
-                g.setColour(Colours::white.withAlpha(0.8f));
+                col = Colours::white;
             }
-            g.drawText(m_plugin.getName(), 8, 0, width, height, Justification::bottomLeft);
+            g.setColour(col.withAlpha(0.8f));
+            g.drawText(m_plugin.getName(), 8, 0, width - (m_showType ? 40 : 0), height, Justification::bottomLeft);
+            if (m_showType) {
+                g.setColour(col.withAlpha(0.1f));
+                g.drawText(m_plugin.isInstrument() ? "Inst" : "Fx", width - 35, 0, 30, height,
+                           Justification::bottomRight);
+            }
         }
 
         void itemClicked(const MouseEvent&) override { itemClicked(); }
@@ -181,6 +189,7 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
       private:
         ServerPlugin m_plugin;
         ClickFuction m_onClick;
+        bool m_showType;
     };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginSearchWindow)

@@ -25,6 +25,7 @@ struct PluginStatus {
     Colour channelColour;
     String loadedPlugins;
     double perf95th;
+    int blocks;
     bool ok;
 };
 
@@ -45,7 +46,7 @@ class PluginMonitorWindow : public TopLevelWindow, public LogTagDelegate {
     PluginMonitor* m_mon;
     ImageComponent m_logo;
     Label m_title;
-    int m_totalWidth = 415;
+    int m_totalWidth = 445;
     int m_totalHeight = 32;
     int m_channelColWidth = 20;
     int m_channelNameWidth = 100;

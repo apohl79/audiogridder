@@ -20,15 +20,10 @@
 namespace e47 {
 
 void App::initialise(const String& commandLineParameters) {
-#ifdef JUCE_MAC
-    Process::setDockIconVisible(false);
-#endif
-    String error;
     auto args = getCommandLineParameterArray();
     enum Modes { SCAN, MASTER, SERVER, SANDBOX };
     Modes mode = MASTER;
     String fileToScan = "";
-    json clientCfg;
     int srvid = -1;
     for (int i = 0; i < args.size(); i++) {
         if (!args[i].compare("-scan") && args.size() >= i + 2) {
@@ -74,6 +69,9 @@ void App::initialise(const String& commandLineParameters) {
 
     switch (mode) {
         case SCAN:
+#ifdef JUCE_MAC
+            Process::setDockIconVisible(false);
+#endif
             AGLogger::setEnabled(true);
             if (fileToScan.length() > 0) {
                 auto parts = StringArray::fromTokens(fileToScan, "|", "");
@@ -129,6 +127,9 @@ void App::initialise(const String& commandLineParameters) {
             break;
         }
         case MASTER:
+#ifdef JUCE_MAC
+            Process::setDockIconVisible(false);
+#endif
             m_child = std::make_unique<std::thread>([this, srvid] {
                 ChildProcess proc;
                 StringArray proc_args;
