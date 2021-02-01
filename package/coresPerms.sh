@@ -1,2 +1,4 @@
 #!/bin/bash
-chmod o+w /cores
+if [ -d /cores ]; then
+    chmod o+w /cores
+fi
