@@ -80,6 +80,9 @@ class Server : public Thread, public LogTag {
 
     static bool scanPlugin(const String& id, const String& format);
 
+    void sandboxShowEditor();
+    void sandboxHideEditor();
+
     // SandboxMaster
     void handleMessageFromSandbox(SandboxMaster&, const SandboxMessage&);
     void handleDisconnectFromSandbox(SandboxMaster&);
@@ -121,7 +124,9 @@ class Server : public Thread, public LogTag {
     std::unique_ptr<SandboxSlave> m_sandboxSlave;
 
     std::atomic_bool m_sandboxReady{true};
+    std::atomic_bool m_sandboxConnectedToMaster{false};
     HandshakeRequest m_sandboxConfig;
+    String m_sandboxHasScreen;
 
     void scanNextPlugin(const String& id, const String& fmt);
     void scanForPlugins();

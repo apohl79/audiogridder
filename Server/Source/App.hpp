@@ -30,7 +30,13 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     using WindowCaptureCallbackNative = std::function<void(std::shared_ptr<Image> image, int width, int height)>;
     using WindowCaptureCallbackFFmpeg = ScreenRecorder::CaptureCallback;
 
-    enum ExitCodes : uint32 { EXIT_OK = 0, EXIT_RESTART = 1, EXIT_SANDBOX_INIT_ERROR = 101 };
+    enum ExitCodes : uint32 {
+        EXIT_OK = 0,
+        EXIT_RESTART = 1,
+        EXIT_SANDBOX_INIT_ERROR = 101,
+        EXIT_SANDBOX_BIND_ERROR = 102,
+        EXIT_SANDBOX_NO_MASTER = 103
+    };
 
     App() : LogTag("app") {
         traceScope();

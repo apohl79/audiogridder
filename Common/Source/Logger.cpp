@@ -33,7 +33,8 @@ AGLogger::AGLogger(const String& appName, const String& filePrefix) : Thread("AG
     if (!d.exists()) {
         d.createDirectory();
     }
-    cleanDirectory(d.getFullPathName(), filePrefix, ".log");
+    int filesToKeep = appName == "Sandbox" ? 50 : 5;
+    cleanDirectory(d.getFullPathName(), filePrefix, ".log", filesToKeep);
 }
 
 AGLogger::~AGLogger() {

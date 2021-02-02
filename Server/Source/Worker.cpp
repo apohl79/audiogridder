@@ -321,15 +321,21 @@ void Worker::handleMessage(std::shared_ptr<Message<EditPlugin>> msg) {
     traceScope();
     auto proc = m_audio->getProcessor(pPLD(msg).getNumber());
     if (nullptr != proc) {
+        getApp()->getServer().sandboxShowEditor();
         m_screen->showEditor(proc);
         m_shouldHideEditor = true;
     }
 }
 
-void Worker::handleMessage(std::shared_ptr<Message<HidePlugin>> /* msg */) {
+void Worker::handleMessage(std::shared_ptr<Message<HidePlugin>> /* msg */, bool fromMaster) {
     traceScope();
-    m_screen->hideEditor();
-    m_shouldHideEditor = false;
+    if (m_shouldHideEditor) {
+        if (!fromMaster) {
+            getApp()->getServer().sandboxHideEditor();
+        }
+        m_screen->hideEditor();
+        m_shouldHideEditor = false;
+    }
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<Mouse>> msg) {

@@ -37,7 +37,7 @@ class Worker : public Thread, public LogTag {
     void handleMessage(std::shared_ptr<Message<AddPlugin>> msg);
     void handleMessage(std::shared_ptr<Message<DelPlugin>> msg);
     void handleMessage(std::shared_ptr<Message<EditPlugin>> msg);
-    void handleMessage(std::shared_ptr<Message<HidePlugin>> msg);
+    void handleMessage(std::shared_ptr<Message<HidePlugin>> msg, bool fromMaster = false);
     void handleMessage(std::shared_ptr<Message<Mouse>> msg);
     void handleMessage(std::shared_ptr<Message<Key>> msg);
     void handleMessage(std::shared_ptr<Message<GetPluginSettings>> msg);

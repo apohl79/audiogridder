@@ -54,8 +54,10 @@ void ServiceResponder::initialize(int port, int id, const String& hostname) {
 }
 
 void ServiceResponder::cleanup() {
-    m_inst->signalThreadShouldExit();
-    m_inst.reset();
+    if (nullptr != m_inst) {
+        m_inst->signalThreadShouldExit();
+        m_inst.reset();
+    }
 }
 
 void ServiceResponder::run() {

@@ -17,7 +17,7 @@ namespace e47 {
 class Server;
 
 struct SandboxMessage {
-    enum Type : uint16 { CONFIG, SANDBOX_PORT, GET_RECENTS, UPDATE_RECENTS, RECENTS };
+    enum Type : uint16 { CONFIG, SANDBOX_PORT, GET_RECENTS, UPDATE_RECENTS, RECENTS, SHOW_EDITOR, HIDE_EDITOR };
     Type type;
     Uuid id;
     json data;

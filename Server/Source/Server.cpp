@@ -278,7 +278,8 @@ Server::~Server() {
     CPUInfo::cleanup();
     WindowPositions::cleanup();
     logln("server terminated");
-    if (getOpt("sandboxMode", false)) {
+    if (!getOpt("sandboxMode", false)) {
+        logln("removing run file");
         File runFile(Defaults::getConfigFileName(Defaults::ConfigServerRun));
         runFile.deleteFile();
     }
@@ -572,10 +573,10 @@ void Server::runServer() {
                     logln("about to kill process " << pid << " that blocks server port " << Defaults::SERVER_PORT);
                     ChildProcess kproc;
                     kproc.start("kill " + pid);
-                    sleep(3000);
                 }
             }
         }
+        sleep(3000);
     }
 #endif
 
@@ -694,6 +695,27 @@ void Server::runSandbox() {
     m_port = Defaults::SANDBOX_PORT;
     while (!m_masterSocket.createListener(m_port, m_host)) {
         m_port++;
+        if (m_port > Defaults::SANDBOX_PORT + 1000) {
+            logln("failed to create listener");
+            getApp()->prepareShutdown(App::EXIT_SANDBOX_BIND_ERROR);
+            return;
+        }
+    }
+
+    int waitForMasterSteps = 6000;
+    while (!m_sandboxConnectedToMaster) {
+        sleep(10);
+        if (--waitForMasterSteps <= 0) {
+            logln("giving up on waiting for master connection");
+            getApp()->prepareShutdown(App::EXIT_SANDBOX_NO_MASTER);
+            return;
+        }
+    }
+
+    if (!m_sandboxSlave->send(SandboxMessage(SandboxMessage::SANDBOX_PORT, {{"port", m_port}}))) {
+        logln("failed to send sendbox port");
+        getApp()->prepareShutdown();
+        return;
     }
 
     loadKnownPluginList();
@@ -749,7 +771,17 @@ bool Server::sendHandshakeResponse(StreamingSocket* sock, bool sandboxEnabled, i
 }
 
 void Server::handleMessageFromSandbox(SandboxMaster& sandbox, const SandboxMessage& msg) {
-    logln("received unhandled message from sandbox " << sandbox.id << ": " << msg.data.dump());
+    if (msg.type == SandboxMessage::SHOW_EDITOR) {
+        if (m_sandboxHasScreen.isNotEmpty() && m_sandboxHasScreen != sandbox.id &&
+            m_sandboxes.contains(m_sandboxHasScreen)) {
+            m_sandboxes.getReference(m_sandboxHasScreen)->send(SandboxMessage(SandboxMessage::HIDE_EDITOR, {}));
+        }
+        m_sandboxHasScreen = sandbox.id;
+    } else if (msg.type == SandboxMessage::HIDE_EDITOR && m_sandboxHasScreen == sandbox.id) {
+        m_sandboxHasScreen.clear();
+    } else {
+        logln("received unhandled message from sandbox " << sandbox.id << ": " << msg.serialize());
+    }
 }
 
 void Server::handleDisconnectFromSandbox(SandboxMaster& sandbox) {
@@ -761,14 +793,12 @@ void Server::handleDisconnectFromSandbox(SandboxMaster& sandbox) {
 
 void Server::handleConnectedToMaster() {
     logln("connected to sandbox master");
-    if (!m_sandboxSlave->send(SandboxMessage(SandboxMessage::SANDBOX_PORT, {{"port", m_port}}))) {
-        logln("failed to send sendbox port");
-        getApp()->prepareShutdown();
-    }
+    m_sandboxConnectedToMaster = true;
 }
 
 void Server::handleDisconnectedFromMaster() {
     logln("disconnected from sandbox master");
+    m_sandboxConnectedToMaster = false;
     getApp()->prepareShutdown();
 }
 
@@ -777,6 +807,25 @@ void Server::handleMessageFromMaster(const SandboxMessage& msg) {
         logln("config message from sandbox master: " << msg.data.dump());
         m_sandboxConfig.fromJson(msg.data);
         m_sandboxReady = true;
+    } else if (msg.type == SandboxMessage::HIDE_EDITOR) {
+        if (m_workers.size() > 0) {
+            auto m = std::make_shared<Message<HidePlugin>>();
+            m_workers.getReference(0)->handleMessage(m, true);
+        }
+    } else {
+        logln("received unhandled message from master: " << msg.serialize());
+    }
+}
+
+void Server::sandboxShowEditor() {
+    if (getOpt("sandboxMode", false)) {
+        m_sandboxSlave->send(SandboxMessage(SandboxMessage::SHOW_EDITOR, {}));
+    }
+}
+
+void Server::sandboxHideEditor() {
+    if (getOpt("sandboxMode", false)) {
+        m_sandboxSlave->send(SandboxMessage(SandboxMessage::HIDE_EDITOR, {}));
     }
 }
 

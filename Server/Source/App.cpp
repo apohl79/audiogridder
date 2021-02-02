@@ -61,12 +61,6 @@ void App::initialise(const String& commandLineParameters) {
 
     logln("commandline: " << commandLineParameters);
 
-    if (error.isNotEmpty()) {
-        logln("error: " << error);
-        quit();
-        return;
-    }
-
     switch (mode) {
         case SCAN:
 #ifdef JUCE_MAC
@@ -115,6 +109,9 @@ void App::initialise(const String& commandLineParameters) {
         }
         case SANDBOX: {
             traceScope();
+#ifdef JUCE_MAC
+            Process::setDockIconVisible(false);
+#endif
             CoreDump::initialize(appName, logName, false);
             AGLogger::deleteFileAtFinish();
             Tracer::deleteFileAtFinish();
@@ -277,6 +274,9 @@ void App::showEditor(std::shared_ptr<AGProcessor> proc, Thread::ThreadID tid, Wi
         m_windowProc = proc;
         m_windowFuncNative = func;
         m_window = std::make_unique<ProcessorWindow>(m_windowProc, m_windowFuncNative);
+#ifdef JUCE_MAC
+        Process::setDockIconVisible(true);
+#endif
     } else {
         logln("show editor failed: '" << proc->getName() << "' has no editor");
     }
@@ -296,6 +296,9 @@ void App::showEditor(std::shared_ptr<AGProcessor> proc, Thread::ThreadID tid, Wi
         m_windowProc = proc;
         m_windowFuncFFmpeg = func;
         m_window = std::make_unique<ProcessorWindow>(m_windowProc, m_windowFuncFFmpeg);
+#ifdef JUCE_MAC
+        Process::setDockIconVisible(true);
+#endif
     } else {
         logln("show editor failed: '" << proc->getName() << "' has no editor");
     }
@@ -316,6 +319,9 @@ void App::hideEditor(Thread::ThreadID tid) {
         m_windowProc.reset();
         m_windowFuncNative = nullptr;
         m_windowFuncFFmpeg = nullptr;
+#ifdef JUCE_MAC
+        Process::setDockIconVisible(false);
+#endif
     } else {
         logln("failed to hide editor: tid does not match window owner");
     }
