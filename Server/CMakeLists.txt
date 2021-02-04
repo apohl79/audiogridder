@@ -57,8 +57,10 @@ target_link_libraries(AudioGridderServer PRIVATE
   ${WEBP_LIBRARIES})
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  target_link_libraries(AudioGridderServer PRIVATE
-    "-framework AVFoundation -framework CoreMedia -framework VideoToolbox")
+  target_link_libraries(AudioGridderServer PRIVATE "-framework AVFoundation -framework CoreMedia")
+  if(AG_MACOS_TARGET STRGREATER_EQUAL 10.8)
+    target_link_libraries(AudioGridderServer PRIVATE "-framework VideoToolbox")
+  endif()
   ag_bundle_sign(AudioGridderServer)
   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     ag_bundle_copy(AudioGridderServer /Applications/Debug)

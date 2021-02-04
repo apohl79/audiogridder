@@ -863,7 +863,7 @@
 				</dict>
 			</array>
 			<key>NAME</key>
-			<string>AudioGridderServer10.7</string>
+			<string>AudioGridderServer</string>
 			<key>PAYLOAD_ONLY</key>
 			<false/>
 			<key>TREAT_MISSING_PRESENTATION_DOCUMENTS_AS_WARNING</key>
