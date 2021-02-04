@@ -157,6 +157,12 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     PopupMenu getMenuForIndex(int topLevelMenuIndex, const String& /* menuName */) override {
         PopupMenu menu;
         if (topLevelMenuIndex == 0) {  // Settings
+            menu.addItem("Settings", [this] {
+                if (nullptr == m_srvSettingsWindow) {
+                    m_srvSettingsWindow = std::make_unique<ServerSettingsWindow>(this);
+                    updateDockIcon();
+                }
+            });
             menu.addItem("Plugins", [this] {
                 if (nullptr == m_pluginListWindow) {
                     m_pluginListWindow = std::make_unique<PluginListWindow>(
@@ -164,12 +170,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
                     updateDockIcon();
                 }
             });
-            menu.addItem("Server Settings", [this] {
-                if (nullptr == m_srvSettingsWindow) {
-                    m_srvSettingsWindow = std::make_unique<ServerSettingsWindow>(this);
-                    updateDockIcon();
-                }
-            });
+            menu.addSeparator();
             menu.addItem("Statistics", [this] {
                 if (nullptr == m_statsWindow) {
                     m_statsWindow = std::make_unique<StatisticsWindow>(this);
