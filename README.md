@@ -16,19 +16,34 @@ For more information and intstallation instructions, please visit
 [https://audiogridder.com](https://audiogridder.com).
 
 <p align="center">
-<img src="https://raw.githubusercontent.com/apohl79/audiogridder/master/images/overview.jpg" width="600" />
+<img src="https://audiogridder.com/wp-content/uploads/2021/02/diagram-back.png" width="500" />
 </p>
 
-# Discussions
+# Help / Bugs / Ideas
 
 Please report bugs, discuss ideas or ask questions in the
 [discussions](https://github.com/apohl79/audiogridder/discussions) area!
 Issues will only be created as a result of a discussion going forward.
 
-# Downloads
+:point_right: **Note: Please do NOT create issues. Please create discussion threads.**
 
-Please find the latest binaries to download in the
-[releases](https://github.com/apohl79/audiogridder/releases) section.
+:exclamation: For Bugs you have to follow [the bug reporting guide](https://audiogridder.com/bug-reports/)!
+
+# Installation
+
+Please find the latest installers in the 
+[download](https://audiogridder.com/download/) section.
+
+## macOS Homebrew
+
+On macOS you can install AudioGridder via homebrew:
+
+```
+brew install audiogridder-plugin
+```
+```
+brew install audiogridder-server
+```
 
 # Features
 
@@ -54,17 +69,10 @@ Please find the latest binaries to download in the
 - ProTools is reportedly working via wrapper plugins that can host
 non AAX plugins within ProTools
 
-# Reporting of Bugs/Issues
-
-If you report a new issue, please be as precise as possible. To
-identify the root cause of an issue, it is necessary to be able to
-reproduce it or at least get some conclusions from the info you
-provide. [Please follow these steps...](https://audiogridder.com/bug-reports/)
-
 
 # Donation
 
-If you like AudioGridder and want to support its further development, you are welcome to donate. :-)
+AudioGridder is free. If you use it, please consider supporting the project with a dontation:
 
 [![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=MF9TGYY8P8GG4)
 [![donorbox](https://d1iczxrky3cnb2.cloudfront.net/button-small-blue.png)](https://donorbox.org/audiogridder?default_interval=o)
