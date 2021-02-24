@@ -27,7 +27,7 @@ Issues will only be created as a result of a discussion going forward.
 
 :point_right: **Note: Please do NOT create issues. Please create discussion threads.**
 
-:exclamation: For Bugs you have to follow [the bug reporting guide](https://audiogridder.com/bug-reports/)!
+:exclamation: You have to follow [the bug reporting guide](https://audiogridder.com/bug-reports/) when reporting bugs!
 
 # Installation
 
@@ -62,7 +62,7 @@ brew install audiogridder-server
 # Compatibility
 
 - Server: macOS 10.7+, Windows 7+
-- Plugin: macOS 10.11+, Windows 7+, Linux 64bit
+- Plugin: macOS 10.7+, Windows 7+, Linux 64bit
 - The server supports AudioUnit (macOS only) and VST2/VST3 plugins
 - The plugin is available as AudioUnit (macOS only) and VST2/VST3
 - Tested DAWs: Cubase 10 Pro, Logic Pro X, Reaper, Ableton Live
@@ -72,7 +72,7 @@ non AAX plugins within ProTools
 
 # Donation
 
-AudioGridder is free. If you use it, please consider supporting the project with a dontation:
+AudioGridder is free. If you use it, please consider supporting the project with a donation:
 
 [![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=MF9TGYY8P8GG4)
 [![donorbox](https://d1iczxrky3cnb2.cloudfront.net/button-small-blue.png)](https://donorbox.org/audiogridder?default_interval=o)
