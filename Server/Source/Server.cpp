@@ -296,6 +296,7 @@ void Server::shutdown() {
     for (auto& w : m_workers) {
         w->waitForThreadToExit(-1);
     }
+    m_sandboxes.clear();
     signalThreadShouldExit();
 }
 
@@ -610,21 +611,27 @@ void Server::runServer() {
 
                 if (m_sandboxing) {
                     // Spawn a sandbox child process for a new client and tell the client the port to connect to
-                    auto sandbox = std::make_shared<SandboxMaster>(*this, String::toHexString(cfg.clientId));
-                    logln("creating sandbox " << sandbox->id);
+                    int num = 0;
+                    String id = String::toHexString(cfg.clientId) + "-" + String(num);
+                    while (m_sandboxes.contains(id)) {
+                        num++;
+                        id = String::toHexString(cfg.clientId) + "-" + String(num);
+                    }
+                    auto sandbox = std::make_shared<SandboxMaster>(*this, id);
+                    logln("creating sandbox " << id);
                     if (sandbox->launchSlaveProcess(File::getSpecialLocation(File::currentExecutableFile),
                                                     Defaults::SANDBOX_CMD_PREFIX)) {
-                        sandbox->onPortReceived = [this, sandbox, clnt](int sandboxPort) {
+                        sandbox->onPortReceived = [this, id, clnt](int sandboxPort) {
                             traceScope();
                             if (!sendHandshakeResponse(clnt, true, sandboxPort)) {
-                                logln("failed to send handshake response for sandbox " << sandbox->id);
-                                m_sandboxes.remove(sandbox->id);
+                                logln("failed to send handshake response for sandbox " << id);
+                                m_sandboxes.remove(id);
                             }
                             clnt->close();
                             delete clnt;
                         };
                         if (sandbox->send(SandboxMessage(SandboxMessage::CONFIG, cfg.toJson()))) {
-                            m_sandboxes.set(sandbox->id, sandbox);
+                            m_sandboxes.set(id, sandbox);
                         } else {
                             logln("failed to send message to sandbox");
                         }
