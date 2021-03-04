@@ -15,8 +15,8 @@ hosting the plugins directly in your DAW but not using your local CPU.
 For more information and intstallation instructions, please visit
 [https://audiogridder.com](https://audiogridder.com).
 
-<p align="center">
-<img src="https://audiogridder.com/wp-content/uploads/2021/02/diagram-back.png" width="500" />
+<p align="left">
+<img src="https://audiogridder.com/wp-content/uploads/2021/03/diagram-gray.png" width="500" />
 </p>
 
 # Help / Bugs / Ideas
