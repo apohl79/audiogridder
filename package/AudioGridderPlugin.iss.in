@@ -12,6 +12,9 @@ Source: "..\build-win-10-x86_64\Plugin\AudioGridderMidi_artefacts\RelWithDebInfo
 Source: "..\build-win-10-x86_64\Plugin\AudioGridderFx_artefacts\RelWithDebInfo\VST\AudioGridder.dll"; DestDir: {code:GetVST2Dir}; Flags: ignoreversion
 Source: "..\build-win-10-x86_64\Plugin\AudioGridderInst_artefacts\RelWithDebInfo\VST\AudioGridderInst.dll"; DestDir: {code:GetVST2Dir}; Flags: ignoreversion
 Source: "..\build-win-10-x86_64\Plugin\AudioGridderMidi_artefacts\RelWithDebInfo\VST\AudioGridderMidi.dll"; DestDir: {code:GetVST2Dir}; Flags: ignoreversion
+Source: "..\build-win-10-x86_64\Plugin\AudioGridderFx_artefacts\RelWithDebInfo\AAX\*"; Excludes: "*.exp,*.lib,*.pdb"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins; Flags: ignoreversion recursesubdirs
+Source: "..\build-win-10-x86_64\Plugin\AudioGridderInst_artefacts\RelWithDebInfo\AAX\*"; Excludes: "*.exp,*.lib,*.pdb"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins; Flags: ignoreversion recursesubdirs
+Source: "..\build-win-10-x86_64\Plugin\AudioGridderMidi_artefacts\RelWithDebInfo\AAX\*"; Excludes: "*.exp,*.lib,*.pdb"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins; Flags: ignoreversion recursesubdirs
 
 [Code]
 var

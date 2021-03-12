@@ -6,16 +6,19 @@ copy /B ..\build-win-10-x86_64\Plugin\AudioGridderFx_artefacts\RelWithDebInfo\VS
 copy /B ..\build-win-10-x86_64\Plugin\AudioGridderFx_artefacts\RelWithDebInfo\VST3\AudioGridder.vst3\Contents\x86_64-win\AudioGridder.pdb ..\..\Archive\Builds\#STR_VER#\win\vst3
 copy /B ..\build-win-10-x86_64\Plugin\AudioGridderFx_artefacts\RelWithDebInfo\VST\AudioGridder.dll ..\..\Archive\Builds\#STR_VER#\win
 copy /B ..\build-win-10-x86_64\Plugin\AudioGridderFx_artefacts\RelWithDebInfo\VST\AudioGridder.pdb ..\..\Archive\Builds\#STR_VER#\win\vst
+xcopy /E /I ..\build-win-10-x86_64\Plugin\AudioGridderFx_artefacts\RelWithDebInfo\AAX ..\..\Archive\Builds\#STR_VER#\win
 
 copy /B ..\build-win-10-x86_64\Plugin\AudioGridderInst_artefacts\RelWithDebInfo\VST3\AudioGridderInst.vst3\Contents\x86_64-win\AudioGridderInst.vst3 ..\..\Archive\Builds\#STR_VER#\win
 copy /B ..\build-win-10-x86_64\Plugin\AudioGridderInst_artefacts\RelWithDebInfo\VST3\AudioGridderInst.vst3\Contents\x86_64-win\AudioGridderInst.pdb ..\..\Archive\Builds\#STR_VER#\win\vst3
 copy /B ..\build-win-10-x86_64\Plugin\AudioGridderInst_artefacts\RelWithDebInfo\VST\AudioGridderInst.dll ..\..\Archive\Builds\#STR_VER#\win
 copy /B ..\build-win-10-x86_64\Plugin\AudioGridderInst_artefacts\RelWithDebInfo\VST\AudioGridderInst.pdb ..\..\Archive\Builds\#STR_VER#\win\vst
+xcopy /E /I ..\build-win-10-x86_64\Plugin\AudioGridderInst_artefacts\RelWithDebInfo\AAX ..\..\Archive\Builds\#STR_VER#\win
 
 copy /B ..\build-win-10-x86_64\Plugin\AudioGridderMidi_artefacts\RelWithDebInfo\VST3\AudioGridderMidi.vst3\Contents\x86_64-win\AudioGridderMidi.vst3 ..\..\Archive\Builds\#STR_VER#\win
 copy /B ..\build-win-10-x86_64\Plugin\AudioGridderMidi_artefacts\RelWithDebInfo\VST3\AudioGridderMidi.vst3\Contents\x86_64-win\AudioGridderMidi.pdb ..\..\Archive\Builds\#STR_VER#\win\vst3
 copy /B ..\build-win-10-x86_64\Plugin\AudioGridderMidi_artefacts\RelWithDebInfo\VST\AudioGridderMidi.dll ..\..\Archive\Builds\#STR_VER#\win
 copy /B ..\build-win-10-x86_64\Plugin\AudioGridderMidi_artefacts\RelWithDebInfo\VST\AudioGridderMidi.pdb ..\..\Archive\Builds\#STR_VER#\win\vst
+xcopy /E /I ..\build-win-10-x86_64\Plugin\AudioGridderMidi_artefacts\RelWithDebInfo\AAX ..\..\Archive\Builds\#STR_VER#\win
 
 @echo compressing package...
 cd build

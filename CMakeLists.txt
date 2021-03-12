@@ -7,15 +7,26 @@ file(STRINGS ${CMAKE_SOURCE_DIR}/package/VERSION.num AG_VERSION)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(AG_VST2_SDK_DEFAULT "")
+set(AG_AAX_PLUGIN_ENABLED FALSE)
+
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   set(AG_MACOS_TARGET 10.8 CACHE STRING "macOS target, default is 10.8")
   set(AG_VST2_SDK_DEFAULT "$ENV{HOME}/audio/vstsdk2.4")
+  set(AG_AAX_SDK_DEFAULT "$ENV{HOME}/audio/AAX_SDK_2p3p2")
+  set(AG_AAX_SDK ${AG_AAX_SDK_DEFAULT} CACHE STRING "AAX SDK Folder")
   set(CMAKE_OSX_DEPLOYMENT_TARGET ${AG_MACOS_TARGET})
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
   set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
+  # No Pro Tools/AAX support for arm64 yet
+  if(CMAKE_OSX_ARCHITECTURES STREQUAL "x86_64")
+    set(AG_AAX_PLUGIN_ENABLED TRUE)
+  endif()
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   set(AG_VST2_SDK_DEFAULT "z:/vstsdk2.4")
+  set(AG_AAX_SDK_DEFAULT "z:/AAX_SDK_2p3p2")
+  set(AG_AAX_SDK ${AG_AAX_SDK_DEFAULT} CACHE STRING "AAX SDK Folder")
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  set(AG_AAX_PLUGIN_ENABLED TRUE)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   set(AG_VST2_SDK_DEFAULT "/mnt/audio/vstsdk2.4")
 endif()
@@ -24,6 +35,9 @@ set(AG_VST2_SDK ${AG_VST2_SDK_DEFAULT} CACHE STRING "VST2 SDK Folder")
 
 add_subdirectory(JUCE)
 juce_set_vst2_sdk_path(${AG_VST2_SDK})
+if(AG_AAX_PLUGIN_ENABLED)
+  juce_set_aax_sdk_path(${AG_AAX_SDK})
+endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
@@ -62,6 +76,26 @@ macro(ag_bundle_sign target_name)
       /usr/bin/codesign --force --sign AudioGridder --timestamp=none $<TARGET_BUNDLE_DIR:${target_name}>
   )
 endmacro()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  macro(ag_bundle_sign_aax target_name)
+    add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}
+      COMMAND
+        ${CMAKE_COMMAND} -E echo "Signing AAX bundle $<TARGET_BUNDLE_DIR:${target_name}>"
+      COMMAND
+        aax_sign.sh $<TARGET_BUNDLE_DIR:${target_name}> || echo "AAX signing not available"
+    )
+  endmacro()
+else()
+  macro(ag_bundle_sign_aax target_name)
+    add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}
+      COMMAND
+        ${CMAKE_COMMAND} -E echo "Signing AAX plugin $<TARGET_FILE_NAME:${target_name}>"
+      COMMAND
+        aax_sign.bat $<TARGET_FILE_DIR:${target_name}>../../..
+    )
+  endmacro()
+endif()
 
 macro(ag_bundle_copy target_name dst_dir)
   add_custom_target(${target_name}_COPY ALL DEPENDS ${target_name}_SIGN
