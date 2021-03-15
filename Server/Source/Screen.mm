@@ -75,12 +75,15 @@ int getCaptureDeviceIndex() {
 }
 
 void askForScreenRecordingPermission() {
-    CGDisplayStreamRef stream = CGDisplayStreamCreate(CGMainDisplayID(), 1, 1, kCVPixelFormatType_32BGRA, nil,
-                                                      ^(CGDisplayStreamFrameStatus, uint64_t, IOSurfaceRef,
-                                                        CGDisplayStreamUpdateRef) {});
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
+    CGDisplayStreamRef stream =
+        CGDisplayStreamCreate(CGMainDisplayID(), 1, 1, kCVPixelFormatType_32BGRA, nil,
+                              ^(CGDisplayStreamFrameStatus, uint64_t, IOSurfaceRef, CGDisplayStreamUpdateRef){
+                              });
     if (stream) {
         CFRelease(stream);
     }
+#endif
 }
 
 bool askForAccessibilityPermission() {
