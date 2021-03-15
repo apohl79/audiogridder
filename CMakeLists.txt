@@ -39,6 +39,13 @@ if(AG_AAX_PLUGIN_ENABLED)
   juce_set_aax_sdk_path(${AG_AAX_SDK})
 endif()
 
+option(AG_WITH_PLUGIN "Enable Plugin build." on)
+option(AG_WITH_SERVER "Enable Server build." on)
+option(AG_WITH_TRACEREADER "Enable tracereader build." off)
+option(AG_ENABLE_DYNAMIC_LINKING "Enable dynamic linking of ffmpeg/webp." off)
+option(AG_ENABLE_CODE_SIGNING "Enable code signing." on)
+option(AG_ENABLE_DEBUG_COPY_STEP "Enable copying binaries after building in Debug mode (on macOS)." on)
+
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 find_package(FFmpeg REQUIRED)
@@ -56,10 +63,6 @@ link_directories(${WEBP_LIBRARY_DIRS})
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/Common/Source AG_SOURCES_COMMON)
 list(REMOVE_ITEM AG_SOURCES_COMMON "${CMAKE_CURRENT_SOURCE_DIR}/Common/Source/TraceReader.cpp")
 
-option(AG_WITH_PLUGIN "Enable Plugin build." on)
-option(AG_WITH_SERVER "Enable Server build." on)
-option(AG_WITH_TRACEREADER "Enable tracereader build." off)
-
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   set(AG_WITH_TRACEREADER on)
 endif()
@@ -69,31 +72,52 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 macro(ag_bundle_sign target_name)
-  add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}
-    COMMAND
-      ${CMAKE_COMMAND} -E echo "Signing bundle $<TARGET_BUNDLE_DIR:${target_name}>"
-    COMMAND
-      /usr/bin/codesign --force --sign AudioGridder --timestamp=none $<TARGET_BUNDLE_DIR:${target_name}>
-  )
+  if(AG_ENABLE_CODE_SIGNING)
+    add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}
+      COMMAND
+        ${CMAKE_COMMAND} -E echo "Signing bundle $<TARGET_BUNDLE_DIR:${target_name}>"
+      COMMAND
+        /usr/bin/codesign --force --sign AudioGridder --timestamp=none $<TARGET_BUNDLE_DIR:${target_name}>
+      )
+  else()
+    add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}
+      COMMAND
+        ${CMAKE_COMMAND} -E echo "Code signing disabled. Not signing bundle $<TARGET_BUNDLE_DIR:${target_name}>"
+      )
+  endif()
 endmacro()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   macro(ag_bundle_sign_aax target_name)
-    add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}
-      COMMAND
-        ${CMAKE_COMMAND} -E echo "Signing AAX bundle $<TARGET_BUNDLE_DIR:${target_name}>"
-      COMMAND
-        aax_sign.sh $<TARGET_BUNDLE_DIR:${target_name}> || echo "AAX signing not available"
-    )
+    if(AG_ENABLE_CODE_SIGNING)
+      add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}
+        COMMAND
+          ${CMAKE_COMMAND} -E echo "Signing AAX bundle $<TARGET_BUNDLE_DIR:${target_name}>"
+        COMMAND
+          aax_sign.sh $<TARGET_BUNDLE_DIR:${target_name}> || echo "AAX signing not available"
+      )
+    else()
+      add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}
+        COMMAND
+          ${CMAKE_COMMAND} -E echo "Code signing disabled. Not signing AAX bundle $<TARGET_BUNDLE_DIR:${target_name}>"
+      )
+    endif()
   endmacro()
 else()
   macro(ag_bundle_sign_aax target_name)
-    add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}
-      COMMAND
-        ${CMAKE_COMMAND} -E echo "Signing AAX plugin $<TARGET_FILE_NAME:${target_name}>"
-      COMMAND
-        aax_sign.bat $<TARGET_FILE_DIR:${target_name}>../../..
-    )
+    if(AG_ENABLE_CODE_SIGNING)
+      add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}
+        COMMAND
+          ${CMAKE_COMMAND} -E echo "Signing AAX plugin $<TARGET_FILE_NAME:${target_name}>"
+        COMMAND
+          aax_sign.bat $<TARGET_FILE_DIR:${target_name}>../../..
+      )
+    else()
+      add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}
+        COMMAND
+          ${CMAKE_COMMAND} -E echo "Code signing disabled. Not signing AAX plugin $<TARGET_FILE_NAME:${target_name}>"
+      )
+    endif()
   endmacro()
 endif()
 
@@ -131,10 +155,19 @@ else()
   message(STATUS "Server disabled.")
 endif()
 
+message(STATUS "Dynamic linking: ${AG_ENABLE_DYNAMIC_LINKING}")
+message(STATUS "Code signing: ${AG_ENABLE_CODE_SIGNING}")
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND AG_ENABLE_DEBUG_COPY_STEP)
+  message(STATUS "Copy step of binaries after building is enabled.")
+endif()
+
+
 if(AG_WITH_TRACEREADER)
   message(STATUS "Tracereader enabled.")
   add_executable(tracereader "${CMAKE_CURRENT_SOURCE_DIR}/Common/Source/TraceReader.cpp")
   target_compile_features(tracereader PRIVATE cxx_std_14)
   target_link_libraries(tracereader ${Boost_LIBRARIES})
-  ag_file_copy(tracereader $ENV{HOME}/bin)
+  if(AG_ENABLE_DEBUG_COPY_STEP)
+    ag_file_copy(tracereader $ENV{HOME}/bin)
+  endif()
 endif()
