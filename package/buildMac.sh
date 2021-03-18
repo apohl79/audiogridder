@@ -5,14 +5,24 @@ function build() {
     arch=$2
     target=$3
     toolchain=$4
+    dev=$5
+    builddir=build-$os-$target-$arch
+    buildtype=RelWithDebInfo
 
+    if [ $dev -gt 0 ]; then
+        builddir=build-dev
+        buildtype=Debug
+    fi
+
+    echo "setting toolchain..."
     toolchain_bak="$(xcode-select -p)"
     sudo xcode-select -s $toolchain
 
-    rm -rf build-$os-$target-$arch
-    cmake -B build-$os-$target-$arch -DCMAKE_BUILD_TYPE=RelWithDebInfo -DFFMPEG_ROOT=$HOME/audio/ag-deps-$os-$arch -DCMAKE_OSX_ARCHITECTURES=$arch -DAG_MACOS_TARGET=$target
-    cmake --build build-$os-$target-$arch -j12
+    rm -rf $builddir
+    cmake -B $builddir -DCMAKE_BUILD_TYPE=$buildtype -DFFMPEG_ROOT=$HOME/audio/ag-deps-$os-$target-$arch -DCMAKE_OSX_ARCHITECTURES=$arch -DAG_MACOS_TARGET=$target
+    cmake --build $builddir -j12
 
+    echo "restoring toolchain..."
     sudo xcode-select -s $toolchain_bak
 
     VERSION=$(cat package/VERSION)
@@ -36,22 +46,32 @@ function build() {
         echo "Created $TARGET"
     fi
 
-    cp -r build-$os-$target-$arch/Server/AudioGridderServer_artefacts/RelWithDebInfo/AudioGridderServer.app ../Archive/Builds/$VERSION/$os$macos_target-$arch/
-    cp -r build-$os-$target-$arch/Plugin/AudioGridderFx_artefacts/RelWithDebInfo/* ../Archive/Builds/$VERSION/$os$macos_target-$arch/
-    cp -r build-$os-$target-$arch/Plugin/AudioGridderInst_artefacts/RelWithDebInfo/* ../Archive/Builds/$VERSION/$os$macos_target-$arch/
-    cp -r build-$os-$target-$arch/Plugin/AudioGridderMidi_artefacts/RelWithDebInfo/* ../Archive/Builds/$VERSION/$os$macos_target-$arch/
+    if [ $dev -eq 0 ]; then
+        rsync -a build-$os-$target-$arch/Server/AudioGridderServer_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/$os$macos_target-$arch/
+        rsync -a build-$os-$target-$arch/Plugin/AudioGridderFx_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/$os$macos_target-$arch/
+        rsync -a build-$os-$target-$arch/Plugin/AudioGridderInst_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/$os$macos_target-$arch/
+        rsync -a build-$os-$target-$arch/Plugin/AudioGridderMidi_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/$os$macos_target-$arch/
+    fi
 }
 
-# macOS 10.8 X86_64
-build macos x86_64 10.8 /Library/Developer/10/CommandLineTools
+if [ "$1" == "dev" ]; then
+    echo
+    echo "--- DEV BUILD ---"
+    echo
+    # macOS 10.8 X86_64
+    build macos x86_64 10.8 /Library/Developer/10/CommandLineTools 1
+else
+    # macOS 10.8 X86_64
+    build macos x86_64 10.8 /Library/Developer/10/CommandLineTools 0
 
-# macOS 10.7 X86_64
-build macos x86_64 10.7 /Library/Developer/10/CommandLineTools
+    # macOS 10.7 X86_64
+    build macos x86_64 10.7 /Library/Developer/10/CommandLineTools 0
 
-# macOS 11.1 ARM64
-build macos arm64 11.1 /Library/Developer/CommandLineTools
+    # macOS 11.1 ARM64
+    build macos arm64 11.1 /Library/Developer/CommandLineTools 0
 
-cd package/build
-zip AudioGridder_$VERSION-MacOS-Installers.zip AudioGridderPlugin_$VERSION_*.pkg AudioGridderServer_$VERSION_*.pkg
-rm AudioGridderPlugin_$VERSION_*.pkg AudioGridderServer_$VERSION_*.pkg
-cd -
+    cd package/build
+    zip AudioGridder_$VERSION-MacOS-Installers.zip AudioGridderPlugin_$VERSION_*.pkg AudioGridderServer_$VERSION_*.pkg
+    rm AudioGridderPlugin_$VERSION_*.pkg AudioGridderServer_$VERSION_*.pkg
+    cd -
+fi

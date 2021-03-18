@@ -15,6 +15,11 @@ macro(ag_add_plugin type)
     set(productname "${productname}${type}")
   endif()
 
+  set(AG_FORMATS AU VST3 VST)
+  if(AG_AAX_PLUGIN_ENABLED)
+    list(APPEND AG_FORMATS AAX)
+  endif()
+
   juce_add_plugin(AudioGridder${type}
     VERSION "${AG_VERSION}"
     PLUGIN_NAME "${pluginname}"
@@ -22,10 +27,10 @@ macro(ag_add_plugin type)
     COMPANY_NAME "e47"
     COMPANY_COPYRIGHT "2020 Andreas Pohl"
     COMPANY_WEBSITE "https://www.audiogridder.com"
-    DESCRIPTION "DSP Server Plugin"
+    DESCRIPTION "${pluginname}"
     PLUGIN_MANUFACTURER_CODE XE47
     PLUGIN_CODE ${AG_PLUGIN_CODE}
-    FORMATS AU VST3 VST
+    FORMATS ${AG_FORMATS}
     IS_SYNTH ${AG_IS_SYNTH}
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT TRUE
@@ -35,6 +40,7 @@ macro(ag_add_plugin type)
     VST_NUM_MIDI_OUTS 16
     VST2_CATEGORY ${AG_VST_CATEGORY}
     VST3_CATEGORIES Network ${AG_VST3_CATEGORY}
+    AAX_CATEGORY AAX_ePlugInCategory_None
     AU_MAIN_TYPE ${AG_AU_TYPE}
     COPY_PLUGIN_AFTER_BUILD FALSE)
 
@@ -65,17 +71,25 @@ macro(ag_add_plugin type)
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags)
 
+  if(AG_AAX_PLUGIN_ENABLED)
+    ag_bundle_sign_aax(AudioGridder${type}_AAX)
+  endif()
+
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     ag_bundle_sign(AudioGridder${type}_AU)
     ag_bundle_sign(AudioGridder${type}_VST)
     ag_bundle_sign(AudioGridder${type}_VST3)
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND AG_ENABLE_DEBUG_COPY_STEP)
       get_target_property(AG_AU_DEST AudioGridder${type} JUCE_AU_COPY_DIR)
       get_target_property(AG_VST_DEST AudioGridder${type} JUCE_VST_COPY_DIR)
       get_target_property(AG_VST3_DEST AudioGridder${type} JUCE_VST3_COPY_DIR)
+      get_target_property(AG_AAX_DEST AudioGridder${type} JUCE_AAX_COPY_DIR)
       ag_bundle_copy(AudioGridder${type}_AU ${AG_AU_DEST})
       ag_bundle_copy(AudioGridder${type}_VST ${AG_VST_DEST})
       ag_bundle_copy(AudioGridder${type}_VST3 ${AG_VST3_DEST})
+      if(AG_AAX_PLUGIN_ENABLED)
+        ag_bundle_copy(AudioGridder${type}_AAX ${AG_AAX_DEST})
+      endif()
     endif()
   endif()
 endmacro()

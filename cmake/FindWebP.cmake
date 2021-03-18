@@ -12,8 +12,14 @@ macro(WEBP_FIND varname shortname headername)
     NO_DEFAULT_PATH
     DOC "Location of FFMPEG Headers")
 
+  if(AG_ENABLE_DYNAMIC_LINKING)
+    set(LIB_NAMES lib${shortname}.dylib lib${shortname}.so lib${shortname}.dll)
+  else()
+    set(LIB_NAMES lib${shortname}.a lib${shortname}.lib)
+  endif()
+
   find_library(WEBP_${varname}_LIBRARIES
-    NAMES lib${shortname}.a lib${shortname}.lib
+    NAMES ${LIB_NAMES}
     PATHS
     ${FFMPEG_ROOT}/lib
     $ENV{FFMPEG_DIR}/lib
