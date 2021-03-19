@@ -751,8 +751,12 @@ void Server::runSandbox() {
             logln("creating worker");
             auto w = std::make_shared<Worker>(clnt, audioSocket, screenSocket, m_sandboxConfig);
             w->startThread();
-            m_workers.add(w);
-            w->waitForThreadToExit(-1);
+            if (w->isThreadRunning()) {
+                m_workers.add(w);
+                w->waitForThreadToExit(-1);
+            } else {
+                logln("failed to start worker thread");
+            }
         } else {
             logln("failed to setup worker");
             getApp()->prepareShutdown();
@@ -761,11 +765,6 @@ void Server::runSandbox() {
     }
 
     getApp()->prepareShutdown();
-
-    // Closing the log and trace here, as we will delete them on clean shutdowns. JUCE does not let the child process
-    // shutdown properly unfortunately, if the ChildProcessMaster gets deleted.
-    AGLogger::cleanup();
-    Tracer::cleanup();
 }
 
 bool Server::sendHandshakeResponse(StreamingSocket* sock, bool sandboxEnabled, int sandboxPort) {
@@ -794,7 +793,9 @@ void Server::handleMessageFromSandbox(SandboxMaster& sandbox, const SandboxMessa
 void Server::handleDisconnectFromSandbox(SandboxMaster& sandbox) {
     if (m_sandboxes.contains(sandbox.id)) {
         logln("disconnected from sandbox " << sandbox.id);
+        auto sandboxToDelete = m_sandboxes[sandbox.id];
         m_sandboxes.remove(sandbox.id);
+        runOnMsgThreadAsync([sandboxToDelete] {});
     }
 }
 
