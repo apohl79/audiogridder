@@ -715,6 +715,7 @@ void AudioGridderAudioProcessor::hidePlugin(bool updateServer) {
     if (updateServer) {
         m_client->hidePlugin();
     }
+    m_lastActivePlugin = m_activePlugin;
     m_activePlugin = -1;
 }
 

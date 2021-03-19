@@ -124,11 +124,6 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
         }
     }
 
-    auto active = m_processor.getActivePlugin();
-    if (active > -1) {
-        m_pluginButtons[as<size_t>(active)]->setActive(true);
-    }
-
     m_stFullscreen.setButtonText("fs");
     m_stFullscreen.setBounds(201, 1, 1, 1);
     m_stFullscreen.setColour(ComboBox::outlineColourId, Colour(Defaults::BUTTON_COLOR));
@@ -301,6 +296,7 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
             String err;
             if (m_processor.loadPlugin(plug.getId(), plug.getName(), err)) {
                 addPluginButton(plug.getId(), plug.getName());
+                editPlugin((int)m_pluginButtons.size() - 1);
 #if JucePlugin_IsSynth
                 m_newPluginButton.setEnabled(false);
 #endif
@@ -535,9 +531,11 @@ int AudioGridderAudioProcessorEditor::getPluginIndex(const String& name) {
     return -1;
 }
 
-void AudioGridderAudioProcessorEditor::focusOfChildComponentChanged(FocusChangeType /* cause */) {
+void AudioGridderAudioProcessorEditor::focusOfChildComponentChanged(FocusChangeType cause) {
     traceScope();
-    if (hasKeyboardFocus(true)) {
+    bool focus = hasKeyboardFocus(true);
+    logln("focus change: has focus is " << (int)focus << ", cause is " << cause);
+    if (focus) {
         // reactivate the plugin screen
         int active = m_processor.getActivePlugin();
         if (active > -1) {
@@ -555,6 +553,16 @@ void AudioGridderAudioProcessorEditor::setConnected(bool connected) {
         m_srvLabel.setText(srvTxt, NotificationType::dontSendNotification);
         for (size_t i = 0; i < m_pluginButtons.size(); i++) {
             m_pluginButtons[i]->setEnabled(m_processor.getLoadedPlugin((int)i).ok);
+        }
+        auto active = m_processor.getActivePlugin();
+        if (active > -1) {
+            editPlugin();
+        } else {
+            auto lastActive = m_processor.getLastActivePlugin();
+            if (lastActive < 0) {
+                lastActive = 0;
+            }
+            editPlugin(lastActive);
         }
     } else {
         m_srvLabel.setText("not connected", NotificationType::dontSendNotification);
@@ -882,11 +890,11 @@ void AudioGridderAudioProcessorEditor::editPlugin(int idx) {
     if (idx == -1) {
         idx = active;
     }
-    if (idx < 0 || m_processor.isBypassed(idx)) {
+    if (idx < 0 || (size_t)idx >= m_pluginButtons.size() || m_processor.isBypassed(idx)) {
         return;
     }
-    m_pluginButtons[as<size_t>(idx)]->setActive(true);
-    m_pluginButtons[as<size_t>(idx)]->setColour(PluginButton::textColourOffId, Colour(Defaults::ACTIVE_COLOR));
+    m_pluginButtons[(size_t)idx]->setActive(true);
+    m_pluginButtons[(size_t)idx]->setColour(PluginButton::textColourOffId, Colour(Defaults::ACTIVE_COLOR));
     m_processor.editPlugin(idx);
     if (m_processor.getGenericEditor()) {
         m_genericEditor.resized();
@@ -913,18 +921,18 @@ void AudioGridderAudioProcessorEditor::editPlugin(int idx) {
                     runOnMsgThreadAsync([this, idx, p_processor] {
                         traceScope();
                         auto p = dynamic_cast<AudioGridderAudioProcessorEditor*>(p_processor->getActiveEditor());
-                        if (this == p && m_pluginButtons.size() > as<size_t>(idx)) {
+                        if (this == p && m_pluginButtons.size() > (size_t)idx) {
                             m_processor.hidePlugin(false);
-                            m_pluginButtons[as<size_t>(idx)]->setActive(false);
+                            m_pluginButtons[(size_t)idx]->setActive(false);
                             resized();
                         }
                     });
                 }
             });
     }
-    if (active > -1 && idx != active && as<size_t>(active) < m_pluginButtons.size()) {
-        m_pluginButtons[as<size_t>(active)]->setActive(false);
-        m_pluginButtons[as<size_t>(active)]->setColour(PluginButton::textColourOffId, Colours::white);
+    if (active > -1 && idx != active && (size_t)active < m_pluginButtons.size()) {
+        m_pluginButtons[(size_t)active]->setActive(false);
+        m_pluginButtons[(size_t)active]->setColour(PluginButton::textColourOffId, Colours::white);
         resized();
     }
 }
