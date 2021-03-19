@@ -386,7 +386,11 @@ Point<float> App::localPointToGlobal(Point<float> lp) {
 
 void App::ProcessorWindow::createEditor() {
     traceScope();
-    setTitleBarHeight(30);
+    auto& lf = getLookAndFeel();
+    if (auto lfv4 = dynamic_cast<LookAndFeel_V4*>(&lf)) {
+        lfv4->getCurrentColourScheme().setUIColour(LookAndFeel_V4::ColourScheme::widgetBackground,
+                                                   Colour(Defaults::BG_COLOR));
+    }
     auto disp = Desktop::getInstance().getDisplays().getPrimaryDisplay();
     if (nullptr != disp) {
         m_totalRect = disp->totalArea;

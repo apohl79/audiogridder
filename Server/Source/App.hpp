@@ -248,7 +248,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     class ProcessorWindow : public DocumentWindow, private Timer, public LogTag {
       public:
         ProcessorWindow(std::shared_ptr<AGProcessor> proc, WindowCaptureCallbackNative func)
-            : DocumentWindow(proc->getName(), Colours::lightgrey, 0),
+            : DocumentWindow(proc->getName(), Colours::lightgrey, DocumentWindow::closeButton),
               LogTag("procwindow"),
               m_processor(proc),
               m_callbackNative(func),
@@ -261,7 +261,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
         }
 
         ProcessorWindow(std::shared_ptr<AGProcessor> proc, WindowCaptureCallbackFFmpeg func)
-            : DocumentWindow(proc->getName(), Colours::lightgrey, 0),
+            : DocumentWindow(proc->getName(), Colours::lightgrey, DocumentWindow::closeButton),
               LogTag("procwindow"),
               m_processor(proc),
               m_callbackNative(nullptr),
@@ -281,6 +281,8 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
                 m_editor = nullptr;
             }
         }
+
+        void closeButtonPressed() override { getApp()->hideEditor(); }
 
         BorderSize<int> getBorderThickness() override { return {}; }
 
@@ -347,7 +349,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
 
         void resized() override {
             traceScope();
-            ResizableWindow::resized();
+            DocumentWindow::resized();
             updateScreenCaptureArea();
         }
 
