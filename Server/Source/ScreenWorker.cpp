@@ -168,6 +168,12 @@ void ScreenWorker::shutdown() {
 
 void ScreenWorker::showEditor(std::shared_ptr<AGProcessor> proc) {
     traceScope();
+    logln("show editor for " << proc->getName());
+
+    if (m_visible && proc == m_currentProc) {
+        logln("already showing editor");
+        return;
+    }
 
     auto tid = getThreadId();
 
@@ -230,6 +236,7 @@ void ScreenWorker::showEditor(std::shared_ptr<AGProcessor> proc) {
     }
 
     m_visible = true;
+    m_currentProc = proc;
 }
 
 void ScreenWorker::hideEditor() {
@@ -247,6 +254,7 @@ void ScreenWorker::hideEditor() {
     });
 
     m_visible = false;
+    m_currentProc = nullptr;
 }
 
 }  // namespace e47
