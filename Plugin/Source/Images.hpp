@@ -53,6 +53,8 @@ class Images : public Component {
     static const int logo_pngSize;
     static const char* cpu_png;
     static const int cpu_pngSize;
+    static const char* pluginlogo_png;
+    static const int pluginlogo_pngSize;
 
   private:
     //[UserVariables]   -- You can add your own custom variables in this section.

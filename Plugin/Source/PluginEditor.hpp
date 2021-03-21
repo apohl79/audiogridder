@@ -42,6 +42,9 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     const int SCREENTOOLS_MARGIN = 3;
     const int SCREENTOOLS_AB_WIDTH = 12;
 
+    const int PLUGINSCREEN_DEFAULT_W = 250;
+    const int PLUGINSCREEN_DEFAULT_H = 100;
+
     std::vector<std::unique_ptr<PluginButton>> m_pluginButtons;
     PluginButton m_newPluginButton;
     ImageComponent m_pluginScreen;

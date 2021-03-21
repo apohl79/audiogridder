@@ -94,7 +94,9 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
     m_cpuLabel.setAlpha(0.6f);
 
     addChildComponent(m_pluginScreen);
-    m_pluginScreen.setBounds(200, SCREENTOOLS_HEIGHT + SCREENTOOLS_MARGIN * 2, 1, 1);
+    m_pluginScreen.setImage(ImageCache::getFromMemory(Images::pluginlogo_png, Images::pluginlogo_pngSize));
+    m_pluginScreen.setBounds(200, SCREENTOOLS_HEIGHT + SCREENTOOLS_MARGIN * 2, PLUGINSCREEN_DEFAULT_W,
+                             PLUGINSCREEN_DEFAULT_H);
     m_pluginScreen.setWantsKeyboardFocus(true);
     m_pluginScreen.addMouseListener(&m_processor.getClient(), true);
     m_pluginScreen.addKeyListener(&m_processor.getClient());
@@ -106,7 +108,6 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
     m_genericEditorView.setViewedComponent(&m_genericEditor, false);
     m_genericEditorView.setVisible(false);
 
-    ;
     for (int idx = 0; idx < m_processor.getNumOfLoadedPlugins(); idx++) {
         auto& plug = m_processor.getLoadedPlugin(idx);
         if (plug.id.isNotEmpty()) {
@@ -239,44 +240,51 @@ void AudioGridderAudioProcessorEditor::resized() {
     int windowHeight = jmax(100, top);
     int leftBarWidth = 200;
     int windowWidth = leftBarWidth;
-    if (m_processor.getActivePlugin() != -1) {
-        if (m_processor.getGenericEditor()) {
-            m_genericEditorView.setVisible(true);
-            m_pluginScreen.setVisible(false);
-            m_stMinus.setVisible(false);
-            m_stPlus.setVisible(false);
-            int screenHeight = m_genericEditor.getHeight() + SCREENTOOLS_HEIGHT;
-            bool showScrollBar = false;
-            if (screenHeight > 600) {
-                screenHeight = 600;
-                showScrollBar = true;
-            }
-            m_genericEditorView.setSize(m_genericEditor.getWidth(), screenHeight - SCREENTOOLS_HEIGHT);
-            m_genericEditorView.setScrollBarsShown(showScrollBar, false);
-            windowHeight = jmax(windowHeight, screenHeight);
-            windowWidth += m_genericEditor.getWidth();
-        } else {
-            m_genericEditorView.setVisible(false);
-            m_pluginScreen.setVisible(true);
-            m_stMinus.setVisible(true);
-            m_stPlus.setVisible(true);
-            int screenHeight = m_pluginScreen.getHeight() + SCREENTOOLS_HEIGHT + 5;
-            windowHeight = jmax(windowHeight, screenHeight);
-            windowWidth += m_pluginScreen.getWidth();
-            m_stMinus.setBounds(windowWidth - SCREENTOOLS_HEIGHT - SCREENTOOLS_MARGIN * 2, SCREENTOOLS_MARGIN,
-                                SCREENTOOLS_HEIGHT, SCREENTOOLS_HEIGHT);
-            m_stPlus.setBounds(windowWidth - SCREENTOOLS_HEIGHT * 2 - SCREENTOOLS_MARGIN * 3, SCREENTOOLS_MARGIN,
-                               SCREENTOOLS_HEIGHT, SCREENTOOLS_HEIGHT);
-            m_stFullscreen.setBounds(windowWidth - SCREENTOOLS_HEIGHT * 3 - SCREENTOOLS_MARGIN * 4, SCREENTOOLS_MARGIN,
-                                     SCREENTOOLS_HEIGHT, SCREENTOOLS_HEIGHT);
+    if (m_processor.getActivePlugin() > -1) {
+        m_stMinus.setVisible(true);
+        m_stPlus.setVisible(true);
+        m_stFullscreen.setVisible(true);
+        m_stA.setVisible(true);
+        m_stB.setVisible(true);
+
+    } else {
+        m_stMinus.setVisible(false);
+        m_stPlus.setVisible(false);
+        m_stFullscreen.setVisible(false);
+        m_stA.setVisible(false);
+        m_stB.setVisible(false);
+    }
+    if (m_processor.getGenericEditor()) {
+        m_genericEditorView.setVisible(true);
+        m_pluginScreen.setVisible(false);
+        int screenHeight = m_genericEditor.getHeight() + SCREENTOOLS_HEIGHT;
+        bool showScrollBar = false;
+        if (screenHeight > 600) {
+            screenHeight = 600;
+            showScrollBar = true;
         }
-        m_stA.setBounds(leftBarWidth + SCREENTOOLS_MARGIN, SCREENTOOLS_MARGIN, SCREENTOOLS_AB_WIDTH,
-                        SCREENTOOLS_HEIGHT);
-        m_stB.setBounds(leftBarWidth + SCREENTOOLS_MARGIN + SCREENTOOLS_AB_WIDTH, SCREENTOOLS_MARGIN,
-                        SCREENTOOLS_AB_WIDTH, SCREENTOOLS_HEIGHT);
-        if (m_currentActiveAB != m_processor.getActivePlugin()) {
-            initStButtons();
-        }
+        m_genericEditorView.setSize(m_genericEditor.getWidth(), screenHeight - SCREENTOOLS_HEIGHT);
+        m_genericEditorView.setScrollBarsShown(showScrollBar, false);
+        windowHeight = jmax(windowHeight, screenHeight);
+        windowWidth += m_genericEditor.getWidth();
+    } else {
+        m_genericEditorView.setVisible(false);
+        m_pluginScreen.setVisible(true);
+        int screenHeight = m_pluginScreen.getHeight() + SCREENTOOLS_HEIGHT + 5;
+        windowHeight = jmax(windowHeight, screenHeight);
+        windowWidth += m_pluginScreen.getWidth();
+        m_stMinus.setBounds(windowWidth - SCREENTOOLS_HEIGHT - SCREENTOOLS_MARGIN * 2, SCREENTOOLS_MARGIN,
+                            SCREENTOOLS_HEIGHT, SCREENTOOLS_HEIGHT);
+        m_stPlus.setBounds(windowWidth - SCREENTOOLS_HEIGHT * 2 - SCREENTOOLS_MARGIN * 3, SCREENTOOLS_MARGIN,
+                           SCREENTOOLS_HEIGHT, SCREENTOOLS_HEIGHT);
+        m_stFullscreen.setBounds(windowWidth - SCREENTOOLS_HEIGHT * 3 - SCREENTOOLS_MARGIN * 4, SCREENTOOLS_MARGIN,
+                                 SCREENTOOLS_HEIGHT, SCREENTOOLS_HEIGHT);
+    }
+    m_stA.setBounds(leftBarWidth + SCREENTOOLS_MARGIN, SCREENTOOLS_MARGIN, SCREENTOOLS_AB_WIDTH, SCREENTOOLS_HEIGHT);
+    m_stB.setBounds(leftBarWidth + SCREENTOOLS_MARGIN + SCREENTOOLS_AB_WIDTH, SCREENTOOLS_MARGIN, SCREENTOOLS_AB_WIDTH,
+                    SCREENTOOLS_HEIGHT);
+    if (m_currentActiveAB != m_processor.getActivePlugin()) {
+        initStButtons();
     }
     if (getWidth() != windowWidth || getHeight() != windowHeight) {
         setSize(windowWidth, windowHeight);
@@ -318,18 +326,6 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
         int idx = getPluginIndex(button->getName());
         int active = m_processor.getActivePlugin();
         auto editFn = [this, idx] { editPlugin(idx); };
-        auto hideFn = [this, idx](int i = -1) {
-            traceScope();
-            m_processor.hidePlugin();
-            size_t index = i > -1 ? (size_t)i : (size_t)idx;
-            m_pluginButtons[index]->setActive(false);
-            if (m_processor.isBypassed((int)index)) {
-                m_pluginButtons[index]->setColour(PluginButton::textColourOffId, Colours::grey);
-            } else {
-                m_pluginButtons[index]->setColour(PluginButton::textColourOffId, Colours::white);
-            }
-            resized();
-        };
         auto bypassFn = [this, idx, button] {
             traceScope();
             m_processor.bypassPlugin(idx);
@@ -362,7 +358,7 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
                 resized();
             }
         };
-        auto deleteFn = [this, idx] {
+        auto deleteFn = [this, idx, active] {
             traceScope();
             if (!m_processor.getConfirmDelete() ||
                 AlertWindow::showOkCancelBox(AlertWindow::QuestionIcon, "Delete",
@@ -376,6 +372,22 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
                         break;
                     }
                 }
+                if (idx == active) {
+                    int newactive = idx;
+                    if (newactive >= (int)m_pluginButtons.size()) {
+                        newactive--;
+                    }
+                    if (newactive > -1) {
+                        editPlugin(newactive);
+                    }
+                }
+                if (m_pluginButtons.size() == 0) {
+                    m_processor.getClient().setPluginScreenUpdateCallback(nullptr);
+                    m_pluginScreen.setImage(
+                        ImageCache::getFromMemory(Images::pluginlogo_png, Images::pluginlogo_pngSize));
+                    m_pluginScreen.setBounds(200, SCREENTOOLS_HEIGHT + SCREENTOOLS_MARGIN * 2, PLUGINSCREEN_DEFAULT_W,
+                                             PLUGINSCREEN_DEFAULT_H);
+                }
 #if JucePlugin_IsSynth
                 m_newPluginButton.setEnabled(true);
 #endif
@@ -385,11 +397,7 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
         if (modifiers.isLeftButtonDown()) {
             switch (area) {
                 case PluginButton::MAIN: {
-                    bool edit = idx != active;
-                    if (active > -1) {
-                        hideFn(active);
-                    }
-                    if (edit) {
+                    if (idx != active) {
                         editFn();
                     }
                     break;
@@ -415,19 +423,6 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
             }
         } else {
             PopupMenu m;
-            if (m_processor.isBypassed(idx)) {
-                m.addItem("Unbypass", unBypassFn);
-            } else {
-                m.addItem("Bypass", bypassFn);
-            }
-            m.addItem("Edit", editFn);
-            m.addItem("Hide", idx == m_processor.getActivePlugin(), false, hideFn);
-            m.addSeparator();
-            m.addItem("Move Up", idx > 0, false, moveUpFn);
-            m.addItem("Move Down", as<size_t>(idx) < m_pluginButtons.size() - 1, false, moveDownFn);
-            m.addSeparator();
-            m.addItem("Delete", deleteFn);
-            m.addSeparator();
             PopupMenu presets;
             int preset = 0;
             for (auto& p : m_processor.getLoadedPlugin(idx).presets) {
@@ -687,11 +682,24 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
         }
         auto serversMDNS = m_processor.getServersMDNS();
         if (serversMDNS.size() > 0) {
+            bool showIp = false;
+            std::set<String> names;
+            for (auto s : serversMDNS) {
+                if (names.find(s.getNameAndID()) != names.end()) {
+                    showIp = true;
+                    break;
+                } else {
+                    names.insert(s.getNameAndID());
+                }
+            }
             for (auto s : serversMDNS) {
                 if (servers.contains(s.getHostAndID())) {
                     continue;
                 }
                 String name = s.getNameAndID();
+                if (showIp) {
+                    name << " (" << s.getHost() << ")";
+                }
                 name << " [load: " << lround(s.getLoad()) << "%]";
                 if (s.getHostAndID() == active) {
                     PopupMenu srvMenu;

@@ -662,7 +662,7 @@ void AudioGridderAudioProcessor::unloadPlugin(int idx) {
     }
 
     if (idx == m_activePlugin) {
-        hidePlugin();
+        m_activePlugin = -1;
     } else if (idx < m_activePlugin) {
         m_activePlugin--;
     }

@@ -145,7 +145,7 @@ int Client::getServerPort() {
 
 void Client::setPluginScreenUpdateCallback(ScreenUpdateCallback fn) {
     traceScope();
-    LockByID lock(*this, SETPLUGINSCREENUPDATECALLBACK);
+    std::lock_guard<std::mutex> lock(m_pluginScreenMtx);
     m_pluginScreenUpdateCallback = fn;
 }
 
@@ -784,7 +784,7 @@ void Client::mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wh
 void Client::sendMouseEvent(MouseEvType ev, Point<float> p, bool isShiftDown, bool isCtrlDown, bool isAltDown,
                             const MouseWheelDetails* wheel) {
     traceScope();
-    if (!isReadyLockFree()) {
+    if (!isReadyLockFree() || m_processor->getActivePlugin() == -1) {
         return;
     };
     Message<Mouse> msg(this);
@@ -808,8 +808,8 @@ void Client::sendMouseEvent(MouseEvType ev, Point<float> p, bool isShiftDown, bo
 }
 
 bool Client::keyPressed(const KeyPress& kp, Component* /* originatingComponent */) {
+    traceScope();
     if (!isReadyLockFree() || m_processor->getActivePlugin() == -1) {
-        traceScope();
         return false;
     };
     bool consumed = true;

@@ -58,7 +58,7 @@ void initialize(const String& appName, const String& filePrefix) {
         if (!d.exists()) {
             d.createDirectory();
         }
-        int filesToKeep = appName == "Sandbox"? 50: 5;
+        int filesToKeep = appName == "Sandbox" ? 50 : 5;
         cleanDirectory(d.getFullPathName(), filePrefix, ".trace", filesToKeep);
     });
 }
