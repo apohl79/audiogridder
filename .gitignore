@@ -15,3 +15,4 @@ GTAGS
 .clangd
 compile_commands.json
 .projectile
+.dir-locals.el
