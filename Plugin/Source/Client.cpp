@@ -198,48 +198,8 @@ void Client::init() {
     logln("connecting server " << host << ":" << id);
     m_cmd_socket = std::make_unique<StreamingSocket>();
     if (m_cmd_socket->connect(host, port, 1000)) {
-        StreamingSocket sock;
-        int retry = 0;
-        int clientPort = Defaults::CLIENT_PORT;
-        do {
-            if (sock.createListener(Defaults::CLIENT_PORT - retry)) {
-                clientPort = Defaults::CLIENT_PORT - retry;
-                break;
-            }
-        } while (retry++ < 200);
-
-        if (!sock.isConnected()) {
-            logln("failed to create listener");
-            return;
-        }
-
-        logln("client listener created, PORT=" << clientPort);
-
-        auto setSocketBlockingState = [](int handle, bool shouldBlock) noexcept -> bool {
-#ifdef JUCE_WINDOWS
-            DWORD nonBlocking = shouldBlock ? 0 : 1;
-            return ioctlsocket(handle, FIONBIO, &nonBlocking) == 0;
-#else
-            int socketFlags = fcntl(handle, F_GETFL, 0);
-            if (socketFlags == -1) {
-                return false;
-            }
-            if (shouldBlock) {
-                socketFlags &= ~O_NONBLOCK;
-            } else {
-                socketFlags |= O_NONBLOCK;
-            }
-            return fcntl(handle, F_SETFL, socketFlags) == 0;
-#endif
-        };
-
-        // set master socket non-blocking
-        if (!setSocketBlockingState(sock.getRawSocketHandle(), false)) {
-            logln("failed to set master socket non-blocking");
-        }
-
-        HandshakeRequest cfg = {3,      clientPort,        m_channelsIn,       m_channelsOut,
-                                m_rate, m_samplesPerBlock, m_doublePrecission, getId()};
+        HandshakeRequest cfg = {3,      0, m_channelsIn, m_channelsOut, m_rate, m_samplesPerBlock, m_doublePrecission,
+                                getId()};
         if (m_processor->getNoSrvPluginListFilter()) {
             cfg.setFlag(HandshakeRequest::NO_PLUGINLIST_FILTER);
         }
@@ -256,34 +216,29 @@ void Client::init() {
             m_cmd_socket->close();
             return;
         }
+        m_cmd_socket->close();
 
         StreamingSocket* audioSock = nullptr;
 
-        if (resp.isFlag(HandshakeResponse::SANDBOX_ENABLED)) {
-            // connect to the sendbox process
+        logln("connecting server " << host << ":" << resp.port);
+        if (!m_cmd_socket->connect(host, resp.port, 3000)) {
+            logln("connection to server failed");
             m_cmd_socket->close();
-            logln("connecting sandbox process " << host << ":" << resp.sandboxPort);
-            if (!m_cmd_socket->connect(host, resp.sandboxPort, 1000)) {
-                logln("connection to sanbox failed");
-                m_cmd_socket->close();
-                return;
-            }
+            return;
+        }
+        logln("command connection established");
 
-            audioSock = new StreamingSocket;
-            if (!audioSock->connect(host, resp.sandboxPort, 1000)) {
-                logln("failed to setup audio connection");
-                delete audioSock;
-                audioSock = nullptr;
-            }
+        audioSock = new StreamingSocket;
+        if (!audioSock->connect(host, resp.port, 3000)) {
+            logln("failed to setup audio connection");
+            delete audioSock;
+            audioSock = nullptr;
+        }
 
-            m_screen_socket = std::make_unique<StreamingSocket>();
-            if (!m_screen_socket->connect(host, resp.sandboxPort)) {
-                logln("failed to setup screen connection");
-                m_screen_socket.reset();
-            }
-        } else {
-            audioSock = accept(sock);
-            m_screen_socket = std::unique_ptr<StreamingSocket>(accept(sock));
+        m_screen_socket = std::make_unique<StreamingSocket>();
+        if (!m_screen_socket->connect(host, resp.port, 3000)) {
+            logln("failed to setup screen connection");
+            m_screen_socket.reset();
         }
 
         if (nullptr != audioSock) {

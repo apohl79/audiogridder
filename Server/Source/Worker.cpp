@@ -21,10 +21,10 @@ namespace e47 {
 std::atomic_uint32_t Worker::count{0};
 std::atomic_uint32_t Worker::runCount{0};
 
-Worker::Worker(StreamingSocket* clnt, const HandshakeRequest& cfg)
+Worker::Worker(std::shared_ptr<StreamingSocket> masterSocket, const HandshakeRequest& cfg)
     : Thread("Worker"),
       LogTag("worker"),
-      m_client(clnt),
+      m_masterSocket(masterSocket),
       m_cfg(cfg),
       m_audio(std::make_shared<AudioWorker>(this)),
       m_screen(std::make_shared<ScreenWorker>(this)),
@@ -32,13 +32,6 @@ Worker::Worker(StreamingSocket* clnt, const HandshakeRequest& cfg)
     traceScope();
     initAsyncFunctors();
     count++;
-}
-
-Worker::Worker(StreamingSocket* clntSocket, StreamingSocket* audioSocket, StreamingSocket* screenSocket,
-               const HandshakeRequest& cfg)
-    : Worker(clntSocket, cfg) {
-    m_audioSocket.reset(audioSocket);
-    m_screenSocket.reset(screenSocket);
 }
 
 Worker::~Worker() {
@@ -54,47 +47,43 @@ Worker::~Worker() {
 void Worker::run() {
     traceScope();
     runCount++;
-    std::unique_ptr<StreamingSocket> sock;
     setLogTagExtra("client:" + String::toHexString(m_cfg.clientId));
 
     if (m_cfg.version >= 2) {
         m_noPluginListFilter = m_cfg.isFlag(HandshakeRequest::NO_PLUGINLIST_FILTER);
     }
 
-    // start audio processing
-    if (nullptr != m_audioSocket) {
-        sock = std::move(m_audioSocket);
+    m_client.reset(m_masterSocket->waitForNextConnection());
+    if (nullptr != m_client && m_client->isConnected()) {
+        logln("client connected " << m_client->getHostName());
     } else {
-        sock = std::make_unique<StreamingSocket>();
-#ifdef JUCE_MAC
-        setsockopt(sock->getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
-#endif
-        sock->connect(m_client->getHostName(), m_cfg.clientPort);
+        logln("no client, giving up");
+        return;
     }
-    if (sock->isConnected()) {
+
+    std::unique_ptr<StreamingSocket> sock;
+
+    // start audio processing
+    sock.reset(m_masterSocket->waitForNextConnection());
+    if (nullptr != sock && sock->isConnected()) {
         m_audio->init(std::move(sock), m_cfg.channelsIn, m_cfg.channelsOut, m_cfg.rate, m_cfg.samplesPerBlock,
                       m_cfg.doublePrecission);
         m_audio->startThread(Thread::realtimeAudioPriority);
     } else {
-        logln("failed to establish audio connection to " << m_client->getHostName() << ":" << m_cfg.clientPort);
+        logln("failed to establish audio connection");
     }
 
     // start screen capturing
-    if (nullptr != m_screenSocket) {
-        sock = std::move(m_screenSocket);
-    } else {
-        sock = std::make_unique<StreamingSocket>();
-#ifdef JUCE_MAC
-        setsockopt(sock->getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
-#endif
-        sock->connect(m_client->getHostName(), m_cfg.clientPort);
-    }
-    if (sock->isConnected()) {
+    sock.reset(m_masterSocket->waitForNextConnection());
+    if (nullptr != sock && sock->isConnected()) {
         m_screen->init(std::move(sock));
         m_screen->startThread();
     } else {
-        logln("failed to establish screen connection to " << m_client->getHostName() << ":" << m_cfg.clientPort);
+        logln("failed to establish screen connection");
     }
+
+    m_masterSocket->close();
+    m_masterSocket.reset();
 
     // send list of plugins
     auto msgPL = std::make_shared<Message<PluginList>>(this);

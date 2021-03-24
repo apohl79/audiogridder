@@ -593,7 +593,6 @@ void Server::runServer() {
                     logln("new client " << clnt->getHostName());
                     logln("  version                  = " << cfg.version);
                     logln("  clientId                 = " << String::toHexString(cfg.clientId));
-                    logln("  clientPort               = " << cfg.clientPort);
                     logln("  channelsIn               = " << cfg.channelsIn);
                     logln("  channelsOut              = " << cfg.channelsOut);
                     logln("  rate                     = " << cfg.rate);
@@ -639,15 +638,41 @@ void Server::runServer() {
                         logln("failed to launch sandbox");
                     }
                 } else {
-                    // Create a new worker thread for a new client
-                    logln("creating worker");
-                    if (!sendHandshakeResponse(clnt)) {
-                        logln("failed to send handshake response");
-                        clnt->close();
+                    auto masterSocket = std::make_shared<StreamingSocket>();
+
+#ifndef JUCE_WINDOWS
+                    setsockopt(masterSocket->getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
+#endif
+
+                    int workerPort = Defaults::CLIENT_PORT;
+                    while (!masterSocket->createListener(workerPort, m_host)) {
+                        workerPort++;
+                        if (workerPort > Defaults::CLIENT_PORT + 1000) {
+                            logln("failed to create listener");
+                            clnt->close();
+                            delete clnt;
+                            clnt = nullptr;
+                            break;
+                        }
+                    }
+
+                    if (nullptr == clnt) {
                         continue;
                     }
 
-                    auto w = std::make_shared<Worker>(clnt, cfg);
+                    // Create a new worker thread for a new client
+                    logln("creating worker");
+                    if (!sendHandshakeResponse(clnt, false, workerPort)) {
+                        logln("failed to send handshake response");
+                        clnt->close();
+                        delete clnt;
+                        continue;
+                    }
+
+                    clnt->close();
+                    delete clnt;
+
+                    auto w = std::make_shared<Worker>(masterSocket, cfg);
                     w->startThread();
                     m_workers.add(w);
                     // lazy cleanup
@@ -695,14 +720,16 @@ void Server::runSandbox() {
         return;
     }
 
+    auto masterSocket = std::make_shared<StreamingSocket>();
+
 #ifndef JUCE_WINDOWS
-    setsockopt(m_masterSocket.getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
+    setsockopt(masterSocket->getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
 #endif
 
-    m_port = Defaults::SANDBOX_PORT;
-    while (!m_masterSocket.createListener(m_port, m_host)) {
+    m_port = Defaults::CLIENT_PORT;
+    while (!masterSocket->createListener(m_port, m_host)) {
         m_port++;
-        if (m_port > Defaults::SANDBOX_PORT + 1000) {
+        if (m_port > Defaults::CLIENT_PORT + 1000) {
             logln("failed to create listener");
             getApp()->prepareShutdown(App::EXIT_SANDBOX_BIND_ERROR);
             return;
@@ -730,49 +757,30 @@ void Server::runSandbox() {
 
     logln("sandbox started: PORT=" << m_port << ", NAME=" << m_name);
 
-    auto* clnt = m_masterSocket.waitForNextConnection();
-    if (nullptr != clnt) {
-        logln("client connected " << clnt->getHostName());
-        while (!m_sandboxReady && !currentThreadShouldExit()) {
-            // wait for the master to send the config
-            sleep(10);
-        }
+    while (!m_sandboxReady && !currentThreadShouldExit()) {
+        // wait for the master to send the config
+        sleep(10);
+    }
 
-        auto* audioSocket = m_masterSocket.waitForNextConnection();
-        auto* screenSocket = m_masterSocket.waitForNextConnection();
-        m_masterSocket.close();
-
-#ifdef JUCE_MAC
-        setsockopt(audioSocket->getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
-        setsockopt(screenSocket->getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
-#endif
-
-        if (m_sandboxReady && nullptr != audioSocket && nullptr != screenSocket) {
-            logln("creating worker");
-            auto w = std::make_shared<Worker>(clnt, audioSocket, screenSocket, m_sandboxConfig);
-            w->startThread();
-            if (w->isThreadRunning()) {
-                m_workers.add(w);
-                w->waitForThreadToExit(-1);
-            } else {
-                logln("failed to start worker thread");
-            }
-        } else {
-            logln("failed to setup worker");
-            getApp()->prepareShutdown();
-            return;
-        }
+    logln("creating worker");
+    auto w = std::make_shared<Worker>(masterSocket, m_sandboxConfig);
+    w->startThread();
+    if (w->isThreadRunning()) {
+        m_workers.add(w);
+        w->waitForThreadToExit(-1);
+    } else {
+        logln("failed to start worker thread");
     }
 
     getApp()->prepareShutdown();
 }
 
-bool Server::sendHandshakeResponse(StreamingSocket* sock, bool sandboxEnabled, int sandboxPort) {
+bool Server::sendHandshakeResponse(StreamingSocket* sock, bool sandboxEnabled, int port) {
     HandshakeResponse resp = {3, 0, 0};
     if (sandboxEnabled) {
         resp.setFlag(HandshakeResponse::SANDBOX_ENABLED);
-        resp.sandboxPort = sandboxPort;
     }
+    resp.port = port;
     return send(sock, reinterpret_cast<const char*>(&resp), sizeof(resp));
 }
 
