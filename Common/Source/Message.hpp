@@ -9,12 +9,15 @@
 #define Message_hpp
 
 #include "json.hpp"
+
+using json = nlohmann::json;
+
+#if defined(AG_PLUGIN) || defined(AG_SERVER)
+
 #include "KeyAndMouseCommon.hpp"
 #include "NumberConversion.hpp"
 #include "Utils.hpp"
 #include "Metrics.hpp"
-
-using json = nlohmann::json;
 
 namespace e47 {
 
@@ -83,7 +86,7 @@ bool read(StreamingSocket* socket, void* data, int size, int timeoutMilliseconds
  */
 struct HandshakeRequest {
     int version;
-    int clientPort;
+    int unused;
     int channelsIn;
     int channelsOut;
     double rate;
@@ -103,7 +106,6 @@ struct HandshakeRequest {
     json toJson() const {
         json j;
         j["version"] = version;
-        j["clientPort"] = clientPort;
         j["channelsIn"] = channelsIn;
         j["channelsOut"] = channelsOut;
         j["rate"] = rate;
@@ -116,7 +118,6 @@ struct HandshakeRequest {
 
     void fromJson(const json& j) {
         version = j["version"].get<int>();
-        clientPort = j["clientPort"].get<int>();
         channelsIn = j["channelsIn"].get<int>();
         channelsOut = j["channelsOut"].get<int>();
         rate = j["rate"].get<double>();
@@ -130,7 +131,7 @@ struct HandshakeRequest {
 struct HandshakeResponse {
     int version;
     uint32 flags;
-    int sandboxPort;
+    int port;
     uint32 unused1;
     uint32 unused2;
     uint32 unused3;
@@ -947,29 +948,46 @@ class MessageFactory : public LogTagDelegate {
     }
 };
 
-/*
-static inline String toString(MidiMessage& mm, int samplePos) {
-    String ret = "Midi message: ";
-    ret << "sample=" << samplePos << " ts=" << mm.getTimeStamp()
-        << " ch=" << mm.getChannel() << " v=" << mm.getVelocity() << " n=" << mm.getNoteNumber()
-        << " desc=" << mm.getDescription();
-    return ret;
-}
+}  // namespace e47
 
-static inline String toString(MidiBuffer& midi) {
-    if (midi.getNumEvents() > 0) {
-        MidiBuffer::Iterator midiIt(midi);
-        MidiMessage mm;
-        int samplePos;
-        String ret = "Midi buffer:\n";
-        while (midiIt.getNextEvent(mm, samplePos)) {
-            ret << "  " << toString(mm, samplePos) << "\n";
-        }
-        return ret;
+#endif
+
+namespace e47 {
+
+struct JsonMessage {
+    using Type = uint16;
+
+    Type type;
+    Uuid id;
+    json data;
+
+    JsonMessage() : type(0) {}
+    JsonMessage(Type t, const json& d) : type(t), data(d) {}
+    JsonMessage(Type t, const json& d, const String& i) : JsonMessage(t, d) { id = i; }
+
+    void serialize(MemoryBlock& block) const {
+        json dataJson;
+        dataJson["type"] = type;
+        dataJson["uuid"] = id.toString().toStdString();
+        dataJson["data"] = data;
+        auto dump = dataJson.dump();
+        block.append(dump.data(), dump.length());
     }
-    return "";
-}
-*/
+
+    void deserialize(const MemoryBlock& block) {
+        auto j = json::parse(block.begin(), block.end());
+        type = j["type"].get<Type>();
+        data = std::move(j["data"]);
+        id = j["uuid"].get<std::string>();
+    }
+};
+
+struct PluginTrayMessage : JsonMessage {
+    enum Type : JsonMessage::Type { STATUS, CHANGE_SERVER };
+    PluginTrayMessage() {}
+    PluginTrayMessage(Type t, const json& d) : JsonMessage(t, d) {}
+    PluginTrayMessage(Type t, const json& d, const String& i) : JsonMessage(t, d, i) {}
+};
 
 }  // namespace e47
 

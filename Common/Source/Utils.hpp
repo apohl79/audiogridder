@@ -390,14 +390,14 @@ inline void configWriteFile(const String& configFile, const json& j) {
     fos.writeText(j.dump(4), false, false, "\n");
 }
 
-inline bool jsonHasValue(const json& cfg, const String& name) { return cfg.find(name.toStdString()) != cfg.end(); }
+inline bool jsonHasValue(const json& j, const String& name) { return j.find(name.toStdString()) != j.end(); }
 
 template <typename T>
-inline T jsonGetValue(const json& cfg, const String& name, const T& def) {
-    if (!jsonHasValue(cfg, name)) {
+inline T jsonGetValue(const json& j, const String& name, const T& def) {
+    if (!jsonHasValue(j, name)) {
         return def;
     }
-    return cfg[name.toStdString()].get<T>();
+    return j[name.toStdString()].get<T>();
 }
 
 template <>

@@ -24,6 +24,9 @@ fi
 for f in $(find $DIR/Plugin/Source -name "*.[ch]pp"); do
     format $f
 done
+for f in $(find $DIR/PluginTray/Source -name "*.[ch]pp"); do
+    format $f
+done
 for f in $(find $DIR/Server/Source -name "*.[ch]pp"); do
     format $f
 done

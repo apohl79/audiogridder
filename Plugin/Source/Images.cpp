@@ -1,19 +1,11 @@
 /*
- * Copyright (c) 2020 Andreas Pohl
+ * Copyright (c) 2021 Andreas Pohl
  * Licensed under MIT (https://github.com/apohl79/audiogridder/blob/master/COPYING)
  *
  * Author: Andreas Pohl
  */
 
 #include "Images.hpp"
-
-Images::Images() { setSize(600, 400); }
-
-Images::~Images() {}
-
-void Images::paint(juce::Graphics& g) { g.fillAll(juce::Colour(0xff323e44)); }
-
-void Images::resized() {}
 
 static const unsigned char resource_Images_server_png[] = {
     137, 80,  78,  71,  13,  10,  26,  10,  0,   0,   0,   13,  73,  72,  68,  82,  0,   0,   1,   214, 0,   0,   1,

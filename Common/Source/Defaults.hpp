@@ -13,9 +13,9 @@
 namespace e47 {
 namespace Defaults {
 
-static constexpr int CLIENT_PORT = 55055;
 static constexpr int SERVER_PORT = 55056;
-static constexpr int SANDBOX_PORT = 55088;
+static constexpr int CLIENT_PORT = 55088;
+static constexpr int PLUGIN_TRAY_PORT = 55055;
 
 static const String SANDBOX_CMD_PREFIX = "sandbox";
 

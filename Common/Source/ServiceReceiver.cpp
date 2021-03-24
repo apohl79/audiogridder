@@ -191,7 +191,9 @@ void ServiceReceiver::initialize(uint64 id, std::function<void()> fn) {
     if (nullptr == m_inst) {
         m_inst = std::make_shared<ServiceReceiver>();
     }
-    m_inst->m_updateFn.set(id, fn);
+    if (fn) {
+        m_inst->m_updateFn.set(id, fn);
+    }
     m_instRefCount++;
 }
 

@@ -5,6 +5,8 @@
  * Author: Andreas Pohl
  */
 
+#if defined(AG_PLUGIN) || defined(AG_SERVER)
+
 #include "Message.hpp"
 #include <sys/types.h>
 #include <cstddef>
@@ -118,3 +120,5 @@ bool read(StreamingSocket* socket, void* data, int size, int timeoutMilliseconds
 }
 
 }  // namespace e47
+
+#endif

@@ -157,6 +157,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     }
 
     m_client->startThread();
+    m_tray = std::make_unique<TrayConnection>(this);
 
     PluginMonitor::add(this);
 }

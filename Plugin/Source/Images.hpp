@@ -1,50 +1,17 @@
 /*
-  ==============================================================================
+ * Copyright (c) 2021 Andreas Pohl
+ * Licensed under MIT (https://github.com/apohl79/audiogridder/blob/master/COPYING)
+ *
+ * Author: Andreas Pohl
+ */
 
-  This is an automatically generated GUI class created by the Projucer!
+#ifndef Images_hpp
+#define Images_hpp
 
-  Be careful when adding custom code to these files, as only the code within
-  the "//[xyz]" and "//[/xyz]" sections will be retained when the file is loaded
-  and re-saved.
-
-  Created with Projucer version: 5.4.7
-
-  ------------------------------------------------------------------------------
-
-  The Projucer is part of the JUCE library.
-  Copyright (c) 2017 - ROLI Ltd.
-
-  ==============================================================================
-*/
-
-#pragma once
-
-//[Headers]     -- You can add your own extra header files here --
 #include <JuceHeader.h>
-//[/Headers]
 
-//==============================================================================
-/**
-                                                                    //[Comments]
-    An auto-generated component, created by the Projucer.
-
-    Describe your class and how it works here!
-                                                                    //[/Comments]
-*/
-class Images : public Component {
+class Images {
   public:
-    //==============================================================================
-    Images();
-    ~Images() override;
-
-    //==============================================================================
-    //[UserMethods]     -- You can add your own custom methods in this section.
-    //[/UserMethods]
-
-    void paint(Graphics& g) override;
-    void resized() override;
-
-    // Binary resources:
     static const char* server_png;
     static const int server_pngSize;
     static const char* settings_png;
@@ -55,16 +22,6 @@ class Images : public Component {
     static const int cpu_pngSize;
     static const char* pluginlogo_png;
     static const int pluginlogo_pngSize;
-
-  private:
-    //[UserVariables]   -- You can add your own custom variables in this section.
-    //[/UserVariables]
-
-    //==============================================================================
-
-    //==============================================================================
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Images)
 };
 
-//[EndFile] You can add extra defines here...
-//[/EndFile]
+#endif  // Images_hpp
