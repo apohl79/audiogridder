@@ -631,13 +631,13 @@ std::set<String> AudioGridderAudioProcessor::getPluginTypes() const {
     return ret;
 }
 
-bool AudioGridderAudioProcessor::loadPlugin(const String& id, const String& name, String& err) {
+bool AudioGridderAudioProcessor::loadPlugin(const ServerPlugin& plugin, String& err) {
     traceScope();
     StringArray presets;
     Array<e47::Client::Parameter> params;
-    logln("loading " << name << " (" << id << ")...");
+    logln("loading " << plugin.getName() << " (" << plugin.getId() << ")...");
     suspendProcessing(true);
-    bool success = m_client->addPlugin(id, presets, params, "", err);
+    bool success = m_client->addPlugin(plugin.getId(), presets, params, "", err);
     suspendProcessing(false);
     if (success) {
         logln("...ok");
@@ -647,7 +647,8 @@ bool AudioGridderAudioProcessor::loadPlugin(const String& id, const String& name
     if (success) {
         updateLatency(m_client->getLatencySamples());
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
-        m_loadedPlugins.push_back({id, name, "", presets, params, false, true});
+        m_loadedPlugins.push_back({plugin.getId(), plugin.getName(), "", presets, params, false, true});
+        updateRecents(plugin);
     }
     m_client->setLoadedPluginsString(getLoadedPluginsString());
     return success;
@@ -935,6 +936,21 @@ void AudioGridderAudioProcessor::resetSettingsAB() {
     m_settingsB = "";
 }
 
+Array<ServerPlugin> AudioGridderAudioProcessor::getRecents() {
+    if (m_tray->connected) {
+        return m_tray->getRecents();
+    } else {
+        return m_client->getRecents();
+    }
+}
+
+void AudioGridderAudioProcessor::updateRecents(const ServerPlugin& plugin) {
+    if (m_tray->connected) {
+        m_tray->sendMessage(
+            PluginTrayMessage(PluginTrayMessage::UPDATE_RECENTS, {{"plugin", plugin.toString().toStdString()}}));
+    }
+}
+
 void AudioGridderAudioProcessor::setActiveServer(const ServerInfo& s) {
     traceScope();
     m_client->setServer(s);
@@ -992,6 +1008,83 @@ String AudioGridderAudioProcessor::Parameter::getName(int maximumStringLength) c
         return name;
     } else {
         return name.dropLastCharacters(name.length() - maximumStringLength);
+    }
+}
+
+void AudioGridderAudioProcessor::TrayConnection::messageReceived(const MemoryBlock& message) {
+    PluginTrayMessage msg;
+    msg.deserialize(message);
+    if (msg.type == PluginTrayMessage::CHANGE_SERVER) {
+        m_processor->getClient().setServer(ServerInfo(msg.data["serverInfo"].get<std::string>()));
+    } else if (msg.type == PluginTrayMessage::GET_RECENTS) {
+        logln("updating recents from tray");
+        Array<ServerPlugin> recents;
+        for (auto& plugin : msg.data["recents"]) {
+            recents.add(ServerPlugin::fromString(plugin.get<std::string>()));
+        }
+        std::lock_guard<std::mutex> lock(m_recentsMtx);
+        m_recents.swapWith(recents);
+    }
+}
+
+void AudioGridderAudioProcessor::TrayConnection::sendStatus() {
+    auto& client = m_processor->getClient();
+    auto track = m_processor->getTrackProperties();
+    String statId = "audio.";
+    statId << m_processor->getId();
+    auto ts = Metrics::getStatistic<TimeStatistic>(statId);
+
+    json j;
+    j["ok"] = client.isReadyLockFree();
+    j["name"] = track.name.toStdString();
+    j["channelsIn"] = m_processor->getTotalNumInputChannels();
+    j["channelsOut"] = m_processor->getTotalNumOutputChannels();
+#ifdef JucePlugin_IsSynth
+    j["instrument"] = true;
+#else
+    j["instrument"] = false;
+#endif
+    j["colour"] = track.colour.getARGB();
+    j["loadedPlugins"] = client.getLoadedPluginsString().toStdString();
+    j["perf95th"] = ts->get1minHistogram().nintyFifth;
+    j["blocks"] = client.NUM_OF_BUFFERS.load();
+    j["serverNameId"] = m_processor->getActiveServerName().toStdString();
+    j["serverHost"] = client.getServerHost().toStdString();
+
+    sendMessage(PluginTrayMessage(PluginTrayMessage::STATUS, j));
+}
+
+void AudioGridderAudioProcessor::TrayConnection::sendMessage(const PluginTrayMessage& msg) {
+    MemoryBlock block;
+    msg.serialize(block);
+    InterprocessConnection::sendMessage(block);
+}
+
+void AudioGridderAudioProcessor::TrayConnection::timerCallback() {
+    if (!connected) {
+        if (!connectToSocket("localhost", Defaults::PLUGIN_TRAY_PORT, 100)) {
+            String path = File::getSpecialLocation(File::globalApplicationsDirectory).getFullPathName();
+#ifdef JUCE_MAC
+#ifdef DEBUG
+            path << "/Debug";
+#endif
+            path << "/AudioGridderPluginTray.app/Contents/MacOS/AudioGridderPluginTray";
+#elif JUCE_WINDOWS
+            path << "/AudioGridderPluginTray/AudioGridderPluginTray.exe";
+#endif
+            if (File(path).existsAsFile()) {
+                logln("tray connection failed, trying to run tray app: " << path);
+                ChildProcess proc;
+                if (!proc.start(path, 0)) {
+                    logln("failed to start tray app");
+                }
+            } else {
+                logln("no tray app available");
+            }
+            Thread::sleep(3000);
+        }
+    } else {
+        sendStatus();
     }
 }
 

@@ -983,7 +983,7 @@ struct JsonMessage {
 };
 
 struct PluginTrayMessage : JsonMessage {
-    enum Type : JsonMessage::Type { STATUS, CHANGE_SERVER };
+    enum Type : JsonMessage::Type { STATUS, CHANGE_SERVER, GET_RECENTS, UPDATE_RECENTS };
     PluginTrayMessage() {}
     PluginTrayMessage(Type t, const json& d) : JsonMessage(t, d) {}
     PluginTrayMessage(Type t, const json& d, const String& i) : JsonMessage(t, d, i) {}

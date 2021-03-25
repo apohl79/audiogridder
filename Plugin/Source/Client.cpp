@@ -550,9 +550,9 @@ void Client::exchangePlugins(int idxA, int idxB) {
     msg.send(m_cmd_socket.get());
 }
 
-std::vector<ServerPlugin> Client::getRecents() {
+Array<ServerPlugin> Client::getRecents() {
     traceScope();
-    std::vector<ServerPlugin> recents;
+    Array<ServerPlugin> recents;
     if (!isReadyLockFree()) {
         return recents;
     };
@@ -565,7 +565,7 @@ std::vector<ServerPlugin> Client::getRecents() {
         auto list = StringArray::fromLines(listChunk);
         for (auto& line : list) {
             if (!line.isEmpty()) {
-                recents.push_back(ServerPlugin::fromString(line));
+                recents.add(ServerPlugin::fromString(line));
             }
         }
     } else {

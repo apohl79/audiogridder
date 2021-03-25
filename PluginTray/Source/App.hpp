@@ -14,6 +14,7 @@
 #include "Utils.hpp"
 #include "Images.hpp"
 #include "Message.hpp"
+#include "ServerPlugin.hpp"
 
 namespace e47 {
 
@@ -122,12 +123,19 @@ class App : public JUCEApplication, public LogTag {
     };
 
     Server& getServer() { return m_srv; }
+    void handleMessage(const PluginTrayMessage& msg, Connection& sender);
+    void sendRecents(const String& srv, Connection* target = nullptr);
 
-    void handleMessage(const PluginTrayMessage& msg, Connection& sender) {}
+    static String getServerString(Connection* c) { return c->status.serverNameId + " (" + c->status.serverHost + ")"; }
+
+    static String getServerString(const ServerInfo& srvInfo) {
+        return srvInfo.getNameAndID() + " (" + srvInfo.getHost() + ")";
+    }
 
   private:
     Tray m_tray;
     Server m_srv;
+    std::unordered_map<String, Array<ServerPlugin>> m_recents;
 };
 
 }  // namespace e47

@@ -47,6 +47,11 @@ class ServerPlugin {
         return *this;
     }
 
+    friend bool operator==(const ServerPlugin& lhs, const ServerPlugin& rhs) {
+        return lhs.m_name == rhs.m_name && lhs.m_company == rhs.m_company && lhs.m_id == rhs.m_id &&
+               lhs.m_type == rhs.m_type && lhs.m_category == rhs.m_category && lhs.m_isInstrument == rhs.m_isInstrument;
+    }
+
     const String& getName() const { return m_name; }
     const String& getCompany() const { return m_company; }
     const String& getId() const { return m_id; }
@@ -64,6 +69,17 @@ class ServerPlugin {
             auto parts = StringArray::fromTokens(s, ";", "");
             return ServerPlugin(parts[0], parts[1], parts[2], parts[3], parts[4], false);
         }
+    }
+
+    String toString() const {
+        json j;
+        j["name"] = m_name.toStdString();
+        j["company"] = m_company.toStdString();
+        j["id"] = m_id.toStdString();
+        j["type"] = m_type.toStdString();
+        j["category"] = m_category.toStdString();
+        j["isInstrument"] = m_isInstrument;
+        return j.dump();
     }
 
   private:

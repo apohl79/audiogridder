@@ -109,7 +109,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
         return idx > -1 && idx < (int)m_loadedPlugins.size() ? m_loadedPlugins[(size_t)idx] : m_unusedDummyPlugin;
     }
 
-    bool loadPlugin(const String& id, const String& name, String& err);
+    bool loadPlugin(const ServerPlugin& plugin, String& err);
     void unloadPlugin(int idx);
     String getLoadedPluginsString() const;
     void editPlugin(int idx);
@@ -145,6 +145,8 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     void setNoSrvPluginListFilter(bool b) { m_noSrvPluginListFilter = b; }
     float getScaleFactor() const { return m_scale; }
     void setScaleFactor(float f) { m_scale = f; }
+    Array<ServerPlugin> getRecents();
+    void updateRecents(const ServerPlugin& plugin);
 
     auto& getServers() const { return m_servers; }
     void addServer(const String& s) { m_servers.add(s); }
@@ -203,88 +205,28 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
 
     class TrayConnection : public InterprocessConnection, public Timer, public LogTagDelegate {
       public:
-        bool connected = false;
+        std::atomic_bool connected{false};
 
         TrayConnection(AudioGridderAudioProcessor* p) : LogTagDelegate(p), m_processor(p) { startTimer(500); }
-
         ~TrayConnection() override { disconnect(); }
 
         void connectionMade() override { connected = true; }
-
         void connectionLost() override { connected = false; }
+        void messageReceived(const MemoryBlock& message) override;
+        void sendStatus();
+        void sendMessage(const PluginTrayMessage& msg);
 
-        void messageReceived(const MemoryBlock& message) override {
-            PluginTrayMessage msg;
-            msg.deserialize(message);
-            switch (msg.type) {
-                case PluginTrayMessage::CHANGE_SERVER:
-                    m_processor->getClient().setServer(ServerInfo(msg.data["serverInfo"].get<std::string>()));
-                    break;
-                case PluginTrayMessage::STATUS:
-                    break;
-            }
-        }
+        void timerCallback() override;
 
-        void sendStatus() {
-            auto& client = m_processor->getClient();
-            auto track = m_processor->getTrackProperties();
-            String statId = "audio.";
-            statId << m_processor->getId();
-            auto ts = Metrics::getStatistic<TimeStatistic>(statId);
-
-            json j;
-            j["ok"] = client.isReadyLockFree();
-            j["name"] = track.name.toStdString();
-            j["channelsIn"] = m_processor->getTotalNumInputChannels();
-            j["channelsOut"] = m_processor->getTotalNumOutputChannels();
-#ifdef JucePlugin_IsSynth
-            j["instrument"] = true;
-#else
-            j["instrument"] = false;
-#endif
-            j["colour"] = track.colour.getARGB();
-            j["loadedPlugins"] = client.getLoadedPluginsString().toStdString();
-            j["perf95th"] = ts->get1minHistogram().nintyFifth;
-            j["blocks"] = client.NUM_OF_BUFFERS.load();
-            j["serverNameId"] = m_processor->getActiveServerName().toStdString();
-            j["serverHost"] = client.getServerHost().toStdString();
-
-            MemoryBlock block;
-            PluginTrayMessage msg(PluginTrayMessage::STATUS, j);
-            msg.serialize(block);
-            sendMessage(block);
-        }
-
-        void timerCallback() override {
-            if (!connected) {
-                if (!connectToSocket("localhost", Defaults::PLUGIN_TRAY_PORT, 100)) {
-                    String path = File::getSpecialLocation(File::globalApplicationsDirectory).getFullPathName();
-#ifdef JUCE_MAC
-#ifdef DEBUG
-                    path << "/Debug";
-#endif
-                    path << "/AudioGridderPluginTray.app/Contents/MacOS/AudioGridderPluginTray";
-#elif JUCE_WINDOWS
-                    path << "/AudioGridderPluginTray/AudioGridderPluginTray.exe";
-#endif
-                    if (File(path).existsAsFile()) {
-                        logln("tray connection failed, trying to run tray app: " << path);
-                        ChildProcess proc;
-                        if (!proc.start(path, 0)) {
-                            logln("failed to start tray app");
-                        }
-                    } else {
-                        logln("no tray app available");
-                    }
-                    Thread::sleep(3000);
-                }
-            } else {
-                sendStatus();
-            }
+        Array<ServerPlugin> getRecents() {
+            std::lock_guard<std::mutex> lock(m_recentsMtx);
+            return m_recents;
         }
 
       private:
         AudioGridderAudioProcessor* m_processor;
+        Array<ServerPlugin> m_recents;
+        std::mutex m_recentsMtx;
     };
 
   private:

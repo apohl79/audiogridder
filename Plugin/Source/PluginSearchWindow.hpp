@@ -57,7 +57,7 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
     TreeView m_tree;
     bool m_showType;
 
-    std::vector<ServerPlugin> m_recents;
+    Array<ServerPlugin> m_recents;
 
     ClickFuction m_onClick;
 

@@ -188,7 +188,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     void bypassPlugin(int idx);
     void unbypassPlugin(int idx);
     void exchangePlugins(int idxA, int idxB);
-    std::vector<ServerPlugin> getRecents();
+    Array<ServerPlugin> getRecents();
     void setPreset(int idx, int preset);
 
     float getParameterValue(int idx, int paramIdx);

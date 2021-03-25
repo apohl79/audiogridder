@@ -30,7 +30,7 @@ PopupMenu App::Tray::getMenuForIndex(int, const String&) {
     menu.addSectionHeader("Connections");
     std::map<String, PopupMenu> serverMenus;
     for (auto& c : m_app->getServer().getConnections()) {
-        String srv = c->status.serverNameId + " (" + c->status.serverHost + ")";
+        String srv = App::getServerString(c.get());
         String name = c->status.name;
         if (name.isEmpty()) {
             name = "Unnamed";
@@ -40,7 +40,7 @@ PopupMenu App::Tray::getMenuForIndex(int, const String&) {
         }
         PopupMenu subRecon;
         for (auto& srvInfo : mdnsServers) {
-            String mdnsName = srvInfo.getNameAndID() + " (" + srvInfo.getHost() + ")";
+            String mdnsName = App::getServerString(srvInfo);
             if (srv != mdnsName) {
                 subRecon.addItem(mdnsName, [c, srvInfo] {
                     c->sendMessage(PluginTrayMessage(PluginTrayMessage::CHANGE_SERVER,
@@ -51,7 +51,7 @@ PopupMenu App::Tray::getMenuForIndex(int, const String&) {
         if (serverMenus.find(srv) == serverMenus.end()) {
             PopupMenu subReconAll;
             for (auto& srvInfo : mdnsServers) {
-                String mdnsName = srvInfo.getNameAndID() + " (" + srvInfo.getHost() + ")";
+                String mdnsName = App::getServerString(srvInfo);
                 if (srv != mdnsName) {
                     subReconAll.addItem(mdnsName, [this, srvInfo] {
                         for (auto& c2 : m_app->getServer().getConnections()) {
@@ -94,6 +94,7 @@ void App::Connection::messageReceived(const MemoryBlock& message) {
         if (!initialized) {
             initialized = true;
             logln("new connection: name=" << status.name);
+            m_app->sendRecents(App::getServerString(this), this);
         }
     } else {
         m_app->handleMessage(msg, *this);
@@ -125,6 +126,43 @@ void App::Server::checkConnections() {
     }
     if (m_noConnectionCounter > 5) {
         m_app->quit();
+    }
+}
+
+void App::handleMessage(const PluginTrayMessage& msg, Connection& sender) {
+    if (msg.type == PluginTrayMessage::UPDATE_RECENTS) {
+        auto srv = getServerString(&sender);
+        auto plugin = ServerPlugin::fromString(msg.data["plugin"].get<std::string>());
+        auto& recents = m_recents[srv];
+        if (!recents.contains(plugin)) {
+            recents.insert(0, plugin);
+            if (recents.size() > 10) {
+                recents.remove(10);
+            }
+            sendRecents(srv);
+        }
+    }
+}
+
+void App::sendRecents(const String& srv, Connection* target) {
+    auto jlist = json::array();
+    for (auto& r : m_recents[srv]) {
+        logln("  adding " << r.toString());
+        jlist.push_back(r.toString().toStdString());
+    }
+    if (jlist.size() > 0) {
+        PluginTrayMessage msgOut(PluginTrayMessage::GET_RECENTS, {{"recents", jlist}});
+        if (nullptr != target) {
+            if (srv == App::getServerString(target)) {
+                target->sendMessage(msgOut);
+            }
+        } else {
+            for (auto& c : m_srv.getConnections()) {
+                if (srv == App::getServerString(c.get())) {
+                    c->sendMessage(msgOut);
+                }
+            }
+        }
     }
 }
 

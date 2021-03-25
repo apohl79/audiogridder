@@ -44,7 +44,7 @@ PluginSearchWindow::PluginSearchWindow(float x, float y, AudioGridderAudioProces
     m_tree.setColour(TreeView::oddItemsColourId, Colour(Defaults::BG_COLOR));
     addAndMakeVisible(&m_tree);
 
-    m_recents = m_processor.getClient().getRecents();
+    m_recents = m_processor.getRecents();
     updateTree();
     updateHeight();
 
@@ -127,7 +127,7 @@ void PluginSearchWindow::updateHeight() {
     }
     int totalHeight = 40 + ITEM_HEIGHT * items;
     int minHeight = 40 + ITEM_HEIGHT * MIN_ITEMS_VISIBLE;
-    if (m_search.isEmpty() && !m_recents.empty()) {
+    if (m_search.isEmpty() && !m_recents.isEmpty()) {
         // remove some pixels, as the separator is not using the full height
         totalHeight += SEPARATOR_HEIGHT - ITEM_HEIGHT;
         minHeight += SEPARATOR_HEIGHT - ITEM_HEIGHT;
@@ -167,7 +167,7 @@ void PluginSearchWindow::updateTree(const String& filter) {
 
     m_tree.setDefaultOpenness(filter.isNotEmpty());
 
-    if (filter.isEmpty() && !m_recents.empty()) {
+    if (filter.isEmpty() && !m_recents.isEmpty()) {
         for (const auto& plug : m_recents) {
             root->addSubItem(new TreePlugin(plug, addFn, m_showType));
         }

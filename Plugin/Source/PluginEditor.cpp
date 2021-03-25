@@ -302,7 +302,7 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
         auto addFn = [this](const ServerPlugin& plug) {
             traceScope();
             String err;
-            if (m_processor.loadPlugin(plug.getId(), plug.getName(), err)) {
+            if (m_processor.loadPlugin(plug, err)) {
                 addPluginButton(plug.getId(), plug.getName());
                 editPlugin((int)m_pluginButtons.size() - 1);
 #if JucePlugin_IsSynth
