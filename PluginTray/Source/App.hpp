@@ -36,6 +36,8 @@ class App : public JUCEApplication, public LogTag {
 #ifdef JUCE_MAC
             setMacMainMenu(this);
 #endif
+            auto& lf = getLookAndFeel();
+            lf.setColour(PopupMenu::backgroundColourId, Colour(Defaults::BG_COLOR));
         }
 
         ~Tray() override {
@@ -104,18 +106,18 @@ class App : public JUCEApplication, public LogTag {
         }
 
         void checkConnections();
-        std::vector<std::shared_ptr<Connection>>& getConnections() { return m_connections; }
+        const Array<std::shared_ptr<Connection>>& getConnections() { return m_connections; }
 
       protected:
         InterprocessConnection* createConnectionObject() override {
             auto c = std::make_shared<Connection>(m_app);
-            m_connections.push_back(c);
+            MessageManager::callAsync([this, c] { m_connections.add(c); });
             return c.get();
         }
 
       private:
         App* m_app;
-        std::vector<std::shared_ptr<Connection>> m_connections;
+        Array<std::shared_ptr<Connection>> m_connections;
         int m_noConnectionCounter = 0;
     };
 

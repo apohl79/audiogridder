@@ -107,18 +107,18 @@ void App::Connection::sendMessage(const PluginTrayMessage& msg) {
 }
 
 void App::Server::checkConnections() {
-    auto it = m_connections.begin();
-    while (it < m_connections.end()) {
-        auto& c = *it;
+    int i = 0;
+    while (i < m_connections.size()) {
+        auto c = m_connections[i];
         bool dead = Time::currentTimeMillis() - c->status.lastUpdated > 5000 || (c->initialized && !c->connected);
         if (dead) {
             logln("lost connection: name=" << c->status.name);
-            m_connections.erase(it);
+            m_connections.remove(i);
         } else {
-            it++;
+            i++;
         }
     }
-    if (m_connections.empty()) {
+    if (m_connections.isEmpty()) {
         m_noConnectionCounter++;
     } else {
         m_noConnectionCounter = 0;
