@@ -65,10 +65,7 @@ brew install audiogridder-server
 - Plugin: macOS 10.7+, Windows 7+, Linux 64bit
 - The server supports AudioUnit (macOS only) and VST2/VST3 plugins
 - The plugin is available as AudioUnit (macOS only) and VST2/VST3
-- Tested DAWs: Cubase 10 Pro, Logic Pro X, Reaper, Ableton Live
-- ProTools is reportedly working via wrapper plugins that can host
-non AAX plugins within ProTools
-
+- Tested DAWs: Cubase 10 Pro, Logic Pro X, Pro Tools 2020.12/12, Reaper, Ableton Live
 
 # Donation
 
