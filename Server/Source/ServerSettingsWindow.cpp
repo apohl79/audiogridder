@@ -20,7 +20,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     traceScope();
     setUsingNativeTitleBar(true);
 
-    int totalWidth = 500;
+    int totalWidth = 600;
     int totalHeight = 80;
     int borderLR = 15;  // left/right border
     int borderTB = 15;  // top/bottom border
@@ -29,7 +29,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     int fieldWidth = 50;
     int wideFieldWidth = 250;
     int fieldHeight = 25;
-    int labelWidth = 250;
+    int labelWidth = 350;
     int labelHeight = 35;
     int headerHeight = 18;
     int checkBoxWidth = 25;
@@ -118,7 +118,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     }
 
     label = std::make_unique<Label>();
-    label->setText("Client Sandboxing:", NotificationType::dontSendNotification);
+    label->setText("Sandboxing (run AG chains in dedicated processes):", NotificationType::dontSendNotification);
     label->setBounds(getLabelBounds(row));
     addChildAndSetID(label.get(), "lbl");
     m_components.push_back(std::move(label));
