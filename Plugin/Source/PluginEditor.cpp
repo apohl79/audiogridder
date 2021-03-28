@@ -11,7 +11,6 @@
 #include "PluginProcessor.hpp"
 #include "NumberConversion.hpp"
 #include "Version.hpp"
-#include "PluginMonitor.hpp"
 #include "PluginSearchWindow.hpp"
 
 namespace e47 {
@@ -755,6 +754,8 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
         });
 
         m.addSeparator();
+        m.addItem("Show Monitor...", [this] { m_processor.showMonitor(); });
+        m.addSeparator();
 
         PopupMenu subm;
         subm.addItem("Show Category", true, m_processor.getMenuShowCategory(), [this] {
@@ -775,18 +776,6 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
         });
 
         m.addSubMenu("Plugin Menu", subm);
-        subm.clear();
-
-        subm.addItem("Show...", true, false, [this] {
-            traceScope();
-            PluginMonitor::setAlwaysShow(true);
-        });
-        subm.addItem("Automatic", true, PluginMonitor::getAutoShow(), [this] {
-            traceScope();
-            PluginMonitor::setAutoShow(!PluginMonitor::getAutoShow());
-            m_processor.saveConfig();
-        });
-        m.addSubMenu("Plugin Monitor", subm);
         subm.clear();
 
         float sf = Desktop::getInstance().getGlobalScaleFactor();

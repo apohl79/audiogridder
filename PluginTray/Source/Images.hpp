@@ -16,6 +16,8 @@ class Images {
     static const int tray_pngSize;
     static const char* wintray_png;
     static const int wintray_pngSize;
+    static const char* logo_png;
+    static const int logo_pngSize;
 };
 
 #endif  // Images_hpp

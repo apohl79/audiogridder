@@ -14,7 +14,6 @@
 #include "Signals.hpp"
 #include "CoreDump.hpp"
 #include "AudioStreamer.hpp"
-#include "PluginMonitor.hpp"
 #include "WindowPositions.hpp"
 
 #if !defined(JUCE_WINDOWS)
@@ -49,7 +48,6 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     CoreDump::initialize(appName, logName, true);
     Metrics::initialize();
     WindowPositions::initialize();
-    PluginMonitor::initialize();
 
     m_client = std::make_unique<Client>(this);
     setLogTagSource(m_client.get());
@@ -158,20 +156,16 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
 
     m_client->startThread();
     m_tray = std::make_unique<TrayConnection>(this);
-
-    PluginMonitor::add(this);
 }
 
 AudioGridderAudioProcessor::~AudioGridderAudioProcessor() {
     traceScope();
     stopAsyncFunctors();
     logln("plugin shutdown: terminating client");
-    PluginMonitor::remove(this);
     m_client->signalThreadShouldExit();
     m_client->close();
     waitForThreadAndLog(m_client.get(), m_client.get());
     logln("plugin shutdown: cleaning up");
-    PluginMonitor::cleanup();
     WindowPositions::cleanup();
     Metrics::cleanup();
     ServiceReceiver::cleanup(m_instId.hash());
@@ -193,9 +187,6 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
 
     Tracer::setEnabled(jsonGetValue(j, "Tracer", Tracer::isEnabled()));
     AGLogger::setEnabled(jsonGetValue(j, "Logger", AGLogger::isEnabled()));
-    PluginMonitor::setAutoShow(jsonGetValue(j, "PluginMonAutoShow", PluginMonitor::getAutoShow()));
-    PluginMonitor::setShowChannelColor(jsonGetValue(j, "PluginMonChanColor", PluginMonitor::getShowChannelColor()));
-    PluginMonitor::setShowChannelName(jsonGetValue(j, "PluginMonChanName", PluginMonitor::getShowChannelName()));
 
     m_scale = jsonGetValue(j, "ZoomFactor", m_scale);
 
@@ -253,9 +244,6 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
     jcfg["ConfirmDelete"] = m_confirmDelete;
     jcfg["Tracer"] = Tracer::isEnabled();
     jcfg["Logger"] = AGLogger::isEnabled();
-    jcfg["PluginMonAutoShow"] = PluginMonitor::getAutoShow();
-    jcfg["PluginMonChanColor"] = PluginMonitor::getShowChannelColor();
-    jcfg["PluginMonChanName"] = PluginMonitor::getShowChannelName();
     jcfg["SyncRemoteMode"] = m_syncRemote;
     jcfg["NoSrvPluginListFilter"] = m_noSrvPluginListFilter;
     jcfg["ZoomFactor"] = m_scale;
@@ -1054,6 +1042,10 @@ void AudioGridderAudioProcessor::TrayConnection::sendStatus() {
     sendMessage(PluginTrayMessage(PluginTrayMessage::STATUS, j));
 }
 
+void AudioGridderAudioProcessor::TrayConnection::showMonitor() {
+    sendMessage(PluginTrayMessage(PluginTrayMessage::SHOW_MONITOR, {}));
+}
+
 void AudioGridderAudioProcessor::TrayConnection::sendMessage(const PluginTrayMessage& msg) {
     MemoryBlock block;
     msg.serialize(block);
@@ -1071,6 +1063,8 @@ void AudioGridderAudioProcessor::TrayConnection::timerCallback() {
             path << "/AudioGridderPluginTray.app/Contents/MacOS/AudioGridderPluginTray";
 #elif JUCE_WINDOWS
             path << "/AudioGridderPluginTray/AudioGridderPluginTray.exe";
+#elif JUCE_LINUX
+            path << "/local/bin/AudioGridderPluginTray";
 #endif
             if (File(path).existsAsFile()) {
                 logln("tray connection failed, trying to run tray app: " << path);

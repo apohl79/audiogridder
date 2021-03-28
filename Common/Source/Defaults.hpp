@@ -29,6 +29,7 @@ static const String KNOWN_PLUGINS_FILE_OLD = "~/.audiogridderserver.cache";
 
 static const String SERVER_CONFIG_FILE = "~/.audiogridder/audiogridderserver.cfg";
 static const String PLUGIN_CONFIG_FILE = "~/.audiogridder/audiogridderplugin.cfg";
+static const String PLUGIN_TRAY_CONFIG_FILE = "~/.audiogridder/audiogridderplugintray.cfg";
 static const String KNOWN_PLUGINS_FILE = "~/.audiogridder/audiogridderserver.cache";
 static const String DEAD_MANS_FILE = "~/.audiogridder/audiogridderserver.crash";
 static const String SERVER_RUN_FILE = "~/.audiogridder/audiogridderserver.running";
@@ -47,6 +48,9 @@ static const String SERVER_CONFIG_FILE =
 static const String PLUGIN_CONFIG_FILE =
     File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
     "\\AudioGridder\\audiogridderplugin.cfg";
+static const String PLUGIN_TRAY_CONFIG_FILE =
+    File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
+    "\\AudioGridder\\audiogridderplugintray.cfg";
 static const String KNOWN_PLUGINS_FILE =
     File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
     "\\AudioGridder\\audiogridderserver.cache";
@@ -80,7 +84,15 @@ inline String getLogFileName(const String& appName, const String& filePrefix, co
     return path;
 }
 
-enum ConfigFile { ConfigServer, ConfigServerRun, ConfigPlugin, ConfigPluginCache, ConfigDeadMan, WindowPositions };
+enum ConfigFile {
+    ConfigServer,
+    ConfigServerRun,
+    ConfigPlugin,
+    ConfigPluginCache,
+    ConfigPluginTray,
+    ConfigDeadMan,
+    WindowPositions
+};
 
 inline String getConfigFileName(ConfigFile type) {
     String file;
@@ -97,6 +109,9 @@ inline String getConfigFileName(ConfigFile type) {
         case ConfigPluginCache:
             file = KNOWN_PLUGINS_FILE;
             fileOld = KNOWN_PLUGINS_FILE_OLD;
+            break;
+        case ConfigPluginTray:
+            file = PLUGIN_TRAY_CONFIG_FILE;
             break;
         case ConfigServerRun:
             file = SERVER_RUN_FILE;

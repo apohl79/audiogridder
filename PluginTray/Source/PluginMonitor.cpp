@@ -5,32 +5,15 @@
  * Author: Andreas Pohl
  */
 
+#include "App.hpp"
 #include "PluginMonitor.hpp"
-#include "PluginProcessor.hpp"
 #include "Images.hpp"
 #include "WindowPositions.hpp"
-#include "Metrics.hpp"
 
 namespace e47 {
 
-PluginStatus::PluginStatus(AudioGridderAudioProcessor* plugin) {
-    auto& client = plugin->getClient();
-    ok = client.isReadyLockFree();
-    auto track = plugin->getTrackProperties();
-    channelName = track.name;
-    channelColour = track.colour;
-    loadedPlugins = client.getLoadedPluginsString();
-    String statId = "audio.";
-    statId << plugin->getId();
-    auto ts = Metrics::getStatistic<TimeStatistic>(statId);
-    perf95th = ts->get1minHistogram().nintyFifth;
-    blocks = client.NUM_OF_BUFFERS;
-}
-
-PluginMonitorWindow::PluginMonitorWindow(PluginMonitor* mon, const String& mode)
-    : TopLevelWindow("AudioGridder - " + mode, true), LogTagDelegate(mon), m_mon(mon) {
-    traceScope();
-
+PluginMonitorWindow::PluginMonitorWindow(PluginMonitor* mon, App* app)
+    : TopLevelWindow("AudioGridder PluginMon", true), LogTagDelegate(mon), m_mon(mon), m_app(app) {
     auto& lf = getLookAndFeel();
     lf.setColour(ResizableWindow::backgroundColourId, Colour(Defaults::BG_COLOR));
 
@@ -40,7 +23,7 @@ PluginMonitorWindow::PluginMonitorWindow(PluginMonitor* mon, const String& mode)
     m_logo.addMouseListener(this, true);
     addAndMakeVisible(m_logo);
 
-    m_title.setText("Plugin Monitor - " + mode, NotificationType::dontSendNotification);
+    m_title.setText("AGridder Monitor", NotificationType::dontSendNotification);
     m_title.setBounds(30, 10, m_totalWidth - 30, 16);
     auto f = m_title.getFont();
     f.setHeight(f.getHeight() - 2);
@@ -58,38 +41,21 @@ PluginMonitorWindow::PluginMonitorWindow(PluginMonitor* mon, const String& mode)
 PluginMonitorWindow::~PluginMonitorWindow() {
     traceScope();
     WindowPositions::PositionType pt = WindowPositions::PluginMonFx;
-#if JucePlugin_IsSynth
-    pt = WindowPositions::PluginMonInst;
-#elif JucePlugin_IsMidiEffect
-    pt = WindowPositions::PluginMonMidi;
-#endif
     WindowPositions::set(pt, {});
 }
 
 void PluginMonitorWindow::mouseUp(const MouseEvent& event) {
     if (event.mods.isLeftButtonDown()) {
         setVisible(false);
-        PluginMonitor::setAlwaysShow(false);
         m_mon->hideWindow();
     } else {
-        PopupMenu m;
-        m.addItem("Show Channel Color", true, PluginMonitor::getShowChannelColor(), [] {
-            PluginMonitor::setShowChannelColor(!PluginMonitor::getShowChannelColor());
-            auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigPlugin));
-            cfg["PluginMonChanColor"] = PluginMonitor::getShowChannelColor();
-            configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), cfg);
-        });
-        m.addItem("Show Channel Name", true, PluginMonitor::getShowChannelName(), [] {
-            PluginMonitor::setShowChannelName(!PluginMonitor::getShowChannelName());
-            auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigPlugin));
-            cfg["PluginMonChanName"] = PluginMonitor::getShowChannelName();
-            configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), cfg);
-        });
-        m.show();
+        PopupMenu menu;
+        m_app->getPopupMenu(menu, false);
+        menu.show();
     }
 }
 
-void PluginMonitorWindow::update(const Array<PluginStatus>& status) {
+void PluginMonitorWindow::update() {
     for (auto& comp : m_components) {
         removeChildComponent(comp.get());
     }
@@ -101,11 +67,11 @@ void PluginMonitorWindow::update(const Array<PluginStatus>& status) {
 
     int colWidth[] = {m_channelColWidth, m_channelNameWidth, 190, 30, 65, 10};
 
-    if (!PluginMonitor::getShowChannelColor()) {
+    if (!m_mon->showChannelColor) {
         colWidth[0] = 0;
     }
 
-    if (!PluginMonitor::getShowChannelName()) {
+    if (!m_mon->showChannelName) {
         colWidth[1] = 0;
     }
 
@@ -127,29 +93,30 @@ void PluginMonitorWindow::update(const Array<PluginStatus>& status) {
 
     int row = 1;
 
-    if (PluginMonitor::getShowChannelName()) {
+    if (m_mon->showChannelName) {
         addLabel("Channel", getLabelBounds(row, 0, 2), Justification::topLeft, 1.0f);
-    } else if (PluginMonitor::getShowChannelColor()) {
+    } else if (m_mon->showChannelColor) {
         addLabel("Ch", getLabelBounds(row, 0, 2), Justification::topLeft, 1.0f);
     }
-    addLabel("Loaded Chain", getLabelBounds(row, 2), Justification::topLeft, 1.0f);
+    addLabel("Inserts", getLabelBounds(row, 2), Justification::topLeft, 1.0f);
     addLabel("Buf", getLabelBounds(row, 3), Justification::topRight, 1.0f);
     addLabel("Perf", getLabelBounds(row, 4), Justification::topRight, 1.0f);
 
     row++;
 
-    for (auto& s : status) {
+    for (auto& c : m_app->getServer().getConnections()) {
+        auto& s = c->status;
         auto line = std::make_unique<HirozontalLine>(getLineBounds(row));
         addChildAndSetID(line.get(), "line");
         m_components.push_back(std::move(line));
 
-        if (PluginMonitor::getShowChannelColor()) {
-            auto chan = std::make_unique<Channel>(getLabelBounds(row, 0), s.channelColour);
+        if (m_mon->showChannelColor) {
+            auto chan = std::make_unique<Channel>(getLabelBounds(row, 0), Colour(s.colour));
             addChildAndSetID(chan.get(), "led");
             m_components.push_back(std::move(chan));
         }
-        if (PluginMonitor::getShowChannelName()) {
-            addLabel(s.channelName, getLabelBounds(row, 1));
+        if (m_mon->showChannelName) {
+            addLabel(s.name, getLabelBounds(row, 1));
         }
         addLabel(s.loadedPlugins, getLabelBounds(row, 2));
         addLabel(String(s.blocks), getLabelBounds(row, 3), Justification::topRight);
@@ -184,10 +151,10 @@ void PluginMonitorWindow::addLabel(const String& txt, juce::Rectangle<int> bound
 
 void PluginMonitorWindow::updatePosition() {
     int width = m_totalWidth;
-    if (!PluginMonitor::getShowChannelColor()) {
+    if (!m_mon->showChannelColor) {
         width -= m_channelColWidth;
     }
-    if (!PluginMonitor::getShowChannelName()) {
+    if (!m_mon->showChannelName) {
         width -= m_channelNameWidth;
     }
 
@@ -249,77 +216,37 @@ void PluginMonitorWindow::HirozontalLine::paint(Graphics& g) {
     g.fillAll();
 }
 
-std::mutex PluginMonitor::m_pluginMtx;
-Array<AudioGridderAudioProcessor*> PluginMonitor::m_plugins;
-
-std::atomic_bool PluginMonitor::m_showChannelName{true};
-std::atomic_bool PluginMonitor::m_showChannelColor{true};
-
-void PluginMonitor::run() {
-    traceScope();
-
-    logln("plugin monitor started");
-
-    String mode;
-#if JucePlugin_IsSynth
-    mode = "Instruments";
-#elif JucePlugin_IsMidiEffect
-    mode = "Midi";
-#else
-    mode = "FX";
-#endif
-
-    while (!currentThreadShouldExit()) {
-        if (m_windowAlwaysShow || m_windowAutoShow || m_windowActive) {
-            bool allOk = true;
-            Array<PluginStatus> status;
-            {
-                std::lock_guard<std::mutex> lock(m_pluginMtx);
-                for (auto plugin : m_plugins) {
-                    PluginStatus s(plugin);
-                    allOk = allOk && s.ok;
-                    status.add(std::move(s));
-                }
-            }
-
-            bool show = !m_windowWantsHide && ((!allOk && m_windowAutoShow) || m_windowAlwaysShow);
-            bool hide = m_windowWantsHide || (!m_windowAlwaysShow && (allOk || !m_windowAutoShow));
-            if (show) {
-                m_windowActive = true;
-            } else if (hide) {
-                m_windowActive = false;
-            }
-            m_windowWantsHide = false;
-
-            runOnMsgThreadAsync([this, mode, status, show, hide] {
-                traceScope();
-                if (show && nullptr == m_window) {
-                    logln("showing monitor window");
-                    m_window = std::make_unique<PluginMonitorWindow>(this, mode);
-                } else if (nullptr != m_window && hide) {
-                    logln("hiding monitor window");
-                    m_window.reset();
-                }
-                if (nullptr != m_window) {
-                    m_window->update(status);
-                }
-            });
-        }
-        int sleepTime = m_windowActive ? 500 : 2000;
-        sleepExitAwareWithCondition(sleepTime, [this]() -> bool { return !m_windowActive && m_windowAlwaysShow; });
+void PluginMonitor::update() {
+    bool allOk = true;
+    for (auto& c : m_app->getServer().getConnections()) {
+        allOk = allOk && c->status.ok;
     }
 
-    logln("plugin monitor terminated");
+    bool show = ((!allOk && windowAutoShow) || windowAlwaysShow);
+    bool hide = (!windowAlwaysShow && (allOk || !windowAutoShow));
+
+    if (show) {
+        windowActive = true;
+    } else if (hide) {
+        windowActive = false;
+    }
+
+    if (show && nullptr == m_window) {
+        m_window = std::make_unique<PluginMonitorWindow>(this, m_app);
+    } else if (nullptr != m_window && hide) {
+        m_window.reset();
+    }
+
+    if (nullptr != m_window) {
+        m_window->update();
+    }
 }
 
-void PluginMonitor::add(AudioGridderAudioProcessor* plugin) {
-    std::lock_guard<std::mutex> lock(m_pluginMtx);
-    m_plugins.addIfNotAlreadyThere(plugin);
-}
-
-void PluginMonitor::remove(AudioGridderAudioProcessor* plugin) {
-    std::lock_guard<std::mutex> lock(m_pluginMtx);
-    m_plugins.removeAllInstancesOf(plugin);
+void PluginMonitor::timerCallback() {
+    if (m_needsUpdate) {
+        MessageManager::callAsync([this] { update(); });
+        m_needsUpdate = false;
+    }
 }
 
 }  // namespace e47

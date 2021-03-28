@@ -24,13 +24,27 @@ void App::initialise(const String& /*commandLineParameters*/) {
 
 void App::shutdown() { AGLogger::cleanup(); }
 
-PopupMenu App::Tray::getMenuForIndex(int, const String&) {
+void App::loadConfig() {
+    auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigPluginTray));
+    m_mon.showChannelColor = jsonGetValue(cfg, "showChannelColor", m_mon.showChannelColor);
+    m_mon.showChannelName = jsonGetValue(cfg, "showChannelName", m_mon.showChannelName);
+    m_mon.windowAutoShow = jsonGetValue(cfg, "autoShow", m_mon.windowAutoShow);
+}
+
+void App::saveConfig() {
+    json cfg;
+    cfg["showChannelColor"] = m_mon.showChannelColor;
+    cfg["showChannelName"] = m_mon.showChannelName;
+    cfg["autoShow"] = m_mon.windowAutoShow;
+    configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPluginTray), cfg);
+}
+
+void App::getPopupMenu(PopupMenu& menu, bool withShowMonitorOption) {
     auto mdnsServers = ServiceReceiver::getServers();
-    PopupMenu menu;
     menu.addSectionHeader("Connections");
     std::map<String, PopupMenu> serverMenus;
-    for (auto& c : m_app->getServer().getConnections()) {
-        String srv = App::getServerString(c.get());
+    for (auto& c : m_srv.getConnections()) {
+        String srv = getServerString(c.get());
         String name = c->status.name;
         if (name.isEmpty()) {
             name = "Unnamed";
@@ -40,7 +54,7 @@ PopupMenu App::Tray::getMenuForIndex(int, const String&) {
         }
         PopupMenu subRecon;
         for (auto& srvInfo : mdnsServers) {
-            String mdnsName = App::getServerString(srvInfo);
+            String mdnsName = getServerString(srvInfo);
             if (srv != mdnsName) {
                 subRecon.addItem(mdnsName, [c, srvInfo] {
                     c->sendMessage(PluginTrayMessage(PluginTrayMessage::CHANGE_SERVER,
@@ -51,10 +65,10 @@ PopupMenu App::Tray::getMenuForIndex(int, const String&) {
         if (serverMenus.find(srv) == serverMenus.end()) {
             PopupMenu subReconAll;
             for (auto& srvInfo : mdnsServers) {
-                String mdnsName = App::getServerString(srvInfo);
+                String mdnsName = getServerString(srvInfo);
                 if (srv != mdnsName) {
                     subReconAll.addItem(mdnsName, [this, srvInfo] {
-                        for (auto& c2 : m_app->getServer().getConnections()) {
+                        for (auto& c2 : m_srv.getConnections()) {
                             c2->sendMessage(PluginTrayMessage(PluginTrayMessage::CHANGE_SERVER,
                                                               {{"serverInfo", srvInfo.serialize().toStdString()}}));
                         }
@@ -69,6 +83,37 @@ PopupMenu App::Tray::getMenuForIndex(int, const String&) {
     for (auto& kv : serverMenus) {
         menu.addSubMenu(kv.first, kv.second);
     }
+
+    menu.addSeparator();
+
+    PopupMenu subMon;
+    if (withShowMonitorOption) {
+        subMon.addItem("Show...", [this] {
+            m_mon.windowAlwaysShow = true;
+            m_mon.refresh();
+        });
+    }
+    subMon.addItem("Automatic", true, m_mon.windowAutoShow, [this] {
+        m_mon.windowAutoShow = !m_mon.windowAutoShow;
+        m_mon.refresh();
+        saveConfig();
+    });
+    subMon.addItem("Show Channel Color", true, m_mon.showChannelColor, [this] {
+        m_mon.showChannelColor = !m_mon.showChannelColor;
+        m_mon.refresh();
+        saveConfig();
+    });
+    subMon.addItem("Show Channel Name", true, m_mon.showChannelName, [this] {
+        m_mon.showChannelName = !m_mon.showChannelName;
+        m_mon.refresh();
+        saveConfig();
+    });
+    menu.addSubMenu("Monitor", subMon);
+}
+
+PopupMenu App::Tray::getMenuForIndex(int, const String&) {
+    PopupMenu menu;
+    m_app->getPopupMenu(menu);
     menu.addSeparator();
     menu.addItem(AUDIOGRIDDER_VERSION, false, false, nullptr);
     return menu;
@@ -79,22 +124,38 @@ void App::Connection::messageReceived(const MemoryBlock& message) {
     msg.deserialize(message);
 
     if (msg.type == PluginTrayMessage::STATUS) {
-        status.name = jsonGetValue(msg.data, "name", status.name);
-        status.channelsIn = jsonGetValue(msg.data, "channelsIn", 0);
-        status.channelsOut = jsonGetValue(msg.data, "channelsOut", 0);
-        status.instrument = jsonGetValue(msg.data, "instrument", false);
-        status.colour = jsonGetValue(msg.data, "colour", 0u);
-        status.loadedPlugins = jsonGetValue(msg.data, "loadedPlugins", status.loadedPlugins);
-        status.perf95th = jsonGetValue(msg.data, "perf95th", 0.0);
-        status.blocks = jsonGetValue(msg.data, "blocks", 0);
-        status.serverNameId = jsonGetValue(msg.data, "serverNameId", status.serverNameId);
-        status.serverHost = jsonGetValue(msg.data, "serverHost", status.serverHost);
-        status.ok = jsonGetValue(msg.data, "ok", false);
+        bool changed = false;
+        auto updateValue = [this, &changed](auto& dst, const auto& src) {
+            if (dst != src) {
+                dst = src;
+                changed = true;
+            }
+        };
+
+        updateValue(status.name, jsonGetValue(msg.data, "name", status.name));
+        updateValue(status.channelsIn, jsonGetValue(msg.data, "channelsIn", 0));
+        updateValue(status.channelsOut, jsonGetValue(msg.data, "channelsOut", 0));
+        updateValue(status.instrument, jsonGetValue(msg.data, "instrument", false));
+        updateValue(status.colour, jsonGetValue(msg.data, "colour", 0u));
+        updateValue(status.loadedPlugins, jsonGetValue(msg.data, "loadedPlugins", status.loadedPlugins));
+        updateValue(status.perf95th, jsonGetValue(msg.data, "perf95th", 0.0));
+        updateValue(status.blocks, jsonGetValue(msg.data, "blocks", 0));
+        updateValue(status.serverNameId, jsonGetValue(msg.data, "serverNameId", status.serverNameId));
+        updateValue(status.serverHost, jsonGetValue(msg.data, "serverHost", status.serverHost));
+        updateValue(status.ok, jsonGetValue(msg.data, "ok", false));
+
         status.lastUpdated = Time::currentTimeMillis();
+
         if (!initialized) {
             initialized = true;
+            changed = true;
             logln("new connection: name=" << status.name);
             m_app->sendRecents(App::getServerString(this), this);
+        }
+
+        if (changed) {
+            logln("changed");
+            m_app->getMonitor().refresh();
         }
     } else {
         m_app->handleMessage(msg, *this);
@@ -109,12 +170,14 @@ void App::Connection::sendMessage(const PluginTrayMessage& msg) {
 
 void App::Server::checkConnections() {
     int i = 0;
+    int removed = 0;
     while (i < m_connections.size()) {
         auto c = m_connections[i];
         bool dead = Time::currentTimeMillis() - c->status.lastUpdated > 5000 || (c->initialized && !c->connected);
         if (dead) {
             logln("lost connection: name=" << c->status.name);
             m_connections.remove(i);
+            removed++;
         } else {
             i++;
         }
@@ -126,6 +189,10 @@ void App::Server::checkConnections() {
     }
     if (m_noConnectionCounter > 5) {
         m_app->quit();
+    } else {
+        if (removed > 0) {
+            m_app->getMonitor().refresh();
+        }
     }
 }
 
@@ -141,6 +208,9 @@ void App::handleMessage(const PluginTrayMessage& msg, Connection& sender) {
             }
             sendRecents(srv);
         }
+    } else if (msg.type == PluginTrayMessage::SHOW_MONITOR) {
+        m_mon.windowAlwaysShow = true;
+        m_mon.refresh();
     }
 }
 

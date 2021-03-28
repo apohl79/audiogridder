@@ -15,12 +15,13 @@
 #include "Images.hpp"
 #include "Message.hpp"
 #include "ServerPlugin.hpp"
+#include "PluginMonitor.hpp"
 
 namespace e47 {
 
 class App : public JUCEApplication, public LogTag {
   public:
-    App() : LogTag("app"), m_tray(this), m_srv(this) {}
+    App() : LogTag("app"), m_tray(this), m_srv(this), m_mon(this) {}
     ~App() override {}
 
     const String getApplicationName() override { return ProjectInfo::projectName; }
@@ -28,6 +29,11 @@ class App : public JUCEApplication, public LogTag {
     void initialise(const String& commandLineParameters) override;
     void shutdown() override;
     void systemRequestedQuit() override { quit(); }
+
+    void loadConfig();
+    void saveConfig();
+
+    void getPopupMenu(PopupMenu& menu, bool withShowMonitorOption = true);
 
     class Tray : public SystemTrayIconComponent, public MenuBarModel {
       public:
@@ -69,6 +75,9 @@ class App : public JUCEApplication, public LogTag {
         bool connected = false;
         bool initialized = false;
 
+        Connection(App* app) : LogTagDelegate(app), m_app(app) {}
+        ~Connection() override { disconnect(); }
+
         struct Status {
             String name;
             int channelsIn;
@@ -85,9 +94,6 @@ class App : public JUCEApplication, public LogTag {
         };
 
         Status status;
-
-        Connection(App* app) : LogTagDelegate(app), m_app(app) {}
-        ~Connection() override { disconnect(); }
 
         void connectionMade() override { connected = true; }
         void connectionLost() override { connected = false; }
@@ -107,7 +113,16 @@ class App : public JUCEApplication, public LogTag {
         }
 
         void checkConnections();
-        const Array<std::shared_ptr<Connection>>& getConnections() { return m_connections; }
+
+        const Array<std::shared_ptr<Connection>> getConnections() {
+            Array<std::shared_ptr<Connection>> ret;
+            for (auto& c : m_connections) {
+                if (c->initialized) {
+                    ret.add(c);
+                }
+            }
+            return ret;
+        }
 
       protected:
         InterprocessConnection* createConnectionObject() override {
@@ -127,15 +142,17 @@ class App : public JUCEApplication, public LogTag {
     void sendRecents(const String& srv, Connection* target = nullptr);
 
     static String getServerString(Connection* c) { return c->status.serverNameId + " (" + c->status.serverHost + ")"; }
-
     static String getServerString(const ServerInfo& srvInfo) {
         return srvInfo.getNameAndID() + " (" + srvInfo.getHost() + ")";
     }
+
+    PluginMonitor& getMonitor() { return m_mon; }
 
   private:
     Tray m_tray;
     Server m_srv;
     std::unordered_map<String, Array<ServerPlugin>> m_recents;
+    PluginMonitor m_mon;
 };
 
 }  // namespace e47

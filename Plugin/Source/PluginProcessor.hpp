@@ -161,6 +161,8 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
         return as<int>(lround(m_client->NUM_OF_BUFFERS * getBlockSize() * 1000 / getSampleRate()));
     }
 
+    void showMonitor() { m_tray->showMonitor(); }
+
     // It looks like most hosts do not support dynamic parameter creation or changes to existing parameters. Logic
     // at least allows for the name to be updated. So we create slots at the start.
     class Parameter : public AudioProcessorParameter, public LogTagDelegate {
@@ -214,6 +216,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
         void connectionLost() override { connected = false; }
         void messageReceived(const MemoryBlock& message) override;
         void sendStatus();
+        void showMonitor();
         void sendMessage(const PluginTrayMessage& msg);
 
         void timerCallback() override;
