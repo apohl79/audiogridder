@@ -240,12 +240,17 @@ void AudioGridderAudioProcessorEditor::resized() {
     int leftBarWidth = 200;
     int windowWidth = leftBarWidth;
     if (m_processor.getActivePlugin() > -1) {
-        m_stMinus.setVisible(true);
-        m_stPlus.setVisible(true);
-        m_stFullscreen.setVisible(true);
+        if (!m_processor.getGenericEditor()) {
+            m_stMinus.setVisible(true);
+            m_stPlus.setVisible(true);
+            m_stFullscreen.setVisible(true);
+        } else {
+            m_stMinus.setVisible(false);
+            m_stPlus.setVisible(false);
+            m_stFullscreen.setVisible(false);
+        }
         m_stA.setVisible(true);
         m_stB.setVisible(true);
-
     } else {
         m_stMinus.setVisible(false);
         m_stPlus.setVisible(false);
