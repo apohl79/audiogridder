@@ -125,7 +125,7 @@ void App::Connection::messageReceived(const MemoryBlock& message) {
 
     if (msg.type == PluginTrayMessage::STATUS) {
         bool changed = false;
-        auto updateValue = [this, &changed](auto& dst, const auto& src) {
+        auto updateValue = [&changed](auto& dst, const auto& src) {
             if (dst != src) {
                 dst = src;
                 changed = true;
