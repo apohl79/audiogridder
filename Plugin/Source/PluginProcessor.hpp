@@ -58,6 +58,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     const String getProgramName(int index) override;
     void changeProgramName(int index, const String& newName) override;
 
+    void getStateInformation(MemoryBlock& destData, bool withServers);
     void getStateInformation(MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
@@ -163,6 +164,9 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
 
     void showMonitor() { m_tray->showMonitor(); }
 
+    String getPresetDir() const { return m_presetsDir; }
+    void setPresetDir(const String& d) { m_presetsDir = d; }
+
     // It looks like most hosts do not support dynamic parameter creation or changes to existing parameters. Logic
     // at least allows for the name to be updated. So we create slots at the start.
     class Parameter : public AudioProcessorParameter, public LogTagDelegate {
@@ -244,6 +248,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     StringArray m_servers;
     String m_activeServerFromCfg;
     int m_activeServerLegacyFromCfg;
+    String m_presetsDir;
 
     int m_numberOfAutomationSlots = 16;
     LoadedPlugin m_unusedDummyPlugin;

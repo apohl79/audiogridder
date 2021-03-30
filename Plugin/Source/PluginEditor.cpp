@@ -24,18 +24,25 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
 
     auto& lf = getLookAndFeel();
     lf.setUsingNativeAlertWindows(true);
+    lf.setColour(AlertWindow::backgroundColourId, Colour(Defaults::BG_COLOR));
     lf.setColour(ResizableWindow::backgroundColourId, Colour(Defaults::BG_COLOR));
     lf.setColour(PopupMenu::backgroundColourId, Colour(Defaults::BG_COLOR));
     lf.setColour(TextEditor::backgroundColourId, Colour(Defaults::BUTTON_COLOR));
     lf.setColour(TextButton::buttonColourId, Colour(Defaults::BUTTON_COLOR));
     lf.setColour(ComboBox::backgroundColourId, Colour(Defaults::BUTTON_COLOR));
+    lf.setColour(ListBox::backgroundColourId, Colour(Defaults::BUTTON_COLOR));
     lf.setColour(PopupMenu::highlightedBackgroundColourId, Colour(Defaults::ACTIVE_COLOR).withAlpha(0.05f));
     lf.setColour(Slider::thumbColourId, Colour(Defaults::SLIDERTHUMB_COLOR));
     lf.setColour(Slider::trackColourId, Colour(Defaults::SLIDERTRACK_COLOR));
     lf.setColour(Slider::backgroundColourId, Colour(Defaults::SLIDERBG_COLOR));
+    lf.setColour(FileBrowserComponent::currentPathBoxBackgroundColourId, Colour(Defaults::BUTTON_COLOR));
+    lf.setColour(FileBrowserComponent::filenameBoxBackgroundColourId, Colour(Defaults::BUTTON_COLOR));
+    lf.setColour(FileBrowserComponent::currentPathBoxArrowColourId, Colour(Defaults::ACTIVE_COLOR));
+    lf.setColour(DirectoryContentsDisplayComponent::highlightColourId, Colour(Defaults::ACTIVE_COLOR).withAlpha(0.05f));
     if (auto lfv4 = dynamic_cast<LookAndFeel_V4*>(&lf)) {
         lfv4->getCurrentColourScheme().setUIColour(LookAndFeel_V4::ColourScheme::widgetBackground,
                                                    Colour(Defaults::BG_COLOR));
+        lfv4->getCurrentColourScheme().setUIColour(LookAndFeel_V4::ColourScheme::highlightedFill, Colours::black);
     }
 
     addAndMakeVisible(m_srvIcon);
@@ -93,12 +100,10 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
     m_cpuLabel.setAlpha(0.6f);
 
     addChildComponent(m_pluginScreen);
-    m_pluginScreen.setImage(ImageCache::getFromMemory(Images::pluginlogo_png, Images::pluginlogo_pngSize));
-    m_pluginScreen.setBounds(200, SCREENTOOLS_HEIGHT + SCREENTOOLS_MARGIN * 2, PLUGINSCREEN_DEFAULT_W,
-                             PLUGINSCREEN_DEFAULT_H);
     m_pluginScreen.setWantsKeyboardFocus(true);
     m_pluginScreen.addMouseListener(&m_processor.getClient(), true);
     m_pluginScreen.addKeyListener(&m_processor.getClient());
+    resetPluginScreen();
     m_pluginScreen.setVisible(false);
 
     addChildComponent(m_genericEditorView);
@@ -106,23 +111,6 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
     m_genericEditor.setBounds(200, SCREENTOOLS_HEIGHT + SCREENTOOLS_MARGIN * 2, 100, 200);
     m_genericEditorView.setViewedComponent(&m_genericEditor, false);
     m_genericEditorView.setVisible(false);
-
-    for (int idx = 0; idx < m_processor.getNumOfLoadedPlugins(); idx++) {
-        auto& plug = m_processor.getLoadedPlugin(idx);
-        if (plug.id.isNotEmpty()) {
-            auto* b = addPluginButton(plug.id, plug.name);
-            if (!plug.ok) {
-                b->setEnabled(false);
-            }
-            if (plug.bypassed) {
-                b->setButtonText("( " + m_processor.getLoadedPlugin(idx).name + " )");
-                b->setColour(PluginButton::textColourOffId, Colours::grey);
-            }
-#if JucePlugin_IsSynth
-            m_newPluginButton.setEnabled(false);
-#endif
-        }
-    }
 
     m_stFullscreen.setButtonText("fs");
     m_stFullscreen.setBounds(201, 1, 1, 1);
@@ -163,6 +151,7 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
     addAndMakeVisible(&m_stB);
 
     initStButtons();
+    createPluginButtons();
 
     setSize(200, 100);
 
@@ -258,7 +247,7 @@ void AudioGridderAudioProcessorEditor::resized() {
         m_stA.setVisible(false);
         m_stB.setVisible(false);
     }
-    if (m_processor.getGenericEditor()) {
+    if (m_processor.getGenericEditor() && m_processor.getActivePlugin() > -1) {
         m_genericEditorView.setVisible(true);
         m_pluginScreen.setVisible(false);
         int screenHeight = m_genericEditor.getHeight() + SCREENTOOLS_HEIGHT;
@@ -387,10 +376,7 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
                 }
                 if (m_pluginButtons.size() == 0) {
                     m_processor.getClient().setPluginScreenUpdateCallback(nullptr);
-                    m_pluginScreen.setImage(
-                        ImageCache::getFromMemory(Images::pluginlogo_png, Images::pluginlogo_pngSize));
-                    m_pluginScreen.setBounds(200, SCREENTOOLS_HEIGHT + SCREENTOOLS_MARGIN * 2, PLUGINSCREEN_DEFAULT_W,
-                                             PLUGINSCREEN_DEFAULT_H);
+                    resetPluginScreen();
                 }
 #if JucePlugin_IsSynth
                 m_newPluginButton.setEnabled(true);
@@ -483,6 +469,30 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button) {
             m_processor.restoreSettingsB();
             hilightStButton(&m_stB);
             enableStButton(&m_stA);
+        }
+    }
+}
+
+void AudioGridderAudioProcessorEditor::createPluginButtons() {
+    traceScope();
+    for (auto& b : m_pluginButtons) {
+        removeChildComponent(b.get());
+    }
+    m_pluginButtons.clear();
+    for (int idx = 0; idx < m_processor.getNumOfLoadedPlugins(); idx++) {
+        auto& plug = m_processor.getLoadedPlugin(idx);
+        if (plug.id.isNotEmpty()) {
+            auto* b = addPluginButton(plug.id, plug.name);
+            if (!plug.ok) {
+                b->setEnabled(false);
+            }
+            if (plug.bypassed) {
+                b->setButtonText("( " + m_processor.getLoadedPlugin(idx).name + " )");
+                b->setColour(PluginButton::textColourOffId, Colours::grey);
+            }
+#if JucePlugin_IsSynth
+            m_newPluginButton.setEnabled(false);
+#endif
         }
     }
 }
@@ -750,7 +760,77 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
         });
         m.showAt(&m_srvIcon);
     } else if (event.eventComponent == &m_settingsIcon) {
-        PopupMenu m;
+        PopupMenu m, subm;
+
+        subm.addItem("Create New...", [this] {
+            traceScope();
+            File d(m_processor.getPresetDir());
+            if (!d.exists()) {
+                d.createDirectory();
+            }
+            WildcardFileFilter filter("*.preset", String(), "Presets");
+            FileBrowserComponent fb(FileBrowserComponent::saveMode | FileBrowserComponent::canSelectFiles, d, &filter,
+                                    nullptr);
+            FileChooserDialogBox fcdialog("Create New Preset", "Enter the name for the new preset.", fb, true,
+                                          Colour(Defaults::BG_COLOR));
+            fcdialog.setAlwaysOnTop(true);
+            if (fcdialog.show(300, 400)) {
+                MemoryBlock data;
+                m_processor.getStateInformation(data, false);
+                auto file = fb.getSelectedFile(0);
+                if (file.getFileExtension() != ".preset") {
+                    file = file.withFileExtension(".preset");
+                }
+                if (file.existsAsFile()) {
+                    file.deleteFile();
+                }
+                FileOutputStream fos(file);
+                fos.write(data.getData(), data.getSize());
+            }
+        });
+        subm.addItem("Choose Preset Directory...", [this] {
+            traceScope();
+            File d(m_processor.getPresetDir());
+            if (!d.exists()) {
+                d.createDirectory();
+            }
+            FileChooser fc("Presets Directory", d);
+            if (fc.browseForDirectory()) {
+                d = fc.getResult();
+                logln("setting presets dir to " << d.getFullPathName());
+                m_processor.setPresetDir(d.getFullPathName());
+                m_processor.saveConfig();
+            }
+        });
+        subm.addItem("Manage...", [this] {
+            traceScope();
+            StringArray cmd;
+#if defined(JUCE_MAC)
+            cmd.add("open");
+#elif defined(JUCE_WINDOWS)
+            cmd.add("explorer.exe");
+#elif defined(JUCE_LINUX)
+            cmd.add("xdg-open");
+#endif
+            if (!cmd.isEmpty()) {
+                File d(m_processor.getPresetDir());
+                if (!d.exists()) {
+                    d.createDirectory();
+                }
+                cmd.add(d.getFullPathName());
+                logln("spawning child proc: " << cmd[0] << " " << cmd[1]);
+                ChildProcess proc;
+                if (!proc.start(cmd, 0)) {
+                    logln("failed to open presets dir");
+                }
+            }
+        });
+        subm.addSeparator();
+        getPresetsMenu(subm, m_processor.getPresetDir());
+        m.addSubMenu("Presets", subm);
+
+        m.addSeparator();
+
         m.addItem("Generic Editor", true, m_processor.getGenericEditor(), [this] {
             traceScope();
             m_processor.setGenericEditor(!m_processor.getGenericEditor());
@@ -762,7 +842,6 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
         m.addItem("Show Monitor...", [this] { m_processor.showMonitor(); });
         m.addSeparator();
 
-        PopupMenu subm;
         subm.addItem("Show Category", true, m_processor.getMenuShowCategory(), [this] {
             traceScope();
             m_processor.setMenuShowCategory(!m_processor.getMenuShowCategory());
@@ -899,6 +978,8 @@ void AudioGridderAudioProcessorEditor::editPlugin(int idx) {
     m_pluginButtons[(size_t)idx]->setColour(PluginButton::textColourOffId, Colour(Defaults::ACTIVE_COLOR));
     m_processor.editPlugin(idx);
     if (m_processor.getGenericEditor()) {
+        m_processor.getClient().setPluginScreenUpdateCallback(nullptr);
+        resetPluginScreen();
         m_genericEditor.resized();
         resized();
         if (active > -1) {
@@ -937,6 +1018,51 @@ void AudioGridderAudioProcessorEditor::editPlugin(int idx) {
         m_pluginButtons[(size_t)active]->setColour(PluginButton::textColourOffId, Colours::white);
         resized();
     }
+}
+
+void AudioGridderAudioProcessorEditor::getPresetsMenu(PopupMenu& menu, const File& dir) {
+    traceScope();
+
+    if (!dir.exists()) {
+        return;
+    }
+
+    auto files = dir.findChildFiles(File::findFiles | File::findDirectories, false);
+    files.sort();
+    for (auto file : files) {
+        if (file.isDirectory()) {
+            PopupMenu subm;
+            getPresetsMenu(subm, file);
+            menu.addSubMenu(file.getFileName(), subm);
+        } else if (file.getFileExtension() == ".preset") {
+            menu.addItem(file.getFileNameWithoutExtension(), [this, file] {
+                traceScope();
+                FileInputStream fis(file);
+                if (fis.openedOk()) {
+                    logln("loading preset " << file.getFullPathName());
+                    MemoryBlock data;
+                    data.setSize((size_t)fis.getTotalLength());
+                    fis.read(data.getData(), (int)data.getSize());
+                    m_processor.setStateInformation(data.getData(), (int)data.getSize());
+                    createPluginButtons();
+                    resetPluginScreen();
+                    resized();
+                    m_processor.getClient().reconnect();
+                } else {
+                    AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Error",
+                                                     "Failed to load preset " + file.getFullPathName() +
+                                                         "!\n\nError: " + fis.getStatus().getErrorMessage(),
+                                                     "OK");
+                }
+            });
+        }
+    }
+}
+
+void AudioGridderAudioProcessorEditor::resetPluginScreen() {
+    m_pluginScreen.setImage(ImageCache::getFromMemory(Images::pluginlogo_png, Images::pluginlogo_pngSize));
+    m_pluginScreen.setBounds(200, SCREENTOOLS_HEIGHT + SCREENTOOLS_MARGIN * 2, PLUGINSCREEN_DEFAULT_W,
+                             PLUGINSCREEN_DEFAULT_H);
 }
 
 }  // namespace e47

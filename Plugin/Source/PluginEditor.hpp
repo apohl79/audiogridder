@@ -65,9 +65,12 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     int m_currentActiveAB = -1;
     TextButton* m_hilightedStButton = nullptr;
 
+    void createPluginButtons();
     PluginButton* addPluginButton(const String& id, const String& name);
     std::vector<PluginButton*> getPluginButtons(const String& id);
     int getPluginIndex(const String& name);
+
+    void getPresetsMenu(PopupMenu& menu, const File& dir);
 
     void initStButtons();
     void enableStButton(TextButton* b);
@@ -76,6 +79,8 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     bool isHilightedStButton(TextButton* b);
 
     void editPlugin(int idx = -1);
+
+    void resetPluginScreen();
 
     ENABLE_ASYNC_FUNCTORS();
 

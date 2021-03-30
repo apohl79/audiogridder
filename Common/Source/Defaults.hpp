@@ -34,6 +34,8 @@ static const String KNOWN_PLUGINS_FILE = "~/.audiogridder/audiogridderserver.cac
 static const String DEAD_MANS_FILE = "~/.audiogridder/audiogridderserver.crash";
 static const String SERVER_RUN_FILE = "~/.audiogridder/audiogridderserver.running";
 static const String WINDOW_POSITIONS_FILE = "~/.audiogridder/audiogridder.winpos";
+static const String PRESETS_DIR =
+    File::getSpecialLocation(File::userDocumentsDirectory).getFullPathName() + "/AudioGridder Presets";
 #else
 static const String SERVER_CONFIG_FILE_OLD =
     File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + "\\.audiogridderserver";
@@ -61,6 +63,8 @@ static const String SERVER_RUN_FILE = File::getSpecialLocation(File::userApplica
 static const String WINDOW_POSITIONS_FILE =
     File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
     "\\AudioGridder\\audiogridder.winpos";
+static const String PRESETS_DIR =
+    File::getSpecialLocation(File::userDocumentsDirectory).getFullPathName() + "\\AudioGridder Presets";
 #endif
 
 setLogTagStatic("defaults");

@@ -212,6 +212,7 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
     m_genericEditor = jsonGetValue(j, "GenericEditor", m_genericEditor);
     m_confirmDelete = jsonGetValue(j, "ConfirmDelete", m_confirmDelete);
     m_syncRemote = jsonGetValue(j, "SyncRemoteMode", m_syncRemote);
+    m_presetsDir = jsonGetValue(j, "PresetsDir", Defaults::PRESETS_DIR);
     auto noSrvPluginListFilter = jsonGetValue(j, "NoSrvPluginListFilter", m_noSrvPluginListFilter);
     if (noSrvPluginListFilter != m_noSrvPluginListFilter) {
         m_noSrvPluginListFilter = noSrvPluginListFilter;
@@ -247,6 +248,7 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
     jcfg["SyncRemoteMode"] = m_syncRemote;
     jcfg["NoSrvPluginListFilter"] = m_noSrvPluginListFilter;
     jcfg["ZoomFactor"] = m_scale;
+    jcfg["PresetsDir"] = m_presetsDir.toStdString();
 
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), jcfg);
 }
@@ -473,17 +475,19 @@ bool AudioGridderAudioProcessor::hasEditor() const { return true; }
 
 AudioProcessorEditor* AudioGridderAudioProcessor::createEditor() { return new AudioGridderAudioProcessorEditor(*this); }
 
-void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData) {
-    traceScope();
-
+void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData, bool withServers) {
     json j;
-    auto jservers = json::array();
-    for (auto& srv : m_servers) {
-        jservers.push_back(srv.toStdString());
-    }
     j["version"] = 2;
-    j["servers"] = jservers;
-    j["activeServerStr"] = m_client->getServerHostAndID().toStdString();
+
+    if (withServers) {
+        auto jservers = json::array();
+        for (auto& srv : m_servers) {
+            jservers.push_back(srv.toStdString());
+        }
+        j["servers"] = jservers;
+        j["activeServerStr"] = m_client->getServerHostAndID().toStdString();
+    }
+
     auto jplugs = json::array();
     {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
@@ -511,7 +515,11 @@ void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData) {
 
     auto dump = j.dump();
     destData.append(dump.data(), dump.length());
+}
 
+void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData) {
+    traceScope();
+    getStateInformation(destData, true);
     saveConfig();
 }
 
@@ -525,8 +533,8 @@ void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeI
         if (j.find("version") != j.end()) {
             version = j["version"].get<int>();
         }
-        m_servers.clear();
         if (j.find("servers") != j.end()) {
+            m_servers.clear();
             for (auto& srv : j["servers"]) {
                 m_servers.add(srv.get<std::string>());
             }
@@ -541,6 +549,7 @@ void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeI
         {
             std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
             m_loadedPlugins.clear();
+            m_activePlugin = -1;
             if (j.find("loadedPlugins") != j.end()) {
                 for (auto& plug : j["loadedPlugins"]) {
                     if (version < 1) {
