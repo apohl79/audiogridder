@@ -31,7 +31,7 @@ class ScreenWorker : public Thread, public LogTagDelegate {
     void runFFmpeg();
     void shutdown();
 
-    void showEditor(std::shared_ptr<AGProcessor> proc);
+    void showEditor(std::shared_ptr<AGProcessor> proc, int x, int y);
     void hideEditor();
 
   private:

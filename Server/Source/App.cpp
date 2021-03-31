@@ -327,6 +327,25 @@ void App::hideEditor(Thread::ThreadID tid) {
     }
 }
 
+void App::bringEditorToFront() {
+    traceScope();
+    std::lock_guard<std::mutex> lock(m_windowMtx);
+    if (m_window != nullptr) {
+        windowToFront(m_window.get());
+    }
+}
+
+void App::moveEditor(int x, int y) {
+    traceScope();
+    if (getServer().getScreenLocalMode()) {
+        logln("window move to " << x << "x" << y);
+        std::lock_guard<std::mutex> lock(m_windowMtx);
+        if (m_window != nullptr) {
+            m_window->setBounds(x, y, m_window->getWidth(), m_window->getHeight());
+        }
+    }
+}
+
 void App::resetEditor() {
     traceScope();
     std::lock_guard<std::mutex> lock(m_windowMtx);

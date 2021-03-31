@@ -101,8 +101,6 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
 
     addChildComponent(m_pluginScreen);
     m_pluginScreen.setWantsKeyboardFocus(true);
-    m_pluginScreen.addMouseListener(&m_processor.getClient(), true);
-    m_pluginScreen.addKeyListener(&m_processor.getClient());
     resetPluginScreen();
     m_pluginScreen.setVisible(false);
 
@@ -150,12 +148,12 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
     m_stB.addListener(this);
     addAndMakeVisible(&m_stB);
 
-    initStButtons();
     createPluginButtons();
+    initStButtons();
 
     setSize(200, 100);
 
-    logln("  setting connected state");
+    logln("setting connected state");
     setConnected(m_processor.getClient().isReadyLockFree());
     setCPULoad(m_processor.getClient().getCPULoad());
     logln("editor created");
@@ -229,7 +227,7 @@ void AudioGridderAudioProcessorEditor::resized() {
     int leftBarWidth = 200;
     int windowWidth = leftBarWidth;
     if (m_processor.getActivePlugin() > -1) {
-        if (!m_processor.getGenericEditor()) {
+        if (!m_processor.getGenericEditor() && !m_pluginScreenEmpty) {
             m_stMinus.setVisible(true);
             m_stPlus.setVisible(true);
             m_stFullscreen.setVisible(true);
@@ -548,7 +546,7 @@ void AudioGridderAudioProcessorEditor::focusOfChildComponentChanged(FocusChangeT
         // reactivate the plugin screen
         int active = m_processor.getActivePlugin();
         if (active > -1) {
-            m_processor.editPlugin(active);
+            m_processor.editPlugin(active, getScreenX() + getWidth() + 10, getScreenY());
         }
     }
 }
@@ -573,12 +571,16 @@ void AudioGridderAudioProcessorEditor::setConnected(bool connected) {
             }
             editPlugin(lastActive);
         }
+        if (m_processor.getClient().isServerLocalMode() && nullptr == m_positionTracker) {
+            m_positionTracker = std::make_unique<PositionTracker>(this);
+        }
     } else {
         m_srvLabel.setText("not connected", NotificationType::dontSendNotification);
         setCPULoad(0.0f);
         for (auto& but : m_pluginButtons) {
             but->setEnabled(false);
         }
+        m_positionTracker.reset();
     }
 }
 
@@ -976,7 +978,9 @@ void AudioGridderAudioProcessorEditor::editPlugin(int idx) {
     }
     m_pluginButtons[(size_t)idx]->setActive(true);
     m_pluginButtons[(size_t)idx]->setColour(PluginButton::textColourOffId, Colour(Defaults::ACTIVE_COLOR));
-    m_processor.editPlugin(idx);
+    m_stA.setVisible(true);
+    m_stB.setVisible(true);
+    m_processor.editPlugin(idx, getScreenX() + getWidth() + 10, getScreenY());
     if (m_processor.getGenericEditor()) {
         m_processor.getClient().setPluginScreenUpdateCallback(nullptr);
         resetPluginScreen();
@@ -995,8 +999,7 @@ void AudioGridderAudioProcessorEditor::editPlugin(int idx) {
                         traceScope();
                         auto p = dynamic_cast<AudioGridderAudioProcessorEditor*>(p_processor->getActiveEditor());
                         if (this == p) {  // make sure the editor hasn't been closed
-                            m_pluginScreen.setSize(width, height);
-                            m_pluginScreen.setImage(img->createCopy());
+                            setPluginScreen(img->createCopy(), width, height);
                             resized();
                         }
                     });
@@ -1007,6 +1010,7 @@ void AudioGridderAudioProcessorEditor::editPlugin(int idx) {
                         if (this == p && m_pluginButtons.size() > (size_t)idx) {
                             m_processor.hidePlugin(false);
                             m_pluginButtons[(size_t)idx]->setActive(false);
+                            resetPluginScreen();
                             resized();
                         }
                     });
@@ -1063,6 +1067,19 @@ void AudioGridderAudioProcessorEditor::resetPluginScreen() {
     m_pluginScreen.setImage(ImageCache::getFromMemory(Images::pluginlogo_png, Images::pluginlogo_pngSize));
     m_pluginScreen.setBounds(200, SCREENTOOLS_HEIGHT + SCREENTOOLS_MARGIN * 2, PLUGINSCREEN_DEFAULT_W,
                              PLUGINSCREEN_DEFAULT_H);
+    m_pluginScreen.removeMouseListener(&m_processor.getClient());
+    m_pluginScreen.removeKeyListener(&m_processor.getClient());
+    m_pluginScreenEmpty = true;
+}
+
+void AudioGridderAudioProcessorEditor::setPluginScreen(const Image& img, int w, int h) {
+    if (m_pluginScreenEmpty) {
+        m_pluginScreenEmpty = false;
+        m_pluginScreen.addMouseListener(&m_processor.getClient(), true);
+        m_pluginScreen.addKeyListener(&m_processor.getClient());
+    }
+    m_pluginScreen.setSize(w, h);
+    m_pluginScreen.setImage(img);
 }
 
 }  // namespace e47

@@ -139,7 +139,7 @@ struct HandshakeResponse {
     uint32 unused5;
     uint32 unused6;
 
-    enum FLAGS : uint32 { SANDBOX_ENABLED = 1 };
+    enum FLAGS : uint32 { SANDBOX_ENABLED = 1, LOCAL_MODE = 2 };
     void setFlag(uint32 f) { flags |= f; }
     bool isFlag(uint32 f) { return (flags & f) == f; }
 };
@@ -548,11 +548,6 @@ class Result : public Payload {
     }
 };
 
-struct preparetoplay_data_t {
-    double rate;
-    int samples;
-};
-
 class PluginList : public StringPayload {
   public:
     static constexpr int Type = __COUNTER__;
@@ -571,10 +566,16 @@ class DelPlugin : public NumberPayload {
     DelPlugin() : NumberPayload(Type) {}
 };
 
-class EditPlugin : public NumberPayload {
+struct editplugin_t {
+    int index;
+    int x;
+    int y;
+};
+
+class EditPlugin : public DataPayload<editplugin_t> {
   public:
     static constexpr int Type = __COUNTER__;
-    EditPlugin() : NumberPayload(Type) {}
+    EditPlugin() : DataPayload<editplugin_t>(Type) {}
 };
 
 class HidePlugin : public Payload {

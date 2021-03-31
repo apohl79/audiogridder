@@ -166,12 +166,17 @@ void ScreenWorker::shutdown() {
     m_currentImageCv.notify_one();
 }
 
-void ScreenWorker::showEditor(std::shared_ptr<AGProcessor> proc) {
+void ScreenWorker::showEditor(std::shared_ptr<AGProcessor> proc, int x, int y) {
     traceScope();
-    logln("show editor for " << proc->getName());
+    logln("show editor for " << proc->getName() << " at " << x << "x" << y);
 
     if (m_visible && proc == m_currentProc) {
         logln("already showing editor");
+        runOnMsgThreadAsync([this, x, y] {
+            traceScope();
+            getApp()->moveEditor(x, y);
+            getApp()->bringEditorToFront();
+        });
         return;
     }
 
@@ -182,7 +187,7 @@ void ScreenWorker::showEditor(std::shared_ptr<AGProcessor> proc) {
             traceScope();
             getApp()->resetEditor();
         });
-        runOnMsgThreadAsync([this, proc, tid] {
+        runOnMsgThreadAsync([this, proc, tid, x, y] {
             traceScope();
             getApp()->showEditor(proc, tid, [this](const uint8_t* data, int size, int w, int h, double scale) {
                 traceScope();
@@ -200,13 +205,14 @@ void ScreenWorker::showEditor(std::shared_ptr<AGProcessor> proc) {
                 m_updated = true;
                 m_currentImageCv.notify_one();
             });
+            getApp()->moveEditor(x, y);
         });
     } else {
         runOnMsgThreadAsync([this] {
             traceScope();
             getApp()->resetEditor();
         });
-        runOnMsgThreadAsync([this, proc, tid] {
+        runOnMsgThreadAsync([this, proc, tid, x, y] {
             traceScope();
             m_currentImageLock.lock();
             m_currentImage.reset();
@@ -232,6 +238,7 @@ void ScreenWorker::showEditor(std::shared_ptr<AGProcessor> proc) {
                     m_currentImageCv.notify_one();
                 }
             });
+            getApp()->moveEditor(x, y);
         });
     }
 

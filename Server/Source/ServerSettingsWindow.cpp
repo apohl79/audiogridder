@@ -301,6 +301,15 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
                 m_screenDiffDetection.onClick();
             }
         }
+        if (m_screenCapturingMode.getSelectedId() == 4) {
+            m_localModeLbl.setAlpha(1);
+            m_localMode.setEnabled(true);
+            m_localMode.setAlpha(1);
+        } else {
+            m_localModeLbl.setAlpha(0.5);
+            m_localMode.setEnabled(false);
+            m_localMode.setAlpha(0.5);
+        }
     };
     m_screenCapturingMode.onChange();
     addChildAndSetID(&m_screenCapturingMode, "captmode");
@@ -356,6 +365,16 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_screenJpgQuality.setText(q);
     m_screenJpgQuality.setBounds(getFieldBounds(row));
     addChildAndSetID(&m_screenJpgQuality, "qual");
+
+    row++;
+
+    m_localModeLbl.setText("Local Mode:", NotificationType::dontSendNotification);
+    m_localModeLbl.setBounds(getLabelBounds(row));
+    addChildAndSetID(&m_localModeLbl, "lbl");
+
+    m_localMode.setToggleState(m_app->getServer().getScreenLocalMode(), NotificationType::dontSendNotification);
+    m_localMode.setBounds(getCheckBoxBounds(row));
+    addChildAndSetID(&m_localMode, "local");
 
     row++;
 
@@ -455,19 +474,23 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
                 appCpy->getServer().setScreenCapturingFFmpeg(true);
                 appCpy->getServer().setScreenCapturingFFmpegEncoder(ScreenRecorder::WEBP);
                 appCpy->getServer().setScreenCapturingOff(false);
+                appCpy->getServer().setScreenLocalMode(false);
                 break;
             case 2:
                 appCpy->getServer().setScreenCapturingFFmpeg(true);
                 appCpy->getServer().setScreenCapturingFFmpegEncoder(ScreenRecorder::MJPEG);
                 appCpy->getServer().setScreenCapturingOff(false);
+                appCpy->getServer().setScreenLocalMode(false);
                 break;
             case 3:
                 appCpy->getServer().setScreenCapturingFFmpeg(false);
                 appCpy->getServer().setScreenCapturingOff(false);
+                appCpy->getServer().setScreenLocalMode(false);
                 break;
             case 4:
                 appCpy->getServer().setScreenCapturingFFmpeg(false);
                 appCpy->getServer().setScreenCapturingOff(true);
+                appCpy->getServer().setScreenLocalMode(m_localMode.getToggleState());
                 break;
         }
         appCpy->getServer().setScreenCapturingFFmpegQuality(
@@ -509,5 +532,4 @@ void ServerSettingsWindow::closeButtonPressed() {
     traceScope();
     m_app->hideServerSettings();
 }
-
 }  // namespace e47

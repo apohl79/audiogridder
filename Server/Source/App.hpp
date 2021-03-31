@@ -63,6 +63,8 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     void showEditor(std::shared_ptr<AGProcessor> proc, Thread::ThreadID tid, WindowCaptureCallbackNative func);
     void showEditor(std::shared_ptr<AGProcessor> proc, Thread::ThreadID tid, WindowCaptureCallbackFFmpeg func);
     void hideEditor(Thread::ThreadID tid = nullptr);
+    void bringEditorToFront();
+    void moveEditor(int x, int y);
 
     void resetEditor();
     void restartEditor();

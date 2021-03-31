@@ -48,6 +48,7 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     std::vector<std::unique_ptr<PluginButton>> m_pluginButtons;
     PluginButton m_newPluginButton;
     ImageComponent m_pluginScreen;
+    bool m_pluginScreenEmpty = true;
     GenericEditor m_genericEditor;
     Viewport m_genericEditorView;
     ImageComponent m_srvIcon, m_settingsIcon, m_cpuIcon;
@@ -81,6 +82,32 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     void editPlugin(int idx = -1);
 
     void resetPluginScreen();
+    void setPluginScreen(const Image& img, int w, int h);
+
+    struct PositionTracker : Timer, LogTagDelegate {
+        AudioGridderAudioProcessorEditor* e;
+        int x, y;
+
+        PositionTracker(AudioGridderAudioProcessorEditor* e_)
+            : LogTagDelegate(e_), e(e_), x(e->getScreenX()), y(e->getScreenY()) {
+            logln("starting position tracker");
+            startTimer(100);
+        }
+
+        void timerCallback() override {
+            if (x != e->getScreenX() || y != e->getScreenY()) {
+                x = e->getScreenX();
+                y = e->getScreenY();
+                auto active = e->m_processor.getActivePlugin();
+                if (active > -1) {
+                    logln("updating editor position to " << x << "x" << y);
+                    e->m_processor.editPlugin(active, x + e->getWidth() + 10, y);
+                }
+            }
+        }
+    };
+
+    std::unique_ptr<PositionTracker> m_positionTracker;
 
     ENABLE_ASYNC_FUNCTORS();
 

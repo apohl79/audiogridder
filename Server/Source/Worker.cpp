@@ -308,10 +308,10 @@ void Worker::handleMessage(std::shared_ptr<Message<DelPlugin>> msg) {
 
 void Worker::handleMessage(std::shared_ptr<Message<EditPlugin>> msg) {
     traceScope();
-    auto proc = m_audio->getProcessor(pPLD(msg).getNumber());
+    auto proc = m_audio->getProcessor(pDATA(msg)->index);
     if (nullptr != proc) {
         getApp()->getServer().sandboxShowEditor();
-        m_screen->showEditor(proc);
+        m_screen->showEditor(proc, pDATA(msg)->x, pDATA(msg)->y);
         m_shouldHideEditor = true;
     }
 }

@@ -147,6 +147,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     String getServerHostAndID();
     int getServerPort();
     int getServerID();
+    bool isServerLocalMode() const { return m_srvLocalMode; }
     int getChannelsIn() const { return m_channelsIn; }
     int getChannelsOut() const { return m_channelsOut; }
     double getSampleRate() const { return m_rate; }
@@ -181,7 +182,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
 
     bool addPlugin(String id, StringArray& presets, Array<Parameter>& params, String settings, String& err);
     void delPlugin(int idx);
-    void editPlugin(int idx);
+    void editPlugin(int idx, int x, int y);
     void hidePlugin();
     MemoryBlock getPluginSettings(int idx);
     void setPluginSettings(int idx, String settings);
@@ -244,6 +245,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     int m_srvId = 0;
     float m_srvLoad = 0.0f;
     int m_srvLoadLastUpdated = 0;
+    bool m_srvLocalMode = false;
     bool m_needsReconnect = false;
     double m_rate = 0;
     bool m_doublePrecission = false;

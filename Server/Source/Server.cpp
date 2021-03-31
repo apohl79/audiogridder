@@ -112,6 +112,7 @@ void Server::loadConfig() {
         logln("screen capture difference detection " << (m_screenDiffDetection ? "enabled" : "disabled"));
     }
     m_screenJpgQuality = jsonGetValue(cfg, "ScreenQuality", m_screenJpgQuality);
+    m_screenLocalMode = jsonGetValue(cfg, "ScreenLocalMode", m_screenLocalMode);
     m_pluginexclude.clear();
     if (jsonHasValue(cfg, "ExcludePlugins")) {
         for (auto& s : cfg["ExcludePlugins"]) {
@@ -159,6 +160,7 @@ void Server::saveConfig() {
     j["ScreenCapturingFFmpegQual"] = m_screenCapturingFFmpegQuality;
     j["ScreenQuality"] = m_screenJpgQuality;
     j["ScreenDiffDetection"] = m_screenDiffDetection;
+    j["ScreenLocalMode"] = m_screenLocalMode;
     j["ExcludePlugins"] = json::array();
     for (auto& p : m_pluginexclude) {
         j["ExcludePlugins"].push_back(p.toStdString());
@@ -589,7 +591,7 @@ void Server::runServer() {
             if (nullptr != clnt) {
                 HandshakeRequest cfg;
                 int len = clnt->read(&cfg, sizeof(cfg), true);
-                if (len > 0) {
+                if (len > 0 && cfg.version >= 4) {
                     logln("new client " << clnt->getHostName());
                     logln("  version                  = " << cfg.version);
                     logln("  clientId                 = " << String::toHexString(cfg.clientId));
@@ -598,10 +600,7 @@ void Server::runServer() {
                     logln("  rate                     = " << cfg.rate);
                     logln("  samplesPerBlock          = " << cfg.samplesPerBlock);
                     logln("  doublePrecission         = " << static_cast<int>(cfg.doublePrecission));
-                    if (cfg.version >= 2) {
-                        logln(
-                            "  flags.NoPluginListFilter = " << (int)cfg.isFlag(HandshakeRequest::NO_PLUGINLIST_FILTER));
-                    }
+                    logln("  flags.NoPluginListFilter = " << (int)cfg.isFlag(HandshakeRequest::NO_PLUGINLIST_FILTER));
                 } else {
                     clnt->close();
                     delete clnt;
@@ -619,7 +618,7 @@ void Server::runServer() {
                     auto sandbox = std::make_shared<SandboxMaster>(*this, id);
                     logln("creating sandbox " << id);
                     if (sandbox->launchSlaveProcess(File::getSpecialLocation(File::currentExecutableFile),
-                                                    Defaults::SANDBOX_CMD_PREFIX)) {
+                                                    Defaults::SANDBOX_CMD_PREFIX, 30000)) {
                         sandbox->onPortReceived = [this, id, clnt](int sandboxPort) {
                             traceScope();
                             if (!sendHandshakeResponse(clnt, true, sandboxPort)) {
@@ -714,7 +713,8 @@ void Server::runSandbox() {
 
     m_sandboxSlave = std::make_unique<SandboxSlave>(*this);
 
-    if (!m_sandboxSlave->initialiseFromCommandLine(getOpt("commandLine", String()), Defaults::SANDBOX_CMD_PREFIX)) {
+    if (!m_sandboxSlave->initialiseFromCommandLine(getOpt("commandLine", String()), Defaults::SANDBOX_CMD_PREFIX,
+                                                   30000)) {
         logln("failed to initialize sandbox process");
         getApp()->prepareShutdown(App::EXIT_SANDBOX_INIT_ERROR);
         return;
@@ -780,13 +780,16 @@ bool Server::sendHandshakeResponse(StreamingSocket* sock, bool sandboxEnabled, i
     if (sandboxEnabled) {
         resp.setFlag(HandshakeResponse::SANDBOX_ENABLED);
     }
+    if (m_screenLocalMode) {
+        resp.setFlag(HandshakeResponse::LOCAL_MODE);
+    }
     resp.port = port;
     return send(sock, reinterpret_cast<const char*>(&resp), sizeof(resp));
 }
 
 void Server::handleMessageFromSandbox(SandboxMaster& sandbox, const SandboxMessage& msg) {
     if (msg.type == SandboxMessage::SHOW_EDITOR) {
-        if (m_sandboxHasScreen.isNotEmpty() && m_sandboxHasScreen != sandbox.id &&
+        if (!m_screenLocalMode && m_sandboxHasScreen.isNotEmpty() && m_sandboxHasScreen != sandbox.id &&
             m_sandboxes.contains(m_sandboxHasScreen)) {
             m_sandboxes.getReference(m_sandboxHasScreen)->send(SandboxMessage(SandboxMessage::HIDE_EDITOR, {}));
         }

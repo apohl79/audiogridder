@@ -198,7 +198,7 @@ void Client::init() {
     logln("connecting server " << host << ":" << id);
     m_cmd_socket = std::make_unique<StreamingSocket>();
     if (m_cmd_socket->connect(host, port, 1000)) {
-        HandshakeRequest cfg = {3,      0, m_channelsIn, m_channelsOut, m_rate, m_samplesPerBlock, m_doublePrecission,
+        HandshakeRequest cfg = {4,      0, m_channelsIn, m_channelsOut, m_rate, m_samplesPerBlock, m_doublePrecission,
                                 getId()};
         if (m_processor->getNoSrvPluginListFilter()) {
             cfg.setFlag(HandshakeRequest::NO_PLUGINLIST_FILTER);
@@ -217,6 +217,9 @@ void Client::init() {
             return;
         }
         m_cmd_socket->close();
+
+        m_srvLocalMode = resp.isFlag(HandshakeResponse::LOCAL_MODE);
+        logln("server local mode is " << (int)m_srvLocalMode);
 
         StreamingSocket* audioSock = nullptr;
 
@@ -448,13 +451,15 @@ void Client::delPlugin(int idx) {
     }
 }
 
-void Client::editPlugin(int idx) {
+void Client::editPlugin(int idx, int x, int y) {
     traceScope();
     if (!isReadyLockFree()) {
         return;
     };
     Message<EditPlugin> msg(this);
-    PLD(msg).setNumber(idx);
+    DATA(msg)->index = idx;
+    DATA(msg)->x = x;
+    DATA(msg)->y = y;
     LockByID lock(*this, EDITPLUGIN);
     msg.send(m_cmd_socket.get());
 }

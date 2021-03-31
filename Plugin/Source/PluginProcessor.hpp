@@ -113,7 +113,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     bool loadPlugin(const ServerPlugin& plugin, String& err);
     void unloadPlugin(int idx);
     String getLoadedPluginsString() const;
-    void editPlugin(int idx);
+    void editPlugin(int idx, int x, int y);
     void hidePlugin(bool updateServer = true);
     int getActivePlugin() const { return m_activePlugin; }
     int getLastActivePlugin() const { return m_lastActivePlugin; }

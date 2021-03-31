@@ -695,11 +695,11 @@ String AudioGridderAudioProcessor::getLoadedPluginsString() const {
     return ret;
 }
 
-void AudioGridderAudioProcessor::editPlugin(int idx) {
+void AudioGridderAudioProcessor::editPlugin(int idx, int x, int y) {
     traceScope();
-    logln("edit plugin " << idx);
+    logln("edit plugin " << idx << " x=" << x << " y=" << y);
     if (!m_genericEditor && getLoadedPlugin(idx).ok) {
-        m_client->editPlugin(idx);
+        m_client->editPlugin(idx, x, y);
     }
     m_activePlugin = idx;
 }
