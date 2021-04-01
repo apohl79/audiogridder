@@ -423,6 +423,23 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
             m.addSubMenu("Presets", presets);
             m.addSeparator();
             PopupMenu params;
+            params.addItem("Assign all", [this, idx] {
+                for (auto& p : m_processor.getLoadedPlugin(idx).params) {
+                    if (p.automationSlot == -1) {
+                        if (!m_processor.enableParamAutomation(idx, p.idx)) {
+                            break;
+                        }
+                    }
+                }
+            });
+            params.addItem("Unassign all", [this, idx] {
+                for (auto& p : m_processor.getLoadedPlugin(idx).params) {
+                    if (p.automationSlot > -1) {
+                        m_processor.disableParamAutomation(idx, p.idx);
+                    }
+                }
+            });
+            params.addSeparator();
             for (auto& p : m_processor.getLoadedPlugin(idx).params) {
                 int paramIdx = p.idx;
                 String name = p.name;

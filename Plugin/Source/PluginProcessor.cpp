@@ -809,6 +809,7 @@ bool AudioGridderAudioProcessor::enableParamAutomation(int idx, int paramIdx, in
             for (slot = 0; slot < m_numberOfAutomationSlots; slot++) {
                 pparam = dynamic_cast<Parameter*>(getParameters()[slot]);
                 if (pparam->m_idx == -1) {
+                    logln("  using slot " << slot);
                     break;
                 }
             }
