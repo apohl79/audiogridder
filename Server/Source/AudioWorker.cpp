@@ -34,8 +34,8 @@ AudioWorker::~AudioWorker() {
     count--;
 }
 
-void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channelsIn, int channelsOut, double rate,
-                       int samplesPerBlock, bool doublePrecission) {
+void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channelsIn, int channelsOut, int channelsSC, double rate,
+                       int samplesPerBlock, bool doublePrecission, bool canDiableSidechain) {
     traceScope();
     m_socket = std::move(s);
     m_rate = rate;
@@ -43,12 +43,14 @@ void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channelsIn, int c
     m_doublePrecission = doublePrecission;
     m_channelsIn = channelsIn;
     m_channelsOut = channelsOut;
-    m_chain = std::make_shared<ProcessorChain>(ProcessorChain::createBussesProperties(channelsIn == 0));
+    m_channelsSC = channelsSC;
+    m_chain = std::make_shared<ProcessorChain>(ProcessorChain::createBussesProperties(channelsIn, channelsOut, channelsSC));
     m_chain->setLogTagSource(getLogTagSource());
     if (m_doublePrecission && m_chain->supportsDoublePrecisionProcessing()) {
         m_chain->setProcessingPrecision(AudioProcessor::doublePrecision);
     }
-    m_chain->updateChannels(channelsIn, channelsOut);
+    m_chain->setCanDisableSidechain(canDiableSidechain);
+    m_chain->updateChannels(channelsIn, channelsOut, channelsSC);
 }
 
 void AudioWorker::run() {

@@ -160,15 +160,17 @@ void Client::setOnCloseCallback(OnCloseCallback fn) {
     m_onCloseCallback = fn;
 }
 
-void Client::init(int channelsIn, int channelsOut, double rate, int samplesPerBlock, bool doublePrecission) {
+void Client::init(int channelsIn, int channelsOut, int channelsSC, double rate, int samplesPerBlock, bool doublePrecission) {
     traceScope();
-    logln("init: channelsIn=" << channelsIn << " channelsOut=" << channelsOut << " rate=" << rate << " samplesPerBlock="
-                              << samplesPerBlock << " doublePrecission=" << (int)doublePrecission);
+    logln("init: channelsIn=" << channelsIn << " channelsOut=" << channelsOut << " channelsSC=" << channelsSC
+                              << " rate=" << rate << " samplesPerBlock=" << samplesPerBlock
+                              << " doublePrecission=" << (int)doublePrecission);
     LockByID lock(*this, INIT1);
     if (!m_ready || m_channelsIn != channelsIn || m_channelsOut != channelsOut || m_rate != rate ||
         m_samplesPerBlock != samplesPerBlock || m_doublePrecission != doublePrecission) {
         m_channelsIn = channelsIn;
         m_channelsOut = channelsOut;
+        m_channelsSC = channelsSC;
         m_rate = rate;
         m_samplesPerBlock = samplesPerBlock;
         m_doublePrecission = doublePrecission;
@@ -197,10 +199,13 @@ void Client::init() {
     logln("connecting server " << host << ":" << id);
     m_cmd_socket = std::make_unique<StreamingSocket>();
     if (m_cmd_socket->connect(host, port, 1000)) {
-        HandshakeRequest cfg = {4,      0, m_channelsIn, m_channelsOut, m_rate, m_samplesPerBlock, m_doublePrecission,
-                                getId()};
+        HandshakeRequest cfg = {4,      m_channelsIn,      m_channelsOut,      m_channelsSC,
+                                m_rate, m_samplesPerBlock, m_doublePrecission, getId()};
         if (m_processor->getNoSrvPluginListFilter()) {
             cfg.setFlag(HandshakeRequest::NO_PLUGINLIST_FILTER);
+        }
+        if (m_processor->getSrvCanDisableSidechain()) {
+            cfg.setFlag(HandshakeRequest::CAN_DISABLE_SIDECHAIN);
         }
 
         if (!send(m_cmd_socket.get(), reinterpret_cast<const char*>(&cfg), sizeof(cfg))) {

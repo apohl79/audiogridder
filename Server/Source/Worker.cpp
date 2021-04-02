@@ -48,9 +48,7 @@ void Worker::run() {
     runCount++;
     setLogTagExtra("client:" + String::toHexString(m_cfg.clientId));
 
-    if (m_cfg.version >= 2) {
-        m_noPluginListFilter = m_cfg.isFlag(HandshakeRequest::NO_PLUGINLIST_FILTER);
-    }
+    m_noPluginListFilter = m_cfg.isFlag(HandshakeRequest::NO_PLUGINLIST_FILTER);
 
     m_client.reset(m_masterSocket->waitForNextConnection());
     if (nullptr != m_client && m_client->isConnected()) {
@@ -65,8 +63,9 @@ void Worker::run() {
     // start audio processing
     sock.reset(m_masterSocket->waitForNextConnection());
     if (nullptr != sock && sock->isConnected()) {
-        m_audio->init(std::move(sock), m_cfg.channelsIn, m_cfg.channelsOut, m_cfg.rate, m_cfg.samplesPerBlock,
-                      m_cfg.doublePrecission);
+        m_audio->init(std::move(sock), m_cfg.channelsIn, m_cfg.channelsOut, m_cfg.channelsSC, m_cfg.rate,
+                      m_cfg.samplesPerBlock, m_cfg.doublePrecission,
+                      m_cfg.isFlag(HandshakeRequest::CAN_DISABLE_SIDECHAIN));
         m_audio->startThread(Thread::realtimeAudioPriority);
     } else {
         logln("failed to establish audio connection");

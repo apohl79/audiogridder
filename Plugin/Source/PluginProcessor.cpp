@@ -25,9 +25,10 @@ namespace e47 {
 AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     : AudioProcessor(BusesProperties()
 #if !JucePlugin_IsSynth && !JucePlugin_IsMidiEffect
-                         .withInput("Input", AudioChannelSet::stereo(), true)
+                         .withInput("Input", AudioChannelSet::discreteChannels(16), true)
+                         .withInput("Sidechain", AudioChannelSet::stereo(), true)
 #endif
-                         .withOutput("Output", AudioChannelSet::stereo(), true)) {
+                         .withOutput("Output", AudioChannelSet::discreteChannels(16), true)) {
     initAsyncFunctors();
 
     String mode;
@@ -291,8 +292,10 @@ void AudioGridderAudioProcessor::changeProgramName(int /* index */, const String
 void AudioGridderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
     traceScope();
     logln("prepareToPlay: sampleRate = " << sampleRate << ", samplesPerBlock=" << samplesPerBlock);
-    m_client->init(getTotalNumInputChannels(), getTotalNumOutputChannels(), sampleRate, samplesPerBlock,
-                   isUsingDoublePrecision());
+    int channelsIn = getMainBusNumInputChannels();
+    int channelsOut = getMainBusNumOutputChannels();
+    int channelsSC = getBusCount(true) == 2? getChannelCountOfBus(true, 1): 0;
+    m_client->init(channelsIn, channelsOut, channelsSC, sampleRate, samplesPerBlock, isUsingDoublePrecision());
     m_prepared = true;
 }
 
@@ -302,14 +305,13 @@ void AudioGridderAudioProcessor::releaseResources() {
 }
 
 bool AudioGridderAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
-    if (layouts.getMainOutputChannelSet() != AudioChannelSet::mono() &&
-        layouts.getMainOutputChannelSet() != AudioChannelSet::stereo()) {
-        return false;
-    }
 #if !JucePlugin_IsSynth && !JucePlugin_IsMidiEffect
-    if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet()) {
+    if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet() ||
+        layouts.getMainInputChannelSet().isDisabled()) {
         return false;
     }
+#else
+    ignoreUnused(layouts);
 #endif
     return true;
 }
@@ -478,6 +480,7 @@ AudioProcessorEditor* AudioGridderAudioProcessor::createEditor() { return new Au
 void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData, bool withServers) {
     json j;
     j["version"] = 2;
+    j["ServerCanDisableSidechain"] = m_serverCanDisableSidechain;
 
     if (withServers) {
         auto jservers = json::array();
@@ -526,13 +529,20 @@ void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData) {
 void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
     traceScope();
 
-    std::string dump(static_cast<const char*>(data), as<size_t>(sizeInBytes));
+    std::string dump(static_cast<const char*>(data), (size_t)sizeInBytes);
     try {
         json j = json::parse(dump);
         int version = 0;
         if (j.find("version") != j.end()) {
             version = j["version"].get<int>();
         }
+
+        if (j.find("ServerCanDisableSidechain") != j.end()) {
+            m_serverCanDisableSidechain = j["ServerCanDisableSidechain"].get<bool>();
+        } else {
+            m_serverCanDisableSidechain = true;
+        }
+
         if (j.find("servers") != j.end()) {
             m_servers.clear();
             for (auto& srv : j["servers"]) {

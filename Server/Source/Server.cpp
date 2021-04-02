@@ -593,14 +593,16 @@ void Server::runServer() {
                 int len = clnt->read(&cfg, sizeof(cfg), true);
                 if (len > 0 && cfg.version >= 4) {
                     logln("new client " << clnt->getHostName());
-                    logln("  version                  = " << cfg.version);
-                    logln("  clientId                 = " << String::toHexString(cfg.clientId));
-                    logln("  channelsIn               = " << cfg.channelsIn);
-                    logln("  channelsOut              = " << cfg.channelsOut);
-                    logln("  rate                     = " << cfg.rate);
-                    logln("  samplesPerBlock          = " << cfg.samplesPerBlock);
-                    logln("  doublePrecission         = " << static_cast<int>(cfg.doublePrecission));
-                    logln("  flags.NoPluginListFilter = " << (int)cfg.isFlag(HandshakeRequest::NO_PLUGINLIST_FILTER));
+                    logln("  version                   = " << cfg.version);
+                    logln("  clientId                  = " << String::toHexString(cfg.clientId));
+                    logln("  channelsIn                = " << cfg.channelsIn);
+                    logln("  channelsOut               = " << cfg.channelsOut);
+                    logln("  channelsSC                = " << cfg.channelsSC);
+                    logln("  rate                      = " << cfg.rate);
+                    logln("  samplesPerBlock           = " << cfg.samplesPerBlock);
+                    logln("  doublePrecission          = " << static_cast<int>(cfg.doublePrecission));
+                    logln("  flags.NoPluginListFilter  = " << (int)cfg.isFlag(HandshakeRequest::NO_PLUGINLIST_FILTER));
+                    logln("  flags.CanDisableSidechain = " << (int)cfg.isFlag(HandshakeRequest::CAN_DISABLE_SIDECHAIN));
                 } else {
                     clnt->close();
                     delete clnt;

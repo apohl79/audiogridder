@@ -159,7 +159,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
 
     bool isReady(int timeout = 1000);
     bool isReadyLockFree();
-    void init(int channelsIn, int channelsOut, double rate, int samplesPerBlock, bool doublePrecission);
+    void init(int channelsIn, int channelsOut, int channelsSC, double rate, int samplesPerBlock, bool doublePrecission);
 
     void reconnect() { m_needsReconnect = true; }
     void close();
@@ -252,6 +252,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
 
     std::atomic_int m_channelsIn{0};
     std::atomic_int m_channelsOut{0};
+    std::atomic_int m_channelsSC{0};
     std::atomic_int m_samplesPerBlock{0};
     std::atomic_int m_latency{0};
 

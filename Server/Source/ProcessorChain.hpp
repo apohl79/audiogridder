@@ -202,6 +202,9 @@ class AGProcessor : public LogTagDelegate {
         m_extraOutChannels = out;
     }
 
+    bool getNeedsDisabledSidechain() const { return m_needsDisabledSidechain; }
+    void setNeedsDisabledSidechain(bool b) { m_needsDisabledSidechain = b; }
+
   private:
     ProcessorChain& m_chain;
     String m_id;
@@ -215,6 +218,7 @@ class AGProcessor : public LogTagDelegate {
     bool m_prepared = false;
     int m_extraInChannels = 0;
     int m_extraOutChannels = 0;
+    bool m_needsDisabledSidechain = false;
     Array<Array<float>> m_bypassBufferF;
     Array<Array<double>> m_bypassBufferD;
     int m_lastKnownLatency = 0;
@@ -236,17 +240,20 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
 
     ProcessorChain(const BusesProperties& props) : AudioProcessor(props) {}
 
-    static BusesProperties createBussesProperties(bool instrument) {
+    static BusesProperties createBussesProperties(int in, int out, int sc) {
         setLogTagStatic("processorchain");
         traceScope();
-        if (instrument) {
-            return BusesProperties().withOutput("Output", AudioChannelSet::stereo(), false);
-        } else {
-            return BusesProperties()
-                .withInput("Input", AudioChannelSet::stereo(), false)
-                .withOutput("Output", AudioChannelSet::stereo(), false);
+        auto props = BusesProperties().withOutput("Output", AudioChannelSet::discreteChannels(out), false);
+        if (in > 0) {
+            props = props.withInput("Input", AudioChannelSet::discreteChannels(in), false);
         }
+        if (sc > 0) {
+            props = props.withInput("Sidechain", AudioChannelSet::discreteChannels(sc), false);
+        }
+        return props;
     }
+
+    void setCanDisableSidechain(bool b) { m_canDisableSidechain = b; }
 
     void prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock) override;
     void releaseResources() override;
@@ -257,9 +264,8 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
     bool supportsDoublePrecisionProcessing() const override;
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
 
-    bool updateChannels(int channelsIn, int channelsOut);
-    void setProcessorBusesLayout(std::shared_ptr<AudioPluginInstance> proc, int& extraInChannels,
-                                 int& extraOutChannels);
+    bool updateChannels(int channelsIn, int channelsOut, int channelsSC);
+    bool setProcessorBusesLayout(AGProcessor* proc);
     int getExtraChannels();
 
     bool acceptsMidi() const override { return false; }
@@ -274,8 +280,7 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
     void getStateInformation(juce::MemoryBlock& /* destData */) override {}
     void setStateInformation(const void* /* data */, int /* sizeInBytes */) override {}
 
-    bool initPluginInstance(std::shared_ptr<AudioPluginInstance> processor, int& extraInChannels, int& extraOutChannels,
-                            String& err);
+    bool initPluginInstance(AGProcessor* proc, String& err);
     bool addPluginProcessor(const String& id, String& err);
     void addProcessor(std::shared_ptr<AGProcessor> processor);
     size_t getSize() const { return m_processors.size(); }
@@ -283,13 +288,9 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
 
     void delProcessor(int idx);
     void exchangeProcessors(int idxA, int idxB);
-
     float getParameterValue(int idx, int paramIdx);
-
     void update();
-
     void clear();
-
     String toString();
 
   private:
@@ -300,11 +301,18 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
     std::atomic<double> m_tailSecs{0.0};
 
     int m_extraChannels = 0;
+    bool m_canDisableSidechain = false;  // If plugins refuse to load, the sidechain input can be deactivated
+                                         // to be able to accept the plugins I/O layout.
+    bool m_sidechainDisabled = false;
 
     template <typename T>
     void processBlockReal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
         traceScope();
         int latency = 0;
+        if (getBusCount(true) > 1 && m_sidechainDisabled){
+            auto sidechainBuffer = getBusBuffer(buffer, true, 1);
+            sidechainBuffer.clear();
+        }
         std::lock_guard<std::mutex> lock(m_processors_mtx);
         for (auto& proc : m_processors) {
             if (proc->processBlock(buffer, midiMessages)) {
@@ -328,7 +336,7 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
         do {
             inst->processBlock(buf, midi);
             samplesProcessed += getBlockSize();
-        } while (samplesProcessed < 8192);
+        } while (samplesProcessed < 16384);
     }
 
     void updateNoLock();

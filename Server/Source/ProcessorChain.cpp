@@ -143,11 +143,16 @@ bool AGProcessor::load(String& err) {
         }
         p = loadPlugin(m_id, m_sampleRate, m_blockSize, err);
         if (nullptr != p) {
-            if (m_chain.initPluginInstance(p, m_extraInChannels, m_extraOutChannels, err)) {
-                loaded = true;
+            {
                 std::lock_guard<std::mutex> lock(m_pluginMtx);
                 m_plugin = p;
+            }
+            if (m_chain.initPluginInstance(this, err)) {
+                loaded = true;
                 loadedCount++;
+            } else {
+                std::lock_guard<std::mutex> lock(m_pluginMtx);
+                m_plugin.reset();
             }
         }
         if (!parallelAllowed) {
@@ -355,71 +360,113 @@ bool ProcessorChain::isBusesLayoutSupported(const BusesLayout& layouts) const {
     return true;
 }
 
-bool ProcessorChain::updateChannels(int channelsIn, int channelsOut) {
+bool ProcessorChain::updateChannels(int channelsIn, int channelsOut, int channelsSC) {
     traceScope();
     AudioProcessor::BusesLayout layout;
     if (channelsIn == 1) {
         layout.inputBuses.add(AudioChannelSet::mono());
     } else if (channelsIn == 2) {
         layout.inputBuses.add(AudioChannelSet::stereo());
+    } else {
+        layout.inputBuses.add(AudioChannelSet::discreteChannels(channelsIn));
+    }
+    if (channelsSC == 1) {
+        layout.inputBuses.add(AudioChannelSet::mono());
+    } else if (channelsSC == 2) {
+        layout.inputBuses.add(AudioChannelSet::stereo());
     }
     if (channelsOut == 1) {
         layout.outputBuses.add(AudioChannelSet::mono());
     } else if (channelsOut == 2) {
         layout.outputBuses.add(AudioChannelSet::stereo());
+    } else {
+        layout.outputBuses.add(AudioChannelSet::discreteChannels(channelsOut));
     }
     setBusesLayout(layout);
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     m_extraChannels = 0;
+    m_sidechainDisabled = false;
     for (auto& proc : m_processors) {
-        auto p = proc->getPlugin();
-        if (nullptr == p) {
-            return false;
-        }
-        int extraInChannels = 0;
-        int extraOutChannels = 0;
-        setProcessorBusesLayout(p, extraInChannels, extraOutChannels);
-        proc->setExtraChannels(extraInChannels, extraOutChannels);
+        setProcessorBusesLayout(proc.get());
     }
     return true;
 }
 
-void ProcessorChain::setProcessorBusesLayout(std::shared_ptr<AudioPluginInstance> proc, int& extraInChannels,
-                                             int& extraOutChannels) {
+bool ProcessorChain::setProcessorBusesLayout(AGProcessor* proc) {
     traceScope();
 
-    auto layout = getBusesLayout();
+    auto plugin = proc->getPlugin();
+    if (nullptr == plugin) {
+        return false;
+    }
 
-    bool supported = proc->checkBusesLayoutSupported(layout) && proc->setBusesLayout(layout);
+    auto layout = getBusesLayout();
+    bool hasSidechain = layout.inputBuses.size() > 1;
+
+    bool supported = plugin->checkBusesLayoutSupported(layout) && plugin->setBusesLayout(layout);
 
     if (!supported) {
         logln("standard layout not supported:");
         printBusesLayout(layout);
 
-        // keep the processor's layout and calculate the neede extra channels
-        auto procLayout = proc->getBusesLayout();
-
-        logln("processor layout:");
-        printBusesLayout(procLayout);
-
-        // main bus IN
-        extraInChannels = procLayout.getMainInputChannels() - layout.getMainInputChannels();
-        // check extra busses IN
-        for (int busIdx = 1; busIdx < procLayout.inputBuses.size(); busIdx++) {
-            extraInChannels += procLayout.inputBuses[busIdx].size();
+        // try with mono or without sidechain
+        if (hasSidechain) {
+            if (layout.getChannelSet(true, 1).size() > 1) {
+                logln("trying with mono sidechain bus");
+                auto layoutMonoSC = layout;
+                layoutMonoSC.inputBuses.remove(1);
+                layoutMonoSC.inputBuses.add(AudioChannelSet::mono());
+                supported = plugin->checkBusesLayoutSupported(layoutMonoSC) && plugin->setBusesLayout(layoutMonoSC);
+            }
+            if (!supported) {
+                logln("trying without sidechain bus");
+                auto layoutNoSC = layout;
+                layoutNoSC.inputBuses.remove(1);
+                supported = plugin->checkBusesLayoutSupported(layoutNoSC) && plugin->setBusesLayout(layoutNoSC);
+            }
         }
-        // main bus OUT
-        extraOutChannels = procLayout.getMainOutputChannels() - layout.getMainOutputChannels();
-        // check extra busses OUT
-        for (int busIdx = 1; busIdx < procLayout.outputBuses.size(); busIdx++) {
-            extraOutChannels += procLayout.outputBuses[busIdx].size();
+        if (!supported && (!hasSidechain || m_canDisableSidechain)) {
+            if (hasSidechain) {
+                logln("disabling sidechain input to use the plugins I/O layout");
+                m_sidechainDisabled = true;
+                proc->setNeedsDisabledSidechain(true);
+            }
+
+            // keep the processor's layout and calculate the neede extra channels
+            auto procLayout = plugin->getBusesLayout();
+
+            logln("processor layout:");
+            printBusesLayout(procLayout);
+
+            // main bus IN
+            int extraInChannels = procLayout.getMainInputChannels() - layout.getMainInputChannels();
+            // check extra busses IN
+            for (int busIdx = 1; busIdx < procLayout.inputBuses.size(); busIdx++) {
+                extraInChannels += procLayout.inputBuses[busIdx].size();
+            }
+            // main bus OUT
+            int extraOutChannels = procLayout.getMainOutputChannels() - layout.getMainOutputChannels();
+            // check extra busses OUT
+            for (int busIdx = 1; busIdx < procLayout.outputBuses.size(); busIdx++) {
+                extraOutChannels += procLayout.outputBuses[busIdx].size();
+            }
+
+            proc->setExtraChannels(extraInChannels, extraOutChannels);
+
+            m_extraChannels = jmax(m_extraChannels, extraInChannels, extraOutChannels);
+
+            logln(extraInChannels << " extra input(s), " << extraOutChannels << " extra output(s) -> "
+                                  << m_extraChannels << " extra channel(s) in total");
+
+            supported = true;
         }
-
-        m_extraChannels = jmax(m_extraChannels, extraInChannels, extraOutChannels);
-
-        logln(extraInChannels << " extra input(s), " << extraOutChannels << " extra output(s) -> " << m_extraChannels
-                              << " extra channel(s) in total");
     }
+
+    if (!supported) {
+        logln("no working layout found");
+    }
+
+    return supported;
 }
 
 int ProcessorChain::getExtraChannels() {
@@ -428,10 +475,13 @@ int ProcessorChain::getExtraChannels() {
     return m_extraChannels;
 }
 
-bool ProcessorChain::initPluginInstance(std::shared_ptr<AudioPluginInstance> inst, int& extraInChannels,
-                                        int& extraOutChannels, String& /*err*/) {
+bool ProcessorChain::initPluginInstance(AGProcessor* proc, String& err) {
     traceScope();
-    setProcessorBusesLayout(inst, extraInChannels, extraOutChannels);
+    if (!setProcessorBusesLayout(proc)) {
+        err = "failed to find working I/O configuration";
+        return false;
+    }
+    auto inst = proc->getPlugin();
     AudioProcessor::ProcessingPrecision prec = AudioProcessor::singlePrecision;
     if (isUsingDoublePrecision() && supportsDoublePrecisionProcessing()) {
         if (inst->supportsDoublePrecisionProcessing()) {
@@ -492,6 +542,7 @@ void ProcessorChain::updateNoLock() {
     int latency = 0;
     bool supportsDouble = true;
     m_extraChannels = 0;
+    m_sidechainDisabled = false;
     for (auto& proc : m_processors) {
         auto p = proc->getPlugin();
         if (nullptr != p) {
@@ -500,6 +551,7 @@ void ProcessorChain::updateNoLock() {
                 supportsDouble = false;
             }
             m_extraChannels = jmax(m_extraChannels, proc->getExtraInChannels(), proc->getExtraOutChannels());
+            m_sidechainDisabled = m_sidechainDisabled || proc->getNeedsDisabledSidechain();
         }
     }
     if (latency != getLatencySamples()) {

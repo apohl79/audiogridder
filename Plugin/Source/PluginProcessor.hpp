@@ -143,6 +143,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     void setConfirmDelete(bool b) { m_confirmDelete = b; }
     bool getNoSrvPluginListFilter() const { return m_noSrvPluginListFilter; }
     void setNoSrvPluginListFilter(bool b) { m_noSrvPluginListFilter = b; }
+    bool getSrvCanDisableSidechain() const { return m_serverCanDisableSidechain; }
     float getScaleFactor() const { return m_scale; }
     void setScaleFactor(float f) { m_scale = f; }
     Array<ServerPlugin> getRecents();
@@ -270,6 +271,12 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     std::mutex m_trackPropertiesMtx;
 
     SyncRemoteMode m_syncRemote = SYNC_WITH_EDITOR;
+
+    // Stay backward compatible: Previously we allocated extra channels for plugins that wanted it, to make them load.
+    // Now with sidechain support, we might mess up the input channels, like having a stereo plugin process the
+    // sidechain signal on a mono channel. With sidechains we can't do this anymore, but we can't break old sessions
+    // either. So for old sessions, we will allow the server deactivate the sidechain.
+    bool m_serverCanDisableSidechain = false;
 
     ENABLE_ASYNC_FUNCTORS();
 

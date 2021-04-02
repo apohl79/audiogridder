@@ -85,9 +85,9 @@ bool read(StreamingSocket* socket, void* data, int size, int timeoutMilliseconds
  */
 struct HandshakeRequest {
     int version;
-    int unused;
     int channelsIn;
     int channelsOut;
+    int channelsSC;
     double rate;
     int samplesPerBlock;
     bool doublePrecission;
@@ -98,7 +98,7 @@ struct HandshakeRequest {
     uint32 unused3;
     uint32 unused4;
 
-    enum FLAGS : uint8 { NO_PLUGINLIST_FILTER = 1 };
+    enum FLAGS : uint8 { NO_PLUGINLIST_FILTER = 1, CAN_DISABLE_SIDECHAIN = 2 };
     void setFlag(uint8 f) { flags |= f; }
     bool isFlag(uint8 f) { return (flags & f) == f; }
 
@@ -107,6 +107,7 @@ struct HandshakeRequest {
         j["version"] = version;
         j["channelsIn"] = channelsIn;
         j["channelsOut"] = channelsOut;
+        j["channelsSC"] = channelsSC;
         j["rate"] = rate;
         j["samplesPerBlock"] = samplesPerBlock;
         j["doublePrecission"] = doublePrecission;
@@ -119,6 +120,7 @@ struct HandshakeRequest {
         version = j["version"].get<int>();
         channelsIn = j["channelsIn"].get<int>();
         channelsOut = j["channelsOut"].get<int>();
+        channelsSC = j["channelsSC"].get<int>();
         rate = j["rate"].get<double>();
         samplesPerBlock = j["samplesPerBlock"].get<int>();
         doublePrecission = j["doublePrecission"].get<bool>();

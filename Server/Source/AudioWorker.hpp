@@ -34,8 +34,8 @@ class AudioWorker : public Thread, public LogTagDelegate {
     AudioWorker(LogTag* tag);
     virtual ~AudioWorker() override;
 
-    void init(std::unique_ptr<StreamingSocket> s, int channelsIn, int channelsOut, double rate, int samplesPerBlock,
-              bool doublePrecission);
+    void init(std::unique_ptr<StreamingSocket> s, int channelsIn, int channelsOut, int channelsSC, double rate,
+              int samplesPerBlock, bool doublePrecission, bool canDisableSidechain);
 
     void run() override;
     void shutdown();
@@ -67,6 +67,7 @@ class AudioWorker : public Thread, public LogTagDelegate {
     std::unique_ptr<StreamingSocket> m_socket;
     int m_channelsIn;
     int m_channelsOut;
+    int m_channelsSC;
     double m_rate;
     int m_samplesPerBlock;
     bool m_doublePrecission;
