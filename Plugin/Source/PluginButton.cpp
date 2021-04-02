@@ -6,7 +6,6 @@
  */
 
 #include "PluginButton.hpp"
-#include "NumberConversion.hpp"
 
 using namespace e47;
 
@@ -31,9 +30,8 @@ void PluginButton::paintButton(Graphics& g, bool shouldDrawButtonAsHighlighted, 
     if (m_active) {
         g.setColour(findColour(ComboBox::outlineColourId).withMultipliedAlpha(0.9f));
         float dashs[] = {4.0, 2.0};
-        g.drawDashedLine(Line<float>(0.0f, 0.0f, as<float>(getWidth()), 0.0f), dashs, 2);
-        g.drawDashedLine(Line<float>(0.0f, as<float>(getHeight()), as<float>(getWidth()), as<float>(getHeight())),
-                         dashs, 2);
+        g.drawDashedLine(Line<float>(0.0f, 0.0f, (float)getWidth(), 0.0f), dashs, 2);
+        g.drawDashedLine(Line<float>(0.0f, (float)getHeight(), (float)getWidth(), (float)getHeight()), dashs, 2);
     }
 
     int textIndentLeft = 0;
@@ -65,8 +63,8 @@ void PluginButton::paintButton(Graphics& g, bool shouldDrawButtonAsHighlighted, 
         g.setColour(baseColour);
         g.fillRect(m_bypassArea.getCentreX() - 2, m_bypassArea.getY() - 2, 4, 4);
         g.setColour(fgColor);
-        g.drawLine(as<float>(m_bypassArea.getCentreX()), as<float>(m_bypassArea.getY() - 1),
-                   as<float>(m_bypassArea.getCentreX()), as<float>(m_bypassArea.getY() + 5), 0.7f);
+        g.drawLine((float)m_bypassArea.getCentreX(), (float)m_bypassArea.getY() - 1, (float)m_bypassArea.getCentreX(),
+                   (float)m_bypassArea.getY() + 5, 0.7f);
 
         Rectangle<float> rect;
 #if !JucePlugin_IsSynth

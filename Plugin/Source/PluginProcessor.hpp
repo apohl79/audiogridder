@@ -11,7 +11,6 @@
 #include <set>
 
 #include "Client.hpp"
-#include "NumberConversion.hpp"
 #include "Utils.hpp"
 #include "json.hpp"
 
@@ -44,7 +43,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     bool hasEditor() const override;
 
     const String getName() const override;
-    StringArray getAlternateDisplayNames() const override { return {"AuGrid", "AuGr", "AG"}; }
+    StringArray getAlternateDisplayNames() const override { return {"AGrid", "AG"}; }
 
     bool acceptsMidi() const override;
     bool producesMidi() const override;
@@ -159,7 +158,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     void setCPULoad(float load);
 
     int getLatencyMillis() const {
-        return as<int>(lround(m_client->NUM_OF_BUFFERS * getBlockSize() * 1000 / getSampleRate()));
+        return (int)lround(m_client->NUM_OF_BUFFERS * getBlockSize() * 1000 / getSampleRate());
     }
 
     void showMonitor() { m_tray->showMonitor(); }

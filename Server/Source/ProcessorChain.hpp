@@ -333,7 +333,7 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
 
     void updateNoLock();
 
-    void printBusesLayout(const AudioProcessor::BusesLayout& l) {
+    void printBusesLayout(const AudioProcessor::BusesLayout& l) const {
         logln("input buses: " << l.inputBuses.size());
         for (int i = 0; i < l.inputBuses.size(); i++) {
             logln("  [" << i << "] " << l.inputBuses[i].size() << " channel(s)");

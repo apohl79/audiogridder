@@ -15,7 +15,6 @@ using json = nlohmann::json;
 #if defined(AG_PLUGIN) || defined(AG_SERVER)
 
 #include "KeyAndMouseCommon.hpp"
-#include "NumberConversion.hpp"
 #include "Utils.hpp"
 #include "Metrics.hpp"
 
@@ -197,7 +196,7 @@ class AudioMessage : public LogTagDelegate {
             }
             for (int chan = 0; chan < m_reqHeader.channels; ++chan) {
                 if (!send(socket, reinterpret_cast<const char*>(buffer.getReadPointer(chan)),
-                          m_reqHeader.samples * as<int>(sizeof(T)), e, &metric)) {
+                          m_reqHeader.samples * (int)sizeof(T), e, &metric)) {
                     return false;
                 }
             }
@@ -233,7 +232,7 @@ class AudioMessage : public LogTagDelegate {
             }
             for (int chan = 0; chan < m_resHeader.channels; ++chan) {
                 if (!send(socket, reinterpret_cast<const char*>(buffer.getReadPointer(chan)),
-                          m_resHeader.samples * as<int>(sizeof(T)), e, &metric)) {
+                          m_resHeader.samples * (int)sizeof(T), e, &metric)) {
                     return false;
                 }
             }
@@ -269,8 +268,8 @@ class AudioMessage : public LogTagDelegate {
                 MessageHelper::seterr(e, MessageHelper::E_SIZE, "buffer has not enough samples");
                 return false;
             }
-            for (int chan = 0; chan < buffer.getNumChannels(); ++chan) {
-                if (!read(socket, buffer.getWritePointer(chan), buffer.getNumSamples() * as<int>(sizeof(T)), 1000, e,
+            for (int chan = 0; chan < m_resHeader.channels; ++chan) {
+                if (!read(socket, buffer.getWritePointer(chan), m_resHeader.samples * (int)sizeof(T), 1000, e,
                           &metric)) {
                     MessageHelper::seterrstr(e, "audio data");
                     return false;
@@ -284,7 +283,7 @@ class AudioMessage : public LogTagDelegate {
                     MessageHelper::seterrstr(e, "midi header");
                     return false;
                 }
-                auto size = as<size_t>(midiHdr.size);
+                auto size = (size_t)midiHdr.size;
                 if (midiData.size() < size) {
                     midiData.resize(size);
                 }
@@ -312,7 +311,7 @@ class AudioMessage : public LogTagDelegate {
             buffer.clear(chan, 0, totalSamples);
         }
         // bytes to read
-        return m_reqHeader.samples * as<int>(sizeof(T));
+        return m_reqHeader.samples * (int)sizeof(T);
     }
 
     bool readFromClient(StreamingSocket* socket, AudioBuffer<float>& bufferF, AudioBuffer<double>& bufferD,
@@ -398,9 +397,9 @@ class Payload : public LogTagDelegate {
 
     int getType() const { return payloadType; }
     void setType(int t) { payloadType = t; }
-    int getSize() const { return as<int>(payloadBuffer.size()); }
+    int getSize() const { return (int)payloadBuffer.size(); }
     void setSize(int size) {
-        payloadBuffer.resize(as<size_t>(size));
+        payloadBuffer.resize((size_t)size);
         realign();
     }
     char* getData() { return reinterpret_cast<char*>(payloadBuffer.data()); }
@@ -442,9 +441,9 @@ class StringPayload : public Payload {
     StringPayload(int type) : Payload(type, sizeof(int)) { realign(); }
 
     void setString(const String& s) {
-        setSize(as<int>(sizeof(int)) + s.length());
+        setSize((int)sizeof(int) + s.length());
         *size = s.length();
-        memcpy(str, s.getCharPointer(), as<size_t>(s.length()));
+        memcpy(str, s.getCharPointer(), (size_t)s.length());
     }
 
     String getString() const {
@@ -456,8 +455,7 @@ class StringPayload : public Payload {
 
     virtual void realign() override {
         size = reinterpret_cast<int*>(payloadBuffer.data());
-        str =
-            as<size_t>(getSize()) > sizeof(int) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(int) : nullptr;
+        str = (size_t)getSize() > sizeof(int) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(int) : nullptr;
     }
 };
 
@@ -469,15 +467,14 @@ class BinaryPayload : public Payload {
     BinaryPayload(int type) : Payload(type, sizeof(int)) { realign(); }
 
     void setData(const char* src, int len) {
-        setSize(as<int>(sizeof(int)) + len);
+        setSize((int)sizeof(int) + len);
         *size = len;
         memcpy(data, src, static_cast<size_t>(len));
     }
 
     virtual void realign() override {
         size = reinterpret_cast<int*>(payloadBuffer.data());
-        data =
-            as<size_t>(getSize()) > sizeof(int) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(int) : nullptr;
+        data = (size_t)getSize() > sizeof(int) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(int) : nullptr;
     }
 };
 
@@ -535,16 +532,16 @@ class Result : public Payload {
         setSize(static_cast<int>(sizeof(hdr_t)) + s.length());
         hdr->rc = rc;
         hdr->size = s.length();
-        memcpy(str, s.getCharPointer(), as<size_t>(s.length()));
+        memcpy(str, s.getCharPointer(), (size_t)s.length());
     }
 
     int getReturnCode() const { return hdr->rc; }
-    String getString() const { return String(str, as<size_t>(hdr->size)); }
+    String getString() const { return String(str, (size_t)hdr->size); }
 
     virtual void realign() override {
         hdr = reinterpret_cast<hdr_t*>(payloadBuffer.data());
-        str = as<size_t>(getSize()) > sizeof(hdr_t) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(hdr_t)
-                                                    : nullptr;
+        str =
+            (size_t)getSize() > sizeof(hdr_t) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(hdr_t) : nullptr;
     }
 };
 
@@ -600,7 +597,7 @@ class ScreenCapture : public Payload {
     ScreenCapture() : Payload(Type) { realign(); }
 
     void setImage(int width, int height, double scale, const void* p, size_t size) {
-        setSize(as<int>(sizeof(hdr_t) + size));
+        setSize((int)(sizeof(hdr_t) + size));
         hdr->width = width;
         hdr->height = height;
         hdr->scale = scale;
@@ -612,8 +609,8 @@ class ScreenCapture : public Payload {
 
     virtual void realign() override {
         hdr = reinterpret_cast<hdr_t*>(payloadBuffer.data());
-        data = as<size_t>(getSize()) > sizeof(hdr_t) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(hdr_t)
-                                                     : nullptr;
+        data =
+            (size_t)getSize() > sizeof(hdr_t) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(hdr_t) : nullptr;
     }
 };
 
@@ -660,7 +657,7 @@ class Key : public BinaryPayload {
     Key() : BinaryPayload(Type) {}
 
     const uint16_t* getKeyCodes() const { return reinterpret_cast<const uint16_t*>(data); }
-    int getKeyCount() const { return *size / as<int>(sizeof(uint16_t)); }
+    int getKeyCount() const { return *size / (int)sizeof(uint16_t); }
 };
 
 class BypassPlugin : public NumberPayload {

@@ -22,8 +22,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
           LogTagDelegate(clnt),
           m_client(clnt),
           m_socket(std::unique_ptr<StreamingSocket>(sock)),
-          m_writeQ(as<size_t>(clnt->NUM_OF_BUFFERS * 2)),
-          m_readQ(as<size_t>(clnt->NUM_OF_BUFFERS * 2)),
+          m_writeQ((size_t)clnt->NUM_OF_BUFFERS * 2),
+          m_readQ((size_t)clnt->NUM_OF_BUFFERS * 2),
           m_durationGlobal(TimeStatistic::getDuration("audio")),
           m_durationLocal(TimeStatistic::getDuration(String("audio.") + String(getId()), false)) {
         traceScope();
@@ -282,7 +282,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
 
     bool waitRead() {
         traceScope();
-        if (m_client->NUM_OF_BUFFERS > 1 && m_readQ.read_available() < as<size_t>(m_client->NUM_OF_BUFFERS / 2) &&
+        if (m_client->NUM_OF_BUFFERS > 1 && m_readQ.read_available() < (size_t)(m_client->NUM_OF_BUFFERS / 2) &&
             m_readQ.read_available() > 0) {
             logln("warning: " << getInstanceString() << ": input buffer below 50% (" << m_readQ.read_available() << "/"
                               << m_client->NUM_OF_BUFFERS << ")");

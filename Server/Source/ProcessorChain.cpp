@@ -6,7 +6,6 @@
  */
 
 #include "ProcessorChain.hpp"
-#include "NumberConversion.hpp"
 #include "App.hpp"
 
 namespace e47 {
@@ -522,8 +521,8 @@ void ProcessorChain::updateNoLock() {
 std::shared_ptr<AGProcessor> ProcessorChain::getProcessor(int index) {
     traceScope();
     std::lock_guard<std::mutex> lock(m_processors_mtx);
-    if (index > -1 && as<size_t>(index) < m_processors.size()) {
-        return m_processors[as<size_t>(index)];
+    if (index > -1 && (size_t)index < m_processors.size()) {
+        return m_processors[(size_t)index];
     }
     return nullptr;
 }
@@ -531,16 +530,16 @@ std::shared_ptr<AGProcessor> ProcessorChain::getProcessor(int index) {
 void ProcessorChain::exchangeProcessors(int idxA, int idxB) {
     traceScope();
     std::lock_guard<std::mutex> lock(m_processors_mtx);
-    if (idxA > -1 && as<size_t>(idxA) < m_processors.size() && idxB > -1 && as<size_t>(idxB) < m_processors.size()) {
-        std::swap(m_processors[as<size_t>(idxA)], m_processors[as<size_t>(idxB)]);
+    if (idxA > -1 && (size_t)idxA < m_processors.size() && idxB > -1 && (size_t)idxB < m_processors.size()) {
+        std::swap(m_processors[(size_t)idxA], m_processors[(size_t)idxB]);
     }
 }
 
 float ProcessorChain::getParameterValue(int idx, int paramIdx) {
     traceScope();
     std::lock_guard<std::mutex> lock(m_processors_mtx);
-    if (idx > -1 && as<size_t>(idx) < m_processors.size()) {
-        auto p = m_processors[as<size_t>(idx)]->getPlugin();
+    if (idx > -1 && (size_t)idx < m_processors.size()) {
+        auto p = m_processors[(size_t)idx]->getPlugin();
         if (nullptr != p) {
             for (auto& param : p->getParameters()) {
                 if (paramIdx == param->getParameterIndex()) {

@@ -8,7 +8,6 @@
 #include "Worker.hpp"
 #include "KeyAndMouse.hpp"
 #include "Defaults.hpp"
-#include "NumberConversion.hpp"
 #include "App.hpp"
 #include "CPUInfo.hpp"
 
@@ -292,7 +291,7 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     }
     if (*msgSettings.payload.size > 0) {
         MemoryBlock block;
-        block.append(msgSettings.payload.data, as<size_t>(*msgSettings.payload.size));
+        block.append(msgSettings.payload.data, (size_t)*msgSettings.payload.size);
         proc->setStateInformation(block.getData(), static_cast<int>(block.getSize()));
     }
     logln("...ok");
@@ -399,7 +398,7 @@ void Worker::handleMessage(std::shared_ptr<Message<SetPluginSettings>> msg) {
         }
         if (*msgSettings.payload.size > 0) {
             MemoryBlock block;
-            block.append(msgSettings.payload.data, as<size_t>(*msgSettings.payload.size));
+            block.append(msgSettings.payload.data, (size_t)*msgSettings.payload.size);
             proc->setStateInformation(block.getData(), static_cast<int>(block.getSize()));
         }
     }

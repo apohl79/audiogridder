@@ -159,7 +159,7 @@ void App::initialise(const String& commandLineParameters) {
                             logln("restarting server");
                             continue;
                         } else if (ec != 0) {
-                            logln("error: server failed with exit code " << as<int>(ec));
+                            logln("error: server failed with exit code " << (int)ec);
                         }
                         File serverRunFile(Defaults::getConfigFileName(Defaults::ConfigServerRun));
                         if (serverRunFile.exists()) {

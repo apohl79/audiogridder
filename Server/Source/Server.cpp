@@ -432,7 +432,7 @@ void Server::scanNextPlugin(const String& id, const String& fmt) {
             } else {
                 auto ec = proc.getExitCode();
                 if (ec != 0) {
-                    logln("error: scan failed with exit code " << as<int>(ec));
+                    logln("error: scan failed with exit code " << (int)ec);
                 }
             }
         } while (!finished);

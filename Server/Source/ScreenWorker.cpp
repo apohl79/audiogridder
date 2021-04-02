@@ -101,7 +101,7 @@ void ScreenWorker::runNative() {
             float brightness = mostlyWhite / 2;
 
             // Calculate the difference between the current and the last image
-            auto diffPxCount = as<uint64_t>(m_width * m_height);
+            auto diffPxCount = (uint64_t)(m_width * m_height);
             if (!forceFullImg && m_lastImage != nullptr && m_currentImage->getBounds() == m_lastImage->getBounds() &&
                 m_diffImage != nullptr) {
                 brightness = 0;

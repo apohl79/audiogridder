@@ -9,7 +9,6 @@
 #include "Images.hpp"
 #include "NewServerWindow.hpp"
 #include "PluginProcessor.hpp"
-#include "NumberConversion.hpp"
 #include "Version.hpp"
 #include "PluginSearchWindow.hpp"
 
@@ -337,15 +336,15 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
             traceScope();
             if (idx > 0) {
                 m_processor.exchangePlugins(idx, idx - 1);
-                std::swap(m_pluginButtons[as<size_t>(idx)], m_pluginButtons[as<size_t>(idx) - 1]);
+                std::swap(m_pluginButtons[(size_t)idx], m_pluginButtons[(size_t)idx - 1]);
                 resized();
             }
         };
         auto moveDownFn = [this, idx] {
             traceScope();
-            if (as<size_t>(idx) < m_pluginButtons.size() - 1) {
+            if ((size_t)(idx) < m_pluginButtons.size() - 1) {
                 m_processor.exchangePlugins(idx, idx + 1);
-                std::swap(m_pluginButtons[as<size_t>(idx)], m_pluginButtons[as<size_t>(idx) + 1]);
+                std::swap(m_pluginButtons[(size_t)idx], m_pluginButtons[(size_t)idx + 1]);
                 resized();
             }
         };
@@ -623,7 +622,7 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
         PopupMenu m;
         m.addSectionHeader("Buffering");
         PopupMenu bufMenu;
-        int rate = as<int>(lround(m_processor.getSampleRate()));
+        int rate = (int)lround(m_processor.getSampleRate());
         int iobuf = m_processor.getBlockSize();
         auto getName = [rate, iobuf](int blocks) -> String {
             String n;
@@ -767,7 +766,7 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
         m.addSeparator();
         m.addItem("Add", [this] {
             traceScope();
-            auto w = new NewServerWindow(as<float>(getScreenX() + 2), as<float>(getScreenY() + 30));
+            auto w = new NewServerWindow((float)(getScreenX() + 2), (float)(getScreenY() + 30));
             w->onOk([this](String server) {
                 traceScope();
                 m_processor.addServer(server);

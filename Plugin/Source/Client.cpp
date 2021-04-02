@@ -8,7 +8,6 @@
 #include "Client.hpp"
 #include <memory>
 #include "PluginProcessor.hpp"
-#include "NumberConversion.hpp"
 #include "ServiceReceiver.hpp"
 #include "AudioStreamer.hpp"
 
@@ -164,7 +163,7 @@ void Client::setOnCloseCallback(OnCloseCallback fn) {
 void Client::init(int channelsIn, int channelsOut, double rate, int samplesPerBlock, bool doublePrecission) {
     traceScope();
     logln("init: channelsIn=" << channelsIn << " channelsOut=" << channelsOut << " rate=" << rate << " samplesPerBlock="
-                              << samplesPerBlock << " doublePrecission=" << as<int>(doublePrecission));
+                              << samplesPerBlock << " doublePrecission=" << (int)doublePrecission);
     LockByID lock(*this, INIT1);
     if (!m_ready || m_channelsIn != channelsIn || m_channelsOut != channelsOut || m_rate != rate ||
         m_samplesPerBlock != samplesPerBlock || m_doublePrecission != doublePrecission) {
@@ -490,7 +489,7 @@ MemoryBlock Client::getPluginSettings(int idx) {
         MessageHelper::Error err;
         if (res.read(m_cmd_socket.get(), &err, 5000)) {
             if (*res.payload.size > 0) {
-                block.append(res.payload.data, as<size_t>(*res.payload.size));
+                block.append(res.payload.data, (size_t)*res.payload.size);
             }
         } else {
             logln(getLoadedPluginsString() << ": failed to read PluginSettings message: " << err.toString());
@@ -566,7 +565,7 @@ Array<ServerPlugin> Client::getRecents() {
     LockByID lock(*this, GETRECENTS);
     msg.send(m_cmd_socket.get());
     if (msg.read(m_cmd_socket.get(), &err, 5000)) {
-        String listChunk(PLD(msg).str, as<size_t>(*PLD(msg).size));
+        String listChunk(PLD(msg).str, (size_t)*PLD(msg).size);
         auto list = StringArray::fromLines(listChunk);
         for (auto& line : list) {
             if (!line.isEmpty()) {
@@ -905,7 +904,7 @@ void Client::updatePluginList(bool sendRequest) {
         logln("failed reading plugin list: " << err.toString());
         return;
     }
-    String listChunk(PLD(msg).str, as<size_t>(*PLD(msg).size));
+    String listChunk(PLD(msg).str, (size_t)*PLD(msg).size);
     auto list = StringArray::fromLines(listChunk);
     for (auto& line : list) {
         if (!line.isEmpty()) {
