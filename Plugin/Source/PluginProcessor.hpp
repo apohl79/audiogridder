@@ -89,6 +89,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
         StringArray presets;
         Array<Client::Parameter> params;
         bool bypassed = false;
+        bool hasEditor = true;
         bool ok = false;
     };
 

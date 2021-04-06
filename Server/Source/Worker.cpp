@@ -209,18 +209,23 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     String err;
     bool success = m_audio->addPlugin(id, err);
     logln("..." << (success ? "ok" : "failed"));
-    if (!success) {
-        m_msgFactory.sendResult(m_client.get(), -1, err);
-        return;
+    std::shared_ptr<AudioPluginInstance> proc;
+    json jresult;
+    jresult["success"] = success;
+    jresult["err"] = err.toStdString();
+    if (success) {
+        proc = m_audio->getProcessor(m_audio->getSize() - 1)->getPlugin();
+        jresult["latency"] = m_audio->getLatencySamples();
+        jresult["hasEditor"] = proc->hasEditor();
     }
-    // send new updated latency samples back
-    if (!m_msgFactory.sendResult(m_client.get(), m_audio->getLatencySamples())) {
+    Message<AddPluginResult> msgResult(this);
+    PLD(msgResult).setJson(jresult);
+    if (!msgResult.send(m_client.get())) {
         logln("failed to send result");
         m_client->close();
         return;
     }
     logln("sending presets...");
-    auto proc = m_audio->getProcessor(m_audio->getSize() - 1)->getPlugin();
     String presets;
     bool first = true;
     for (int i = 0; i < proc->getNumPrograms(); i++) {
@@ -231,7 +236,7 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
         }
         presets << proc->getProgramName(i);
     }
-    Message<Presets> msgPresets;
+    Message<Presets> msgPresets(this);
     msgPresets.payload.setString(presets);
     if (!msgPresets.send(m_client.get())) {
         logln("failed to send Presets message");
@@ -273,7 +278,7 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
         jparams.push_back(jparam);
     }
     Message<Parameters> msgParams(this);
-    msgParams.payload.setJson(jparams);
+    PLD(msgParams).setJson(jparams);
     if (!msgParams.send(m_client.get())) {
         logln("failed to send Parameters message");
         m_client->close();

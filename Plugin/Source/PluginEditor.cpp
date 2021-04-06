@@ -225,8 +225,9 @@ void AudioGridderAudioProcessorEditor::resized() {
     int windowHeight = jmax(100, top);
     int leftBarWidth = 200;
     int windowWidth = leftBarWidth;
+
     if (m_processor.getActivePlugin() > -1) {
-        if (!m_processor.getGenericEditor() && !m_pluginScreenEmpty) {
+        if (!genericEditorEnabled() && !m_pluginScreenEmpty) {
             m_stMinus.setVisible(true);
             m_stPlus.setVisible(true);
             m_stFullscreen.setVisible(true);
@@ -244,7 +245,7 @@ void AudioGridderAudioProcessorEditor::resized() {
         m_stA.setVisible(false);
         m_stB.setVisible(false);
     }
-    if (m_processor.getGenericEditor() && m_processor.getActivePlugin() > -1) {
+    if (genericEditorEnabled() && m_processor.getActivePlugin() > -1) {
         m_genericEditorView.setVisible(true);
         m_pluginScreen.setVisible(false);
         int screenHeight = m_genericEditor.getHeight() + SCREENTOOLS_HEIGHT;
@@ -853,6 +854,7 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
             traceScope();
             m_processor.setGenericEditor(!m_processor.getGenericEditor());
             m_processor.saveConfig();
+            resized();
             editPlugin();
         });
 
@@ -997,7 +999,7 @@ void AudioGridderAudioProcessorEditor::editPlugin(int idx) {
     m_stA.setVisible(true);
     m_stB.setVisible(true);
     m_processor.editPlugin(idx, getScreenX() + getWidth() + 10, getScreenY());
-    if (m_processor.getGenericEditor()) {
+    if (genericEditorEnabled()) {
         m_processor.getClient().setPluginScreenUpdateCallback(nullptr);
         resetPluginScreen();
         m_genericEditor.resized();
@@ -1096,6 +1098,17 @@ void AudioGridderAudioProcessorEditor::setPluginScreen(const Image& img, int w, 
     }
     m_pluginScreen.setSize(w, h);
     m_pluginScreen.setImage(img);
+}
+
+bool AudioGridderAudioProcessorEditor::genericEditorEnabled() const {
+    bool ret = m_processor.getGenericEditor();
+    if (!ret) {
+        int active = m_processor.getActivePlugin();
+        if (active > -1) {
+            ret = !m_processor.getLoadedPlugin(active).hasEditor;
+        }
+    }
+    return ret;
 }
 
 }  // namespace e47

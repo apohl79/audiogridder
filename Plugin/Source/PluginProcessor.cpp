@@ -93,7 +93,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
             for (auto& p : m_loadedPlugins) {
                 logln("loading " << p.name << " (" << p.id << ") [on connect]... ");
                 String err;
-                p.ok = m_client->addPlugin(p.id, p.presets, p.params, p.settings, err);
+                p.ok = m_client->addPlugin(p.id, p.presets, p.params, p.hasEditor, p.settings, err);
                 if (p.ok) {
                     logln("...ok");
                 } else {
@@ -642,9 +642,10 @@ bool AudioGridderAudioProcessor::loadPlugin(const ServerPlugin& plugin, String& 
     traceScope();
     StringArray presets;
     Array<e47::Client::Parameter> params;
+    bool hasEditor;
     logln("loading " << plugin.getName() << " (" << plugin.getId() << ")...");
     suspendProcessing(true);
-    bool success = m_client->addPlugin(plugin.getId(), presets, params, "", err);
+    bool success = m_client->addPlugin(plugin.getId(), presets, params, hasEditor, "", err);
     suspendProcessing(false);
     if (success) {
         logln("...ok");
@@ -654,7 +655,7 @@ bool AudioGridderAudioProcessor::loadPlugin(const ServerPlugin& plugin, String& 
     if (success) {
         updateLatency(m_client->getLatencySamples());
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
-        m_loadedPlugins.push_back({plugin.getId(), plugin.getName(), "", presets, params, false, true});
+        m_loadedPlugins.push_back({plugin.getId(), plugin.getName(), "", presets, params, false, hasEditor, true});
         updateRecents(plugin);
     }
     m_client->setLoadedPluginsString(getLoadedPluginsString());

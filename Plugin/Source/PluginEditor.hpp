@@ -83,6 +83,7 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
 
     void resetPluginScreen();
     void setPluginScreen(const Image& img, int w, int h);
+    bool genericEditorEnabled() const;
 
     struct PositionTracker : Timer, LogTagDelegate {
         AudioGridderAudioProcessorEditor* e;

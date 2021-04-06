@@ -365,7 +365,8 @@ void Client::quit() {
     msg.send(m_cmd_socket.get());
 }
 
-bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params, String settings, String& err) {
+bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params, bool& hasEditor, String settings,
+                       String& err) {
     traceScope();
     if (!isReadyLockFree()) {
         return false;
@@ -376,18 +377,18 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
     LockByID lock(*this, ADDPLUGIN);
     TimeStatistic::Timeout timeout(LOAD_PLUGIN_TIMEOUT);
     if (msg.send(m_cmd_socket.get())) {
-        auto result = m_msgFactory.getResult(m_cmd_socket.get(), LOAD_PLUGIN_TIMEOUT / 1000, &e);
-        if (nullptr == result) {
+        Message<AddPluginResult> msgResult(this);
+        if (!msgResult.read(m_cmd_socket.get(), &e, LOAD_PLUGIN_TIMEOUT / 1000)) {
             err = "failed to get result: " + e.toString();
             logln(err);
             return false;
         }
-        if (result->getReturnCode() < 0) {
-            err = result->getString();
+        auto jresult = PLD(msgResult).getJson();
+        if (!jresult["success"].get<bool>()) {
+            err = jresult["err"].get<std::string>();
             logln(err);
             return false;
         }
-        auto latency = result->getReturnCode();
         if (timeout.getMillisecondsLeft() == 0) {
             err = "timeout";
             logln(err);
@@ -434,7 +435,8 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
             logln(err);
             return false;
         }
-        m_latency = latency;
+        m_latency = jresult["latency"].get<int>();
+        hasEditor = jresult["hasEditor"].get<bool>();
         return true;
     }
     return false;

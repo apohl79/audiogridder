@@ -559,6 +559,12 @@ class AddPlugin : public StringPayload {
     AddPlugin() : StringPayload(Type) {}
 };
 
+class AddPluginResult : public JsonPayload {
+  public:
+    static constexpr int Type = __COUNTER__;
+    AddPluginResult() : JsonPayload(Type) {}
+};
+
 class DelPlugin : public NumberPayload {
   public:
     static constexpr int Type = __COUNTER__;
