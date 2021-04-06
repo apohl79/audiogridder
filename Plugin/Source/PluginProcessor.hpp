@@ -167,6 +167,11 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
 
     String getPresetDir() const { return m_presetsDir; }
     void setPresetDir(const String& d) { m_presetsDir = d; }
+    bool hasDefaultPreset() const { return m_defaultPreset.isNotEmpty() && File(m_defaultPreset).existsAsFile(); }
+    void storePreset(const File& file);
+    bool loadPreset(const File& file);
+    void storePresetDefault();
+    void resetPresetDefault();
 
     // It looks like most hosts do not support dynamic parameter creation or changes to existing parameters. Logic
     // at least allows for the name to be updated. So we create slots at the start.
@@ -250,6 +255,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     String m_activeServerFromCfg;
     int m_activeServerLegacyFromCfg;
     String m_presetsDir;
+    String m_defaultPreset;
 
     int m_numberOfAutomationSlots = 16;
     LoadedPlugin m_unusedDummyPlugin;

@@ -780,7 +780,15 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
         m.showAt(&m_srvIcon);
     } else if (event.eventComponent == &m_settingsIcon) {
         PopupMenu m, subm;
-
+        subm.addItem("Make Default", [this] {
+            traceScope();
+            m_processor.storePresetDefault();
+        });
+        subm.addItem("Reset Default", m_processor.hasDefaultPreset(), false, [this] {
+            traceScope();
+            m_processor.resetPresetDefault();
+        });
+        subm.addSeparator();
         subm.addItem("Create New...", [this] {
             traceScope();
             File d(m_processor.getPresetDir());
@@ -794,8 +802,6 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
                                           Colour(Defaults::BG_COLOR));
             fcdialog.setAlwaysOnTop(true);
             if (fcdialog.show(300, 400)) {
-                MemoryBlock data;
-                m_processor.getStateInformation(data, false);
                 auto file = fb.getSelectedFile(0);
                 if (file.getFileExtension() != ".preset") {
                     file = file.withFileExtension(".preset");
@@ -803,8 +809,7 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
                 if (file.existsAsFile()) {
                     file.deleteFile();
                 }
-                FileOutputStream fos(file);
-                fos.write(data.getData(), data.getSize());
+                m_processor.storePreset(file);
             }
         });
         subm.addItem("Choose Preset Directory...", [this] {
@@ -1059,22 +1064,11 @@ void AudioGridderAudioProcessorEditor::getPresetsMenu(PopupMenu& menu, const Fil
         } else if (file.getFileExtension() == ".preset") {
             menu.addItem(file.getFileNameWithoutExtension(), [this, file] {
                 traceScope();
-                FileInputStream fis(file);
-                if (fis.openedOk()) {
-                    logln("loading preset " << file.getFullPathName());
-                    MemoryBlock data;
-                    data.setSize((size_t)fis.getTotalLength());
-                    fis.read(data.getData(), (int)data.getSize());
-                    m_processor.setStateInformation(data.getData(), (int)data.getSize());
+                if (m_processor.loadPreset(file)) {
                     createPluginButtons();
                     resetPluginScreen();
                     resized();
                     m_processor.getClient().reconnect();
-                } else {
-                    AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Error",
-                                                     "Failed to load preset " + file.getFullPathName() +
-                                                         "!\n\nError: " + fis.getStatus().getErrorMessage(),
-                                                     "OK");
                 }
             });
         }

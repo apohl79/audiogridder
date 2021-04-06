@@ -155,6 +155,13 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
         m_client->setServer(m_servers[m_activeServerLegacyFromCfg]);
     }
 
+    if (m_defaultPreset.isNotEmpty()) {
+        File preset(m_defaultPreset);
+        if (preset.existsAsFile()) {
+            loadPreset(preset);
+        }
+    }
+
     m_client->startThread();
     m_tray = std::make_unique<TrayConnection>(this);
 }
@@ -214,6 +221,7 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
     m_confirmDelete = jsonGetValue(j, "ConfirmDelete", m_confirmDelete);
     m_syncRemote = jsonGetValue(j, "SyncRemoteMode", m_syncRemote);
     m_presetsDir = jsonGetValue(j, "PresetsDir", Defaults::PRESETS_DIR);
+    m_defaultPreset = jsonGetValue(j, "DefaultPreset", m_defaultPreset);
     auto noSrvPluginListFilter = jsonGetValue(j, "NoSrvPluginListFilter", m_noSrvPluginListFilter);
     if (noSrvPluginListFilter != m_noSrvPluginListFilter) {
         m_noSrvPluginListFilter = noSrvPluginListFilter;
@@ -250,8 +258,54 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
     jcfg["NoSrvPluginListFilter"] = m_noSrvPluginListFilter;
     jcfg["ZoomFactor"] = m_scale;
     jcfg["PresetsDir"] = m_presetsDir.toStdString();
+    jcfg["DefaultPreset"] = m_defaultPreset.toStdString();
 
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), jcfg);
+}
+
+void AudioGridderAudioProcessor::storePreset(const File& file) {
+    MemoryBlock data;
+    getStateInformation(data, false);
+    FileOutputStream fos(file);
+    fos.write(data.getData(), data.getSize());
+}
+
+bool AudioGridderAudioProcessor::loadPreset(const File& file) {
+    FileInputStream fis(file);
+    if (fis.openedOk()) {
+        logln("loading preset " << file.getFullPathName());
+        MemoryBlock data;
+        data.setSize((size_t)fis.getTotalLength());
+        fis.read(data.getData(), (int)data.getSize());
+        setStateInformation(data.getData(), (int)data.getSize());
+        return true;
+    } else {
+        AlertWindow::showMessageBoxAsync(
+            AlertWindow::WarningIcon, "Error",
+            "Failed to load preset " + file.getFullPathName() + "!\n\nError: " + fis.getStatus().getErrorMessage(),
+            "OK");
+    }
+    return false;
+}
+
+void AudioGridderAudioProcessor::storePresetDefault() {
+    File d(m_presetsDir);
+    if (!d.exists()) {
+        d.createDirectory();
+    }
+    File preset = d.getNonexistentChildFile("Default", "").withFileExtension(".preset");
+    storePreset(preset);
+    m_defaultPreset = preset.getFullPathName();
+    saveConfig();
+}
+
+void AudioGridderAudioProcessor::resetPresetDefault() {
+    File preset(m_defaultPreset);
+    if (preset.existsAsFile()) {
+        preset.deleteFile();
+    }
+    m_defaultPreset = "";
+    saveConfig();
 }
 
 const String AudioGridderAudioProcessor::getName() const {
