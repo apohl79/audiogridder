@@ -143,6 +143,9 @@ class ServerInfo {
             if (hostParts.size() > 2) {
                 m_name = hostParts[2];
             }
+            if (hostParts.size() > 3) {
+                m_version = hostParts[3];
+            }
         } else {
             m_host = s;
             m_id = 0;
@@ -151,13 +154,17 @@ class ServerInfo {
         refresh();
     }
 
-    ServerInfo(const String& host, const String& name, int id, float load)
-        : m_host(host), m_name(name), m_id(id), m_load(load) {
+    ServerInfo(const String& host, const String& name, int id, float load, const String& version = "")
+        : m_host(host), m_name(name), m_id(id), m_load(load), m_version(version) {
         refresh();
     }
 
     ServerInfo(const ServerInfo& other)
-        : m_host(other.m_host), m_name(other.m_name), m_id(other.m_id), m_load(other.m_load) {
+        : m_host(other.m_host),
+          m_name(other.m_name),
+          m_id(other.m_id),
+          m_load(other.m_load),
+          m_version(other.m_version) {
         refresh();
     }
 
@@ -166,17 +173,19 @@ class ServerInfo {
         m_name = other.m_name;
         m_id = other.m_id;
         m_load = other.m_load;
+        m_version = other.m_version;
         refresh();
         return *this;
     }
 
     bool operator==(const ServerInfo& other) const {
-        return m_host == other.m_host && m_name == other.m_name && m_id == other.m_id;
+        return m_host == other.m_host && m_name == other.m_name && m_id == other.m_id && m_version == other.m_version;
     }
 
     bool isValid() const { return m_id > -1; }
     const String& getHost() const { return m_host; }
     const String& getName() const { return m_name; }
+    const String& getVersion() const { return m_version; }
     int getID() const { return m_id; }
     float getLoad() const { return m_load; }
 
@@ -200,7 +209,8 @@ class ServerInfo {
         String ret = "Server(";
         ret << "name=" << m_name << ", ";
         ret << "host=" << m_host << ", ";
-        ret << "id=" << m_id;
+        ret << "id=" << m_id << ", ";
+        ret << "version=" << m_version;
         if (m_load > 0.0f) {
             ret << ", load=" << m_load;
         }
@@ -210,7 +220,7 @@ class ServerInfo {
 
     String serialize() const {
         String ret = m_host;
-        ret << ":" << m_id << ":" << m_name;
+        ret << ":" << m_id << ":" << m_name << ":" << m_version;
         return ret;
     }
 
@@ -227,6 +237,7 @@ class ServerInfo {
     String m_host, m_name;
     int m_id;
     float m_load;
+    String m_version;
     Time m_updated;
 };
 

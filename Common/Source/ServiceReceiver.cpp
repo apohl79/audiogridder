@@ -172,6 +172,10 @@ int ServiceReceiver::handleRecord(int /*sock*/, const struct sockaddr* from, siz
                         if (j.find("LOAD") != j.end()) {
                             m_curLoad = j["LOAD"].get<float>();
                         }
+                        m_curVersion = "unknown";
+                        if (j.find("V") != j.end()) {
+                            m_curVersion = j["V"].get<std::string>();
+                        }
                         complete = true;
                     }
                 }
@@ -181,7 +185,7 @@ int ServiceReceiver::handleRecord(int /*sock*/, const struct sockaddr* from, siz
     }
     if (complete) {
         auto host = mDNSConnector::ipToString(from, addrlen, true);
-        m_currentResult.add(ServerInfo(host, m_curName, m_curId, m_curLoad));
+        m_currentResult.add(ServerInfo(host, m_curName, m_curId, m_curLoad, m_curVersion));
     }
     return 0;
 }

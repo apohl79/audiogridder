@@ -11,6 +11,7 @@
 #include "Defaults.hpp"
 #include "CPUInfo.hpp"
 #include "json.hpp"
+#include "Version.hpp"
 
 using json = nlohmann::json;
 
@@ -103,6 +104,7 @@ int ServiceResponder::handleRecord(int sock, const struct sockaddr* from, size_t
             json j;
             j["ID"] = m_id;
             j["LOAD"] = CPUInfo::getUsage();
+            j["V"] = AUDIOGRIDDER_VERSION;
             String txtRecord;
             txtRecord << "INFO=" << j.dump();
             mdns_query_answer(sock, from, addrlen, m_sendBuffer, sizeof(m_sendBuffer), query_id,

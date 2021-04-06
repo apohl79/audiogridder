@@ -142,8 +142,9 @@ class App : public JUCEApplication, public LogTag {
     void sendRecents(const String& srv, Connection* target = nullptr);
 
     static String getServerString(Connection* c) { return c->status.serverNameId + " (" + c->status.serverHost + ")"; }
-    static String getServerString(const ServerInfo& srvInfo) {
-        return srvInfo.getNameAndID() + " (" + srvInfo.getHost() + ")";
+    static String getServerString(const ServerInfo& srvInfo, bool withVersion) {
+        return srvInfo.getNameAndID() + " (" + srvInfo.getHost() + ")" +
+               (withVersion ? " [" + srvInfo.getVersion() + "]" : "");
     }
 
     PluginMonitor& getMonitor() { return m_mon; }
