@@ -22,16 +22,28 @@ void PluginButton::paintButton(Graphics& g, bool shouldDrawButtonAsHighlighted, 
     auto fgColor = findColour(getToggleState() ? TextButton::textColourOnId : TextButton::textColourOffId)
                        .withMultipliedAlpha(isEnabled() ? 0.7f : 0.4f);
 
+    Colour txtColor, bgColor;
+    float symLineThikness = 0.7f;
+
     if (!m_active || shouldDrawButtonAsDown || shouldDrawButtonAsHighlighted) {
         g.setColour(baseColour);
         g.fillRect(getLocalBounds());
+        txtColor = fgColor;
+        bgColor = baseColour;
     }
 
     if (m_active) {
-        g.setColour(findColour(ComboBox::outlineColourId).withMultipliedAlpha(0.9f));
+        txtColor = Colours::black;
+        bgColor = fgColor;
+        symLineThikness = 1.3f;
+        g.setColour(bgColor);
+        g.fillRect(getLocalBounds());
+        g.setColour(baseColour);
         float dashs[] = {4.0, 2.0};
         g.drawDashedLine(Line<float>(0.0f, 0.0f, (float)getWidth(), 0.0f), dashs, 2);
         g.drawDashedLine(Line<float>(0.0f, (float)getHeight(), (float)getWidth(), (float)getHeight()), dashs, 2);
+        g.drawDashedLine(Line<float>(0.0f, 0.0f, 0.0f, (float)getHeight()), dashs, 2);
+        g.drawDashedLine(Line<float>((float)getWidth(), 0.0f, (float)getWidth(), (float)getHeight()), dashs, 2);
     }
 
     int textIndentLeft = 0;
@@ -58,19 +70,19 @@ void PluginButton::paintButton(Graphics& g, bool shouldDrawButtonAsHighlighted, 
         m_deleteArea = Rectangle<int>(getWidth() - width - space, indent_right, width, width);
 
         // bypass
-        g.setColour(fgColor);
-        g.drawEllipse(m_bypassArea.toFloat(), 0.7f);
-        g.setColour(baseColour);
-        g.fillRect(m_bypassArea.getCentreX() - 2, m_bypassArea.getY() - 2, 4, 4);
-        g.setColour(fgColor);
+        g.setColour(txtColor);
+        g.drawEllipse(m_bypassArea.toFloat(), symLineThikness);
+        //g.setColour(bgColor.withAlpha(0.1f));
+        //g.fillRect(m_bypassArea.getCentreX() - 2, m_bypassArea.getY() - 2, 4, 4);
+        g.setColour(txtColor);
         g.drawLine((float)m_bypassArea.getCentreX(), (float)m_bypassArea.getY() - 1, (float)m_bypassArea.getCentreX(),
-                   (float)m_bypassArea.getY() + 5, 0.7f);
+                   (float)m_bypassArea.getY() + 5, symLineThikness);
 
         Rectangle<float> rect;
 #if !JucePlugin_IsSynth
         // down
         Path down;
-        PathStrokeType stroke(0.7f);
+        PathStrokeType stroke(symLineThikness);
         rect = m_moveDownArea.toFloat();
         down.addTriangle(rect.getX(), rect.getY(), rect.getRight(), rect.getY(), rect.getCentreX(), rect.getBottom());
         g.strokePath(down, stroke);
@@ -85,8 +97,8 @@ void PluginButton::paintButton(Graphics& g, bool shouldDrawButtonAsHighlighted, 
 
         // delete
         rect = m_deleteArea.toFloat();
-        g.drawLine(rect.getX(), rect.getY(), rect.getRight(), rect.getBottom(), 0.7f);
-        g.drawLine(rect.getX(), rect.getBottom(), rect.getRight(), rect.getY(), 0.7f);
+        g.drawLine(rect.getX(), rect.getY(), rect.getRight(), rect.getBottom(), symLineThikness);
+        g.drawLine(rect.getX(), rect.getBottom(), rect.getRight(), rect.getY(), symLineThikness);
     }
 
     drawText(g, textIndentLeft, textIndentRight);
@@ -102,9 +114,16 @@ void PluginButton::clicked(const ModifierKeys& modifiers) {
 void PluginButton::drawText(Graphics& g, int left, int right) {
     auto& lf = getLookAndFeel();
     Font font(lf.getTextButtonFont(*this, getHeight()));
+    Colour col = findColour(TextButton::textColourOffId);
+    if (m_active) {
+        col = Colours::black;
+        font.setBold(true);
+    }
+    if (!m_enabled) {
+        col = col.withAlpha(0.5f);
+    }
     g.setFont(font);
-    g.setColour(findColour(getToggleState() ? TextButton::textColourOnId : TextButton::textColourOffId)
-                    .withMultipliedAlpha(isEnabled() ? 1.0f : 0.5f));
+    g.setColour(col);
 
     const int yIndent = jmin(4, proportionOfHeight(0.3f));
     const int cornerSize = jmin(getHeight(), getWidth()) / 2;
