@@ -199,6 +199,9 @@ class ServerInfo {
 
     String getNameAndID() const {
         String ret = m_name;
+        if (ret.isEmpty()) {
+            ret = m_host;
+        }
         if (m_id > 0) {
             ret << ":" << m_id;
         }

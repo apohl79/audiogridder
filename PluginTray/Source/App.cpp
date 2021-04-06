@@ -41,6 +41,13 @@ void App::saveConfig() {
 
 void App::getPopupMenu(PopupMenu& menu, bool withShowMonitorOption) {
     auto mdnsServers = ServiceReceiver::getServers();
+    std::vector<ServerInfo> cfgServers;
+    auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigPlugin));
+    if (jsonHasValue(cfg, "Servers")) {
+        for (auto& srv : cfg["Servers"]) {
+            cfgServers.emplace_back(srv.get<std::string>());
+        }
+    }
     menu.addSectionHeader("Connections");
     std::map<String, PopupMenu> serverMenus;
     for (auto& c : m_srv.getConnections()) {
@@ -62,6 +69,16 @@ void App::getPopupMenu(PopupMenu& menu, bool withShowMonitorOption) {
                                                      {{"serverInfo", srvInfo.serialize().toStdString()}}));
                 });
         }
+        subRecon.addSeparator();
+        for (auto& srvInfo : cfgServers) {
+            String cfgName = getServerString(srvInfo, false);
+            bool enabled = srv != cfgName;
+            subRecon.addItem(
+                cfgName, enabled, false, [c, srvInfo] {
+                    c->sendMessage(PluginTrayMessage(PluginTrayMessage::CHANGE_SERVER,
+                                                     {{"serverInfo", srvInfo.serialize().toStdString()}}));
+                });
+        }
         if (serverMenus.find(srv) == serverMenus.end()) {
             PopupMenu subReconAll;
             for (auto& srvInfo : mdnsServers) {
@@ -70,6 +87,18 @@ void App::getPopupMenu(PopupMenu& menu, bool withShowMonitorOption) {
                     (srv != getServerString(srvInfo, false)) && (srvInfo.getVersion() == AUDIOGRIDDER_VERSION);
                 subReconAll.addItem(
                     mdnsName, enabled, false, [this, srvInfo] {
+                        for (auto& c2 : m_srv.getConnections()) {
+                            c2->sendMessage(PluginTrayMessage(PluginTrayMessage::CHANGE_SERVER,
+                                                              {{"serverInfo", srvInfo.serialize().toStdString()}}));
+                        }
+                    });
+            }
+            subReconAll.addSeparator();
+            for (auto& srvInfo : cfgServers) {
+                String cfgName = getServerString(srvInfo, false);
+                bool enabled = srv != cfgName;
+                subReconAll.addItem(
+                    cfgName, enabled, false, [this, srvInfo] {
                         for (auto& c2 : m_srv.getConnections()) {
                             c2->sendMessage(PluginTrayMessage(PluginTrayMessage::CHANGE_SERVER,
                                                               {{"serverInfo", srvInfo.serialize().toStdString()}}));
