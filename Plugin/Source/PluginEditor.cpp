@@ -153,8 +153,10 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
     setSize(200, 100);
 
     logln("setting connected state");
-    setConnected(m_processor.getClient().isReadyLockFree());
-    setCPULoad(m_processor.getClient().getCPULoad());
+    runOnMsgThreadAsync([this] {
+        setConnected(m_processor.getClient().isReadyLockFree());
+        setCPULoad(m_processor.getClient().getCPULoad());
+    });
     logln("editor created");
 }
 
