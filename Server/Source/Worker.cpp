@@ -185,7 +185,7 @@ void Worker::shutdown() {
         return;
     }
     m_shutdown = true;
-    if (m_shouldHideEditor) {
+    if (m_activeEditorIdx > -1) {
         m_screen->hideEditor();
     }
     if (nullptr != m_audio) {
@@ -304,29 +304,36 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
 
 void Worker::handleMessage(std::shared_ptr<Message<DelPlugin>> msg) {
     traceScope();
-    m_audio->delPlugin(pPLD(msg).getNumber());
+    int idx = pPLD(msg).getNumber();
+    if (idx == m_activeEditorIdx) {
+        getApp()->getServer().sandboxHideEditor();
+        m_screen->hideEditor();
+        m_activeEditorIdx = -1;
+    }
+    m_audio->delPlugin(idx);
     // send new updated latency samples back
     m_msgFactory.sendResult(m_client.get(), m_audio->getLatencySamples());
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<EditPlugin>> msg) {
     traceScope();
-    auto proc = m_audio->getProcessor(pDATA(msg)->index);
+    int idx = pDATA(msg)->index;
+    auto proc = m_audio->getProcessor(idx);
     if (nullptr != proc) {
         getApp()->getServer().sandboxShowEditor();
         m_screen->showEditor(proc, pDATA(msg)->x, pDATA(msg)->y);
-        m_shouldHideEditor = true;
+        m_activeEditorIdx = idx;
     }
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<HidePlugin>> /* msg */, bool fromMaster) {
     traceScope();
-    if (m_shouldHideEditor) {
+    if (m_activeEditorIdx > -1) {
         if (!fromMaster) {
             getApp()->getServer().sandboxHideEditor();
         }
         m_screen->hideEditor();
-        m_shouldHideEditor = false;
+        m_activeEditorIdx = -1;
     }
 }
 
