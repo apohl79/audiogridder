@@ -155,12 +155,14 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
         m_client->setServer(m_servers[m_activeServerLegacyFromCfg]);
     }
 
+#if !JucePlugin_IsSynth && !JucePlugin_IsMidiEffect
     if (m_defaultPreset.isNotEmpty()) {
         File preset(m_defaultPreset);
         if (preset.existsAsFile()) {
             loadPreset(preset);
         }
     }
+#endif
 
     m_client->startThread();
     m_tray = std::make_unique<TrayConnection>(this);

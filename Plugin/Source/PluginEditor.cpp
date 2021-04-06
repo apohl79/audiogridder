@@ -782,6 +782,7 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
         m.showAt(&m_srvIcon);
     } else if (event.eventComponent == &m_settingsIcon) {
         PopupMenu m, subm;
+#if !JucePlugin_IsSynth && !JucePlugin_IsMidiEffect
         subm.addItem("Make Default", [this] {
             traceScope();
             m_processor.storePresetDefault();
@@ -791,6 +792,7 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
             m_processor.resetPresetDefault();
         });
         subm.addSeparator();
+#endif
         subm.addItem("Create New...", [this] {
             traceScope();
             File d(m_processor.getPresetDir());
