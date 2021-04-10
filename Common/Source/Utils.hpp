@@ -435,7 +435,8 @@ inline void cleanDirectory(const String& path, const String& filePrefix, const S
 #ifndef JUCE_WINDOWS
             if (fileExtension == ".log") {
                 FileInputStream fis(*it);
-                while (!fis.isExhausted()) {
+                int maxlines = 5;
+                while (--maxlines >= 0) {
                     auto line = fis.readNextLine();
                     if (line.contains("matching core file name")) {
                         auto parts = StringArray::fromTokens(line, " ", "");
@@ -451,6 +452,7 @@ inline void cleanDirectory(const String& path, const String& filePrefix, const S
                             logln("removing old diagnistics file: " << corepath);
                             corefile.deleteFile();
                         }
+                        maxlines = 0;
                     }
                 }
             }
