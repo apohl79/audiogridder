@@ -122,6 +122,7 @@ void Server::loadConfig() {
     m_scanForPlugins = jsonGetValue(cfg, "ScanForPlugins", m_scanForPlugins);
     m_parallelPluginLoad = jsonGetValue(cfg, "ParallelPluginLoad", m_parallelPluginLoad);
     m_sandboxing = jsonGetValue(cfg, "Sandboxing", m_sandboxing);
+    m_sandboxCoreDumps = jsonGetValue(cfg, "SandboxCoreDumps", m_sandboxCoreDumps);
 }
 
 void Server::saveConfig() {
@@ -168,6 +169,7 @@ void Server::saveConfig() {
     j["ScanForPlugins"] = m_scanForPlugins;
     j["ParallelPluginLoad"] = m_parallelPluginLoad;
     j["Sandboxing"] = m_sandboxing;
+    j["SandboxCoreDumps"] = m_sandboxCoreDumps;
 
     File cfg(Defaults::getConfigFileName(Defaults::ConfigServer));
     if (cfg.exists()) {
@@ -774,7 +776,9 @@ void Server::runSandbox() {
         logln("failed to start worker thread");
     }
 
-    getApp()->prepareShutdown();
+    if (!currentThreadShouldExit()) {
+        getApp()->prepareShutdown();
+    }
 }
 
 bool Server::sendHandshakeResponse(StreamingSocket* sock, bool sandboxEnabled, int port) {

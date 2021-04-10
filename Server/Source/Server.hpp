@@ -122,6 +122,7 @@ class Server : public Thread, public LogTag {
     bool m_scanForPlugins = true;
     bool m_parallelPluginLoad = false;
     bool m_sandboxing = true;
+    bool m_sandboxCoreDumps = false;
 
     HashMap<String, std::shared_ptr<SandboxMaster>, DefaultHashFunctions, CriticalSection> m_sandboxes;
     std::unique_ptr<SandboxSlave> m_sandboxSlave;
