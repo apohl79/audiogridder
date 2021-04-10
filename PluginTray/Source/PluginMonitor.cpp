@@ -65,7 +65,7 @@ void PluginMonitorWindow::update() {
     int borderTB = 15;  // top/bottom border
     int rowHeight = 18;
 
-    int colWidth[] = {m_channelColWidth, m_channelNameWidth, 190, 30, 65, 10};
+    int colWidth[] = {m_channelColWidth, m_channelNameWidth, 190, 45, 30, 65, 10};
 
     if (!m_mon->showChannelColor) {
         colWidth[0] = 0;
@@ -99,8 +99,9 @@ void PluginMonitorWindow::update() {
         addLabel("Ch", getLabelBounds(row, 0, 2), Justification::topLeft, 1.0f);
     }
     addLabel("Inserts", getLabelBounds(row, 2), Justification::topLeft, 1.0f);
-    addLabel("Buf", getLabelBounds(row, 3), Justification::topRight, 1.0f);
-    addLabel("Perf", getLabelBounds(row, 4), Justification::topRight, 1.0f);
+    addLabel("I/O", getLabelBounds(row, 3), Justification::topRight, 1.0f);
+    addLabel("Buf", getLabelBounds(row, 4), Justification::topRight, 1.0f);
+    addLabel("Perf", getLabelBounds(row, 5), Justification::topRight, 1.0f);
 
     row++;
 
@@ -118,10 +119,16 @@ void PluginMonitorWindow::update() {
         if (m_mon->showChannelName) {
             addLabel(s.name, getLabelBounds(row, 1));
         }
+        String io;
+        io << s.channelsIn << ":" << s.channelsOut;
+        if (s.channelsSC > 0) {
+            io << "+" << s.channelsSC;
+        }
         addLabel(s.loadedPlugins, getLabelBounds(row, 2));
-        addLabel(String(s.blocks), getLabelBounds(row, 3), Justification::topRight);
-        addLabel(String(s.perf95th, 2) + " ms", getLabelBounds(row, 4), Justification::topRight);
-        auto led = std::make_unique<Status>(getLabelBounds(row, 5), s.ok);
+        addLabel(io, getLabelBounds(row, 3), Justification::topRight);
+        addLabel(String(s.blocks), getLabelBounds(row, 4), Justification::topRight);
+        addLabel(String(s.perf95th, 2) + " ms", getLabelBounds(row, 5), Justification::topRight);
+        auto led = std::make_unique<Status>(getLabelBounds(row, 6), s.ok);
         addChildAndSetID(led.get(), "led");
         m_components.push_back(std::move(led));
 

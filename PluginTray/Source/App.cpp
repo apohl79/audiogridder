@@ -15,14 +15,24 @@ void App::initialise(const String& /*commandLineParameters*/) {
 #ifdef JUCE_MAC
     Process::setDockIconVisible(false);
 #endif
+    auto args = getCommandLineParameterArray();
+    for (int i = 0; i < args.size(); i++) {
+        if (args[i] == "-keeprunning") {
+            m_keepRunning = true;
+        }
+    }
     if (!m_srv.beginWaitingForSocket(Defaults::PLUGIN_TRAY_PORT)) {
         quit();
+        return;
     }
     AGLogger::initialize("Tray", "AudioGridderTray_", "");
     ServiceReceiver::initialize(0);
 }
 
-void App::shutdown() { AGLogger::cleanup(); }
+void App::shutdown() {
+    AGLogger::cleanup();
+    ServiceReceiver::cleanup(0);
+}
 
 void App::loadConfig() {
     auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigPluginTray));
@@ -51,7 +61,7 @@ void App::getPopupMenu(PopupMenu& menu, bool withShowMonitorOption) {
     menu.addSectionHeader("Connections");
     std::map<String, PopupMenu> serverMenus;
     for (auto& c : m_srv.getConnections()) {
-        String srv = getServerString(c.get());
+        String srv = getServerString(c);
         String name = c->status.name;
         if (name.isEmpty()) {
             name = "Unnamed";
@@ -144,6 +154,10 @@ void App::getPopupMenu(PopupMenu& menu, bool withShowMonitorOption) {
 PopupMenu App::Tray::getMenuForIndex(int, const String&) {
     PopupMenu menu;
     m_app->getPopupMenu(menu);
+    if (m_app->getKeepRunning()) {
+        menu.addSeparator();
+        menu.addItem("Quit", [this] { m_app->quit(); });
+    }
     menu.addSeparator();
     menu.addItem(AUDIOGRIDDER_VERSION, false, false, nullptr);
     return menu;
@@ -165,6 +179,7 @@ void App::Connection::messageReceived(const MemoryBlock& message) {
         updateValue(status.name, jsonGetValue(msg.data, "name", status.name));
         updateValue(status.channelsIn, jsonGetValue(msg.data, "channelsIn", 0));
         updateValue(status.channelsOut, jsonGetValue(msg.data, "channelsOut", 0));
+        updateValue(status.channelsSC, jsonGetValue(msg.data, "channelsSC", 0));
         updateValue(status.instrument, jsonGetValue(msg.data, "instrument", false));
         updateValue(status.colour, jsonGetValue(msg.data, "colour", 0u));
         updateValue(status.loadedPlugins, jsonGetValue(msg.data, "loadedPlugins", status.loadedPlugins));
@@ -179,12 +194,13 @@ void App::Connection::messageReceived(const MemoryBlock& message) {
         if (!initialized) {
             initialized = true;
             changed = true;
-            logln("new connection: name=" << status.name);
+            logln("new connection " << String::toHexString((uint64)this) << " (name=" << status.name << ")");
             m_app->sendRecents(App::getServerString(this), this);
         }
 
         if (changed) {
-            logln("changed");
+            logln("state change by connection " << String::toHexString((uint64)this) << " (name=" << status.name
+                                                << ")");
             m_app->getMonitor().refresh();
         }
     } else {
@@ -203,9 +219,12 @@ void App::Server::checkConnections() {
     int removed = 0;
     while (i < m_connections.size()) {
         auto c = m_connections[i];
-        bool dead = Time::currentTimeMillis() - c->status.lastUpdated > 5000 || (c->initialized && !c->connected);
-        if (dead) {
-            logln("lost connection: name=" << c->status.name);
+        bool timeout = Time::currentTimeMillis() - c->status.lastUpdated > 5000;
+        bool dead = (c->initialized && !c->connected);
+        if (timeout || dead) {
+            logln("lost connection " << String::toHexString((uint64)c.get()) << " (name=" << c->status.name
+                                     << " timeout=" << (int)timeout << " dead=" << (int)dead << ")");
+            c->disconnect();
             m_connections.remove(i);
             removed++;
         } else {
@@ -217,7 +236,7 @@ void App::Server::checkConnections() {
     } else {
         m_noConnectionCounter = 0;
     }
-    if (m_noConnectionCounter > 5) {
+    if (m_noConnectionCounter > 5 && !m_app->getKeepRunning()) {
         m_app->quit();
     } else {
         if (removed > 0) {
@@ -258,7 +277,7 @@ void App::sendRecents(const String& srv, Connection* target) {
             }
         } else {
             for (auto& c : m_srv.getConnections()) {
-                if (srv == App::getServerString(c.get())) {
+                if (srv == App::getServerString(c)) {
                     c->sendMessage(msgOut);
                 }
             }

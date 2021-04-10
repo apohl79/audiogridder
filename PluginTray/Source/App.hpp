@@ -35,6 +35,8 @@ class App : public JUCEApplication, public LogTag {
 
     void getPopupMenu(PopupMenu& menu, bool withShowMonitorOption = true);
 
+    bool getKeepRunning() const { return m_keepRunning; }
+
     class Tray : public SystemTrayIconComponent, public MenuBarModel {
       public:
         Tray(App* app) : m_app(app) {
@@ -76,12 +78,16 @@ class App : public JUCEApplication, public LogTag {
         bool initialized = false;
 
         Connection(App* app) : LogTagDelegate(app), m_app(app) {}
-        ~Connection() override { disconnect(); }
+        ~Connection() override {
+            disconnect();
+            logln("connection " << String::toHexString((uint64)this) << " deleted");
+        }
 
         struct Status {
             String name;
             int channelsIn;
             int channelsOut;
+            int channelsSC;
             bool instrument;
             uint32 colour;
             String loadedPlugins;
@@ -114,11 +120,11 @@ class App : public JUCEApplication, public LogTag {
 
         void checkConnections();
 
-        const Array<std::shared_ptr<Connection>> getConnections() {
-            Array<std::shared_ptr<Connection>> ret;
+        const Array<Connection*> getConnections() {
+            Array<Connection*> ret;
             for (auto& c : m_connections) {
                 if (c->initialized) {
-                    ret.add(c);
+                    ret.add(c.get());
                 }
             }
             return ret;
@@ -127,6 +133,7 @@ class App : public JUCEApplication, public LogTag {
       protected:
         InterprocessConnection* createConnectionObject() override {
             auto c = std::make_shared<Connection>(m_app);
+            c->status.lastUpdated = Time::currentTimeMillis();
             MessageManager::callAsync([this, c] { m_connections.add(c); });
             return c.get();
         }
@@ -150,6 +157,7 @@ class App : public JUCEApplication, public LogTag {
     PluginMonitor& getMonitor() { return m_mon; }
 
   private:
+    bool m_keepRunning = false;
     Tray m_tray;
     Server m_srv;
     std::unordered_map<String, Array<ServerPlugin>> m_recents;
