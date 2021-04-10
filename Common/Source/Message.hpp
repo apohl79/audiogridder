@@ -899,11 +899,11 @@ class MessageFactory : public LogTagDelegate {
   public:
     MessageFactory(const LogTag* tag) : LogTagDelegate(tag) {}
 
-    std::shared_ptr<Message<Any>> getNextMessage(StreamingSocket* socket, MessageHelper::Error* e) {
+    std::shared_ptr<Message<Any>> getNextMessage(StreamingSocket* socket, MessageHelper::Error* e, int timeout = 1000) {
         traceScope();
         if (nullptr != socket) {
             auto msg = std::make_shared<Message<Any>>(getLogTagSource());
-            if (msg->read(socket, e)) {
+            if (msg->read(socket, e, timeout)) {
                 return msg;
             } else {
                 traceln("read failed");
