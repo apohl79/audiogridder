@@ -346,7 +346,8 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     std::mutex m_clientMtx;
     LockID m_clientMtxId = NOLOCK;
 
-    std::unique_ptr<StreamingSocket> m_cmd_socket;
+    std::unique_ptr<StreamingSocket> m_cmdOut;
+    std::unique_ptr<StreamingSocket> m_cmdIn;
     std::unique_ptr<StreamingSocket> m_screen_socket;
     std::vector<ServerPlugin> m_plugins;
 
@@ -393,6 +394,10 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     std::shared_ptr<AudioStreamer<double>> m_audioStreamerD;
 
     bool audioConnectionOk();
+
+    void handleMessage(std::shared_ptr<Message<Key>> msg);
+
+    ENABLE_ASYNC_FUNCTORS();
 };
 
 }  // namespace e47

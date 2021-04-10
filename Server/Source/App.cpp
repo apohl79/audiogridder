@@ -112,7 +112,10 @@ void App::initialise(const String& commandLineParameters) {
 #ifdef JUCE_MAC
             Process::setDockIconVisible(false);
 #endif
-            CoreDump::initialize(appName, logName, false);
+            if (jsonGetValue(configParseFile(Defaults::getConfigFileName(Defaults::ConfigServer)), "SandboxCoreDumps",
+                             false)) {
+                CoreDump::initialize(appName, logName, false);
+            }
             AGLogger::deleteFileAtFinish();
             Tracer::deleteFileAtFinish();
             json opts;
@@ -126,6 +129,10 @@ void App::initialise(const String& commandLineParameters) {
         case MASTER:
 #ifdef JUCE_MAC
             Process::setDockIconVisible(false);
+            File appState("~/Library/Saved Application State/com.e47.AudioGridderServer.savedState");
+            if (appState.exists()) {
+                appState.deleteRecursively();
+            }
 #endif
             m_child = std::make_unique<std::thread>([this, srvid] {
                 ChildProcess proc;
@@ -373,6 +380,14 @@ void App::forgetEditorIfNeeded() {
     if (m_windowProc != nullptr && m_windowProc->getActiveEditor() == nullptr && m_window != nullptr) {
         logln("forgetting editor");
         m_window->forgetEditor();
+    }
+}
+
+void App::addKeyListener(KeyListener* l){
+    traceScope();
+    std::lock_guard<std::mutex> lock(m_windowMtx);
+    if (m_window != nullptr) {
+        m_window->addKeyListener(l);
     }
 }
 

@@ -57,7 +57,8 @@ class Worker : public Thread, public LogTag {
 
   private:
     std::shared_ptr<StreamingSocket> m_masterSocket;
-    std::unique_ptr<StreamingSocket> m_client;
+    std::unique_ptr<StreamingSocket> m_cmdIn;
+    std::unique_ptr<StreamingSocket> m_cmdOut;
     HandshakeRequest m_cfg;
     std::shared_ptr<AudioWorker> m_audio;
     std::shared_ptr<ScreenWorker> m_screen;
@@ -66,6 +67,16 @@ class Worker : public Thread, public LogTag {
     MessageFactory m_msgFactory;
 
     bool m_noPluginListFilter = false;
+
+    struct KeyWatcher : KeyListener {
+        Worker* worker;
+        KeyWatcher(Worker *w) : worker(w) {}
+        bool keyPressed(const KeyPress& kp, Component*);
+    };
+
+    std::unique_ptr<KeyWatcher> m_keyWatcher;
+
+    void sendKeys(const std::vector<uint16_t>& keysToPress);
 
     ENABLE_ASYNC_FUNCTORS();
 };

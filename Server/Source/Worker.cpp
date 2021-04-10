@@ -13,6 +13,9 @@
 
 #ifdef JUCE_MAC
 #include <sys/socket.h>
+#include <fcntl.h>
+#else
+#include <windows.h>
 #endif
 
 namespace e47 {
@@ -27,7 +30,8 @@ Worker::Worker(std::shared_ptr<StreamingSocket> masterSocket, const HandshakeReq
       m_cfg(cfg),
       m_audio(std::make_shared<AudioWorker>(this)),
       m_screen(std::make_shared<ScreenWorker>(this)),
-      m_msgFactory(this) {
+      m_msgFactory(this),
+      m_keyWatcher(std::make_unique<KeyWatcher>(this)) {
     traceScope();
     initAsyncFunctors();
     count++;
@@ -36,8 +40,8 @@ Worker::Worker(std::shared_ptr<StreamingSocket> masterSocket, const HandshakeReq
 Worker::~Worker() {
     traceScope();
     stopAsyncFunctors();
-    if (nullptr != m_client && m_client->isConnected()) {
-        m_client->close();
+    if (nullptr != m_cmdIn && m_cmdIn->isConnected()) {
+        m_cmdIn->close();
     }
     waitForThreadAndLog(this, this);
     count--;
@@ -50,18 +54,57 @@ void Worker::run() {
 
     m_noPluginListFilter = m_cfg.isFlag(HandshakeRequest::NO_PLUGINLIST_FILTER);
 
-    m_client.reset(m_masterSocket->waitForNextConnection());
-    if (nullptr != m_client && m_client->isConnected()) {
-        logln("client connected " << m_client->getHostName());
+    auto setNonBlocking = [](int handle) noexcept -> bool {
+#ifdef JUCE_WINDOWS
+        DWORD nonBlocking = 1;
+        return ioctlsocket(handle, FIONBIO, &nonBlocking) == 0;
+#else
+        int socketFlags = fcntl(handle, F_GETFL, 0);
+        if (socketFlags == -1) {
+            return false;
+        }
+        socketFlags &= ~O_NONBLOCK;
+        return fcntl(handle, F_SETFL, socketFlags) == 0;
+#endif
+    };
+
+    auto accept = [this]() -> StreamingSocket* {
+        TimeStatistic::Timeout timeout(2000);
+        do {
+            if (m_masterSocket->waitUntilReady(true, 100) > 0) {
+                auto sock = m_masterSocket->waitForNextConnection();
+                if (nullptr != sock) {
+                    return sock;
+                }
+            }
+        } while (timeout.getMillisecondsLeft() > 0);
+        return nullptr;
+    };
+
+    // set master socket non-blocking
+    if (!setNonBlocking(m_masterSocket->getRawSocketHandle())) {
+        logln("failed to set master socket non-blocking");
+    }
+
+    m_cmdIn.reset(accept());
+    if (nullptr != m_cmdIn && m_cmdIn->isConnected()) {
+        logln("client connected " << m_cmdIn->getHostName());
     } else {
         logln("no client, giving up");
+        return;
+    }
+
+    // command sending socket
+    m_cmdOut.reset(accept());
+    if (nullptr == m_cmdIn || !m_cmdIn->isConnected()) {
+        logln("failed to establish command connection");
         return;
     }
 
     std::unique_ptr<StreamingSocket> sock;
 
     // start audio processing
-    sock.reset(m_masterSocket->waitForNextConnection());
+    sock.reset(accept());
     if (nullptr != sock && sock->isConnected()) {
         m_audio->init(std::move(sock), m_cfg.channelsIn, m_cfg.channelsOut, m_cfg.channelsSC, m_cfg.rate,
                       m_cfg.samplesPerBlock, m_cfg.doublePrecission,
@@ -72,7 +115,7 @@ void Worker::run() {
     }
 
     // start screen capturing
-    sock.reset(m_masterSocket->waitForNextConnection());
+    sock.reset(accept());
     if (nullptr != sock && sock->isConnected()) {
         m_screen->init(std::move(sock));
         m_screen->startThread();
@@ -89,10 +132,10 @@ void Worker::run() {
 
     // enter message loop
     logln("command processor started");
-    while (!currentThreadShouldExit() && nullptr != m_client && m_client->isConnected() && m_audio->isThreadRunning() &&
+    while (!currentThreadShouldExit() && nullptr != m_cmdIn && m_cmdIn->isConnected() && m_audio->isThreadRunning() &&
            m_screen->isThreadRunning()) {
         MessageHelper::Error e;
-        auto msg = m_msgFactory.getNextMessage(m_client.get(), &e);
+        auto msg = m_msgFactory.getNextMessage(m_cmdIn.get(), &e);
         if (nullptr != msg) {
             switch (msg->getType()) {
                 case Quit::Type:
@@ -208,7 +251,6 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     logln("adding plugin " << id << "...");
     String err;
     bool success = m_audio->addPlugin(id, err);
-    logln("..." << (success ? "ok" : "failed"));
     std::shared_ptr<AudioPluginInstance> proc;
     json jresult;
     jresult["success"] = success;
@@ -220,9 +262,14 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     }
     Message<AddPluginResult> msgResult(this);
     PLD(msgResult).setJson(jresult);
-    if (!msgResult.send(m_client.get())) {
+    if (!msgResult.send(m_cmdIn.get())) {
         logln("failed to send result");
-        m_client->close();
+        m_cmdIn->close();
+        return;
+    }
+    logln("..." << (success ? "ok" : "failed"));
+    if (!success) {
+        m_cmdIn->close();
         return;
     }
     logln("sending presets...");
@@ -238,9 +285,9 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     }
     Message<Presets> msgPresets(this);
     msgPresets.payload.setString(presets);
-    if (!msgPresets.send(m_client.get())) {
+    if (!msgPresets.send(m_cmdIn.get())) {
         logln("failed to send Presets message");
-        m_client->close();
+        m_cmdIn->close();
         return;
     }
     logln("...ok");
@@ -279,18 +326,18 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     }
     Message<Parameters> msgParams(this);
     PLD(msgParams).setJson(jparams);
-    if (!msgParams.send(m_client.get())) {
+    if (!msgParams.send(m_cmdIn.get())) {
         logln("failed to send Parameters message");
-        m_client->close();
+        m_cmdIn->close();
         return;
     }
     logln("...ok");
     logln("reading plugin settings...");
     Message<PluginSettings> msgSettings(this);
     MessageHelper::Error e;
-    if (!msgSettings.read(m_client.get(), &e, 10000)) {
+    if (!msgSettings.read(m_cmdIn.get(), &e, 10000)) {
         logln("failed to read PluginSettings message:" << e.toString());
-        m_client->close();
+        m_cmdIn->close();
         return;
     }
     if (*msgSettings.payload.size > 0) {
@@ -299,7 +346,7 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
         proc->setStateInformation(block.getData(), static_cast<int>(block.getSize()));
     }
     logln("...ok");
-    m_audio->addToRecentsList(id, m_client->getHostName());
+    m_audio->addToRecentsList(id, m_cmdIn->getHostName());
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<DelPlugin>> msg) {
@@ -312,7 +359,7 @@ void Worker::handleMessage(std::shared_ptr<Message<DelPlugin>> msg) {
     }
     m_audio->delPlugin(idx);
     // send new updated latency samples back
-    m_msgFactory.sendResult(m_client.get(), m_audio->getLatencySamples());
+    m_msgFactory.sendResult(m_cmdIn.get(), m_audio->getLatencySamples());
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<EditPlugin>> msg) {
@@ -323,6 +370,9 @@ void Worker::handleMessage(std::shared_ptr<Message<EditPlugin>> msg) {
         getApp()->getServer().sandboxShowEditor();
         m_screen->showEditor(proc, pDATA(msg)->x, pDATA(msg)->y);
         m_activeEditorIdx = idx;
+        if (getApp()->getServer().getScreenLocalMode()) {
+            runOnMsgThreadAsync([this] { getApp()->addKeyListener(m_keyWatcher.get()); });
+        }
     }
 }
 
@@ -393,7 +443,7 @@ void Worker::handleMessage(std::shared_ptr<Message<GetPluginSettings>> msg) {
         proc->getStateInformation(block);
         Message<PluginSettings> ret(this);
         ret.payload.setData(block.begin(), static_cast<int>(block.getSize()));
-        ret.send(m_client.get());
+        ret.send(m_cmdIn.get());
     }
 }
 
@@ -402,9 +452,9 @@ void Worker::handleMessage(std::shared_ptr<Message<SetPluginSettings>> msg) {
     auto proc = m_audio->getProcessor(pPLD(msg).getNumber());
     if (nullptr != proc) {
         Message<PluginSettings> msgSettings(this);
-        if (!msgSettings.read(m_client.get())) {
+        if (!msgSettings.read(m_cmdIn.get())) {
             logln("failed to read PluginSettings message");
-            m_client->close();
+            m_cmdIn->close();
             return;
         }
         if (*msgSettings.payload.size > 0) {
@@ -438,9 +488,9 @@ void Worker::handleMessage(std::shared_ptr<Message<ExchangePlugins>> msg) {
 
 void Worker::handleMessage(std::shared_ptr<Message<RecentsList>> msg) {
     traceScope();
-    auto list = m_audio->getRecentsList(m_client->getHostName());
+    auto list = m_audio->getRecentsList(m_cmdIn->getHostName());
     pPLD(msg).setString(list);
-    msg->send(m_client.get());
+    msg->send(m_cmdIn.get());
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<Preset>> msg) {
@@ -470,7 +520,7 @@ void Worker::handleMessage(std::shared_ptr<Message<GetParameterValue>> msg) {
     DATA(ret)->idx = pDATA(msg)->idx;
     DATA(ret)->paramIdx = pDATA(msg)->paramIdx;
     DATA(ret)->value = m_audio->getParameterValue(pDATA(msg)->idx, pDATA(msg)->paramIdx);
-    ret.send(m_client.get());
+    ret.send(m_cmdIn.get());
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<GetAllParameterValues>> msg) {
@@ -482,7 +532,7 @@ void Worker::handleMessage(std::shared_ptr<Message<GetAllParameterValues>> msg) 
             DATA(ret)->idx = pPLD(msg).getNumber();
             DATA(ret)->paramIdx = param->getParameterIndex();
             DATA(ret)->value = param->getValue();
-            ret.send(m_client.get());
+            ret.send(m_cmdIn.get());
         }
     }
 }
@@ -516,7 +566,7 @@ void Worker::handleMessage(std::shared_ptr<Message<Restart>> /*msg*/) {
 void Worker::handleMessage(std::shared_ptr<Message<CPULoad>> msg) {
     traceScope();
     pPLD(msg).setFloat(CPUInfo::getUsage());
-    msg->send(m_client.get());
+    msg->send(m_cmdIn.get());
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<PluginList>> msg) {
@@ -541,7 +591,104 @@ void Worker::handleMessage(std::shared_ptr<Message<PluginList>> msg) {
         }
     }
     pPLD(msg).setString(list);
-    msg->send(m_client.get());
+    msg->send(m_cmdIn.get());
+}
+
+void Worker::sendKeys(const std::vector<uint16_t>& keysToPress) {
+    Message<Key> msg(this);
+    PLD(msg).setData(reinterpret_cast<const char*>(keysToPress.data()),
+                     static_cast<int>(keysToPress.size() * sizeof(uint16_t)));
+    msg.send(m_cmdOut.get());
+}
+
+bool Worker::KeyWatcher::keyPressed(const KeyPress& kp, Component*) {
+    std::vector<uint16_t> keysToPress;
+    auto modkeys = kp.getModifiers();
+    if (modkeys.isShiftDown()) {
+        keysToPress.push_back(getKeyCode("Shift"));
+    }
+    if (modkeys.isCtrlDown()) {
+        keysToPress.push_back(getKeyCode("Control"));
+    }
+    if (modkeys.isAltDown()) {
+        keysToPress.push_back(getKeyCode("Option"));
+    }
+    if (kp.isKeyCurrentlyDown(KeyPress::escapeKey)) {
+        keysToPress.push_back(getKeyCode("Escape"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::spaceKey)) {
+        keysToPress.push_back(getKeyCode("Space"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::returnKey)) {
+        keysToPress.push_back(getKeyCode("Return"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::tabKey)) {
+        keysToPress.push_back(getKeyCode("Tab"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::deleteKey)) {
+        keysToPress.push_back(getKeyCode("Delete"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::backspaceKey)) {
+        keysToPress.push_back(getKeyCode("Backspace"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::upKey)) {
+        keysToPress.push_back(getKeyCode("UpArrow"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::downKey)) {
+        keysToPress.push_back(getKeyCode("DownArrow"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::leftKey)) {
+        keysToPress.push_back(getKeyCode("LeftArrow"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::rightKey)) {
+        keysToPress.push_back(getKeyCode("RightArrow"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::pageUpKey)) {
+        keysToPress.push_back(getKeyCode("PageUp"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::pageDownKey)) {
+        keysToPress.push_back(getKeyCode("PageDown"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::homeKey)) {
+        keysToPress.push_back(getKeyCode("Home"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::endKey)) {
+        keysToPress.push_back(getKeyCode("End"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F1Key)) {
+        keysToPress.push_back(getKeyCode("F1"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F2Key)) {
+        keysToPress.push_back(getKeyCode("F2"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F3Key)) {
+        keysToPress.push_back(getKeyCode("F3"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F4Key)) {
+        keysToPress.push_back(getKeyCode("F4"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F5Key)) {
+        keysToPress.push_back(getKeyCode("F5"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F6Key)) {
+        keysToPress.push_back(getKeyCode("F6"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F7Key)) {
+        keysToPress.push_back(getKeyCode("F7"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F8Key)) {
+        keysToPress.push_back(getKeyCode("F8"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F9Key)) {
+        keysToPress.push_back(getKeyCode("F9"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F10Key)) {
+        keysToPress.push_back(getKeyCode("F10"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F11Key)) {
+        keysToPress.push_back(getKeyCode("F11"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F12Key)) {
+        keysToPress.push_back(getKeyCode("F12"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F13Key)) {
+        keysToPress.push_back(getKeyCode("F13"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F14Key)) {
+        keysToPress.push_back(getKeyCode("F14"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F15Key)) {
+        keysToPress.push_back(getKeyCode("F15"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F16Key)) {
+        keysToPress.push_back(getKeyCode("F16"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F17Key)) {
+        keysToPress.push_back(getKeyCode("F17"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F18Key)) {
+        keysToPress.push_back(getKeyCode("F18"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::F19Key)) {
+        keysToPress.push_back(getKeyCode("F19"));
+    } else {
+        auto c = static_cast<char>(kp.getKeyCode());
+        String key(CharPointer_UTF8(&c), 1);
+        auto kc = getKeyCode(key.toUpperCase().toStdString());
+        if (NOKEY != kc) {
+            keysToPress.push_back(kc);
+        }
+    }
+    worker->sendKeys(keysToPress);
+    return true;
 }
 
 }  // namespace e47

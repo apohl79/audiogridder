@@ -10,6 +10,7 @@
 #include "PluginProcessor.hpp"
 #include "ServiceReceiver.hpp"
 #include "AudioStreamer.hpp"
+#include "KeyAndMouse.hpp"
 
 #ifdef JUCE_WINDOWS
 #include "windows.h"
@@ -23,12 +24,13 @@ std::atomic_uint32_t Client::count{0};
 
 Client::Client(AudioGridderAudioProcessor* processor)
     : Thread("Client"), LogTag("client"), m_processor(processor), m_msgFactory(this) {
-    logln("client created");
+    initAsyncFunctors();
     count++;
 }
 
 Client::~Client() {
     traceScope();
+    stopAsyncFunctors();
     signalThreadShouldExit();
     close();
     count--;
@@ -40,6 +42,7 @@ void Client::run() {
     uint32 cpuUpdateSeconds = 5;
     uint32 syncSeconds = 10;
     uint32 loops = 0;
+    MessageFactory msgFactory(this);
     bool lastState = isReady();
     while (!currentThreadShouldExit()) {
         // Check for config updates from other clients
@@ -95,11 +98,68 @@ void Client::run() {
             m_processor->sync();
         }
 
-        // Relax
-        sleepExitAware(1000);
+        if (isReadyLockFree()) {
+            TimeStatistic::Timeout timeout(1000);
+            while (timeout.getMillisecondsLeft() > 0 && !currentThreadShouldExit()) {
+                MessageHelper::Error err;
+                auto msg = msgFactory.getNextMessage(m_cmdIn.get(), &err, 100);
+                if (nullptr != msg) {
+                    switch (msg->getType()) {
+                        case Key::Type:
+                            handleMessage(Message<Any>::convert<Key>(msg));
+                            break;
+                        default:
+                            logln("unknown message type " << msg->getType());
+                    }
+                }
+            }
+        } else {
+            // Relax
+            sleepExitAware(1000);
+        }
+
         loops++;
     }
     logln("client loop terminated");
+}
+
+void Client::handleMessage(std::shared_ptr<Message<Key>> msg) {
+#if defined(JUCE_MAC) || defined(JUCE_WINDOWS)
+    traceScope();
+    runOnMsgThreadAsync([this, msg] {
+        traceScope();
+        void* nativeHandle = nullptr;
+#ifdef JUCE_WINDOWS
+        auto* e = m_processor->getActiveEditor();
+        if (nullptr != e) {
+            nativeHandle = e->getPeer()->getNativeHandle();
+        }
+        if (nullptr == nativeHandle) {
+            logln("unable to get native handle");
+            return;
+        }
+#endif
+        auto* codes = pPLD(msg).getKeyCodes();
+        auto num = pPLD(msg).getKeyCount();
+        uint16_t key = 0;
+        uint64_t flags = 0;
+        for (int i = 0; i < num; i++) {
+            if (isShiftKey(codes[i])) {
+                setShiftKey(flags);
+            } else if (isControlKey(codes[i])) {
+                setControlKey(flags);
+            } else if (isAltKey(codes[i])) {
+                setAltKey(flags);
+            } else {
+                key = codes[i];
+            }
+        }
+        keyEventDown(key, flags, true, nativeHandle);
+        keyEventUp(key, flags, true, nativeHandle);
+    });
+#else
+    ignoreUnused(msg);
+#endif
 }
 
 void Client::setServer(const ServerInfo& srv) {
@@ -166,8 +226,8 @@ void Client::init(int channelsIn, int channelsOut, int channelsSC, double rate, 
                               << " rate=" << rate << " samplesPerBlock=" << samplesPerBlock
                               << " doublePrecission=" << (int)doublePrecission);
     LockByID lock(*this, INIT1);
-    if (!m_ready || m_channelsIn != channelsIn || m_channelsOut != channelsOut || m_rate != rate ||
-        m_samplesPerBlock != samplesPerBlock || m_doublePrecission != doublePrecission) {
+    if (!m_ready || m_channelsIn != channelsIn || m_channelsOut != channelsOut || m_channelsSC != channelsSC ||
+        m_rate != rate || m_samplesPerBlock != samplesPerBlock || m_doublePrecission != doublePrecission) {
         m_channelsIn = channelsIn;
         m_channelsOut = channelsOut;
         m_channelsSC = channelsSC;
@@ -197,8 +257,8 @@ void Client::init() {
         return;
     }
     logln("connecting server " << host << ":" << id);
-    m_cmd_socket = std::make_unique<StreamingSocket>();
-    if (m_cmd_socket->connect(host, port, 1000)) {
+    m_cmdOut = std::make_unique<StreamingSocket>();
+    if (m_cmdOut->connect(host, port, 1000)) {
         HandshakeRequest cfg = {4,      m_channelsIn,      m_channelsOut,      m_channelsSC,
                                 m_rate, m_samplesPerBlock, m_doublePrecission, getId()};
         if (m_processor->getNoSrvPluginListFilter()) {
@@ -208,33 +268,37 @@ void Client::init() {
             cfg.setFlag(HandshakeRequest::CAN_DISABLE_SIDECHAIN);
         }
 
-        if (!send(m_cmd_socket.get(), reinterpret_cast<const char*>(&cfg), sizeof(cfg))) {
-            m_cmd_socket->close();
+        if (!send(m_cmdOut.get(), reinterpret_cast<const char*>(&cfg), sizeof(cfg))) {
+            m_cmdOut->close();
             return;
         }
 
         HandshakeResponse resp;
         MessageHelper::Error err;
-        if (!read(m_cmd_socket.get(), &resp, sizeof(resp), 5000, &err)) {
+        if (!read(m_cmdOut.get(), &resp, sizeof(resp), 5000, &err)) {
             logln("handshake error: " << err.toString());
-            m_cmd_socket->close();
+            m_cmdOut->close();
             return;
         }
-        m_cmd_socket->close();
+        m_cmdOut->close();
 
         m_srvLocalMode = resp.isFlag(HandshakeResponse::LOCAL_MODE);
         logln("server local mode is " << (int)m_srvLocalMode);
 
-        StreamingSocket* audioSock = nullptr;
-
         logln("connecting server " << host << ":" << resp.port);
-        if (!m_cmd_socket->connect(host, resp.port, 3000)) {
+        if (!m_cmdOut->connect(host, resp.port, 3000)) {
             logln("connection to server failed");
-            m_cmd_socket->close();
+            m_cmdOut->close();
             return;
+        }
+        m_cmdIn = std::make_unique<StreamingSocket>();
+        if (!m_cmdIn->connect(host, resp.port, 3000)) {
+            logln("failed to setup command receive connection");
+            m_cmdIn.reset();
         }
         logln("command connection established");
 
+        StreamingSocket* audioSock = nullptr;
         audioSock = new StreamingSocket;
         if (!audioSock->connect(host, resp.port, 3000)) {
             logln("failed to setup audio connection");
@@ -293,7 +357,7 @@ bool Client::isReady(int timeout) {
         }
     }
     if (locked) {
-        m_ready = !m_error && !m_needsReconnect && nullptr != m_cmd_socket && m_cmd_socket->isConnected() &&
+        m_ready = !m_error && !m_needsReconnect && nullptr != m_cmdOut && m_cmdOut->isConnected() &&
                   m_screenWorker->isThreadRunning() && nullptr != m_screen_socket && m_screen_socket->isConnected() &&
                   audioConnectionOk();
         m_clientMtx.unlock();
@@ -323,11 +387,11 @@ void Client::close() {
         m_screenWorker.reset();
         m_screen_socket.reset();
     }
-    if (nullptr != m_cmd_socket) {
-        if (m_cmd_socket->isConnected()) {
-            m_cmd_socket->close();
+    if (nullptr != m_cmdOut) {
+        if (m_cmdOut->isConnected()) {
+            m_cmdOut->close();
         }
-        m_cmd_socket.reset();
+        m_cmdOut.reset();
     }
     m_audioMtx.lock();
     if (nullptr != m_audioStreamerD && m_audioStreamerD->isThreadRunning()) {
@@ -362,7 +426,7 @@ void Client::quit() {
     traceScope();
     // called from close which already holds a lock
     Message<Quit> msg(this);
-    msg.send(m_cmd_socket.get());
+    msg.send(m_cmdOut.get());
 }
 
 bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params, bool& hasEditor, String settings,
@@ -376,9 +440,9 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
     PLD(msg).setString(id);
     LockByID lock(*this, ADDPLUGIN);
     TimeStatistic::Timeout timeout(LOAD_PLUGIN_TIMEOUT);
-    if (msg.send(m_cmd_socket.get())) {
+    if (msg.send(m_cmdOut.get())) {
         Message<AddPluginResult> msgResult(this);
-        if (!msgResult.read(m_cmd_socket.get(), &e, LOAD_PLUGIN_TIMEOUT / 1000)) {
+        if (!msgResult.read(m_cmdOut.get(), &e, timeout.getMillisecondsLeft())) {
             err = "failed to get result: " + e.toString();
             logln(err);
             return false;
@@ -395,7 +459,7 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
             return false;
         }
         Message<Presets> msgPresets(this);
-        if (!msgPresets.read(m_cmd_socket.get(), &e, timeout.getMillisecondsLeft())) {
+        if (!msgPresets.read(m_cmdOut.get(), &e, timeout.getMillisecondsLeft())) {
             err = "failed to read presets: " + e.toString();
             logln(err);
             return false;
@@ -407,7 +471,7 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
             return false;
         }
         Message<Parameters> msgParams(this);
-        if (!msgParams.read(m_cmd_socket.get(), &e, timeout.getMillisecondsLeft())) {
+        if (!msgParams.read(m_cmdOut.get(), &e, timeout.getMillisecondsLeft())) {
             err = "failed to read parameters: " + e.toString();
             logln(err);
             return false;
@@ -430,7 +494,7 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
             block.fromBase64Encoding(settings);
             msgSettings.payload.setData(block.begin(), static_cast<int>(block.getSize()));
         }
-        if (!msgSettings.send(m_cmd_socket.get())) {
+        if (!msgSettings.send(m_cmdOut.get())) {
             err = "failed to send settings";
             logln(err);
             return false;
@@ -450,8 +514,8 @@ void Client::delPlugin(int idx) {
     Message<DelPlugin> msg(this);
     PLD(msg).setNumber(idx);
     LockByID lock(*this, DELPLUGIN);
-    msg.send(m_cmd_socket.get());
-    auto result = m_msgFactory.getResult(m_cmd_socket.get());
+    msg.send(m_cmdOut.get());
+    auto result = m_msgFactory.getResult(m_cmdOut.get());
     if (nullptr != result && result->getReturnCode() > -1) {
         m_latency = result->getReturnCode();
     }
@@ -467,7 +531,7 @@ void Client::editPlugin(int idx, int x, int y) {
     DATA(msg)->x = x;
     DATA(msg)->y = y;
     LockByID lock(*this, EDITPLUGIN);
-    msg.send(m_cmd_socket.get());
+    msg.send(m_cmdOut.get());
 }
 
 void Client::hidePlugin() {
@@ -477,7 +541,7 @@ void Client::hidePlugin() {
     };
     Message<HidePlugin> msg(this);
     LockByID lock(*this, HIDEPLUGIN);
-    msg.send(m_cmd_socket.get());
+    msg.send(m_cmdOut.get());
 }
 
 MemoryBlock Client::getPluginSettings(int idx) {
@@ -489,12 +553,12 @@ MemoryBlock Client::getPluginSettings(int idx) {
     Message<GetPluginSettings> msg(this);
     PLD(msg).setNumber(idx);
     LockByID lock(*this, GETPLUGINSETTINGS);
-    if (!msg.send(m_cmd_socket.get())) {
+    if (!msg.send(m_cmdOut.get())) {
         m_error = true;
     } else {
         Message<PluginSettings> res(this);
         MessageHelper::Error err;
-        if (res.read(m_cmd_socket.get(), &err, 5000)) {
+        if (res.read(m_cmdOut.get(), &err, 5000)) {
             if (*res.payload.size > 0) {
                 block.append(res.payload.data, (size_t)*res.payload.size);
             }
@@ -511,7 +575,7 @@ void Client::setPluginSettings(int idx, String settings) {
     Message<SetPluginSettings> msg(this);
     PLD(msg).setNumber(idx);
     LockByID lock(*this, SETPLUGINSETTINGS);
-    if (!msg.send(m_cmd_socket.get())) {
+    if (!msg.send(m_cmdOut.get())) {
         m_error = true;
     } else {
         Message<PluginSettings> msgSettings(this);
@@ -520,7 +584,7 @@ void Client::setPluginSettings(int idx, String settings) {
             block.fromBase64Encoding(settings);
             msgSettings.payload.setData(block.begin(), static_cast<int>(block.getSize()));
         }
-        if (!msgSettings.send(m_cmd_socket.get())) {
+        if (!msgSettings.send(m_cmdOut.get())) {
             logln("failed to send settings");
             m_error = true;
         }
@@ -535,7 +599,7 @@ void Client::bypassPlugin(int idx) {
     Message<BypassPlugin> msg(this);
     PLD(msg).setNumber(idx);
     LockByID lock(*this, BYPASSPLUGIN);
-    msg.send(m_cmd_socket.get());
+    msg.send(m_cmdOut.get());
 }
 
 void Client::unbypassPlugin(int idx) {
@@ -546,7 +610,7 @@ void Client::unbypassPlugin(int idx) {
     Message<UnbypassPlugin> msg(this);
     PLD(msg).setNumber(idx);
     LockByID lock(*this, UNBYPASSPLUGIN);
-    msg.send(m_cmd_socket.get());
+    msg.send(m_cmdOut.get());
 }
 
 void Client::exchangePlugins(int idxA, int idxB) {
@@ -558,7 +622,7 @@ void Client::exchangePlugins(int idxA, int idxB) {
     DATA(msg)->idxA = idxA;
     DATA(msg)->idxB = idxB;
     LockByID lock(*this, EXCHANGEPLUGINS);
-    msg.send(m_cmd_socket.get());
+    msg.send(m_cmdOut.get());
 }
 
 Array<ServerPlugin> Client::getRecents() {
@@ -570,8 +634,8 @@ Array<ServerPlugin> Client::getRecents() {
     Message<RecentsList> msg(this);
     MessageHelper::Error err;
     LockByID lock(*this, GETRECENTS);
-    msg.send(m_cmd_socket.get());
-    if (msg.read(m_cmd_socket.get(), &err, 5000)) {
+    msg.send(m_cmdOut.get());
+    if (msg.read(m_cmdOut.get(), &err, 5000)) {
         String listChunk(PLD(msg).str, (size_t)*PLD(msg).size);
         auto list = StringArray::fromLines(listChunk);
         for (auto& line : list) {
@@ -595,7 +659,7 @@ void Client::setPreset(int idx, int preset) {
     DATA(msg)->idx = idx;
     DATA(msg)->preset = preset;
     LockByID lock(*this, SETPRESET);
-    msg.send(m_cmd_socket.get());
+    msg.send(m_cmdOut.get());
 }
 
 float Client::getParameterValue(int idx, int paramIdx) {
@@ -607,10 +671,10 @@ float Client::getParameterValue(int idx, int paramIdx) {
     DATA(msg)->idx = idx;
     DATA(msg)->paramIdx = paramIdx;
     LockByID lock(*this, GETPARAMETERVALUE);
-    msg.send(m_cmd_socket.get());
+    msg.send(m_cmdOut.get());
     Message<ParameterValue> ret(this);
     MessageHelper::Error err;
-    if (ret.read(m_cmd_socket.get(), &err)) {
+    if (ret.read(m_cmdOut.get(), &err)) {
         if (DATA(msg)->idx == DATA(ret)->idx && DATA(msg)->paramIdx == DATA(ret)->paramIdx) {
             return DATA(ret)->value;
         }
@@ -631,7 +695,7 @@ void Client::setParameterValue(int idx, int paramIdx, float val) {
     DATA(msg)->paramIdx = paramIdx;
     DATA(msg)->value = val;
     LockByID lock(*this, SETPARAMETERVALUE);
-    msg.send(m_cmd_socket.get());
+    msg.send(m_cmdOut.get());
 }
 
 Array<Client::ParameterResult> Client::getAllParameterValues(int idx, int cnt) {
@@ -642,12 +706,12 @@ Array<Client::ParameterResult> Client::getAllParameterValues(int idx, int cnt) {
     Message<GetAllParameterValues> msg(this);
     PLD(msg).setNumber(idx);
     LockByID lock(*this, GETALLPARAMETERVALUES);
-    msg.send(m_cmd_socket.get());
+    msg.send(m_cmdOut.get());
     Array<Client::ParameterResult> ret;
     for (int i = 0; i < cnt; i++) {
         Message<ParameterValue> msgVal(this);
         MessageHelper::Error err;
-        if (msgVal.read(m_cmd_socket.get(), &err)) {
+        if (msgVal.read(m_cmdOut.get(), &err)) {
             if (idx == DATA(msgVal)->idx) {
                 ret.add({DATA(msgVal)->paramIdx, DATA(msgVal)->value});
             }
@@ -770,7 +834,7 @@ void Client::sendMouseEvent(MouseEvType ev, Point<float> p, bool isShiftDown, bo
         DATA(msg)->isSmooth = false;
     }
     LockByID lock(*this, SENDMOUSEEVENT);
-    msg.send(m_cmd_socket.get());
+    msg.send(m_cmdOut.get());
 }
 
 bool Client::keyPressed(const KeyPress& kp, Component* /* originatingComponent */) {
@@ -870,7 +934,7 @@ bool Client::keyPressed(const KeyPress& kp, Component* /* originatingComponent *
     PLD(msg).setData(reinterpret_cast<const char*>(keysToPress.data()),
                      static_cast<int>(keysToPress.size() * sizeof(uint16_t)));
     LockByID lock(*this, KEYPRESSED);
-    msg.send(m_cmd_socket.get());
+    msg.send(m_cmdOut.get());
 
     return consumed;
 }
@@ -880,7 +944,7 @@ void Client::updateScreenCaptureArea(int val) {
     Message<UpdateScreenCaptureArea> msg(this);
     PLD(msg).setNumber(val);
     LockByID lock(*this, UPDATESCREENCAPTUREAREA);
-    msg.send(m_cmd_socket.get());
+    msg.send(m_cmdOut.get());
 }
 
 void Client::rescan(bool wipe) {
@@ -888,14 +952,14 @@ void Client::rescan(bool wipe) {
     Message<Rescan> msg(this);
     PLD(msg).setNumber(wipe ? 1 : 0);
     LockByID lock(*this, RESCAN);
-    msg.send(m_cmd_socket.get());
+    msg.send(m_cmdOut.get());
 }
 
 void Client::restart() {
     traceScope();
     Message<Restart> msg(this);
     LockByID lock(*this, RESTART);
-    msg.send(m_cmd_socket.get());
+    msg.send(m_cmdOut.get());
 }
 
 void Client::updatePluginList(bool sendRequest) {
@@ -903,11 +967,11 @@ void Client::updatePluginList(bool sendRequest) {
     Message<PluginList> msg(this);
     LockByID lock(*this, UPDATEPLUGINLIST, false);  // NOT enforcing the lock as this is called from init()
     if (sendRequest) {
-        msg.send(m_cmd_socket.get());
+        msg.send(m_cmdOut.get());
     }
     m_plugins.clear();
     MessageHelper::Error err;
-    if (!msg.read(m_cmd_socket.get(), &err, 5000)) {
+    if (!msg.read(m_cmdOut.get(), &err, 5000)) {
         logln("failed reading plugin list: " << err.toString());
         return;
     }
@@ -938,8 +1002,8 @@ void Client::updateCPULoad() {
         traceln("updating cpu load via server request");
         Message<CPULoad> msg(this);
         LockByID lock(*this, UPDATECPULOAD2);
-        msg.send(m_cmd_socket.get());
-        msg.read(m_cmd_socket.get());
+        msg.send(m_cmdOut.get());
+        msg.read(m_cmdOut.get());
         if (m_srvLoad != PLD(msg).getFloat()) {
             m_srvLoad = PLD(msg).getFloat();
             updated = true;

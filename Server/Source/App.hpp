@@ -70,6 +70,8 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     void restartEditor();
     void forgetEditorIfNeeded();
 
+    void addKeyListener(KeyListener* l);
+
     void updateScreenCaptureArea(int val);
 
     Point<float> localPointToGlobal(Point<float> lp);

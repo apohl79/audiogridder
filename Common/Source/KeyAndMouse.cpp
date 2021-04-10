@@ -19,6 +19,8 @@
 #include "KeyAndMouse.hpp"
 #include "Utils.hpp"
 
+#if defined(JUCE_MAC) || defined(JUCE_WINDOWS)
+
 namespace e47 {
 
 setLogTagStatic("keyandmouse");
@@ -49,11 +51,15 @@ void mouseScrollEventReal(float deltaX, float deltaY) {
     CFRelease(event);
 }
 
-void keyEventReal(uint16_t keyCode, uint64_t flags, bool keyDown) {
+void keyEventReal(uint16_t keyCode, uint64_t flags, bool keyDown, bool currentProcessOnly) {
     traceScope();
     CGEventRef ev = CGEventCreateKeyboardEvent(nullptr, keyCode, keyDown);
     CGEventSetFlags(ev, flags | CGEventGetFlags(ev));
-    CGEventPost(kCGSessionEventTap, ev);
+    if (currentProcessOnly) {
+        CGEventPostToPid(getpid(), ev);
+    } else {
+        CGEventPost(kCGSessionEventTap, ev);
+    }
     CFRelease(ev);
 }
 
@@ -116,20 +122,27 @@ void sendInput(INPUT* in) {
     }
 }
 
-void sendKey(WORD vk, bool keyDown) {
+void sendKey(WORD vk, bool keyDown, HWND hwnd = NULL) {
     traceScope();
-    INPUT event;
-    event.type = INPUT_KEYBOARD;
-    event.ki.wVk = vk;
-    event.ki.wScan = 0;
-    if (keyDown) {
-        event.ki.dwFlags = 0;
+    if (hwnd) {
+        auto msg = keyDown? WM_KEYDOWN: WM_KEYUP;
+        if (SendMessage(hwnd, msg, vk, 1)) {
+            logln("SendMessage failed: " << GetLastErrorStr());
+        }
     } else {
-        event.ki.dwFlags = KEYEVENTF_KEYUP;
+        INPUT event;
+        event.type = INPUT_KEYBOARD;
+        event.ki.wVk = vk;
+        event.ki.wScan = 0;
+        if (keyDown) {
+            event.ki.dwFlags = 0;
+        } else {
+            event.ki.dwFlags = KEYEVENTF_KEYUP;
+        }
+        event.ki.time = 0;
+        event.ki.dwExtraInfo = NULL;
+        sendInput(&event);
     }
-    event.ki.time = 0;
-    event.ki.dwExtraInfo = NULL;
-    sendInput(&event);
 }
 
 void mouseEventReal(POINT pos, DWORD evFlags, uint64_t flags) {
@@ -191,34 +204,41 @@ void mouseScrollEventReal(POINT pos, DWORD deltaX, DWORD deltaY) {
     }
 }
 
-void keyEventReal(WORD vk, uint64_t flags, bool keyDown) {
+void keyEventReal(WORD vk, uint64_t flags, bool keyDown, void* nativeHandle) {
     traceScope();
+
+    auto hwnd = (HWND)nativeHandle;
+    if (nullptr != nativeHandle && !IsWindow(hwnd)) {
+        logln("nativeHandle is no HWND");
+        return;
+    }
+
     // modifiers down
     if (keyDown) {
         if ((flags & VK_SHIFT) == VK_SHIFT) {
-            sendKey(VK_SHIFT, true);
+            sendKey(VK_SHIFT, true, hwnd);
         }
         if ((flags & VK_CONTROL) == VK_CONTROL) {
-            sendKey(VK_CONTROL, true);
+            sendKey(VK_CONTROL, true, hwnd);
         }
         if ((flags & VK_MENU) == VK_MENU) {
-            sendKey(VK_MENU, true);
+            sendKey(VK_MENU, true, hwnd);
         }
     }
 
     // send key
-    sendKey(vk, keyDown);
+    sendKey(vk, keyDown, hwnd);
 
     // modifiers up
     if (!keyDown) {
         if ((flags & VK_SHIFT) == VK_SHIFT) {
-            sendKey(VK_SHIFT, false);
+            sendKey(VK_SHIFT, false, hwnd);
         }
         if ((flags & VK_CONTROL) == VK_CONTROL) {
-            sendKey(VK_CONTROL, false);
+            sendKey(VK_CONTROL, false, hwnd);
         }
         if ((flags & VK_MENU) == VK_MENU) {
-            sendKey(VK_MENU, false);
+            sendKey(VK_MENU, false, hwnd);
         }
     }
 }
@@ -364,11 +384,12 @@ void mouseScrollEvent(float x, float y, float deltaX, float deltaY, bool isSmoot
 #endif
 }
 
-void keyEvent(uint16_t keyCode, uint64_t flags, bool keyDown) {
+void keyEvent(uint16_t keyCode, uint64_t flags, bool keyDown, bool currentProcessOnly, void* nativeHandle) {
 #if defined(JUCE_MAC)
-    keyEventReal(keyCode, flags, keyDown);
+    ignoreUnused(nativeHandle);
+    keyEventReal(keyCode, flags, keyDown, currentProcessOnly);
 #elif defined(JUCE_WINDOWS)
-    keyEventReal(getVK(keyCode), flags, keyDown);
+    keyEventReal(getVK(keyCode), flags, keyDown, currentProcessOnly? nativeHandle: nullptr);
 #endif
 }
 
@@ -394,8 +415,14 @@ void setAltKey(uint64_t& flags) {
 #endif
 }
 
-void keyEventDown(uint16_t keyCode, uint64_t flags) { keyEvent(keyCode, flags, true); }
+void keyEventDown(uint16_t keyCode, uint64_t flags, bool currentProcessOnly, void* nativeHandle) {
+    keyEvent(keyCode, flags, true, currentProcessOnly, nativeHandle);
+}
 
-void keyEventUp(uint16_t keyCode, uint64_t flags) { keyEvent(keyCode, flags, false); }
+void keyEventUp(uint16_t keyCode, uint64_t flags, bool currentProcessOnly, void* nativeHandle) {
+    keyEvent(keyCode, flags, false, currentProcessOnly, nativeHandle);
+}
 
 }  // namespace e47
+
+#endif

@@ -8,6 +8,7 @@
 #ifndef KeyAndMouseCommon_hpp
 #define KeyAndMouseCommon_hpp
 
+#include <string>
 #include <unordered_map>
 
 enum MouseEvType : uint8_t {

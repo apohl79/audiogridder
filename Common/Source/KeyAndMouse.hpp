@@ -8,6 +8,8 @@
 #ifndef KeyAndMouse_hpp
 #define KeyAndMouse_hpp
 
+#if defined(JUCE_MAC) || defined(JUCE_WINDOWS)
+
 #include <stdint.h>
 #include <string>
 #include <unordered_map>
@@ -26,9 +28,11 @@ void setAltKey(uint64_t& flags);
 
 void mouseEvent(MouseEvType t, float x, float y, uint64_t flags = 0);
 void mouseScrollEvent(float x, float y, float deltaX, float deltaY, bool isSmooth);
-void keyEventDown(uint16_t keyCode, uint64_t flags = 0);
-void keyEventUp(uint16_t keyCode, uint64_t flags = 0);
+void keyEventDown(uint16_t keyCode, uint64_t flags = 0, bool currentProcessOnly = false, void* nativeHandle = nullptr);
+void keyEventUp(uint16_t keyCode, uint64_t flags = 0, bool currentProcessOnly = false, void* nativeHandle = nullptr);
 
 }  // namespace e47
+
+#endif
 
 #endif /* KeyAndMouse_hpp */
