@@ -11,6 +11,7 @@
 #include "Defaults.hpp"
 #include "mDNSConnector.hpp"
 #include "json.hpp"
+#include "Metrics.hpp"
 
 #ifdef JUCE_WINDOWS
 #include <Winsock2.h>
@@ -55,10 +56,10 @@ void ServiceReceiver::run() {
 
         connector.sendQuery(Defaults::MDNS_SERVICE_NAME);
         // read/store result
-        auto timeout = Time::currentTimeMillis() + 3000;
+        TimeStatistic::Timeout timeout(3000);
         do {
             connector.readResponses(queryCallback);
-        } while (timeout > Time::currentTimeMillis());
+        } while (timeout.getMillisecondsLeft() > 0 && !currentThreadShouldExit());
 
         struct SortSrvByName {
             static int compareElements(const ServerInfo& lhs, const ServerInfo& rhs) {
@@ -208,11 +209,13 @@ std::shared_ptr<ServiceReceiver> ServiceReceiver::getInstance() {
 
 void ServiceReceiver::cleanup(uint64 id) {
     std::lock_guard<std::mutex> lock(m_instMtx);
-    m_inst->m_updateFn.remove(id);
-    m_instRefCount--;
-    if (m_instRefCount == 0) {
-        m_inst->signalThreadShouldExit();
-        m_inst.reset();
+    if (nullptr != m_inst) {
+        m_inst->m_updateFn.remove(id);
+        m_instRefCount--;
+        if (m_instRefCount == 0) {
+            m_inst->signalThreadShouldExit();
+            m_inst.reset();
+        }
     }
 }
 

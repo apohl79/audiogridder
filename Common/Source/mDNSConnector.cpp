@@ -217,12 +217,12 @@ int mDNSConnector::openServiceSockets(int maxSockets) {
     return m_sockets.size();
 }
 
-void mDNSConnector::readQueries(mdns_record_callback_fn callback, void* userData, int timeoutSeconds) {
-    readRecords(SERVICE, callback, userData, timeoutSeconds);
+void mDNSConnector::readQueries(mdns_record_callback_fn callback, void* userData) {
+    readRecords(SERVICE, callback, userData);
 }
 
-void mDNSConnector::readResponses(mdns_record_callback_fn callback, void* userData, int timeoutSeconds) {
-    readRecords(QUERY, callback, userData, timeoutSeconds);
+void mDNSConnector::readResponses(mdns_record_callback_fn callback, void* userData) {
+    readRecords(QUERY, callback, userData);
 }
 
 void mDNSConnector::sendQuery(const String& service) {
@@ -257,7 +257,7 @@ void mDNSConnector::sendQuery(const String& service) {
     }
 }
 
-void mDNSConnector::readRecords(ReadType type, mdns_record_callback_fn callback, void* userData, int timeoutSeconds) {
+void mDNSConnector::readRecords(ReadType type, mdns_record_callback_fn callback, void* userData) {
     traceScope();
     int nfds = 0;
     fd_set readfs;
@@ -269,7 +269,7 @@ void mDNSConnector::readRecords(ReadType type, mdns_record_callback_fn callback,
         FD_SET(sock, &readfs);
     }
 
-    struct timeval tv = {timeoutSeconds, 0};
+    struct timeval tv = {0, 100000};
     int ret = select(nfds, &readfs, nullptr, nullptr, &tv);
     if (ret > 0) {
         for (int sock : m_sockets) {

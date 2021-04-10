@@ -27,11 +27,11 @@ class mDNSConnector : public LogTagDelegate {
     int openServiceSockets(int maxSockets);
 
     // server side, wait for requests
-    void readQueries(mdns_record_callback_fn callback, void* userData = nullptr, int timeoutSeconds = 1);
+    void readQueries(mdns_record_callback_fn callback, void* userData = nullptr);
 
     // client side, send/read queries
     void sendQuery(const String& service);
-    void readResponses(mdns_record_callback_fn callback, void* userData = nullptr, int timeoutSeconds = 1);
+    void readResponses(mdns_record_callback_fn callback, void* userData = nullptr);
 
     void close();
 
@@ -54,7 +54,7 @@ class mDNSConnector : public LogTagDelegate {
     size_t m_bufferSize = 2048;
 
     enum ReadType { SERVICE, QUERY };
-    void readRecords(ReadType type, mdns_record_callback_fn callback, void* userData = nullptr, int timeoutSeconds = 1);
+    void readRecords(ReadType type, mdns_record_callback_fn callback, void* userData = nullptr);
 };
 
 }  // namespace e47
