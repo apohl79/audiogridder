@@ -117,13 +117,15 @@ void AGLogger::deleteFileAtFinish() {
 
 void AGLogger::cleanup() {
     std::lock_guard<std::mutex> lock(m_instMtx);
-    m_instRefCount--;
-    if (m_instRefCount == 0) {
-        if (nullptr != m_inst && m_inst->isThreadRunning()) {
-            m_inst->signalThreadShouldExit();
-            m_inst->logReal("");
+    if (m_instRefCount > 0) {
+        m_instRefCount--;
+        if (m_instRefCount == 0) {
+            if (nullptr != m_inst && m_inst->isThreadRunning()) {
+                m_inst->signalThreadShouldExit();
+                m_inst->logReal("");
+            }
+            m_inst.reset();
         }
-        m_inst.reset();
     }
 }
 
