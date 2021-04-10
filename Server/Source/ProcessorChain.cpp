@@ -19,7 +19,8 @@ AGProcessor::AGProcessor(ProcessorChain& chain, const String& id, double sampleR
       m_chain(chain),
       m_id(id),
       m_sampleRate(sampleRate),
-      m_blockSize(blockSize) {
+      m_blockSize(blockSize),
+      m_parallelLoadAllowed(getApp()->getServer().getParallelPluginLoad()) {
     count++;
 }
 
@@ -137,8 +138,7 @@ bool AGProcessor::load(String& err) {
         p = m_plugin;
     }
     if (nullptr == p) {
-        bool parallelAllowed = getApp()->getServer().getParallelPluginLoad();
-        if (!parallelAllowed) {
+        if (!m_parallelLoadAllowed) {
             m_pluginLoaderMtx.lock();
         }
         p = loadPlugin(m_id, m_sampleRate, m_blockSize, err);
@@ -155,7 +155,7 @@ bool AGProcessor::load(String& err) {
                 m_plugin.reset();
             }
         }
-        if (!parallelAllowed) {
+        if (!m_parallelLoadAllowed) {
             m_pluginLoaderMtx.unlock();
         }
     }
@@ -176,12 +176,11 @@ void AGProcessor::unload() {
             loadedCount--;
         }
     }
-    bool parallelAllowed = getApp()->getServer().getParallelPluginLoad();
-    if (!parallelAllowed) {
+    if (!m_parallelLoadAllowed) {
         m_pluginLoaderMtx.lock();
     }
     p.reset();
-    if (!parallelAllowed) {
+    if (!m_parallelLoadAllowed) {
         m_pluginLoaderMtx.unlock();
     }
 }
@@ -406,23 +405,20 @@ bool ProcessorChain::setProcessorBusesLayout(AGProcessor* proc) {
     bool supported = plugin->checkBusesLayoutSupported(layout) && plugin->setBusesLayout(layout);
 
     if (!supported) {
-        logln("standard layout not supported:");
-        printBusesLayout(layout);
+        logln("standard layout not supported");
 
         // try with mono or without sidechain
         if (hasSidechain) {
             if (layout.getChannelSet(true, 1).size() > 1) {
                 logln("trying with mono sidechain bus");
-                auto layoutMonoSC = layout;
-                layoutMonoSC.inputBuses.remove(1);
-                layoutMonoSC.inputBuses.add(AudioChannelSet::mono());
-                supported = plugin->checkBusesLayoutSupported(layoutMonoSC) && plugin->setBusesLayout(layoutMonoSC);
+                layout.inputBuses.remove(1);
+                layout.inputBuses.add(AudioChannelSet::mono());
+                supported = plugin->checkBusesLayoutSupported(layout) && plugin->setBusesLayout(layout);
             }
             if (!supported) {
                 logln("trying without sidechain bus");
-                auto layoutNoSC = layout;
-                layoutNoSC.inputBuses.remove(1);
-                supported = plugin->checkBusesLayoutSupported(layoutNoSC) && plugin->setBusesLayout(layoutNoSC);
+                layout.inputBuses.remove(1);
+                supported = plugin->checkBusesLayoutSupported(layout) && plugin->setBusesLayout(layout);
             }
         }
         if (!supported && (!hasSidechain || m_canDisableSidechain)) {
@@ -432,11 +428,10 @@ bool ProcessorChain::setProcessorBusesLayout(AGProcessor* proc) {
                 proc->setNeedsDisabledSidechain(true);
             }
 
+            logln("falling back to the plugin layout");
+
             // keep the processor's layout and calculate the neede extra channels
             auto procLayout = plugin->getBusesLayout();
-
-            logln("processor layout:");
-            printBusesLayout(procLayout);
 
             // main bus IN
             int extraInChannels = procLayout.getMainInputChannels() - layout.getMainInputChannels();
@@ -458,12 +453,16 @@ bool ProcessorChain::setProcessorBusesLayout(AGProcessor* proc) {
             logln(extraInChannels << " extra input(s), " << extraOutChannels << " extra output(s) -> "
                                   << m_extraChannels << " extra channel(s) in total");
 
+            layout = procLayout;
             supported = true;
         }
     }
 
-    if (!supported) {
-        logln("no working layout found");
+    if (supported) {
+        logln("using I/O layout:");
+        printBusesLayout(layout);
+    } else {
+        logln("no working I/O layout found");
     }
 
     return supported;

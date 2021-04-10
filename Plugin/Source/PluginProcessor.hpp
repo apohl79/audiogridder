@@ -27,6 +27,9 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     void releaseResources() override;
 
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
+    bool canAddBus(bool isInput) const override { return isInput == true; }
+    bool canRemoveBus(bool isInput) const override { return isInput == true; }
+    void numChannelsChanged() override;
 
     template <typename T>
     void processBlockReal(AudioBuffer<T>& buf, MidiBuffer& midi);
@@ -219,8 +222,10 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
       public:
         std::atomic_bool connected{false};
 
-        TrayConnection(AudioGridderAudioProcessor* p) : LogTagDelegate(p), m_processor(p) { startTimer(500); }
+        TrayConnection(AudioGridderAudioProcessor* p) : LogTagDelegate(p), m_processor(p) {}
         ~TrayConnection() override { disconnect(); }
+
+        void start() { startTimer(500); }
 
         void connectionMade() override { connected = true; }
         void connectionLost() override { connected = false; }

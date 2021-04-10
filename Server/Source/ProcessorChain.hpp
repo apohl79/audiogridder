@@ -210,6 +210,7 @@ class AGProcessor : public LogTagDelegate {
     String m_id;
     double m_sampleRate;
     int m_blockSize;
+    bool m_parallelLoadAllowed;
     static std::mutex m_pluginLoaderMtx;
     std::shared_ptr<AudioPluginInstance> m_plugin;
     std::mutex m_pluginMtx;
@@ -329,7 +330,7 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
     void preProcessBlocks(std::shared_ptr<AudioPluginInstance> inst) {
         traceScope();
         MidiBuffer midi;
-        int channels = jmax(getMainBusNumInputChannels(), getMainBusNumOutputChannels()) + m_extraChannels;
+        int channels = jmax(getTotalNumInputChannels(), getTotalNumOutputChannels()) + m_extraChannels;
         AudioBuffer<T> buf(channels, getBlockSize());
         buf.clear();
         int samplesProcessed = 0;
@@ -353,7 +354,7 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
         for (int i = 0; i < l.outputBuses.size(); i++) {
             logln("  [" << i << "] " << l.outputBuses[i].size() << " channel(s)");
             for (auto ct : l.outputBuses[i].getChannelTypes()) {
-                logln("    <- " << AudioChannelSet::getAbbreviatedChannelTypeName(ct));
+                logln("    -> " << AudioChannelSet::getAbbreviatedChannelTypeName(ct));
             }
         }
     }

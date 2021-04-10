@@ -26,7 +26,7 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     : AudioProcessor(BusesProperties()
 #if !JucePlugin_IsSynth && !JucePlugin_IsMidiEffect
                          .withInput("Input", AudioChannelSet::discreteChannels(16), true)
-                         .withInput("Sidechain", AudioChannelSet::stereo(), true)
+                         .withInput("Sidechain", AudioChannelSet::stereo(), false)
 #endif
                          .withOutput("Output", AudioChannelSet::discreteChannels(16), true)) {
     initAsyncFunctors();
@@ -44,17 +44,19 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     String logName = "AudioGridderPlugin_";
 
     AGLogger::initialize(appName, logName, Defaults::getConfigFileName(Defaults::ConfigPlugin));
+
+    m_client = std::make_unique<Client>(this);
+    setLogTagSource(m_client.get());
+    logln(mode << " plugin loaded (version: " << AUDIOGRIDDER_VERSION << ", build date: " << AUDIOGRIDDER_BUILD_DATE
+               << ")");
+
     Tracer::initialize(appName, logName);
     Signals::initialize();
     CoreDump::initialize(appName, logName, true);
     Metrics::initialize();
     WindowPositions::initialize();
 
-    m_client = std::make_unique<Client>(this);
-    setLogTagSource(m_client.get());
     traceScope();
-    logln(mode << " plugin loaded (version: " << AUDIOGRIDDER_VERSION << ", build date: " << AUDIOGRIDDER_BUILD_DATE
-               << ")");
 
     ServiceReceiver::initialize(m_instId.hash(), [this] {
         traceScope();
@@ -164,7 +166,6 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     }
 #endif
 
-    m_client->startThread();
     m_tray = std::make_unique<TrayConnection>(this);
 }
 
@@ -348,16 +349,27 @@ void AudioGridderAudioProcessor::changeProgramName(int /* index */, const String
 void AudioGridderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
     traceScope();
     logln("prepareToPlay: sampleRate = " << sampleRate << ", samplesPerBlock=" << samplesPerBlock);
+
+    if (!m_client->isThreadRunning()) {
+        m_client->startThread();
+    }
+
+    if (!m_tray->isTimerRunning()) {
+        m_tray->start();
+    }
+
     int channelsIn = getMainBusNumInputChannels();
     int channelsOut = getMainBusNumOutputChannels();
     int channelsSC = getBusCount(true) == 2? getChannelCountOfBus(true, 1): 0;
     m_client->init(channelsIn, channelsOut, channelsSC, sampleRate, samplesPerBlock, isUsingDoublePrecision());
+
     m_prepared = true;
 }
 
 void AudioGridderAudioProcessor::releaseResources() {
-    m_prepared = false;
+    traceScope();
     logln("releaseResources");
+    m_prepared = false;
 }
 
 bool AudioGridderAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
@@ -370,6 +382,11 @@ bool AudioGridderAudioProcessor::isBusesLayoutSupported(const BusesLayout& layou
     ignoreUnused(layouts);
 #endif
     return true;
+}
+
+void AudioGridderAudioProcessor::numChannelsChanged() {
+    traceScope();
+    logln("numChannelsChanged");
 }
 
 template <typename T>
@@ -396,17 +413,19 @@ void AudioGridderAudioProcessor::processBlockReal(AudioBuffer<T>& buffer, MidiBu
         buffer.clear(i, 0, buffer.getNumSamples());
     }
 
-    if ((buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) || midiMessages.getNumEvents() > 0) {
-        auto streamer = m_client->getStreamer<T>();
-        if (nullptr != streamer) {
-            streamer->send(buffer, midiMessages, posInfo);
-            streamer->read(buffer, midiMessages);
-            if (m_client->getLatencySamples() != getLatencySamples()) {
-                updateLatency(m_client->getLatencySamples());
-            }
-        } else {
-            for (auto i = 0; i < buffer.getNumChannels(); ++i) {
-                buffer.clear(i, 0, buffer.getNumSamples());
+    if (posInfo.isPlaying || posInfo.isRecording) {
+        if ((buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) || midiMessages.getNumEvents() > 0) {
+            auto streamer = m_client->getStreamer<T>();
+            if (nullptr != streamer) {
+                streamer->send(buffer, midiMessages, posInfo);
+                streamer->read(buffer, midiMessages);
+                if (m_client->getLatencySamples() != getLatencySamples()) {
+                    updateLatency(m_client->getLatencySamples());
+                }
+            } else {
+                for (auto i = 0; i < buffer.getNumChannels(); ++i) {
+                    buffer.clear(i, 0, buffer.getNumSamples());
+                }
             }
         }
     }
@@ -1102,8 +1121,9 @@ void AudioGridderAudioProcessor::TrayConnection::sendStatus() {
     json j;
     j["ok"] = client.isReadyLockFree();
     j["name"] = track.name.toStdString();
-    j["channelsIn"] = m_processor->getTotalNumInputChannels();
+    j["channelsIn"] = m_processor->getMainBusNumInputChannels();
     j["channelsOut"] = m_processor->getTotalNumOutputChannels();
+    j["channelsSC"] = m_processor->getBusCount(true) > 0 ? m_processor->getChannelCountOfBus(true, 1) : 0;
 #ifdef JucePlugin_IsSynth
     j["instrument"] = true;
 #else
