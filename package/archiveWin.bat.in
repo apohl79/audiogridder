@@ -1,6 +1,8 @@
 @echo archiving files...
 copy /B ..\build-win-10-x86_64\Server\AudioGridderServer_artefacts\RelWithDebInfo\AudioGridderServer.exe ..\..\Archive\Builds\#STR_VER#\win
 copy /B ..\build-win-10-x86_64\Server\AudioGridderServer_artefacts\RelWithDebInfo\AudioGridderServer.pdb ..\..\Archive\Builds\#STR_VER#\win
+copy /B ..\build-win-10-x86_64\PluginTray\AudioGridderPluginTray_artefacts\RelWithDebInfo\AudioGridderPluginTray.exe ..\..\Archive\Builds\#STR_VER#\win
+copy /B ..\build-win-10-x86_64\PluginTray\AudioGridderPluginTray_artefacts\RelWithDebInfo\AudioGridderPluginTray.pdb ..\..\Archive\Builds\#STR_VER#\win
 
 copy /B ..\build-win-10-x86_64\Plugin\AudioGridderFx_artefacts\RelWithDebInfo\VST3\AudioGridder.vst3\Contents\x86_64-win\AudioGridder.vst3 ..\..\Archive\Builds\#STR_VER#\win
 copy /B ..\build-win-10-x86_64\Plugin\AudioGridderFx_artefacts\RelWithDebInfo\VST3\AudioGridder.vst3\Contents\x86_64-win\AudioGridder.pdb ..\..\Archive\Builds\#STR_VER#\win\vst3

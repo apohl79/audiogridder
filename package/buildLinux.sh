@@ -8,6 +8,7 @@ VERSION=$(cat package/VERSION)
 
 mkdir -p package/build/vst
 mkdir -p package/build/vst3
+mkdir -p package/build/tray
 
 cp build-linux-x86_64/Plugin/AudioGridderFx_artefacts/RelWithDebInfo/VST/libAudioGridder.so package/build/vst/AudioGridder.so
 cp build-linux-x86_64/Plugin/AudioGridderInst_artefacts/RelWithDebInfo/VST/libAudioGridderInst.so package/build/vst/AudioGridderInst.so
@@ -15,10 +16,12 @@ cp build-linux-x86_64/Plugin/AudioGridderMidi_artefacts/RelWithDebInfo/VST/libAu
 cp -r build-linux-x86_64/Plugin/AudioGridderFx_artefacts/RelWithDebInfo/VST3/AudioGridder.vst3 package/build/vst3/
 cp -r build-linux-x86_64/Plugin/AudioGridderInst_artefacts/RelWithDebInfo/VST3/AudioGridderInst.vst3 package/build/vst3/
 cp -r build-linux-x86_64/Plugin/AudioGridderMidi_artefacts/RelWithDebInfo/VST3/AudioGridderMidi.vst3 package/build/vst3/
+cp build-linux-x86_64/PluginTray/AudioGridderPluginTray_artefacts/RelWithDebInfo/AudioGridderPluginTray package/build/tray/
 
 cp package/build/vst/* ../Archive/Builds/$VERSION/linux
 cp -r package/build/vst3/* ../Archive/Builds/$VERSION/linux
+cp -r package/build/tray/* ../Archive/Builds/$VERSION/linux
 
 cd package/build
-zip -r AudioGridder_$VERSION-Linux.zip vst vst3
-rm -rf vst vst3
+zip -r AudioGridder_$VERSION-Linux.zip vst vst3 tray ../install-trayapp-linux.sh
+rm -rf vst vst3 tray

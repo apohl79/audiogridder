@@ -1,5 +1,16 @@
 #!/bin/bash
 
+VERSION=$(cat package/VERSION)
+
+function package() {
+    PROJECT=$1
+    PKG=$2
+    TARGET=$3
+    packagesbuild --package-version "$VERSION" $PROJECT
+    mv $PKG $TARGET
+    echo "Created $TARGET"
+}
+
 function build() {
     os=$1
     arch=$2
@@ -25,29 +36,22 @@ function build() {
     echo "restoring toolchain..."
     sudo xcode-select -s $toolchain_bak
 
-    VERSION=$(cat package/VERSION)
+    if [ $dev -eq 0 ]; then
 
-    if [ -n "$(which packagesbuild)" ]; then
-        echo
+        if [ -n "$(which packagesbuild)" ]; then
+            echo
 
-        macos_target=""
-        if [ "$target" == "10.7" ]; then
-            macos_target="-$target"
+            macos_target=""
+            if [ "$target" == "10.7" ]; then
+                macos_target="-$target"
+            fi
+
+            package package/AudioGridderPlugin$macos_target-$arch.pkgproj package/build/AudioGridderPlugin.pkg package/build/AudioGridderPlugin_${VERSION}_macOS$macos_target-$arch.pkg
+            package package/AudioGridderServer$macos_target-$arch.pkgproj package/build/AudioGridderServer.pkg package/build/AudioGridderServer_${VERSION}_macOS$macos_target-$arch.pkg
         fi
 
-        TARGET=package/build/AudioGridderPlugin_${VERSION}_macOS$macos_target-$arch.pkg
-        packagesbuild --package-version "$VERSION" package/AudioGridderPlugin$macos_target-$arch.pkgproj
-        mv package/build/AudioGridderPlugin.pkg $TARGET
-        echo "Created $TARGET"
-
-        TARGET=package/build/AudioGridderServer_${VERSION}_macOS$macos_target-$arch.pkg
-        packagesbuild --package-version "$VERSION" package/AudioGridderServer$macos_target-$arch.pkgproj
-        mv package/build/AudioGridderServer.pkg $TARGET
-        echo "Created $TARGET"
-    fi
-
-    if [ $dev -eq 0 ]; then
         rsync -a build-$os-$target-$arch/Server/AudioGridderServer_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/$os$macos_target-$arch/
+        rsync -a build-$os-$target-$arch/PluginTray/AudioGridderPluginTray_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/$os$macos_target-$arch/
         rsync -a build-$os-$target-$arch/Plugin/AudioGridderFx_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/$os$macos_target-$arch/
         rsync -a build-$os-$target-$arch/Plugin/AudioGridderInst_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/$os$macos_target-$arch/
         rsync -a build-$os-$target-$arch/Plugin/AudioGridderMidi_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/$os$macos_target-$arch/
@@ -69,6 +73,16 @@ else
 
     # macOS 11.1 ARM64
     build macos arm64 11.1 /Library/Developer/CommandLineTools 0
+
+    package/createUniversalBinaries.sh
+    rsync -a build-macos-universal/Server/AudioGridderServer_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/macos-universal/
+    rsync -a build-macos-universal/PluginTray/AudioGridderPluginTray_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/macos-universal/
+    rsync -a build-macos-universal/Plugin/AudioGridderFx_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/macos-universal/
+    rsync -a build-macos-universal/Plugin/AudioGridderInst_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/macos-universal/
+    rsync -a build-macos-universal/Plugin/AudioGridderMidi_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/macos-universal/
+
+    package package/AudioGridderPlugin-universal.pkgproj package/build/AudioGridderPlugin.pkg package/build/AudioGridderPlugin_${VERSION}_macOS-universal.pkg
+    package package/AudioGridderServer-universal.pkgproj package/build/AudioGridderServer.pkg package/build/AudioGridderServer_${VERSION}_macOS-universal.pkg
 
     cd package/build
     zip AudioGridder_$VERSION-MacOS-Installers.zip AudioGridderPlugin_$VERSION_*.pkg AudioGridderServer_$VERSION_*.pkg

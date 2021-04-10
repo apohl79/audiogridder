@@ -1,7 +1,7 @@
 [Setup]
 AppName=AudioGridder Plugin
 AppVersion=#STR_VER#
-DefaultDirName={commonpf64}
+DefaultDirName={commonpf64}\AudioGridderPluginTray
 DefaultGroupName=AudioGridder
 OutputBaseFilename=AudioGridderPlugin_#STR_VER#
 
@@ -15,6 +15,7 @@ Source: "..\build-win-10-x86_64\Plugin\AudioGridderMidi_artefacts\RelWithDebInfo
 Source: "..\build-win-10-x86_64\Plugin\AudioGridderFx_artefacts\RelWithDebInfo\AAX\*"; Excludes: "*.exp,*.lib,*.pdb"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins; Flags: ignoreversion recursesubdirs
 Source: "..\build-win-10-x86_64\Plugin\AudioGridderInst_artefacts\RelWithDebInfo\AAX\*"; Excludes: "*.exp,*.lib,*.pdb"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins; Flags: ignoreversion recursesubdirs
 Source: "..\build-win-10-x86_64\Plugin\AudioGridderMidi_artefacts\RelWithDebInfo\AAX\*"; Excludes: "*.exp,*.lib,*.pdb"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins; Flags: ignoreversion recursesubdirs
+Source: "..\build-win-10-x86_64\PluginTray\AudioGridderPluginTray_artefacts\RelWithDebInfo\AudioGridderPluginTray.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Code]
 var

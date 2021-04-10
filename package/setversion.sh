@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DEFAULT_VERSION="1.0.0"
+DEFAULT_VERSION="1.2.0"
 DEFAULT_VERSION_STR="dev-build"
 
 if [ "$1" = "-h" ]; then
@@ -44,5 +44,6 @@ if [ "$STR_VER" != "dev-build" ]; then
     mkdir -p ../Archive/Builds/$STR_VER/macos-x86_64
     mkdir -p ../Archive/Builds/$STR_VER/macos-10.7-x86_64
     mkdir -p ../Archive/Builds/$STR_VER/macos-arm64
+    mkdir -p ../Archive/Builds/$STR_VER/macos-universal
     mkdir -p ../Archive/Builds/$STR_VER/linux
 fi
