@@ -18,9 +18,6 @@ namespace e47 {
 
 class ScreenWorker : public Thread, public LogTagDelegate {
   public:
-    static std::atomic_uint32_t count;
-    static std::atomic_uint32_t runCount;
-
     ScreenWorker(LogTag* tag);
     virtual ~ScreenWorker();
 

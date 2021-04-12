@@ -28,9 +28,6 @@ class ProcessorChain;
 
 class AudioWorker : public Thread, public LogTagDelegate {
   public:
-    static std::atomic_uint32_t count;
-    static std::atomic_uint32_t runCount;
-
     AudioWorker(LogTag* tag);
     virtual ~AudioWorker() override;
 

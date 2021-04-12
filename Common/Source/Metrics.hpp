@@ -30,19 +30,46 @@ class Meter : public BasicStatistic {
     ~Meter() override {}
 
     inline void increment(uint32 i = 1) { m_counter += i; }
-    inline double rate_1min() const { return m_rate_1min; }
+    inline double rate_1min() { return m_rate1min + getExtRate1min(); }
+
+    inline void enableExtData(bool b) { m_hasExtRates = b; }
+
+    inline double getExtRate1min() {
+        auto rate = 0.0;
+        if (m_hasExtRates) {
+            std::lock_guard<std::mutex> lock(m_extRate1minMtx);
+            for (auto& ext : m_extRate1min) {
+                rate += ext.second;
+            }
+        }
+        return rate;
+    }
+
+    inline void updateExtRate1min(const String& key, double val) {
+        std::lock_guard<std::mutex> lock(m_extRate1minMtx);
+        m_extRate1min[key] = val;
+    }
+
+    inline void removeExtRate1min(const String& key) {
+        std::lock_guard<std::mutex> lock(m_extRate1minMtx);
+        m_extRate1min.erase(key);
+    }
 
     void aggregate() override {}
     void aggregate1s() override {
         auto c = m_counter.exchange(0, std::memory_order_relaxed);
-        m_rate_1min = m_rate_1min * (1 - ALPHA_1min) + c * ALPHA_1min;
+        m_rate1min = m_rate1min * (1 - ALPHA_1min) + c * ALPHA_1min;
     }
     void log(const String&) override {}
 
   private:
     std::atomic_uint_fast64_t m_counter{0};
-    double m_rate_1min = 0.0;
+    double m_rate1min = 0.0;
     const double ALPHA_1min;
+
+    bool m_hasExtRates = false;
+    std::unordered_map<String, double> m_extRate1min;
+    std::mutex m_extRate1minMtx;
 
     inline double alpha(int secs) { return 1 - std::exp(std::log(0.005) / secs); }
 };
@@ -124,7 +151,37 @@ class TimeStatistic : public BasicStatistic, public LogTag {
             }
         }
 
+        Histogram(const json& j) {
+            min = jsonGetValue(j, "min", 0.0);
+            max = jsonGetValue(j, "max", 0.0);
+            avg = jsonGetValue(j, "avg", 0.0);
+            sum = jsonGetValue(j, "sum", 0.0);
+            nintyFifth = jsonGetValue(j, "95th", 0.0);
+            count = jsonGetValue(j, "count", (size_t)0);
+            if (j.find("dist") != j.end()) {
+                for (auto& d : j["dist"]) {
+                    dist.emplace_back(std::make_pair(d["lower"].get<double>(), d["count"].get<size_t>()));
+                }
+            }
+        }
+
         void updateBin(size_t bin, size_t c) { dist[bin].second += c; }
+
+        json toJson() {
+            json j;
+            j["min"] = min;
+            j["max"] = max;
+            j["avg"] = avg;
+            j["sum"] = sum;
+            j["count"] = count;
+            j["95th"] = nintyFifth;
+            json jdist = json::array();
+            for (auto& d : dist) {
+                jdist.push_back({{"lower", d.first}, {"count", d.second}});
+            }
+            j["dist"] = jdist;
+            return j;
+        }
     };
 
     TimeStatistic(size_t numOfBins = 10, double binSize = 2 /* ms */)
@@ -143,6 +200,20 @@ class TimeStatistic : public BasicStatistic, public LogTag {
 
     static Duration getDuration(const String& name, bool show = true);
 
+    std::vector<Histogram> get1minValues();
+
+    inline void enableExtData(bool b) { m_hasExtValues = b; }
+
+    inline void updateExt1minValues(const String& key, const std::vector<Histogram> values) {
+        std::lock_guard<std::mutex> lock(m_ext1minValuesMtx);
+        m_ext1minValues[key] = values;
+    }
+
+    inline void removeExt1minValues(const String& key) {
+        std::lock_guard<std::mutex> lock(m_ext1minValuesMtx);
+        m_ext1minValues.erase(key);
+    }
+
   private:
     std::vector<double> m_times[2];
     std::mutex m_timesMtx;
@@ -154,7 +225,9 @@ class TimeStatistic : public BasicStatistic, public LogTag {
     Meter m_meter;
     bool m_showLog = true;
 
-    std::vector<Histogram> get1minValues();
+    bool m_hasExtValues = false;
+    std::unordered_map<String, std::vector<Histogram>> m_ext1minValues;
+    std::mutex m_ext1minValuesMtx;
 };
 
 class Metrics : public Thread, public LogTag, public SharedInstance<Metrics> {

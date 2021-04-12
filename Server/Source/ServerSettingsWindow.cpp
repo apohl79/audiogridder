@@ -73,7 +73,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     addChildAndSetID(label.get(), "lbl");
     m_components.push_back(std::move(label));
 
-    m_nameText.setText(m_app->getServer().getName());
+    m_nameText.setText(m_app->getServer()->getName());
     m_nameText.setBounds(getWideFieldBounds(row));
     addChildAndSetID(&m_nameText, "name");
 
@@ -85,7 +85,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     addChildAndSetID(label.get(), "lbl");
     m_components.push_back(std::move(label));
 
-    int idConfig = m_app->getServer().getId(true);
+    int idConfig = m_app->getServer()->getId(true);
     String id;
     id << idConfig;
     m_idText.setText(id);
@@ -94,7 +94,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 
     row++;
 
-    int idReal = m_app->getServer().getId();
+    int idReal = m_app->getServer()->getId();
     if (idConfig != idReal) {
         // server started with -id where the passed id is different from the config
         label = std::make_unique<Label>();
@@ -124,7 +124,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_components.push_back(std::move(label));
 
     m_sandbox.setBounds(getCheckBoxBounds(row));
-    m_sandbox.setToggleState(m_app->getServer().getSandboxing(), NotificationType::dontSendNotification);
+    m_sandbox.setToggleState(m_app->getServer()->getSandboxing(), NotificationType::dontSendNotification);
     addChildAndSetID(&m_sandbox, "sandbox");
 
     row++;
@@ -149,7 +149,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_components.push_back(std::move(label));
 
     m_auSupport.setBounds(getCheckBoxBounds(row));
-    m_auSupport.setToggleState(m_app->getServer().getEnableAU(), NotificationType::dontSendNotification);
+    m_auSupport.setToggleState(m_app->getServer()->getEnableAU(), NotificationType::dontSendNotification);
     addChildAndSetID(&m_auSupport, "au");
 
     row++;
@@ -162,7 +162,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_components.push_back(std::move(label));
 
     m_vst3Support.setBounds(getCheckBoxBounds(row));
-    m_vst3Support.setToggleState(m_app->getServer().getEnableVST3(), NotificationType::dontSendNotification);
+    m_vst3Support.setToggleState(m_app->getServer()->getEnableVST3(), NotificationType::dontSendNotification);
     addChildAndSetID(&m_vst3Support, "vst");
 
     row++;
@@ -181,7 +181,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     addChildAndSetID(&m_vst3Folders, "vst3fold");
 
     tmpStr = "";
-    for (auto& folder : m_app->getServer().getVST3Folders()) {
+    for (auto& folder : m_app->getServer()->getVST3Folders()) {
         tmpStr << folder << newLine;
     }
     m_vst3Folders.setText(tmpStr);
@@ -195,7 +195,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_components.push_back(std::move(label));
 
     m_vst2Support.setBounds(getCheckBoxBounds(row));
-    m_vst2Support.setToggleState(m_app->getServer().getEnableVST2(), NotificationType::dontSendNotification);
+    m_vst2Support.setToggleState(m_app->getServer()->getEnableVST2(), NotificationType::dontSendNotification);
     addChildAndSetID(&m_vst2Support, "vst2");
 
     row++;
@@ -214,7 +214,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     addChildAndSetID(&m_vst2Folders, "vst2fold");
 
     tmpStr = "";
-    for (auto& folder : m_app->getServer().getVST2Folders()) {
+    for (auto& folder : m_app->getServer()->getVST2Folders()) {
         tmpStr << folder << newLine;
     }
     m_vst2Folders.setText(tmpStr);
@@ -228,7 +228,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_components.push_back(std::move(label));
 
     m_vstNoStandardFolders.setBounds(getCheckBoxBounds(row));
-    m_vstNoStandardFolders.setToggleState(m_app->getServer().getVSTNoStandardFolders(),
+    m_vstNoStandardFolders.setToggleState(m_app->getServer()->getVSTNoStandardFolders(),
                                           NotificationType::dontSendNotification);
     addChildAndSetID(&m_vstNoStandardFolders, "vstnostandarddirs");
 
@@ -258,12 +258,12 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_screenCapturingMode.addItem("Legacy", 3);
     m_screenCapturingMode.addItem("Disabled", 4);
     int mode = 1;
-    if (m_app->getServer().getScreenCapturingOff()) {
+    if (m_app->getServer()->getScreenCapturingOff()) {
         mode = 4;
-    } else if (!m_app->getServer().getScreenCapturingFFmpeg()) {
+    } else if (!m_app->getServer()->getScreenCapturingFFmpeg()) {
         mode = 3;
     } else {
-        switch (m_app->getServer().getScreenCapturingFFmpegEncoder()) {
+        switch (m_app->getServer()->getScreenCapturingFFmpegEncoder()) {
             case ScreenRecorder::WEBP:
                 mode = 1;
                 break;
@@ -325,7 +325,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_screenCapturingQuality.addItem("High", ScreenRecorder::ENC_QUALITY_HIGH + 1);
     m_screenCapturingQuality.addItem("Medium", ScreenRecorder::ENC_QUALITY_MEDIUM + 1);
     m_screenCapturingQuality.addItem("Low", ScreenRecorder::ENC_QUALITY_LOW + 1);
-    m_screenCapturingQuality.setSelectedId(m_app->getServer().getScreenCapturingFFmpegQuality() + 1);
+    m_screenCapturingQuality.setSelectedId(m_app->getServer()->getScreenCapturingFFmpegQuality() + 1);
 
     addChildAndSetID(&m_screenCapturingQuality, "captqual");
 
@@ -336,7 +336,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     addChildAndSetID(&m_screenDiffDetectionLbl, "lbl");
 
     m_screenDiffDetection.setBounds(getCheckBoxBounds(row));
-    m_screenDiffDetection.setToggleState(m_app->getServer().getScreenDiffDetection(),
+    m_screenDiffDetection.setToggleState(m_app->getServer()->getScreenDiffDetection(),
                                          NotificationType::dontSendNotification);
     m_screenDiffDetection.onClick = [this] {
         if (m_screenCapturingMode.getSelectedId() == 2) {
@@ -361,7 +361,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     addChildAndSetID(&m_screenJpgQualityLbl, "lbl");
 
     String q;
-    q << m_app->getServer().getScreenQuality();
+    q << m_app->getServer()->getScreenQuality();
     m_screenJpgQuality.setText(q);
     m_screenJpgQuality.setBounds(getFieldBounds(row));
     addChildAndSetID(&m_screenJpgQuality, "qual");
@@ -372,7 +372,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_localModeLbl.setBounds(getLabelBounds(row));
     addChildAndSetID(&m_localModeLbl, "lbl");
 
-    m_localMode.setToggleState(m_app->getServer().getScreenLocalMode(), NotificationType::dontSendNotification);
+    m_localMode.setToggleState(m_app->getServer()->getScreenLocalMode(), NotificationType::dontSendNotification);
     m_localMode.setBounds(getCheckBoxBounds(row));
     addChildAndSetID(&m_localMode, "local");
 
@@ -397,7 +397,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_components.push_back(std::move(label));
 
     m_scanForPlugins.setBounds(getCheckBoxBounds(row));
-    m_scanForPlugins.setToggleState(m_app->getServer().getScanForPlugins(), NotificationType::dontSendNotification);
+    m_scanForPlugins.setToggleState(m_app->getServer()->getScanForPlugins(), NotificationType::dontSendNotification);
     addChildAndSetID(&m_scanForPlugins, "scan");
 
     row++;
@@ -409,7 +409,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_components.push_back(std::move(label));
 
     m_parallelPluginLoad.setBounds(getCheckBoxBounds(row));
-    m_parallelPluginLoad.setToggleState(m_app->getServer().getParallelPluginLoad(),
+    m_parallelPluginLoad.setToggleState(m_app->getServer()->getParallelPluginLoad(),
                                         NotificationType::dontSendNotification);
     addChildAndSetID(&m_parallelPluginLoad, "pload");
 
@@ -461,56 +461,56 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
         Tracer::setEnabled(m_tracer.getToggleState());
         AGLogger::setEnabled(m_logger.getToggleState());
         auto appCpy = app;
-        appCpy->getServer().setId(m_idText.getText().getIntValue());
-        appCpy->getServer().setName(m_nameText.getText());
-        appCpy->getServer().setEnableAU(m_auSupport.getToggleState());
-        appCpy->getServer().setEnableVST3(m_vst3Support.getToggleState());
-        appCpy->getServer().setEnableVST2(m_vst2Support.getToggleState());
-        appCpy->getServer().setScanForPlugins(m_scanForPlugins.getToggleState());
-        appCpy->getServer().setParallelPluginLoad(m_parallelPluginLoad.getToggleState());
-        appCpy->getServer().setSandboxing(m_sandbox.getToggleState());
+        appCpy->getServer()->setId(m_idText.getText().getIntValue());
+        appCpy->getServer()->setName(m_nameText.getText());
+        appCpy->getServer()->setEnableAU(m_auSupport.getToggleState());
+        appCpy->getServer()->setEnableVST3(m_vst3Support.getToggleState());
+        appCpy->getServer()->setEnableVST2(m_vst2Support.getToggleState());
+        appCpy->getServer()->setScanForPlugins(m_scanForPlugins.getToggleState());
+        appCpy->getServer()->setParallelPluginLoad(m_parallelPluginLoad.getToggleState());
+        appCpy->getServer()->setSandboxing(m_sandbox.getToggleState());
         switch (m_screenCapturingMode.getSelectedId()) {
             case 1:
-                appCpy->getServer().setScreenCapturingFFmpeg(true);
-                appCpy->getServer().setScreenCapturingFFmpegEncoder(ScreenRecorder::WEBP);
-                appCpy->getServer().setScreenCapturingOff(false);
-                appCpy->getServer().setScreenLocalMode(false);
+                appCpy->getServer()->setScreenCapturingFFmpeg(true);
+                appCpy->getServer()->setScreenCapturingFFmpegEncoder(ScreenRecorder::WEBP);
+                appCpy->getServer()->setScreenCapturingOff(false);
+                appCpy->getServer()->setScreenLocalMode(false);
                 break;
             case 2:
-                appCpy->getServer().setScreenCapturingFFmpeg(true);
-                appCpy->getServer().setScreenCapturingFFmpegEncoder(ScreenRecorder::MJPEG);
-                appCpy->getServer().setScreenCapturingOff(false);
-                appCpy->getServer().setScreenLocalMode(false);
+                appCpy->getServer()->setScreenCapturingFFmpeg(true);
+                appCpy->getServer()->setScreenCapturingFFmpegEncoder(ScreenRecorder::MJPEG);
+                appCpy->getServer()->setScreenCapturingOff(false);
+                appCpy->getServer()->setScreenLocalMode(false);
                 break;
             case 3:
-                appCpy->getServer().setScreenCapturingFFmpeg(false);
-                appCpy->getServer().setScreenCapturingOff(false);
-                appCpy->getServer().setScreenLocalMode(false);
+                appCpy->getServer()->setScreenCapturingFFmpeg(false);
+                appCpy->getServer()->setScreenCapturingOff(false);
+                appCpy->getServer()->setScreenLocalMode(false);
                 break;
             case 4:
-                appCpy->getServer().setScreenCapturingFFmpeg(false);
-                appCpy->getServer().setScreenCapturingOff(true);
-                appCpy->getServer().setScreenLocalMode(m_localMode.getToggleState());
+                appCpy->getServer()->setScreenCapturingFFmpeg(false);
+                appCpy->getServer()->setScreenCapturingOff(true);
+                appCpy->getServer()->setScreenLocalMode(m_localMode.getToggleState());
                 break;
         }
-        appCpy->getServer().setScreenCapturingFFmpegQuality(
+        appCpy->getServer()->setScreenCapturingFFmpegQuality(
             (ScreenRecorder::EncoderQuality)(m_screenCapturingQuality.getSelectedId() - 1));
-        appCpy->getServer().setScreenDiffDetection(m_screenDiffDetection.getToggleState());
+        appCpy->getServer()->setScreenDiffDetection(m_screenDiffDetection.getToggleState());
         float qual = m_screenJpgQuality.getText().getFloatValue();
         if (qual < 0.1) {
             qual = 0.1f;
         } else if (qual > 1) {
             qual = 1.0f;
         }
-        appCpy->getServer().setScreenQuality(qual);
+        appCpy->getServer()->setScreenQuality(qual);
         if (m_vst3Folders.getText().length() > 0) {
-            appCpy->getServer().setVST3Folders(StringArray::fromLines(m_vst3Folders.getText()));
+            appCpy->getServer()->setVST3Folders(StringArray::fromLines(m_vst3Folders.getText()));
         }
         if (m_vst2Folders.getText().length() > 0) {
-            appCpy->getServer().setVST2Folders(StringArray::fromLines(m_vst2Folders.getText()));
+            appCpy->getServer()->setVST2Folders(StringArray::fromLines(m_vst2Folders.getText()));
         }
-        appCpy->getServer().setVSTNoStandardFolders(m_vstNoStandardFolders.getToggleState());
-        appCpy->getServer().saveConfig();
+        appCpy->getServer()->setVSTNoStandardFolders(m_vstNoStandardFolders.getToggleState());
+        appCpy->getServer()->saveConfig();
         appCpy->hideServerSettings();
         appCpy->restartServer();
     };

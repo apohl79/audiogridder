@@ -10,7 +10,6 @@
 
 namespace e47 {
 
-std::atomic_uint32_t AGProcessor::count{0};
 std::atomic_uint32_t AGProcessor::loadedCount{0};
 std::mutex AGProcessor::m_pluginLoaderMtx;
 
@@ -20,14 +19,9 @@ AGProcessor::AGProcessor(ProcessorChain& chain, const String& id, double sampleR
       m_id(id),
       m_sampleRate(sampleRate),
       m_blockSize(blockSize),
-      m_parallelLoadAllowed(getApp()->getServer().getParallelPluginLoad()) {
-    count++;
-}
+      m_parallelLoadAllowed(getApp()->getServer()->getParallelPluginLoad()) {}
 
-AGProcessor::~AGProcessor() {
-    unload();
-    count--;
-}
+AGProcessor::~AGProcessor() { unload(); }
 
 String AGProcessor::createPluginID(const PluginDescription& d) {
     return d.pluginFormatName + "-" + d.name + "-" + String::toHexString(d.uid);

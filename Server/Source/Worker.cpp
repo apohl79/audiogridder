@@ -326,7 +326,7 @@ void Worker::handleMessage(std::shared_ptr<Message<DelPlugin>> msg) {
     traceScope();
     int idx = pPLD(msg).getNumber();
     if (idx == m_activeEditorIdx) {
-        getApp()->getServer().sandboxHideEditor();
+        getApp()->getServer()->sandboxHideEditor();
         m_screen->hideEditor();
         m_activeEditorIdx = -1;
     }
@@ -340,10 +340,10 @@ void Worker::handleMessage(std::shared_ptr<Message<EditPlugin>> msg) {
     int idx = pDATA(msg)->index;
     auto proc = m_audio->getProcessor(idx);
     if (nullptr != proc) {
-        getApp()->getServer().sandboxShowEditor();
+        getApp()->getServer()->sandboxShowEditor();
         m_screen->showEditor(proc, pDATA(msg)->x, pDATA(msg)->y);
         m_activeEditorIdx = idx;
-        if (getApp()->getServer().getScreenLocalMode()) {
+        if (getApp()->getServer()->getScreenLocalMode()) {
             runOnMsgThreadAsync([this] { getApp()->addKeyListener(m_keyWatcher.get()); });
         }
     }
@@ -353,7 +353,7 @@ void Worker::handleMessage(std::shared_ptr<Message<HidePlugin>> /* msg */, bool 
     traceScope();
     if (m_activeEditorIdx > -1) {
         if (!fromMaster) {
-            getApp()->getServer().sandboxHideEditor();
+            getApp()->getServer()->sandboxHideEditor();
         }
         m_screen->hideEditor();
         m_activeEditorIdx = -1;
@@ -521,8 +521,8 @@ void Worker::handleMessage(std::shared_ptr<Message<Rescan>> msg) {
     runOnMsgThreadAsync([this, wipe] {
         traceScope();
         if (wipe) {
-            getApp()->getServer().getPluginList().clear();
-            getApp()->getServer().saveKnownPluginList();
+            getApp()->getServer()->getPluginList().clear();
+            getApp()->getServer()->saveKnownPluginList();
         }
         getApp()->restartServer(true);
     });

@@ -32,9 +32,9 @@ class StatisticsWindow : public DocumentWindow, public LogTag {
   private:
     App* m_app;
     std::vector<std::unique_ptr<Component>> m_components;
-    Label m_cpu, m_totalWorkers, m_activeWorkers, m_totalAudioWorkers, m_activeAudioWorkers, m_totalScreenWorkers,
-        m_activeScreenWorkers, m_processors, m_plugins, m_audioRPS, m_audioPTavg, m_audioPTmin, m_audioPTmax,
+    Label m_cpu, m_totalWorkers, m_activeWorkers, m_plugins, m_audioRPS, m_audioPTavg, m_audioPTmin, m_audioPTmax,
         m_audioPT95th, m_audioBytesOut, m_audioBytesIn;
+    bool m_sandboxing;
 
     class Updater : public Thread, public LogTagDelegate {
       public:

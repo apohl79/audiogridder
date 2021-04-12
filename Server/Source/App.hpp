@@ -56,7 +56,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     void prepareShutdown(uint32 exitCode = 0);
 
     const KnownPluginList& getPluginList();
-    Server& getServer() { return *m_server; }
+    std::shared_ptr<Server> getServer() { return m_server; }
 
     void restartServer(bool rescan = false);
 
@@ -165,6 +165,8 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
                 if (nullptr == m_srvSettingsWindow) {
                     m_srvSettingsWindow = std::make_unique<ServerSettingsWindow>(this);
                     updateDockIcon();
+                } else {
+                    windowToFront(m_srvSettingsWindow.get());
                 }
             });
             menu.addItem("Plugins", [this] {
@@ -172,6 +174,8 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
                     m_pluginListWindow = std::make_unique<PluginListWindow>(
                         this, m_server->getPluginList(), Defaults::getConfigFileName(Defaults::ConfigDeadMan));
                     updateDockIcon();
+                } else {
+                    windowToFront(m_pluginListWindow.get());
                 }
             });
             menu.addSeparator();
@@ -179,6 +183,8 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
                 if (nullptr == m_statsWindow) {
                     m_statsWindow = std::make_unique<StatisticsWindow>(this);
                     updateDockIcon();
+                } else {
+                    windowToFront(m_statsWindow.get());
                 }
             });
             menu.addSeparator();
@@ -333,7 +339,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
 
         void startCapturing() {
             traceScope();
-            if (!getApp()->getServer().getScreenCapturingOff()) {
+            if (!getApp()->getServer()->getScreenCapturingOff()) {
                 if (m_callbackNative) {
                     startTimer(50);
                 } else {

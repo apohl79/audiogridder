@@ -19,7 +19,6 @@ class ProcessorChain;
 
 class AGProcessor : public LogTagDelegate {
   public:
-    static std::atomic_uint32_t count;
     static std::atomic_uint32_t loadedCount;
 
     AGProcessor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize);
@@ -310,7 +309,7 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
     void processBlockReal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
         traceScope();
         int latency = 0;
-        if (getBusCount(true) > 1 && m_sidechainDisabled){
+        if (getBusCount(true) > 1 && m_sidechainDisabled) {
             auto sidechainBuffer = getBusBuffer(buffer, true, 1);
             sidechainBuffer.clear();
         }

@@ -10,14 +10,24 @@
 
 namespace e47 {
 
-SandboxPeer::SandboxPeer(Server& server) : LogTagDelegate(&server), m_server(server) {}
+SandboxPeer::SandboxPeer(Server& server) : LogTagDelegate(&server), m_server(server) { initAsyncFunctors(); }
+SandboxPeer::~SandboxPeer() { stopAsyncFunctors(); }
 
-bool SandboxPeer::send(const SandboxMessage& msg, ResponseCallback callback) {
-    auto data = msg.serialize();
-    MemoryBlock block(data.data(), data.length());
-    bool ret = sendMessage(block);
-    if (ret && callback) {
-        m_callbacks.set(msg.id.hash(), callback);
+bool SandboxPeer::send(const SandboxMessage& msg, ResponseCallback callback, bool shouldBlock) {
+    MemoryBlock block;
+    msg.serialize(block);
+    auto hash = msg.id.hash();
+    bool ret = true;
+    auto fn = [this, block, hash, callback, &ret] {
+        ret = sendMessage(block);
+        if (ret && callback) {
+            m_callbacks.set(hash, callback);
+        }
+    };
+    if (shouldBlock) {
+        runOnMsgThreadSync(fn);
+    } else {
+        runOnMsgThreadAsync(fn);
     }
     return ret;
 }

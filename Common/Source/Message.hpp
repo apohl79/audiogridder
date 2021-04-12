@@ -998,6 +998,13 @@ struct PluginTrayMessage : JsonMessage {
     PluginTrayMessage(Type t, const json& d, const String& i) : JsonMessage(t, d, i) {}
 };
 
+struct SandboxMessage : JsonMessage {
+    enum Type : JsonMessage::Type { CONFIG, SANDBOX_PORT, SHOW_EDITOR, HIDE_EDITOR, METRICS };
+    SandboxMessage() {}
+    SandboxMessage(Type t, const json& d) : JsonMessage(t, d) {}
+    SandboxMessage(Type t, const json& d, const String& i) : JsonMessage(t, d, i) {}
+};
+
 }  // namespace e47
 
 #endif /* Message_hpp */

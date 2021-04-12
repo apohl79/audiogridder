@@ -12,13 +12,7 @@
 
 namespace e47 {
 
-std::atomic_uint32_t ScreenWorker::count{0};
-std::atomic_uint32_t ScreenWorker::runCount{0};
-
-ScreenWorker::ScreenWorker(LogTag* tag) : Thread("ScreenWorker"), LogTagDelegate(tag) {
-    initAsyncFunctors();
-    count++;
-}
+ScreenWorker::ScreenWorker(LogTag* tag) : Thread("ScreenWorker"), LogTagDelegate(tag) { initAsyncFunctors(); }
 
 ScreenWorker::~ScreenWorker() {
     traceScope();
@@ -27,7 +21,6 @@ ScreenWorker::~ScreenWorker() {
         m_socket->close();
     }
     waitForThreadAndLog(getLogTagSource(), this);
-    count--;
 }
 
 void ScreenWorker::init(std::unique_ptr<StreamingSocket> s) {
@@ -37,10 +30,9 @@ void ScreenWorker::init(std::unique_ptr<StreamingSocket> s) {
 
 void ScreenWorker::run() {
     traceScope();
-    runCount++;
     logln("screen processor started");
 
-    if (getApp()->getServer().getScreenCapturingFFmpeg()) {
+    if (getApp()->getServer()->getScreenCapturingFFmpeg()) {
         runFFmpeg();
     } else {
         runNative();
@@ -51,7 +43,6 @@ void ScreenWorker::run() {
     }
 
     logln("screen processor terminated");
-    runCount--;
 }
 
 void ScreenWorker::runFFmpeg() {
@@ -79,10 +70,10 @@ void ScreenWorker::runFFmpeg() {
 void ScreenWorker::runNative() {
     traceScope();
     Message<ScreenCapture> msg;
-    float qual = getApp()->getServer().getScreenQuality();
+    float qual = getApp()->getServer()->getScreenQuality();
     PNGImageFormat png;
     JPEGImageFormat jpg;
-    bool diffDetect = getApp()->getServer().getScreenDiffDetection();
+    bool diffDetect = getApp()->getServer()->getScreenDiffDetection();
     uint32_t captureCount = 0;
     while (!currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected()) {
         std::unique_lock<std::mutex> lock(m_currentImageLock);
@@ -182,7 +173,7 @@ void ScreenWorker::showEditor(std::shared_ptr<AGProcessor> proc, int x, int y) {
 
     auto tid = getThreadId();
 
-    if (getApp()->getServer().getScreenCapturingFFmpeg()) {
+    if (getApp()->getServer()->getScreenCapturingFFmpeg()) {
         runOnMsgThreadAsync([this] {
             traceScope();
             getApp()->resetEditor();

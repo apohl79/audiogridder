@@ -348,7 +348,7 @@ void App::bringEditorToFront() {
 
 void App::moveEditor(int x, int y) {
     traceScope();
-    if (getServer().getScreenLocalMode()) {
+    if (getServer()->getScreenLocalMode()) {
         logln("window move to " << x << "x" << y);
         std::lock_guard<std::mutex> lock(m_windowMtx);
         if (m_window != nullptr) {
@@ -387,7 +387,7 @@ void App::forgetEditorIfNeeded() {
     }
 }
 
-void App::addKeyListener(KeyListener* l){
+void App::addKeyListener(KeyListener* l) {
     traceScope();
     std::lock_guard<std::mutex> lock(m_windowMtx);
     if (m_window != nullptr) {

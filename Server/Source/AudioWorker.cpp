@@ -14,15 +14,10 @@
 
 namespace e47 {
 
-std::atomic_uint32_t AudioWorker::count{0};
-std::atomic_uint32_t AudioWorker::runCount{0};
 std::unordered_map<String, AudioWorker::RecentsListType> AudioWorker::m_recents;
 std::mutex AudioWorker::m_recentsMtx;
 
-AudioWorker::AudioWorker(LogTag* tag) : Thread("AudioWorker"), LogTagDelegate(tag) {
-    initAsyncFunctors();
-    count++;
-}
+AudioWorker::AudioWorker(LogTag* tag) : Thread("AudioWorker"), LogTagDelegate(tag) { initAsyncFunctors(); }
 
 AudioWorker::~AudioWorker() {
     traceScope();
@@ -31,7 +26,6 @@ AudioWorker::~AudioWorker() {
         m_socket->close();
     }
     waitForThreadAndLog(getLogTagSource(), this);
-    count--;
 }
 
 void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channelsIn, int channelsOut, int channelsSC, double rate,
@@ -44,7 +38,8 @@ void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channelsIn, int c
     m_channelsIn = channelsIn;
     m_channelsOut = channelsOut;
     m_channelsSC = channelsSC;
-    m_chain = std::make_shared<ProcessorChain>(ProcessorChain::createBussesProperties(channelsIn, channelsOut, channelsSC));
+    m_chain =
+        std::make_shared<ProcessorChain>(ProcessorChain::createBussesProperties(channelsIn, channelsOut, channelsSC));
     m_chain->setLogTagSource(getLogTagSource());
     if (m_doublePrecission && m_chain->supportsDoublePrecisionProcessing()) {
         m_chain->setProcessingPrecision(AudioProcessor::doublePrecision);
@@ -55,7 +50,6 @@ void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channelsIn, int c
 
 void AudioWorker::run() {
     traceScope();
-    runCount++;
     logln("audio processor started");
 
     AudioBuffer<float> bufferF;
@@ -124,7 +118,6 @@ void AudioWorker::run() {
     clear();
     signalThreadShouldExit();
     logln("audio processor terminated");
-    runCount--;
 }
 
 void AudioWorker::shutdown() {

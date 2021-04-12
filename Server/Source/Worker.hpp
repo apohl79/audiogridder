@@ -70,7 +70,7 @@ class Worker : public Thread, public LogTag {
 
     struct KeyWatcher : KeyListener {
         Worker* worker;
-        KeyWatcher(Worker *w) : worker(w) {}
+        KeyWatcher(Worker* w) : worker(w) {}
         bool keyPressed(const KeyPress& kp, Component*);
     };
 

@@ -63,18 +63,30 @@ void TimeStatistic::aggregate() {
         hist.updateBin(i, count);
         data.clear();
     }
-    std::lock_guard<std::mutex> lock(m_1minValuesMtx);
-    m_1minValues.push_back(std::move(hist));
-    if (m_1minValues.size() > 6) {
-        m_1minValues.erase(m_1minValues.begin());
+    if (hist.count) {
+        std::lock_guard<std::mutex> lock(m_1minValuesMtx);
+        m_1minValues.push_back(std::move(hist));
+        if (m_1minValues.size() > 6) {
+            m_1minValues.erase(m_1minValues.begin());
+        }
     }
 }
 
 void TimeStatistic::aggregate1s() { m_meter.aggregate1s(); }
 
 std::vector<TimeStatistic::Histogram> TimeStatistic::get1minValues() {
-    std::lock_guard<std::mutex> lock(m_1minValuesMtx);
-    return m_1minValues;  // copy
+    std::vector<TimeStatistic::Histogram> values;
+    {
+        std::lock_guard<std::mutex> lock(m_1minValuesMtx);
+        values = m_1minValues;  // copy
+    }
+    if (m_hasExtValues) {
+        std::lock_guard<std::mutex> lock(m_ext1minValuesMtx);
+        for (auto ext : m_ext1minValues) {
+            values.insert(values.end(), ext.second.begin(), ext.second.end());
+        }
+    }
+    return values;
 }
 
 TimeStatistic::Histogram TimeStatistic::get1minHistogram() {

@@ -11,36 +11,20 @@
 #include <JuceHeader.h>
 
 #include "Utils.hpp"
+#include "Message.hpp"
 
 namespace e47 {
 
 class Server;
 
-struct SandboxMessage {
-    enum Type : uint16 { CONFIG, SANDBOX_PORT, SHOW_EDITOR, HIDE_EDITOR };
-    Type type;
-    Uuid id;
-    json data;
-
-    SandboxMessage(Type t, const json& d) : type(t), data(d) {}
-    SandboxMessage(Type t, const json& d, const String& i) : SandboxMessage(t, d) { id = i; }
-
-    auto serialize() const {
-        json dataJson;
-        dataJson["type"] = type;
-        dataJson["uuid"] = id.toString().toStdString();
-        dataJson["data"] = data;
-        return dataJson.dump();
-    }
-};
-
 class SandboxPeer : public LogTagDelegate {
   public:
     SandboxPeer(Server& server);
+    ~SandboxPeer();
 
     using ResponseCallback = std::function<void(const SandboxMessage&)>;
 
-    bool send(const SandboxMessage& msg, ResponseCallback callback = nullptr);
+    bool send(const SandboxMessage& msg, ResponseCallback callback = nullptr, bool shouldBlock = false);
     void read(const MemoryBlock& data);
 
   protected:
@@ -51,6 +35,8 @@ class SandboxPeer : public LogTagDelegate {
 
   private:
     HashMap<uint64, ResponseCallback, DefaultHashFunctions, CriticalSection> m_callbacks;
+
+    ENABLE_ASYNC_FUNCTORS();
 };
 
 struct SandboxMaster : ChildProcessMaster, SandboxPeer {

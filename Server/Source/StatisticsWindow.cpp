@@ -19,6 +19,7 @@ StatisticsWindow::StatisticsWindow(App* app)
                      DocumentWindow::closeButton),
       LogTag("statistics"),
       m_app(app),
+      m_sandboxing(m_app->getServer()->getSandboxing()),
       m_updater(this) {
     traceScope();
     setUsingNativeTitleBar(true);
@@ -59,54 +60,28 @@ StatisticsWindow::StatisticsWindow(App* app)
     addChildAndSetID(line.get(), "line");
     m_components.push_back(std::move(line));
 
-    addLabel("Total workers:", getLabelBounds(row));
-    m_totalWorkers.setBounds(getFieldBounds(row));
-    m_totalWorkers.setJustificationType(Justification::right);
-    addChildAndSetID(&m_totalWorkers, "totalworkers");
+    if (m_sandboxing) {
+        addLabel("Sanboxes:", getLabelBounds(row));
+        m_totalWorkers.setBounds(getFieldBounds(row));
+        m_totalWorkers.setJustificationType(Justification::right);
+        addChildAndSetID(&m_totalWorkers, "totalworkers");
 
-    row++;
+        row++;
+    } else {
+        addLabel("Total workers:", getLabelBounds(row));
+        m_totalWorkers.setBounds(getFieldBounds(row));
+        m_totalWorkers.setJustificationType(Justification::right);
+        addChildAndSetID(&m_totalWorkers, "totalworkers");
 
-    addLabel("Active workers:", getLabelBounds(row));
-    m_activeWorkers.setBounds(getFieldBounds(row));
-    m_activeWorkers.setJustificationType(Justification::right);
-    addChildAndSetID(&m_activeWorkers, "activeworkers");
+        row++;
 
-    row++;
+        addLabel("Active workers:", getLabelBounds(row));
+        m_activeWorkers.setBounds(getFieldBounds(row));
+        m_activeWorkers.setJustificationType(Justification::right);
+        addChildAndSetID(&m_activeWorkers, "activeworkers");
 
-    addLabel("Total audio workers:", getLabelBounds(row));
-    m_totalAudioWorkers.setBounds(getFieldBounds(row));
-    m_totalAudioWorkers.setJustificationType(Justification::right);
-    addChildAndSetID(&m_totalAudioWorkers, "totalaudioworkers");
-
-    row++;
-
-    addLabel("Active audio workers:", getLabelBounds(row));
-    m_activeAudioWorkers.setBounds(getFieldBounds(row));
-    m_activeAudioWorkers.setJustificationType(Justification::right);
-    addChildAndSetID(&m_activeAudioWorkers, "activeaudioworkers");
-
-    row++;
-
-    addLabel("Total screen workers:", getLabelBounds(row));
-    m_totalScreenWorkers.setBounds(getFieldBounds(row));
-    m_totalScreenWorkers.setJustificationType(Justification::right);
-    addChildAndSetID(&m_totalScreenWorkers, "totalscreenworkers");
-
-    row++;
-
-    addLabel("Active screen workers:", getLabelBounds(row));
-    m_activeScreenWorkers.setBounds(getFieldBounds(row));
-    m_activeScreenWorkers.setJustificationType(Justification::right);
-    addChildAndSetID(&m_activeScreenWorkers, "activescreenworkers");
-
-    row++;
-
-    addLabel("Number of processors:", getLabelBounds(row));
-    m_processors.setBounds(getFieldBounds(row));
-    m_processors.setJustificationType(Justification::right);
-    addChildAndSetID(&m_processors, "processors");
-
-    row++;
+        row++;
+    }
 
     addLabel("Loaded plugins:", getLabelBounds(row));
     m_plugins.setBounds(getFieldBounds(row));
@@ -183,14 +158,17 @@ StatisticsWindow::StatisticsWindow(App* app)
     m_updater.set([this, audioTime, bytesOutMeter, bytesInMeter] {
         traceScope();
         m_cpu.setText(String(CPUInfo::getUsage(), 2) + "%", NotificationType::dontSendNotification);
-        m_totalWorkers.setText(String(Worker::count), NotificationType::dontSendNotification);
-        m_activeWorkers.setText(String(Worker::runCount), NotificationType::dontSendNotification);
-        m_totalAudioWorkers.setText(String(AudioWorker::count), NotificationType::dontSendNotification);
-        m_activeAudioWorkers.setText(String(AudioWorker::runCount), NotificationType::dontSendNotification);
-        m_totalScreenWorkers.setText(String(ScreenWorker::count), NotificationType::dontSendNotification);
-        m_activeScreenWorkers.setText(String(ScreenWorker::runCount), NotificationType::dontSendNotification);
-        m_processors.setText(String(AGProcessor::count), NotificationType::dontSendNotification);
-        m_plugins.setText(String(AGProcessor::loadedCount), NotificationType::dontSendNotification);
+        if (m_sandboxing) {
+            auto srv = m_app->getServer();
+            if (nullptr != srv) {
+                m_totalWorkers.setText(String(srv->getNumSandboxes()), NotificationType::dontSendNotification);
+                m_plugins.setText(String(srv->getNumLoadedBySandboxes()), NotificationType::dontSendNotification);
+            }
+        } else {
+            m_totalWorkers.setText(String(Worker::count), NotificationType::dontSendNotification);
+            m_activeWorkers.setText(String(Worker::runCount), NotificationType::dontSendNotification);
+            m_plugins.setText(String(AGProcessor::loadedCount), NotificationType::dontSendNotification);
+        }
 
         auto hist = audioTime->get1minHistogram();
         auto rps = audioTime->getMeter().rate_1min();
