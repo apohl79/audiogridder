@@ -600,6 +600,8 @@ void AudioGridderAudioProcessorEditor::setConnected(bool connected) {
             but->setEnabled(false);
         }
         m_positionTracker.reset();
+        resetPluginScreen();
+        resized();
     }
 }
 
