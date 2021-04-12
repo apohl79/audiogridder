@@ -14,6 +14,9 @@
 
 #ifdef JUCE_WINDOWS
 #include <windows.h>
+#else
+#include <sys/socket.h>
+#include <fcntl.h>
 #endif
 
 namespace e47 {
@@ -118,6 +121,37 @@ bool read(StreamingSocket* socket, void* data, int size, int timeoutMilliseconds
         return false;
     }
 }
+
+bool setNonBlocking(int handle) noexcept {
+#ifdef JUCE_WINDOWS
+    DWORD nonBlocking = 1;
+    return ioctlsocket(handle, FIONBIO, &nonBlocking) == 0;
+#else
+    int socketFlags = fcntl(handle, F_GETFL, 0);
+    if (socketFlags == -1) {
+        return false;
+    }
+    socketFlags &= ~O_NONBLOCK;
+    return fcntl(handle, F_SETFL, socketFlags) == 0;
+#endif
+}
+
+StreamingSocket* accept(StreamingSocket* master, int timeoutMs, std::function<bool()> abortFn) {
+    TimeStatistic::Timeout timeout(timeoutMs);
+    do {
+        if (master->waitUntilReady(true, 100) > 0) {
+            auto sock = master->waitForNextConnection();
+            if (nullptr != sock) {
+                return sock;
+            }
+        }
+        if (nullptr != abortFn && abortFn()) {
+            return nullptr;
+        }
+    } while (timeout.getMillisecondsLeft() > 0);
+    return nullptr;
+}
+
 
 }  // namespace e47
 

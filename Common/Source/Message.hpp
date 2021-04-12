@@ -80,6 +80,9 @@ bool send(StreamingSocket* socket, const char* data, int size, MessageHelper::Er
 bool read(StreamingSocket* socket, void* data, int size, int timeoutMilliseconds = 0, MessageHelper::Error* e = nullptr,
           Meter* metric = nullptr);
 
+bool setNonBlocking(int handle) noexcept;
+StreamingSocket* accept(StreamingSocket*, int timeoutMs = 1000, std::function<bool()> abortFn = nullptr);
+
 /*
  * Client/Server handshake
  */
