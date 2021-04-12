@@ -73,21 +73,19 @@ void App::getPopupMenu(PopupMenu& menu, bool withShowMonitorOption) {
         for (auto& srvInfo : mdnsServers) {
             String mdnsName = getServerString(srvInfo, true);
             bool enabled = (srv != getServerString(srvInfo, false)) && (srvInfo.getVersion() == AUDIOGRIDDER_VERSION);
-            subRecon.addItem(
-                mdnsName, enabled, false, [c, srvInfo] {
-                    c->sendMessage(PluginTrayMessage(PluginTrayMessage::CHANGE_SERVER,
-                                                     {{"serverInfo", srvInfo.serialize().toStdString()}}));
-                });
+            subRecon.addItem(mdnsName, enabled, false, [c, srvInfo] {
+                c->sendMessage(PluginTrayMessage(PluginTrayMessage::CHANGE_SERVER,
+                                                 {{"serverInfo", srvInfo.serialize().toStdString()}}));
+            });
         }
         subRecon.addSeparator();
         for (auto& srvInfo : cfgServers) {
             String cfgName = getServerString(srvInfo, false);
             bool enabled = srv != cfgName;
-            subRecon.addItem(
-                cfgName, enabled, false, [c, srvInfo] {
-                    c->sendMessage(PluginTrayMessage(PluginTrayMessage::CHANGE_SERVER,
-                                                     {{"serverInfo", srvInfo.serialize().toStdString()}}));
-                });
+            subRecon.addItem(cfgName, enabled, false, [c, srvInfo] {
+                c->sendMessage(PluginTrayMessage(PluginTrayMessage::CHANGE_SERVER,
+                                                 {{"serverInfo", srvInfo.serialize().toStdString()}}));
+            });
         }
         if (serverMenus.find(srv) == serverMenus.end()) {
             PopupMenu subReconAll;
@@ -95,25 +93,23 @@ void App::getPopupMenu(PopupMenu& menu, bool withShowMonitorOption) {
                 String mdnsName = getServerString(srvInfo, true);
                 bool enabled =
                     (srv != getServerString(srvInfo, false)) && (srvInfo.getVersion() == AUDIOGRIDDER_VERSION);
-                subReconAll.addItem(
-                    mdnsName, enabled, false, [this, srvInfo] {
-                        for (auto& c2 : m_srv.getConnections()) {
-                            c2->sendMessage(PluginTrayMessage(PluginTrayMessage::CHANGE_SERVER,
-                                                              {{"serverInfo", srvInfo.serialize().toStdString()}}));
-                        }
-                    });
+                subReconAll.addItem(mdnsName, enabled, false, [this, srvInfo] {
+                    for (auto& c2 : m_srv.getConnections()) {
+                        c2->sendMessage(PluginTrayMessage(PluginTrayMessage::CHANGE_SERVER,
+                                                          {{"serverInfo", srvInfo.serialize().toStdString()}}));
+                    }
+                });
             }
             subReconAll.addSeparator();
             for (auto& srvInfo : cfgServers) {
                 String cfgName = getServerString(srvInfo, false);
                 bool enabled = srv != cfgName;
-                subReconAll.addItem(
-                    cfgName, enabled, false, [this, srvInfo] {
-                        for (auto& c2 : m_srv.getConnections()) {
-                            c2->sendMessage(PluginTrayMessage(PluginTrayMessage::CHANGE_SERVER,
-                                                              {{"serverInfo", srvInfo.serialize().toStdString()}}));
-                        }
-                    });
+                subReconAll.addItem(cfgName, enabled, false, [this, srvInfo] {
+                    for (auto& c2 : m_srv.getConnections()) {
+                        c2->sendMessage(PluginTrayMessage(PluginTrayMessage::CHANGE_SERVER,
+                                                          {{"serverInfo", srvInfo.serialize().toStdString()}}));
+                    }
+                });
             }
             serverMenus[srv].addSubMenu("Connect all...", subReconAll);
             serverMenus[srv].addSeparator();

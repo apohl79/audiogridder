@@ -220,7 +220,8 @@ void Client::setOnCloseCallback(OnCloseCallback fn) {
     m_onCloseCallback = fn;
 }
 
-void Client::init(int channelsIn, int channelsOut, int channelsSC, double rate, int samplesPerBlock, bool doublePrecission) {
+void Client::init(int channelsIn, int channelsOut, int channelsSC, double rate, int samplesPerBlock,
+                  bool doublePrecission) {
     traceScope();
     logln("init: channelsIn=" << channelsIn << " channelsOut=" << channelsOut << " channelsSC=" << channelsSC
                               << " rate=" << rate << " samplesPerBlock=" << samplesPerBlock

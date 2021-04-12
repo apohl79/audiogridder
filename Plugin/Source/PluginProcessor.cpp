@@ -360,7 +360,7 @@ void AudioGridderAudioProcessor::prepareToPlay(double sampleRate, int samplesPer
 
     int channelsIn = getMainBusNumInputChannels();
     int channelsOut = getMainBusNumOutputChannels();
-    int channelsSC = getBusCount(true) == 2? getChannelCountOfBus(true, 1): 0;
+    int channelsSC = getBusCount(true) == 2 ? getChannelCountOfBus(true, 1) : 0;
     m_client->init(channelsIn, channelsOut, channelsSC, sampleRate, samplesPerBlock, isUsingDoublePrecision());
 
     m_prepared = true;

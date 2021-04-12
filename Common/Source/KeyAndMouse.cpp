@@ -125,7 +125,7 @@ void sendInput(INPUT* in) {
 void sendKey(WORD vk, bool keyDown, HWND hwnd = NULL) {
     traceScope();
     if (hwnd) {
-        auto msg = keyDown? WM_KEYDOWN: WM_KEYUP;
+        auto msg = keyDown ? WM_KEYDOWN : WM_KEYUP;
         if (SendMessage(hwnd, msg, vk, 1)) {
             logln("SendMessage failed: " << GetLastErrorStr());
         }
@@ -389,7 +389,7 @@ void keyEvent(uint16_t keyCode, uint64_t flags, bool keyDown, bool currentProces
     ignoreUnused(nativeHandle);
     keyEventReal(keyCode, flags, keyDown, currentProcessOnly);
 #elif defined(JUCE_WINDOWS)
-    keyEventReal(getVK(keyCode), flags, keyDown, currentProcessOnly? nativeHandle: nullptr);
+    keyEventReal(getVK(keyCode), flags, keyDown, currentProcessOnly ? nativeHandle : nullptr);
 #endif
 }
 

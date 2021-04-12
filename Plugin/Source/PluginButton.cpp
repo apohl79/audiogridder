@@ -72,8 +72,8 @@ void PluginButton::paintButton(Graphics& g, bool shouldDrawButtonAsHighlighted, 
         // bypass
         g.setColour(txtColor);
         g.drawEllipse(m_bypassArea.toFloat(), symLineThikness);
-        //g.setColour(bgColor.withAlpha(0.1f));
-        //g.fillRect(m_bypassArea.getCentreX() - 2, m_bypassArea.getY() - 2, 4, 4);
+        // g.setColour(bgColor.withAlpha(0.1f));
+        // g.fillRect(m_bypassArea.getCentreX() - 2, m_bypassArea.getY() - 2, 4, 4);
         g.setColour(txtColor);
         g.drawLine((float)m_bypassArea.getCentreX(), (float)m_bypassArea.getY() - 1, (float)m_bypassArea.getCentreX(),
                    (float)m_bypassArea.getY() + 5, symLineThikness);

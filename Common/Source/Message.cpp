@@ -152,7 +152,6 @@ StreamingSocket* accept(StreamingSocket* master, int timeoutMs, std::function<bo
     return nullptr;
 }
 
-
 }  // namespace e47
 
 #endif
