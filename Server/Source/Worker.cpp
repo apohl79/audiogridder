@@ -54,39 +54,12 @@ void Worker::run() {
 
     m_noPluginListFilter = m_cfg.isFlag(HandshakeRequest::NO_PLUGINLIST_FILTER);
 
-    auto setNonBlocking = [](int handle) noexcept -> bool {
-#ifdef JUCE_WINDOWS
-        DWORD nonBlocking = 1;
-        return ioctlsocket(handle, FIONBIO, &nonBlocking) == 0;
-#else
-        int socketFlags = fcntl(handle, F_GETFL, 0);
-        if (socketFlags == -1) {
-            return false;
-        }
-        socketFlags &= ~O_NONBLOCK;
-        return fcntl(handle, F_SETFL, socketFlags) == 0;
-#endif
-    };
-
-    auto accept = [this]() -> StreamingSocket* {
-        TimeStatistic::Timeout timeout(2000);
-        do {
-            if (m_masterSocket->waitUntilReady(true, 100) > 0) {
-                auto sock = m_masterSocket->waitForNextConnection();
-                if (nullptr != sock) {
-                    return sock;
-                }
-            }
-        } while (timeout.getMillisecondsLeft() > 0);
-        return nullptr;
-    };
-
     // set master socket non-blocking
     if (!setNonBlocking(m_masterSocket->getRawSocketHandle())) {
         logln("failed to set master socket non-blocking");
     }
 
-    m_cmdIn.reset(accept());
+    m_cmdIn.reset(accept(m_masterSocket.get(), 2000));
     if (nullptr != m_cmdIn && m_cmdIn->isConnected()) {
         logln("client connected " << m_cmdIn->getHostName());
     } else {
@@ -95,7 +68,7 @@ void Worker::run() {
     }
 
     // command sending socket
-    m_cmdOut.reset(accept());
+    m_cmdOut.reset(accept(m_masterSocket.get(), 2000));
     if (nullptr == m_cmdIn || !m_cmdIn->isConnected()) {
         logln("failed to establish command connection");
         return;
@@ -104,7 +77,7 @@ void Worker::run() {
     std::unique_ptr<StreamingSocket> sock;
 
     // start audio processing
-    sock.reset(accept());
+    sock.reset(accept(m_masterSocket.get(), 2000));
     if (nullptr != sock && sock->isConnected()) {
         m_audio->init(std::move(sock), m_cfg.channelsIn, m_cfg.channelsOut, m_cfg.channelsSC, m_cfg.rate,
                       m_cfg.samplesPerBlock, m_cfg.doublePrecission,
@@ -115,7 +88,7 @@ void Worker::run() {
     }
 
     // start screen capturing
-    sock.reset(accept());
+    sock.reset(accept(m_masterSocket.get(), 2000));
     if (nullptr != sock && sock->isConnected()) {
         m_screen->init(std::move(sock));
         m_screen->startThread();

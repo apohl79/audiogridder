@@ -123,6 +123,7 @@ void Server::loadConfig() {
     m_parallelPluginLoad = jsonGetValue(cfg, "ParallelPluginLoad", m_parallelPluginLoad);
     m_sandboxing = jsonGetValue(cfg, "Sandboxing", m_sandboxing);
     m_sandboxCoreDumps = jsonGetValue(cfg, "SandboxCoreDumps", m_sandboxCoreDumps);
+    m_sandboxLogAutoclean = jsonGetValue(cfg, "SandboxLogAutoclean", m_sandboxLogAutoclean);
 }
 
 void Server::saveConfig() {
@@ -170,6 +171,7 @@ void Server::saveConfig() {
     j["ParallelPluginLoad"] = m_parallelPluginLoad;
     j["Sandboxing"] = m_sandboxing;
     j["SandboxCoreDumps"] = m_sandboxCoreDumps;
+    j["SandboxLogAutoclean"] = m_sandboxLogAutoclean;
 
     File cfg(Defaults::getConfigFileName(Defaults::ConfigServer));
     if (cfg.exists()) {
@@ -272,7 +274,7 @@ void Server::saveKnownPluginList(KnownPluginList& plist) {
 Server::~Server() {
     traceScope();
     stopAsyncFunctors();
-    if (m_masterSocket.isConnected()) {
+    if (!getOpt("sandboxMode", false)) {
         m_masterSocket.close();
     }
     waitForThreadAndLog(this, this);
@@ -291,17 +293,21 @@ Server::~Server() {
 
 void Server::shutdown() {
     traceScope();
-    logln("shutting down");
-    m_masterSocket.close();
+    logln("shutting down server");
+    if (!getOpt("sandboxMode", false)) {
+        m_masterSocket.close();
+    }
+    logln("shutting down " << m_workers.size() << " workers");
     for (auto& w : m_workers) {
         logln("shutting down worker, isRunning=" << (int)w->isThreadRunning());
         w->shutdown();
     }
+    logln("waiting for " << m_workers.size() << " workers");
     for (auto& w : m_workers) {
         w->waitForThreadToExit(-1);
     }
-    m_sandboxes.clear();
     signalThreadShouldExit();
+    logln("thread signaled");
 }
 
 void Server::setName(const String& name) {
@@ -543,6 +549,8 @@ void Server::runServer() {
     setsockopt(m_masterSocket.getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
 #endif
 
+    setNonBlocking(m_masterSocket.getRawSocketHandle());
+
     ServiceResponder::initialize(m_port + getId(), getId(), m_name);
 
     if (m_name.isEmpty()) {
@@ -589,7 +597,7 @@ void Server::runServer() {
     if (m_masterSocket.createListener(m_port + getId(), m_host)) {
         logln("server started: ID=" << getId() << ", PORT=" << m_port + getId() << ", NAME=" << m_name);
         while (!currentThreadShouldExit()) {
-            auto* clnt = m_masterSocket.waitForNextConnection();
+            auto* clnt = accept(&m_masterSocket, 1000, [] { return currentThreadShouldExit(); });
             if (nullptr != clnt) {
                 HandshakeRequest cfg;
                 int len = clnt->read(&cfg, sizeof(cfg), true);
@@ -693,6 +701,16 @@ void Server::runServer() {
                 }
             }
         }
+        logln("terminating sandboxes");
+        Array<std::shared_ptr<SandboxMaster>> deleters;
+        for (auto sandbox : m_sandboxes){
+            deleters.add(sandbox);
+        }
+        for (auto d: deleters) {
+            m_sandboxes.remove(d->id);
+        }
+        runOnMsgThreadAsync([deleters] {});
+        sleep(3000); // give the processes some time to terminate
     } else {
         logln("failed to create listener");
         runOnMsgThreadAsync([this] {
@@ -776,6 +794,8 @@ void Server::runSandbox() {
         logln("failed to start worker thread");
     }
 
+    logln("run finished");
+
     if (!currentThreadShouldExit()) {
         getApp()->prepareShutdown();
     }
@@ -822,9 +842,14 @@ void Server::handleConnectedToMaster() {
 }
 
 void Server::handleDisconnectedFromMaster() {
-    logln("disconnected from sandbox master");
-    m_sandboxConnectedToMaster = false;
-    getApp()->prepareShutdown();
+    if (m_sandboxConnectedToMaster.exchange(false)) {
+        logln("disconnected from sandbox master");
+        auto *deleter = m_sandboxSlave.get();
+        m_sandboxSlave.release();
+        runOnMsgThreadAsync([deleter] { delete deleter; });
+        signalThreadShouldExit();
+        getApp()->prepareShutdown();
+    }
 }
 
 void Server::handleMessageFromMaster(const SandboxMessage& msg) {

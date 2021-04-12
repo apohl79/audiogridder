@@ -112,12 +112,16 @@ void App::initialise(const String& commandLineParameters) {
 #ifdef JUCE_MAC
             Process::setDockIconVisible(false);
 #endif
-            if (jsonGetValue(configParseFile(Defaults::getConfigFileName(Defaults::ConfigServer)), "SandboxCoreDumps",
-                             false)) {
+            auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigServer));
+            bool enableCoreDumps = jsonGetValue(cfg, "SandboxCoreDumps", false);
+            bool enableLogAutoclean = jsonGetValue(cfg, "SandboxLogAutoclean", true);
+            if (enableCoreDumps) {
                 CoreDump::initialize(appName, logName, false);
             }
-            AGLogger::deleteFileAtFinish();
-            Tracer::deleteFileAtFinish();
+            if (enableLogAutoclean) {
+                AGLogger::deleteFileAtFinish();
+                Tracer::deleteFileAtFinish();
+            }
             json opts;
             opts["sandboxMode"] = true;
             opts["commandLine"] = commandLineParameters.toStdString();
