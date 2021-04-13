@@ -23,5 +23,6 @@ cp -r package/build/vst3/* ../Archive/Builds/$VERSION/linux
 cp -r package/build/tray/* ../Archive/Builds/$VERSION/linux
 
 cd package/build
-zip -r AudioGridder_$VERSION-Linux.zip vst vst3 tray ../install-trayapp-linux.sh
+zip -r AudioGridder_$VERSION-Linux.zip vst vst3 tray
+zip -j AudioGridder_$VERSION-Linux.zip ../install-trayapp-linux.sh
 rm -rf vst vst3 tray
