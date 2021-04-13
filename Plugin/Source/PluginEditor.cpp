@@ -693,10 +693,6 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
                     traceScope();
                     m_processor.getClient().rescan(true);
                 });
-                srvMenu.addItem("Restart server", [this] {
-                    traceScope();
-                    m_processor.getClient().restart();
-                });
                 srvMenu.addItem("Reconnect", [this] {
                     traceScope();
                     m_processor.getClient().reconnect();

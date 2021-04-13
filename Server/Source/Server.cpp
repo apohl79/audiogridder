@@ -716,7 +716,7 @@ void Server::runServer() {
         for (auto d : deleters) {
             m_sandboxes.remove(d->id);
         }
-        runOnMsgThreadAsync([deleters] {});
+        runOnMsgThreadAsync([deleters{std::move(deleters)}] {});
         sleep(3000);  // give the processes some time to terminate
     } else {
         logln("failed to create listener");
@@ -818,6 +818,9 @@ void Server::runSandbox() {
         logln("failed to start worker thread");
     }
 
+    auto *deleter = m_sandboxController.release();
+    runOnMsgThreadAsync([deleter] { delete deleter; });
+
     logln("run finished");
 
     if (!currentThreadShouldExit()) {
@@ -874,14 +877,14 @@ void Server::handleMessageFromSandbox(SandboxMaster& sandbox, const SandboxMessa
 void Server::handleDisconnectFromSandbox(SandboxMaster& sandbox) {
     if (m_sandboxes.contains(sandbox.id)) {
         logln("disconnected from sandbox " << sandbox.id);
-        auto sandboxToDelete = m_sandboxes[sandbox.id];
-        m_sandboxes.remove(sandbox.id);
-        runOnMsgThreadAsync([sandboxToDelete] {});
         m_sandboxLoadedCount.remove(sandbox.id);
         Metrics::getStatistic<TimeStatistic>("audio")->removeExt1minValues(sandbox.id);
         Metrics::getStatistic<TimeStatistic>("audio")->getMeter().removeExtRate1min(sandbox.id);
         Metrics::getStatistic<Meter>("NetBytesOut")->removeExtRate1min(sandbox.id);
         Metrics::getStatistic<Meter>("NetBytesIn")->removeExtRate1min(sandbox.id);
+        auto deleter = m_sandboxes[sandbox.id];
+        m_sandboxes.remove(sandbox.id);
+        runOnMsgThreadAsync([deleter = std::move(deleter)] {});
     }
 }
 
@@ -893,9 +896,6 @@ void Server::handleConnectedToMaster() {
 void Server::handleDisconnectedFromMaster() {
     if (m_sandboxConnectedToMaster.exchange(false)) {
         logln("disconnected from sandbox master");
-        auto* deleter = m_sandboxController.get();
-        m_sandboxController.release();
-        runOnMsgThreadAsync([deleter] { delete deleter; });
         signalThreadShouldExit();
         getApp()->prepareShutdown();
     }
@@ -917,13 +917,13 @@ void Server::handleMessageFromMaster(const SandboxMessage& msg) {
 }
 
 void Server::sandboxShowEditor() {
-    if (getOpt("sandboxMode", false)) {
+    if (getOpt("sandboxMode", false) && nullptr != m_sandboxController) {
         m_sandboxController->send(SandboxMessage(SandboxMessage::SHOW_EDITOR, {}), nullptr, true);
     }
 }
 
 void Server::sandboxHideEditor() {
-    if (getOpt("sandboxMode", false)) {
+    if (getOpt("sandboxMode", false) && nullptr != m_sandboxController) {
         m_sandboxController->send(SandboxMessage(SandboxMessage::HIDE_EDITOR, {}));
     }
 }
