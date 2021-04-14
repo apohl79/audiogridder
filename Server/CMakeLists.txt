@@ -13,7 +13,7 @@ juce_add_gui_app(AudioGridderServer
   VERSION "${AG_VERSION}"
   PRODUCT_NAME "AudioGridderServer"
   COMPANY_NAME "e47"
-  COMPANY_COPYRIGHT "2020 Andreas Pohl"
+  COMPANY_COPYRIGHT "2021 Andreas Pohl"
   COMPANY_WEBSITE "https://www.audiogridder.com"
   PLUGINHOST_AU TRUE
   ICON_BIG "${AG_ICON_BIG}"

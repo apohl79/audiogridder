@@ -25,7 +25,7 @@ macro(ag_add_plugin type)
     PLUGIN_NAME "${pluginname}"
     PRODUCT_NAME "${productname}"
     COMPANY_NAME "e47"
-    COMPANY_COPYRIGHT "2020 Andreas Pohl"
+    COMPANY_COPYRIGHT "2021 Andreas Pohl"
     COMPANY_WEBSITE "https://www.audiogridder.com"
     DESCRIPTION "${pluginname}"
     PLUGIN_MANUFACTURER_CODE XE47
