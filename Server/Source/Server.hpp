@@ -130,7 +130,7 @@ class Server : public Thread, public LogTag {
     bool m_vstNoStandardFolders;
     bool m_scanForPlugins = true;
     bool m_parallelPluginLoad = false;
-    bool m_sandboxing = true;
+    bool m_sandboxing = false;
     bool m_sandboxCoreDumps = false;
     bool m_sandboxLogAutoclean = true;
 
