@@ -744,10 +744,6 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
                         traceScope();
                         m_processor.getClient().rescan(true);
                     });
-                    srvMenu.addItem("Restart server", [this] {
-                        traceScope();
-                        m_processor.getClient().restart();
-                    });
                     srvMenu.addItem("Reconnect", [this] {
                         traceScope();
                         m_processor.getClient().reconnect();
@@ -783,11 +779,19 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
 #if !JucePlugin_IsSynth && !JucePlugin_IsMidiEffect
         subm.addItem("Make Default", [this] {
             traceScope();
+            if (m_processor.hasDefaultPreset() &&
+                AlertWindow::showOkCancelBox(AlertWindow::QuestionIcon, "Replace",
+                                             "Are you sure you want to replace your existing default preset?", "Yes", "No")) {
+                m_processor.resetPresetDefault();
+            }
             m_processor.storePresetDefault();
         });
         subm.addItem("Reset Default", m_processor.hasDefaultPreset(), false, [this] {
             traceScope();
-            m_processor.resetPresetDefault();
+            if (AlertWindow::showOkCancelBox(AlertWindow::QuestionIcon, "Reset",
+                                             "Are you sure you want to delete your default settings?", "Yes", "No")) {
+                m_processor.resetPresetDefault();
+            }
         });
         subm.addSeparator();
 #endif
