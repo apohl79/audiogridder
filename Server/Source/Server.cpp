@@ -707,17 +707,27 @@ void Server::runServer() {
                     deadWorkers->clear();
                 }
             }
+            {
+                std::lock_guard<std::mutex> lock(m_sandboxesForDeletionMtx);
+                if (!m_sandboxesForDeletion.isEmpty()) {
+                    std::thread([deleters = std::move(m_sandboxesForDeletion)] {}).detach();
+                }
+            }
+
         }
-        logln("terminating sandboxes");
-        Array<std::shared_ptr<SandboxMaster>> deleters;
-        for (auto sandbox : m_sandboxes) {
-            deleters.add(sandbox);
+        if (m_sandboxes.size() > 0) {
+            for (auto sandbox: m_sandboxes) {
+                m_sandboxesForDeletion.add(sandbox);
+            }
+            m_sandboxes.clear();
         }
-        for (auto d : deleters) {
-            m_sandboxes.remove(d->id);
+        {
+            std::lock_guard<std::mutex> lock(m_sandboxesForDeletionMtx);
+            if (!m_sandboxesForDeletion.isEmpty()) {
+                std::thread([deleters = std::move(m_sandboxesForDeletion)] {}).detach();
+                sleep(3000);
+            }
         }
-        runOnMsgThreadAsync([deleters{std::move(deleters)}] {});
-        sleep(3000);  // give the processes some time to terminate
     } else {
         logln("failed to create listener");
         runOnMsgThreadAsync([this] {
@@ -818,8 +828,9 @@ void Server::runSandbox() {
         logln("failed to start worker thread");
     }
 
+    logln("terminating sandbox connection to master");
     auto *deleter = m_sandboxController.release();
-    runOnMsgThreadAsync([deleter] { delete deleter; });
+    std::thread([deleter] { delete deleter; }).detach();
 
     logln("run finished");
 
@@ -884,7 +895,7 @@ void Server::handleDisconnectFromSandbox(SandboxMaster& sandbox) {
         Metrics::getStatistic<Meter>("NetBytesIn")->removeExtRate1min(sandbox.id);
         auto deleter = m_sandboxes[sandbox.id];
         m_sandboxes.remove(sandbox.id);
-        runOnMsgThreadAsync([deleter = std::move(deleter)] {});
+        m_sandboxesForDeletion.add(std::move(deleter));
     }
 }
 

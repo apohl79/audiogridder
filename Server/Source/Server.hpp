@@ -135,6 +135,9 @@ class Server : public Thread, public LogTag {
     bool m_sandboxLogAutoclean = true;
 
     HashMap<String, std::shared_ptr<SandboxMaster>, DefaultHashFunctions, CriticalSection> m_sandboxes;
+    Array<std::shared_ptr<SandboxMaster>> m_sandboxesForDeletion;
+    std::mutex m_sandboxesForDeletionMtx;
+
     std::unique_ptr<SandboxSlave> m_sandboxController;
 
     HashMap<String, uint32, DefaultHashFunctions, CriticalSection> m_sandboxLoadedCount;
