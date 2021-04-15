@@ -21,7 +21,7 @@ void App::initialise(const String& /*commandLineParameters*/) {
             m_keepRunning = true;
         }
     }
-    if (!m_srv.beginWaitingForSocket(Defaults::PLUGIN_TRAY_PORT)) {
+    if (!m_srv.beginWaitingForSocket(Defaults::PLUGIN_TRAY_PORT, "127.0.0.1")) {
         quit();
         return;
     }
