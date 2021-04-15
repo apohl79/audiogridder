@@ -290,6 +290,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
                 delete m_editor;
                 m_editor = nullptr;
             }
+            m_processor->setLastPosition(getPosition());
         }
 
         void closeButtonPressed() override { getApp()->hideEditor(); }

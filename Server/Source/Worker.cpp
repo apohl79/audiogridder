@@ -108,7 +108,8 @@ void Worker::run() {
     while (!currentThreadShouldExit() && nullptr != m_cmdIn && m_cmdIn->isConnected() && m_audio->isThreadRunning() &&
            m_screen->isThreadRunning()) {
         MessageHelper::Error e;
-        auto msg = m_msgFactory.getNextMessage(m_cmdIn.get(), &e);
+        std::shared_ptr<Message<Any>> msg;
+        msg = m_msgFactory.getNextMessage(m_cmdIn.get(), &e);
         if (nullptr != msg) {
             switch (msg->getType()) {
                 case Quit::Type:
@@ -358,6 +359,7 @@ void Worker::handleMessage(std::shared_ptr<Message<HidePlugin>> /* msg */, bool 
         m_screen->hideEditor();
         m_activeEditorIdx = -1;
     }
+    logln("hiding done (worker)");
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<Mouse>> msg) {

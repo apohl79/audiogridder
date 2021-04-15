@@ -204,6 +204,9 @@ class AGProcessor : public LogTagDelegate {
     bool getNeedsDisabledSidechain() const { return m_needsDisabledSidechain; }
     void setNeedsDisabledSidechain(bool b) { m_needsDisabledSidechain = b; }
 
+    Point<int> getLastPosition() const { return m_lastPosition; }
+    void setLastPosition(Point<int> p) { m_lastPosition = p; }
+
   private:
     ProcessorChain& m_chain;
     String m_id;
@@ -222,6 +225,7 @@ class AGProcessor : public LogTagDelegate {
     Array<Array<float>> m_bypassBufferF;
     Array<Array<double>> m_bypassBufferD;
     int m_lastKnownLatency = 0;
+    Point<int> m_lastPosition = {0, 0};
 };
 
 class ProcessorChain : public AudioProcessor, public LogTagDelegate {

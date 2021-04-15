@@ -435,18 +435,10 @@ void App::ProcessorWindow::createEditor() {
     }
     m_editor = m_processor->createEditorIfNeeded();
     if (nullptr != m_editor) {
-#ifdef JUCE_WINDOWS
-        // try to figure out, if the HWND is valid, this is a temp hack to investigate some user crash reports
-        auto peer = ComponentPeer::getPeerFor(this);
-        if (nullptr != peer) {
-            auto hwnd = (HWND)peer->getNativeHandle();
-            if (!IsWindow(hwnd)) {
-                logln("failed to create editor: invalid HWND of processor window");
-                return;
-            }
-        }
-#endif
         setContentNonOwned(m_editor, true);
+        if (getApp()->getServer()->getScreenCapturingOff()) {
+            setTopLeftPosition(m_processor->getLastPosition());
+        }
         Component::setVisible(true);
         startCapturing();
     } else {
