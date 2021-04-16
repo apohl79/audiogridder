@@ -232,7 +232,7 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     if (success) {
         proc = m_audio->getProcessor(m_audio->getSize() - 1)->getPlugin();
         jresult["latency"] = m_audio->getLatencySamples();
-        jresult["hasEditor"] = proc->hasEditor();
+        runOnMsgThreadSync([&] { jresult["hasEditor"] = proc->hasEditor(); });
     }
     Message<AddPluginResult> msgResult(this);
     PLD(msgResult).setJson(jresult);
