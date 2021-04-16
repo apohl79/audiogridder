@@ -801,36 +801,40 @@ void Server::runSandbox() {
         sleep(10);
     }
 
-    logln("creating worker");
-    auto w = std::make_shared<Worker>(masterSocket, m_sandboxConfig);
-    w->startThread();
-    if (w->isThreadRunning()) {
-        m_workers.add(w);
+    if (!currentThreadShouldExit()) {
+        logln("creating worker");
+        auto w = std::make_shared<Worker>(masterSocket, m_sandboxConfig);
+        w->startThread();
+        if (w->isThreadRunning()) {
+            m_workers.add(w);
 
-        auto audioTime = Metrics::getStatistic<TimeStatistic>("audio");
-        auto bytesOutMeter = Metrics::getStatistic<Meter>("NetBytesOut");
-        auto bytesInMeter = Metrics::getStatistic<Meter>("NetBytesIn");
+            auto audioTime = Metrics::getStatistic<TimeStatistic>("audio");
+            auto bytesOutMeter = Metrics::getStatistic<Meter>("NetBytesOut");
+            auto bytesInMeter = Metrics::getStatistic<Meter>("NetBytesIn");
 
-        while (!w->waitForThreadToExit(1000)) {
-            json jmetrics;
-            jmetrics["LoadedCount"] = AGProcessor::loadedCount.load();
-            jmetrics["NetBytesOut"] = bytesOutMeter->rate_1min();
-            jmetrics["NetBytesIn"] = bytesInMeter->rate_1min();
-            jmetrics["RPS"] = audioTime->getMeter().rate_1min();
-            json jtimes = json::array();
-            for (auto& hist : audioTime->get1minValues()) {
-                jtimes.push_back(hist.toJson());
+            while (!w->waitForThreadToExit(1000)) {
+                json jmetrics;
+                jmetrics["LoadedCount"] = AGProcessor::loadedCount.load();
+                jmetrics["NetBytesOut"] = bytesOutMeter->rate_1min();
+                jmetrics["NetBytesIn"] = bytesInMeter->rate_1min();
+                jmetrics["RPS"] = audioTime->getMeter().rate_1min();
+                json jtimes = json::array();
+                for (auto& hist : audioTime->get1minValues()) {
+                    jtimes.push_back(hist.toJson());
+                }
+                jmetrics["audio"] = jtimes;
+                m_sandboxController->send(SandboxMessage(SandboxMessage::METRICS, jmetrics), nullptr, true);
             }
-            jmetrics["audio"] = jtimes;
-            m_sandboxController->send(SandboxMessage(SandboxMessage::METRICS, jmetrics), nullptr, true);
+        } else {
+            logln("failed to start worker thread");
         }
-    } else {
-        logln("failed to start worker thread");
     }
 
     logln("terminating sandbox connection to master");
-    auto *deleter = m_sandboxController.release();
-    std::thread([deleter] { delete deleter; }).detach();
+    if (nullptr != m_sandboxController) {
+        auto* deleter = m_sandboxController.release();
+        std::thread([deleter] { delete deleter; }).detach();
+    }
 
     logln("run finished");
 
