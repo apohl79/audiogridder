@@ -1174,7 +1174,9 @@ void AudioGridderAudioProcessor::TrayConnection::timerCallback() {
             } else {
                 logln("no tray app available");
             }
-            Thread::sleep(3000);
+            // stop the timer here and reactivate it later to give the try app some time to start
+            stopTimer();
+            callAfterDelay(3000, [this] { start(); });
         }
     } else {
         sendStatus();
