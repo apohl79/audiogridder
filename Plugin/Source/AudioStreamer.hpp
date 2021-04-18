@@ -110,8 +110,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                 m_writeQ.push(std::move(buf));
                 notifyWrite();
             } else {
-                if (!copyToWorkingBuffer(m_workingSendBuf, m_workingSendSamples, buffer, midi,
-                                         m_client->getChannelsIn() == 0)) {
+                if (!copyToWorkingBuffer(m_workingSendBuf, m_workingSendSamples, buffer, midi)) {
                     logln("error: " << getInstanceString() << ": send error");
                     setError();
                     return;
@@ -300,14 +299,9 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         return true;
     }
 
-    bool copyToWorkingBuffer(AudioMidiBuffer& dst, int& workingSamples, AudioBuffer<T>& src, MidiBuffer& midi,
-                             bool midiOnly = false) {
+    bool copyToWorkingBuffer(AudioMidiBuffer& dst, int& workingSamples, AudioBuffer<T>& src, MidiBuffer& midi) {
         traceScope();
-        if (!midiOnly) {
-            if (src.getNumChannels() < 1) {
-                logln("error: " << getInstanceString() << ": copy failed, source audio buffer empty");
-                return false;
-            }
+        if (src.getNumChannels() > 0) {
             if ((dst.audio.getNumSamples() - workingSamples) < src.getNumSamples()) {
                 dst.audio.setSize(src.getNumChannels(), workingSamples + src.getNumSamples(), true);
             }
