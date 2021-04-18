@@ -1,16 +1,17 @@
 # AudioGridder
 
-AudioGridder is a plugin host, that allows you to offload the DSP processing of
-audio plugins to remote computers running macOS or Windows. This can come in handy
-when mixing complex projects or running CPU intensive instruments for instance.
-AudioGridder comes with a plugin and a server and supports VST2, VST3 and
-AudioUnit plugin formats. Plugins can be hosted and accessed across the network:
-simply run the AudioGridder server on a remote machine and connect your DAW
-using the AudioGridder plugin. This allows you to add remote insert chains or
-instruments into your DAW's signal paths. The DSP code of the loaded remote
-plugins will be executed on the remote machine and the remote plugin UI's will
-be streamed over the wire. With AudioGridder you get an experience very close to
-hosting the plugins directly in your DAW but not using your local CPU.
+AudioGridder is a network bridge for audio and MIDI that allows for offloading
+the DSP processing of audio plugins to remote computers running macOS or
+Windows. This can come in handy when mixing complex projects or running CPU
+intensive instruments for instance.  AudioGridder comes with a plugin and a
+server and supports VST2, VST3 and AudioUnit plugin formats. Plugins can be
+hosted and accessed across the network: simply run the AudioGridder server on a
+remote machine and connect your DAW using the AudioGridder plugin. This allows
+you to add remote insert chains or instruments into your DAW's signal paths. The
+DSP code of the loaded remote plugins will be executed on the remote machine and
+the remote plugin UI's will be streamed over the wire. With AudioGridder you get
+an experience very close to hosting the plugins directly in your DAW but not
+using your local CPU.
 
 For more information and intstallation instructions, please visit
 [https://audiogridder.com](https://audiogridder.com).
@@ -47,7 +48,7 @@ brew install audiogridder-server
 
 # Features
 
-- VST2 / VST3 / AudioUnit (macOS only)
+- VST2 / VST3 / AAX / AudioUnit (macOS only)
 - Effect & Instrument plugins
 - Latency compensation
 - 32/64 bit float processing
@@ -64,7 +65,7 @@ brew install audiogridder-server
 - Server: macOS 10.7+, Windows 7+
 - Plugin: macOS 10.7+, Windows 7+, Linux 64bit
 - The server supports AudioUnit (macOS only) and VST2/VST3 plugins
-- The plugin is available as AudioUnit (macOS only) and VST2/VST3
+- The plugin is available as VST2/VST3, AAX and AudioUnit (macOS only)
 - Tested DAWs: Cubase 10 Pro, Logic Pro X, Pro Tools 2020.12/12, Reaper, Ableton Live
 
 # Donation
