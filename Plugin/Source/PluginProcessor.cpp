@@ -28,10 +28,13 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
                          .withInput("Input", AudioChannelSet::discreteChannels(16), true)
                          .withInput("Sidechain", AudioChannelSet::stereo(), false)
 #endif
-                         .withOutput("Output", AudioChannelSet::discreteChannels(16), true)) {
-    initAsyncFunctors();
+#if !JucePlugin_IsMidiEffect
+                         .withOutput("Output", AudioChannelSet::discreteChannels(16), true)
+#endif
+    ){
+          initAsyncFunctors();
 
-    String mode;
+String mode;
 #if JucePlugin_IsSynth
     mode = "Instrument";
 #elif JucePlugin_IsMidiEffect
