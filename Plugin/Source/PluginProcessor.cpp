@@ -222,6 +222,7 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
     m_menuShowCompany = jsonGetValue(j, "MenuShowCompany", m_menuShowCompany);
     m_genericEditor = jsonGetValue(j, "GenericEditor", m_genericEditor);
     m_confirmDelete = jsonGetValue(j, "ConfirmDelete", m_confirmDelete);
+    m_transferWhenPlayingOnly = jsonGetValue(j, "TransferWhenPlayingOnly", m_transferWhenPlayingOnly);
     m_syncRemote = jsonGetValue(j, "SyncRemoteMode", m_syncRemote);
     m_presetsDir = jsonGetValue(j, "PresetsDir", Defaults::PRESETS_DIR);
     m_defaultPreset = jsonGetValue(j, "DefaultPreset", m_defaultPreset);
@@ -255,6 +256,7 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
     jcfg["MenuShowCompany"] = m_menuShowCompany;
     jcfg["GenericEditor"] = m_genericEditor;
     jcfg["ConfirmDelete"] = m_confirmDelete;
+    jcfg["TransferWhenPlayingOnly"] = m_transferWhenPlayingOnly;
     jcfg["Tracer"] = Tracer::isEnabled();
     jcfg["Logger"] = AGLogger::isEnabled();
     jcfg["SyncRemoteMode"] = m_syncRemote;
@@ -413,7 +415,7 @@ void AudioGridderAudioProcessor::processBlockReal(AudioBuffer<T>& buffer, MidiBu
         buffer.clear(i, 0, buffer.getNumSamples());
     }
 
-    if (posInfo.isPlaying || posInfo.isRecording) {
+    if (!m_transferWhenPlayingOnly || posInfo.isPlaying || posInfo.isRecording) {
         if ((buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) || midiMessages.getNumEvents() > 0) {
             auto streamer = m_client->getStreamer<T>();
             if (nullptr != streamer) {

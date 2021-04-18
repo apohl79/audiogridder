@@ -923,6 +923,20 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
             m_processor.saveConfig();
         });
 
+
+        subm.addItem("Always", true, m_processor.getTransferWhenPlayingOnly() == false, [this] {
+            traceScope();
+            m_processor.setTransferWhenPlayingOnly(false);
+            m_processor.saveConfig();
+        });
+        subm.addItem("Only when Playing/Recording", true, m_processor.getTransferWhenPlayingOnly() == true, [this] {
+            traceScope();
+            m_processor.setTransferWhenPlayingOnly(true);
+            m_processor.saveConfig();
+        });
+        m.addSubMenu("Transfer Audio/MIDI", subm);
+        subm.clear();
+
         subm.addItem("Always (every 10s)", true,
                      m_processor.getSyncRemoteMode() == AudioGridderAudioProcessor::SYNC_ALWAYS, [this] {
                          m_processor.setSyncRemoteMode(AudioGridderAudioProcessor::SYNC_ALWAYS);

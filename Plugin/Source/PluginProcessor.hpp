@@ -176,6 +176,9 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     void storePresetDefault();
     void resetPresetDefault();
 
+    bool getTransferWhenPlayingOnly() const { return m_transferWhenPlayingOnly; }
+    void setTransferWhenPlayingOnly(bool b) { m_transferWhenPlayingOnly = b; }
+
     // It looks like most hosts do not support dynamic parameter creation or changes to existing parameters. Logic
     // at least allows for the name to be updated. So we create slots at the start.
     class Parameter : public AudioProcessorParameter, public LogTagDelegate {
@@ -278,6 +281,8 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     bool m_confirmDelete = true;
     bool m_noSrvPluginListFilter = false;
     float m_scale = 1.0;
+
+    bool m_transferWhenPlayingOnly = false;
 
     TrackProperties m_trackProperties;
     std::mutex m_trackPropertiesMtx;
