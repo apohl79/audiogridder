@@ -1082,6 +1082,11 @@ void AudioGridderAudioProcessorEditor::getPresetsMenu(PopupMenu& menu, const Fil
             getPresetsMenu(subm, file);
             menu.addSubMenu(file.getFileName(), subm);
         } else if (file.getFileExtension() == ".preset") {
+            auto j = configParseFile(file.getFullPathName());
+            auto mode = jsonGetValue(j, "Mode", String());
+            if (mode.isNotEmpty() && mode != m_processor.getMode()) {
+                continue;
+            }
             menu.addItem(file.getFileNameWithoutExtension(), [this, file] {
                 traceScope();
                 if (m_processor.loadPreset(file)) {

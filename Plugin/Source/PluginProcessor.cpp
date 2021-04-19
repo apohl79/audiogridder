@@ -34,24 +34,23 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
       ) {
     initAsyncFunctors();
 
-    String mode;
 #if JucePlugin_IsSynth
-    mode = "Instrument";
+    m_mode = "Instrument";
 #elif JucePlugin_IsMidiEffect
-    mode = "Midi";
+    m_mode = "Midi";
 #else
-    mode = "FX";
+    m_mode = "FX";
 #endif
 
-    String appName = mode;
+    String appName = m_mode;
     String logName = "AudioGridderPlugin_";
 
     AGLogger::initialize(appName, logName, Defaults::getConfigFileName(Defaults::ConfigPlugin));
 
     m_client = std::make_unique<Client>(this);
     setLogTagSource(m_client.get());
-    logln(mode << " plugin loaded (version: " << AUDIOGRIDDER_VERSION << ", build date: " << AUDIOGRIDDER_BUILD_DATE
-               << ")");
+    logln(m_mode << " plugin loaded (version: " << AUDIOGRIDDER_VERSION << ", build date: " << AUDIOGRIDDER_BUILD_DATE
+                 << ")");
 
     Tracer::initialize(appName, logName);
     Signals::initialize();
@@ -272,28 +271,29 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
 }
 
 void AudioGridderAudioProcessor::storePreset(const File& file) {
-    MemoryBlock data;
-    getStateInformation(data, false);
-    FileOutputStream fos(file);
-    fos.write(data.getData(), data.getSize());
+    logln("storing preset " << file.getFullPathName());
+    auto j = getState(false);
+    configWriteFile(file.getFullPathName(), j);
 }
 
 bool AudioGridderAudioProcessor::loadPreset(const File& file) {
-    FileInputStream fis(file);
-    if (fis.openedOk()) {
-        logln("loading preset " << file.getFullPathName());
-        MemoryBlock data;
-        data.setSize((size_t)fis.getTotalLength());
-        fis.read(data.getData(), (int)data.getSize());
-        setStateInformation(data.getData(), (int)data.getSize());
-        return true;
-    } else {
-        AlertWindow::showMessageBoxAsync(
-            AlertWindow::WarningIcon, "Error",
-            "Failed to load preset " + file.getFullPathName() + "!\n\nError: " + fis.getStatus().getErrorMessage(),
-            "OK");
+    String err;
+    auto j = configParseFile(file.getFullPathName(), &err);
+    if (err.isEmpty() && !setState(j)) {
+        String mode = jsonGetValue(j, "Mode", mode);
+        if (mode != m_mode) {
+            err << "Can't load " << mode << " presets into " << m_mode << " plugins!";
+        } else {
+            err = "Error in the preset file. Check the plugin log for more info.";
+        }
     }
-    return false;
+    if (err.isNotEmpty()) {
+        AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Error",
+                                         "Failed to load preset " + file.getFullPathName() + "!\n\nError: " + err,
+                                         "OK");
+        return false;
+    }
+    return true;
 }
 
 void AudioGridderAudioProcessor::storePresetDefault() {
@@ -557,9 +557,30 @@ bool AudioGridderAudioProcessor::hasEditor() const { return true; }
 
 AudioProcessorEditor* AudioGridderAudioProcessor::createEditor() { return new AudioGridderAudioProcessorEditor(*this); }
 
-void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData, bool withServers) {
+void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData) {
+    traceScope();
+    auto j = getState(true);
+    auto dump = j.dump();
+    destData.append(dump.data(), dump.length());
+    saveConfig();
+}
+
+void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
+    traceScope();
+
+    std::string dump(static_cast<const char*>(data), (size_t)sizeInBytes);
+    try {
+        json j = json::parse(dump);
+        setState(j);
+    } catch (json::parse_error& e) {
+        logln("parsing state info failed: " << e.what());
+    }
+}
+
+json AudioGridderAudioProcessor::getState(bool withServers) {
     json j;
     j["version"] = 2;
+    j["Mode"] = m_mode.toStdString();
     j["ServerCanDisableSidechain"] = m_serverCanDisableSidechain;
 
     if (withServers) {
@@ -596,89 +617,77 @@ void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData, bool
     }
     j["loadedPlugins"] = jplugs;
 
-    auto dump = j.dump();
-    destData.append(dump.data(), dump.length());
+    return j;
 }
 
-void AudioGridderAudioProcessor::getStateInformation(MemoryBlock& destData) {
-    traceScope();
-    getStateInformation(destData, true);
-    saveConfig();
-}
+bool AudioGridderAudioProcessor::setState(const json& j) {
+    int version = jsonGetValue(j, "version", 0);
 
-void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
-    traceScope();
+    if (jsonHasValue(j, "Mode")) {
+        String mode;
+        jsonGetValue(j, "Mode", mode);
+        if (m_mode != mode) {
+            logln("error: mode mismatch, not setting state");
+            return false;
+        }
+    }
 
-    std::string dump(static_cast<const char*>(data), (size_t)sizeInBytes);
-    try {
-        json j = json::parse(dump);
-        int version = 0;
-        if (j.find("version") != j.end()) {
-            version = j["version"].get<int>();
-        }
+    m_serverCanDisableSidechain = jsonGetValue(j, "ServerCanDisableSidechain", true);
 
-        if (j.find("ServerCanDisableSidechain") != j.end()) {
-            m_serverCanDisableSidechain = j["ServerCanDisableSidechain"].get<bool>();
-        } else {
-            m_serverCanDisableSidechain = true;
+    if (j.find("servers") != j.end()) {
+        m_servers.clear();
+        for (auto& srv : j["servers"]) {
+            m_servers.add(srv.get<std::string>());
         }
-
-        if (j.find("servers") != j.end()) {
-            m_servers.clear();
-            for (auto& srv : j["servers"]) {
-                m_servers.add(srv.get<std::string>());
-            }
-        }
-        String activeServerStr;
-        int activeServer = -1;
-        if (j.find("activeServerStr") != j.end()) {
-            activeServerStr = j["activeServerStr"].get<std::string>();
-        } else if (j.find("activeServer") != j.end()) {
-            activeServer = j["activeServer"].get<int>();
-        }
-        {
-            std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
-            m_loadedPlugins.clear();
-            m_activePlugin = -1;
-            if (j.find("loadedPlugins") != j.end()) {
-                for (auto& plug : j["loadedPlugins"]) {
-                    if (version < 1) {
-                        StringArray dummy;
-                        Array<Client::Parameter> dummy2;
-                        m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
-                                                   plug[2].get<std::string>(), dummy, dummy2, false, false});
-                    } else if (version == 1) {
-                        StringArray dummy;
-                        Array<Client::Parameter> dummy2;
-                        m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
-                                                   plug[2].get<std::string>(), dummy, dummy2, plug[3].get<bool>(),
-                                                   false});
-                    } else {
-                        StringArray presets;
-                        for (auto& p : plug[3]) {
-                            presets.add(p.get<std::string>());
-                        }
-                        Array<e47::Client::Parameter> params;
-                        for (auto& p : plug[4]) {
-                            params.add(e47::Client::Parameter::fromJson(p));
-                        }
-                        m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
-                                                   plug[2].get<std::string>(), presets, params, plug[5].get<bool>(),
-                                                   false});
+    }
+    String activeServerStr;
+    int activeServer = -1;
+    if (j.find("activeServerStr") != j.end()) {
+        activeServerStr = j["activeServerStr"].get<std::string>();
+    } else if (j.find("activeServer") != j.end()) {
+        activeServer = j["activeServer"].get<int>();
+    }
+    {
+        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+        m_loadedPlugins.clear();
+        m_activePlugin = -1;
+        if (j.find("loadedPlugins") != j.end()) {
+            for (auto& plug : j["loadedPlugins"]) {
+                if (version < 1) {
+                    StringArray dummy;
+                    Array<Client::Parameter> dummy2;
+                    m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
+                                               plug[2].get<std::string>(), dummy, dummy2, false, false});
+                } else if (version == 1) {
+                    StringArray dummy;
+                    Array<Client::Parameter> dummy2;
+                    m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
+                                               plug[2].get<std::string>(), dummy, dummy2, plug[3].get<bool>(), false});
+                } else {
+                    StringArray presets;
+                    for (auto& p : plug[3]) {
+                        presets.add(p.get<std::string>());
                     }
+                    Array<e47::Client::Parameter> params;
+                    for (auto& p : plug[4]) {
+                        params.add(e47::Client::Parameter::fromJson(p));
+                    }
+                    m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
+                                               plug[2].get<std::string>(), presets, params, plug[5].get<bool>(),
+                                               false});
                 }
             }
         }
-        if (activeServerStr.isNotEmpty()) {
-            m_client->setServer(activeServerStr);
-            m_client->reconnect();
-        } else if (activeServer > -1 && activeServer < m_servers.size()) {
-            m_client->setServer(m_servers[activeServer]);
-            m_client->reconnect();
-        }
-    } catch (json::parse_error& e) {
-        logln("parsing state info failed: " << e.what());
     }
+    if (activeServerStr.isNotEmpty()) {
+        m_client->setServer(activeServerStr);
+        m_client->reconnect();
+    } else if (activeServer > -1 && activeServer < m_servers.size()) {
+        m_client->setServer(m_servers[activeServer]);
+        m_client->reconnect();
+    }
+
+    return true;
 }
 
 void AudioGridderAudioProcessor::sync() {

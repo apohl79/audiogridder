@@ -60,9 +60,13 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     const String getProgramName(int index) override;
     void changeProgramName(int index, const String& newName) override;
 
-    void getStateInformation(MemoryBlock& destData, bool withServers);
     void getStateInformation(MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
+
+    json getState(bool withServers);
+    bool setState(const json& j);
+
+    const String& getMode() const { return m_mode; }
 
     void updateTrackProperties(const TrackProperties& properties) override {
         traceScope();
@@ -252,6 +256,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
 
   private:
     Uuid m_instId;
+    String m_mode;
     std::unique_ptr<Client> m_client;
     std::unique_ptr<TrayConnection> m_tray;
     std::atomic_bool m_prepared{false};

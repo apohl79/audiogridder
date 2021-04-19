@@ -308,8 +308,13 @@ inline void waitForThreadAndLog(const LogTag* tag, Thread* t, int millisUntilWar
     }
 }
 
-inline json configParseFile(const String& configFile) {
+inline json configParseFile(const String& configFile, String* err = nullptr) {
     setLogTagStatic("utils");
+    auto setErr = [&](const String& s) {
+        if (nullptr != err) {
+            *err = s;
+        }
+    };
     File cfg(configFile);
     if (cfg.exists()) {
         FileInputStream fis(cfg);
@@ -318,10 +323,14 @@ inline json configParseFile(const String& configFile) {
                 return json::parse(fis.readEntireStreamAsString().toStdString());
             } catch (json::parse_error& e) {
                 logln("parsing config file " << configFile << " failed: " << e.what());
+                setErr(e.what());
             }
         } else {
             logln("failed to open config file " << configFile << ": " << fis.getStatus().getErrorMessage());
+            setErr(fis.getStatus().getErrorMessage());
         }
+    } else {
+        setErr("file does not exists");
     }
     return {};
 }
