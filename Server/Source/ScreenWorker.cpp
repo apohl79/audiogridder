@@ -34,8 +34,12 @@ void ScreenWorker::run() {
 
     if (getApp()->getServer()->getScreenCapturingFFmpeg()) {
         runFFmpeg();
-    } else {
+    } else if (!getApp()->getServer()->getScreenCapturingOff()) {
         runNative();
+    } else {
+        while (!currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected()) {
+            sleepExitAware(100);
+        }
     }
 
     if (m_visible) {
