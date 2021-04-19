@@ -31,10 +31,10 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
 #if !JucePlugin_IsMidiEffect
                          .withOutput("Output", AudioChannelSet::discreteChannels(16), true)
 #endif
-    ){
-          initAsyncFunctors();
+      ) {
+    initAsyncFunctors();
 
-String mode;
+    String mode;
 #if JucePlugin_IsSynth
     mode = "Instrument";
 #elif JucePlugin_IsMidiEffect

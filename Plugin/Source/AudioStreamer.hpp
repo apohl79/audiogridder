@@ -35,7 +35,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
             m_readQ.push(std::move(buf));
         }
         m_workingSendBuf.audio.clear();
-        m_workingReadBufe.audio.clear();
+        m_workingReadBuf.audio.clear();
 
         m_bytesOutMeter = Metrics::getStatistic<Meter>("NetBytesOut");
         m_bytesInMeter = Metrics::getStatistic<Meter>("NetBytesIn");
@@ -180,21 +180,26 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                         return;
                     }
                     m_readQ.pop(buf);
-                    if (!copyToWorkingBuffer(m_workingReadBufe, m_workingReadSamples, buf.audio, buf.midi)) {
+                    if (!copyToWorkingBuffer(m_workingReadBuf, m_workingReadSamples, buf.audio, buf.midi)) {
                         logln("error: " << getInstanceString() << ": read error");
                         setError();
                         return;
                     }
                 }
-                for (int chan = 0; chan < buffer.getNumChannels(); chan++) {
-                    buffer.copyFrom(chan, 0, m_workingReadBufe.audio, chan, 0, buffer.getNumSamples());
+                int maxCh = jmin(buffer.getNumChannels(), m_workingReadBuf.audio.getNumChannels());
+                // clear channels of the target buffer, that have no data in the src buffer
+                for (int chan = maxCh; chan < buffer.getNumChannels(); chan++) {
+                    buffer.clear(chan, 0, buffer.getNumSamples());
+                }
+                for (int chan = 0; chan < maxCh; chan++) {
+                    buffer.copyFrom(chan, 0, m_workingReadBuf.audio, chan, 0, buffer.getNumSamples());
                 }
                 midi.clear();
-                midi.addEvents(m_workingReadBufe.midi, 0, buffer.getNumSamples(), 0);
-                m_workingReadBufe.midi.clear(0, buffer.getNumSamples());
+                midi.addEvents(m_workingReadBuf.midi, 0, buffer.getNumSamples(), 0);
+                m_workingReadBuf.midi.clear(0, buffer.getNumSamples());
                 m_workingReadSamples -= buffer.getNumSamples();
                 if (m_workingReadSamples > 0) {
-                    shiftSamplesToFront(m_workingReadBufe, buffer.getNumSamples(), m_workingReadSamples);
+                    shiftSamplesToFront(m_workingReadBuf, buffer.getNumSamples(), m_workingReadSamples);
                 }
             }
         } else {
@@ -230,7 +235,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
     TimeStatistic::Duration m_durationGlobal, m_durationLocal;
     std::shared_ptr<Meter> m_bytesOutMeter, m_bytesInMeter;
 
-    AudioMidiBuffer m_workingSendBuf, m_workingReadBufe;
+    AudioMidiBuffer m_workingSendBuf, m_workingReadBuf;
     int m_workingSendSamples = 0;
     int m_workingReadSamples = 0;
 
@@ -302,7 +307,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
     bool copyToWorkingBuffer(AudioMidiBuffer& dst, int& workingSamples, AudioBuffer<T>& src, MidiBuffer& midi) {
         traceScope();
         if (src.getNumChannels() > 0) {
-            if ((dst.audio.getNumSamples() - workingSamples) < src.getNumSamples()) {
+            if ((dst.audio.getNumSamples() - workingSamples) < src.getNumSamples() ||
+                dst.audio.getNumChannels() < src.getNumChannels()) {
                 dst.audio.setSize(src.getNumChannels(), workingSamples + src.getNumSamples(), true);
             }
             for (int chan = 0; chan < src.getNumChannels(); chan++) {

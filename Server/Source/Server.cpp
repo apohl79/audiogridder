@@ -713,10 +713,9 @@ void Server::runServer() {
                     std::thread([deleters = std::move(m_sandboxesForDeletion)] {}).detach();
                 }
             }
-
         }
         if (m_sandboxes.size() > 0) {
-            for (auto sandbox: m_sandboxes) {
+            for (auto sandbox : m_sandboxes) {
                 m_sandboxesForDeletion.add(sandbox);
             }
             m_sandboxes.clear();

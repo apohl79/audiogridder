@@ -781,7 +781,8 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
             traceScope();
             if (m_processor.hasDefaultPreset() &&
                 AlertWindow::showOkCancelBox(AlertWindow::QuestionIcon, "Replace",
-                                             "Are you sure you want to replace your existing default preset?", "Yes", "No")) {
+                                             "Are you sure you want to replace your existing default preset?", "Yes",
+                                             "No")) {
                 m_processor.resetPresetDefault();
             }
             m_processor.storePresetDefault();
@@ -922,7 +923,6 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
             m_processor.setConfirmDelete(!m_processor.getConfirmDelete());
             m_processor.saveConfig();
         });
-
 
         subm.addItem("Always", true, m_processor.getTransferWhenPlayingOnly() == false, [this] {
             traceScope();
