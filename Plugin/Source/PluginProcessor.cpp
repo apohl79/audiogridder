@@ -578,6 +578,7 @@ void AudioGridderAudioProcessor::setStateInformation(const void* data, int sizeI
 }
 
 json AudioGridderAudioProcessor::getState(bool withServers) {
+    traceScope();
     json j;
     j["version"] = 2;
     j["Mode"] = m_mode.toStdString();
@@ -621,13 +622,15 @@ json AudioGridderAudioProcessor::getState(bool withServers) {
 }
 
 bool AudioGridderAudioProcessor::setState(const json& j) {
+    traceScope();
+
     int version = jsonGetValue(j, "version", 0);
 
     if (jsonHasValue(j, "Mode")) {
-        String mode;
-        jsonGetValue(j, "Mode", mode);
+        String mode = jsonGetValue(j, "Mode", String());
         if (m_mode != mode) {
-            logln("error: mode mismatch, not setting state");
+            logln("error: mode mismatch, not setting state: cannot load  mode " << mode << " into " << m_mode
+                                                                                << " plugin");
             return false;
         }
     }
