@@ -836,6 +836,7 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
         subm.addSeparator();
         getPresetsMenu(subm, m_processor.getPresetDir());
         m.addSubMenu("Presets", subm);
+        subm.clear();
 
         m.addSeparator();
 
