@@ -160,6 +160,59 @@ static constexpr uint32 PLUGIN_NOTOK_COLOR = 0xff8b0000;
 
 static const String MDNS_SERVICE_NAME = "_audiogridder._tcp.local.";
 
+struct ThemeInitailizer : Component {
+    void initPlugin() {
+        auto& lf = getLookAndFeel();
+        lf.setUsingNativeAlertWindows(true);
+        lf.setColour(AlertWindow::backgroundColourId, Colour(Defaults::BG_COLOR));
+        lf.setColour(ResizableWindow::backgroundColourId, Colour(Defaults::BG_COLOR));
+        lf.setColour(PopupMenu::backgroundColourId, Colour(Defaults::BG_COLOR));
+        lf.setColour(TextEditor::backgroundColourId, Colour(Defaults::BUTTON_COLOR));
+        lf.setColour(TextButton::buttonColourId, Colour(Defaults::BUTTON_COLOR));
+        lf.setColour(ComboBox::backgroundColourId, Colour(Defaults::BUTTON_COLOR));
+        lf.setColour(ListBox::backgroundColourId, Colour(Defaults::BUTTON_COLOR));
+        lf.setColour(PopupMenu::highlightedBackgroundColourId, Colour(Defaults::ACTIVE_COLOR).withAlpha(0.05f));
+        lf.setColour(Slider::thumbColourId, Colour(Defaults::SLIDERTHUMB_COLOR));
+        lf.setColour(Slider::trackColourId, Colour(Defaults::SLIDERTRACK_COLOR));
+        lf.setColour(Slider::backgroundColourId, Colour(Defaults::SLIDERBG_COLOR));
+        lf.setColour(FileBrowserComponent::currentPathBoxBackgroundColourId, Colour(Defaults::BUTTON_COLOR));
+        lf.setColour(FileBrowserComponent::filenameBoxBackgroundColourId, Colour(Defaults::BUTTON_COLOR));
+        lf.setColour(FileBrowserComponent::currentPathBoxArrowColourId, Colour(Defaults::ACTIVE_COLOR));
+        lf.setColour(DirectoryContentsDisplayComponent::highlightColourId,
+                     Colour(Defaults::ACTIVE_COLOR).withAlpha(0.05f));
+        if (auto lfv4 = dynamic_cast<LookAndFeel_V4*>(&lf)) {
+            lfv4->getCurrentColourScheme().setUIColour(LookAndFeel_V4::ColourScheme::widgetBackground,
+                                                       Colour(Defaults::BG_COLOR));
+            lfv4->getCurrentColourScheme().setUIColour(LookAndFeel_V4::ColourScheme::highlightedFill, Colours::black);
+        }
+    }
+
+    void initServer() {
+        auto& lf = getLookAndFeel();
+        lf.setColour(ResizableWindow::backgroundColourId, Colour(Defaults::BG_COLOR));
+        lf.setColour(PopupMenu::backgroundColourId, Colour(Defaults::BG_COLOR));
+        lf.setColour(TextEditor::backgroundColourId, Colour(Defaults::BUTTON_COLOR));
+        lf.setColour(TextButton::buttonColourId, Colour(Defaults::BUTTON_COLOR));
+        lf.setColour(ComboBox::backgroundColourId, Colour(Defaults::BUTTON_COLOR));
+        lf.setColour(ListBox::backgroundColourId, Colour(Defaults::BG_COLOR));
+        lf.setColour(AlertWindow::backgroundColourId, Colour(Defaults::BG_COLOR));
+        if (auto lfv4 = dynamic_cast<LookAndFeel_V4*>(&lf)) {
+            lfv4->getCurrentColourScheme().setUIColour(LookAndFeel_V4::ColourScheme::widgetBackground,
+                                                       Colour(Defaults::BG_COLOR));
+        }
+    }
+};
+
+inline void initPluginTheme() {
+    ThemeInitailizer ti;
+    ti.initPlugin();
+}
+
+inline void initServerTheme() {
+    ThemeInitailizer ti;
+    ti.initServer();
+}
+
 }  // namespace Defaults
 }  // namespace e47
 

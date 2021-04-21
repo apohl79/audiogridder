@@ -58,6 +58,7 @@ void App::initialise(const String& commandLineParameters) {
     AGLogger::initialize(appName, logName, Defaults::getConfigFileName(Defaults::ConfigServer));
     Tracer::initialize(appName, logName);
     Signals::initialize();
+    Defaults::initServerTheme();
 
     logln("commandline: " << commandLineParameters);
 
@@ -424,11 +425,6 @@ Point<float> App::localPointToGlobal(Point<float> lp) {
 
 void App::ProcessorWindow::createEditor() {
     traceScope();
-    auto& lf = getLookAndFeel();
-    if (auto lfv4 = dynamic_cast<LookAndFeel_V4*>(&lf)) {
-        lfv4->getCurrentColourScheme().setUIColour(LookAndFeel_V4::ColourScheme::widgetBackground,
-                                                   Colour(Defaults::BG_COLOR));
-    }
     auto disp = Desktop::getInstance().getDisplays().getPrimaryDisplay();
     if (nullptr != disp) {
         m_totalRect = disp->totalArea;
