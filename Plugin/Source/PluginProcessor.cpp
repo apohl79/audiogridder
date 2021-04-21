@@ -34,6 +34,8 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
       ) {
     initAsyncFunctors();
 
+    Defaults::initPluginTheme();
+
 #if JucePlugin_IsSynth
     m_mode = "Instrument";
 #elif JucePlugin_IsMidiEffect
@@ -1188,6 +1190,13 @@ void AudioGridderAudioProcessor::TrayConnection::timerCallback() {
                 }
             } else {
                 logln("no tray app available");
+                static std::once_flag once;
+                std::call_once(once, [] {
+                    AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Error",
+                                                     "AudioGridder tray application not found! Please uninstall the "
+                                                     "AudioGridder plugin and reinstall it!",
+                                                     "OK");
+                });
             }
             // stop the timer here and reactivate it later to give the try app some time to start
             stopTimer();
