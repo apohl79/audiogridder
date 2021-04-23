@@ -344,15 +344,6 @@ double ProcessorChain::getTailLengthSeconds() const { return m_tailSecs; }
 
 bool ProcessorChain::supportsDoublePrecisionProcessing() const { return m_supportsDoublePrecission; }
 
-bool ProcessorChain::isBusesLayoutSupported(const BusesLayout& layouts) const {
-    if (layouts.getMainOutputChannelSet() != AudioChannelSet::mono() &&
-        layouts.getMainOutputChannelSet() != AudioChannelSet::stereo() &&
-        layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet()) {
-        return false;
-    }
-    return true;
-}
-
 bool ProcessorChain::updateChannels(int channelsIn, int channelsOut, int channelsSC) {
     traceScope();
     AudioProcessor::BusesLayout layout;
@@ -360,7 +351,7 @@ bool ProcessorChain::updateChannels(int channelsIn, int channelsOut, int channel
         layout.inputBuses.add(AudioChannelSet::mono());
     } else if (channelsIn == 2) {
         layout.inputBuses.add(AudioChannelSet::stereo());
-    } else {
+    } else if (channelsIn > 0) {
         layout.inputBuses.add(AudioChannelSet::discreteChannels(channelsIn));
     }
     if (channelsSC == 1) {
@@ -372,10 +363,14 @@ bool ProcessorChain::updateChannels(int channelsIn, int channelsOut, int channel
         layout.outputBuses.add(AudioChannelSet::mono());
     } else if (channelsOut == 2) {
         layout.outputBuses.add(AudioChannelSet::stereo());
-    } else {
+    } else if (channelsOut > 0) {
         layout.outputBuses.add(AudioChannelSet::discreteChannels(channelsOut));
     }
-    setBusesLayout(layout);
+    logln("setting chain layout");
+    printBusesLayout(layout);
+    if (!setBusesLayout(layout)) {
+        logln("failed to set layout");
+    }
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     m_extraChannels = 0;
     m_sidechainDisabled = false;

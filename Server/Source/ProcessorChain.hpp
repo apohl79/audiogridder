@@ -266,7 +266,7 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
     const String getName() const override { return "ProcessorChain"; }
     double getTailLengthSeconds() const override;
     bool supportsDoublePrecisionProcessing() const override;
-    bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
+    bool isBusesLayoutSupported(const BusesLayout& /*layouts*/) const override { return true; }
 
     bool updateChannels(int channelsIn, int channelsOut, int channelsSC);
     bool setProcessorBusesLayout(AGProcessor* proc);
