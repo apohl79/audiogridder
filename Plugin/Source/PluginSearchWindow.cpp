@@ -217,8 +217,17 @@ void PluginSearchWindow::updateTree(const String& filter) {
             (*level->entryMap)[plug.getName()] = plug;
         }
     }
-    for (auto& type : menuMap) {
-        root->addSubItem(createPluginMenu(type.first, type.second, addFn));
+    if (menuMap.size() == 1) {
+        for (auto& type : menuMap) {
+            auto folder = createPluginMenu(type.first, type.second, addFn);
+            for (int i = 0; i < folder->getNumSubItems(); i++) {
+                root->addSubItem(folder->getSubItem(i));
+            }
+        }
+    } else {
+        for (auto& type : menuMap) {
+            root->addSubItem(createPluginMenu(type.first, type.second, addFn));
+        }
     }
 }
 
