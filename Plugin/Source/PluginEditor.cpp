@@ -366,6 +366,9 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
                 case PluginButton::MAIN: {
                     if (idx != active) {
                         editFn();
+                    } else if (!m_processor.isEditAlways()) {
+                        unhighlightPluginButton(active);
+                        m_processor.hidePlugin();
                     }
                     break;
                 }
@@ -558,16 +561,19 @@ void AudioGridderAudioProcessorEditor::setConnected(bool connected) {
             m_pluginButtons[i]->setEnabled(m_processor.getLoadedPlugin((int)i).ok);
         }
         auto active = m_processor.getActivePlugin();
+        bool editing = false;
         if (active > -1) {
             editPlugin();
-        } else {
+            editing = true;
+        } else if (m_processor.isEditAlways()) {
             auto lastActive = m_processor.getLastActivePlugin();
             if (lastActive < 0) {
                 lastActive = 0;
             }
             editPlugin(lastActive);
+            editing = true;
         }
-        if (m_processor.getClient().isServerLocalMode() && nullptr == m_positionTracker) {
+        if (editing && m_processor.getClient().isServerLocalMode() && nullptr == m_positionTracker) {
             m_positionTracker = std::make_unique<PositionTracker>(this);
         }
     } else {
@@ -901,6 +907,11 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
             m_processor.setConfirmDelete(!m_processor.getConfirmDelete());
             m_processor.saveConfig();
         });
+        m.addItem("Keep Plugin UI Open", true, m_processor.isEditAlways(), [this] {
+            traceScope();
+            m_processor.setEditAlways(!m_processor.isEditAlways());
+            m_processor.saveConfig();
+        });
 
         subm.addItem("Always", true, m_processor.getTransferWhenPlayingOnly() == false, [this] {
             traceScope();
@@ -997,8 +1008,7 @@ void AudioGridderAudioProcessorEditor::editPlugin(int idx) {
     if (idx < 0 || (size_t)idx >= m_pluginButtons.size() || m_processor.isBypassed(idx)) {
         return;
     }
-    m_pluginButtons[(size_t)idx]->setActive(true);
-    m_pluginButtons[(size_t)idx]->setColour(PluginButton::textColourOffId, Colour(Defaults::ACTIVE_COLOR));
+    highlightPluginButton(idx);
     m_stA.setVisible(true);
     m_stB.setVisible(true);
     m_processor.editPlugin(idx, getScreenX() + getWidth() + 10, getScreenY());
@@ -1039,10 +1049,19 @@ void AudioGridderAudioProcessorEditor::editPlugin(int idx) {
             });
     }
     if (active > -1 && idx != active && (size_t)active < m_pluginButtons.size()) {
-        m_pluginButtons[(size_t)active]->setActive(false);
-        m_pluginButtons[(size_t)active]->setColour(PluginButton::textColourOffId, Colours::white);
+        unhighlightPluginButton(active);
         resized();
     }
+}
+
+void AudioGridderAudioProcessorEditor::highlightPluginButton(int idx) {
+    m_pluginButtons[(size_t)idx]->setActive(true);
+    m_pluginButtons[(size_t)idx]->setColour(PluginButton::textColourOffId, Colour(Defaults::ACTIVE_COLOR));
+}
+
+void AudioGridderAudioProcessorEditor::unhighlightPluginButton(int idx) {
+        m_pluginButtons[(size_t)idx]->setActive(false);
+        m_pluginButtons[(size_t)idx]->setColour(PluginButton::textColourOffId, Colours::white);
 }
 
 void AudioGridderAudioProcessorEditor::getPresetsMenu(PopupMenu& menu, const File& dir) {

@@ -124,6 +124,8 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     void hidePlugin(bool updateServer = true);
     int getActivePlugin() const { return m_activePlugin; }
     int getLastActivePlugin() const { return m_lastActivePlugin; }
+    bool isEditAlways() const { return m_editAlways; }
+    void setEditAlways(bool b) { m_editAlways = b; }
     bool isBypassed(int idx);
     void bypassPlugin(int idx);
     void unbypassPlugin(int idx);
@@ -264,6 +266,7 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     mutable std::mutex m_loadedPluginsSyncMtx;
     int m_activePlugin = -1;
     int m_lastActivePlugin = -1;
+    bool m_editAlways = true;
     StringArray m_servers;
     String m_activeServerFromCfg;
     int m_activeServerLegacyFromCfg;

@@ -230,6 +230,7 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
     m_syncRemote = jsonGetValue(j, "SyncRemoteMode", m_syncRemote);
     m_presetsDir = jsonGetValue(j, "PresetsDir", Defaults::PRESETS_DIR);
     m_defaultPreset = jsonGetValue(j, "DefaultPreset", m_defaultPreset);
+    m_editAlways = jsonGetValue(j, "EditAlways", m_editAlways);
     auto noSrvPluginListFilter = jsonGetValue(j, "NoSrvPluginListFilter", m_noSrvPluginListFilter);
     if (noSrvPluginListFilter != m_noSrvPluginListFilter) {
         m_noSrvPluginListFilter = noSrvPluginListFilter;
@@ -268,6 +269,7 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
     jcfg["ZoomFactor"] = m_scale;
     jcfg["PresetsDir"] = m_presetsDir.toStdString();
     jcfg["DefaultPreset"] = m_defaultPreset.toStdString();
+    jcfg["EditAlways"] = m_editAlways;
 
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), jcfg);
 }
