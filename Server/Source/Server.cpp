@@ -550,6 +550,13 @@ void Server::runServer() {
     saveConfig();
     saveKnownPluginList();
 
+    for (auto& type: m_pluginlist.getTypes()) {
+        if ((type.pluginFormatName == "AudioUnit" && !m_enableAU) ||
+            (type.pluginFormatName == "VST" && !m_enableVST2) || (type.pluginFormatName == "VST3" && !m_enableVST3)) {
+            m_pluginlist.removeType(type);
+        }
+    }
+
     getApp()->hideSplashWindow(1000);
 
 #ifndef JUCE_WINDOWS
