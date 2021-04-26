@@ -129,6 +129,10 @@ AudioGridderAudioProcessorEditor::AudioGridderAudioProcessorEditor(AudioGridderA
 
     setSize(200, 100);
 
+    if (m_processor.getClient().isServerLocalMode()) {
+        m_positionTracker = std::make_unique<PositionTracker>(this);
+    }
+
     logln("setting connected state");
     runOnMsgThreadAsync([this] {
         setConnected(m_processor.getClient().isReadyLockFree());
@@ -573,7 +577,7 @@ void AudioGridderAudioProcessorEditor::setConnected(bool connected) {
             editPlugin(lastActive);
             editing = true;
         }
-        if (editing && m_processor.getClient().isServerLocalMode() && nullptr == m_positionTracker) {
+        if (m_processor.getClient().isServerLocalMode() && nullptr == m_positionTracker) {
             m_positionTracker = std::make_unique<PositionTracker>(this);
         }
     } else {
@@ -582,7 +586,6 @@ void AudioGridderAudioProcessorEditor::setConnected(bool connected) {
         for (auto& but : m_pluginButtons) {
             but->setEnabled(false);
         }
-        m_positionTracker.reset();
         resetPluginScreen();
         resized();
     }

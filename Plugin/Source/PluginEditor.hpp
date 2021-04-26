@@ -80,6 +80,7 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     bool isHilightedStButton(TextButton* b);
 
     void editPlugin(int idx = -1);
+    void hidePlugin(int idx = -1);
 
     void resetPluginScreen();
     void setPluginScreen(const Image& img, int w, int h);
@@ -99,10 +100,10 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
         }
 
         void timerCallback() override {
-            if (x != e->getScreenX() || y != e->getScreenY()) {
+            auto active = e->m_processor.getActivePlugin();
+            if (active > -1 && (x != e->getScreenX() || y != e->getScreenY())) {
                 x = e->getScreenX();
                 y = e->getScreenY();
-                auto active = e->m_processor.getActivePlugin();
                 if (active > -1) {
                     logln("updating editor position to " << x << "x" << y);
                     e->m_processor.editPlugin(active, x + e->getWidth() + 10, y);
