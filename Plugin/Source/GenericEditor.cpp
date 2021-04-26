@@ -25,6 +25,7 @@ void GenericEditor::resized() {
     m_labels.clear();
     m_components.clear();
     m_clickHandlers.clear();
+    m_gestureTrackers.clear();
     int active = m_processor.getActivePlugin();
     if (active < 0) {
         return;
@@ -59,12 +60,16 @@ void GenericEditor::resized() {
             }
             c->setSelectedId((int)param.getValue() + 1, NotificationType::dontSendNotification);
             c->setBounds(leftIndent + labelWidth, topIndent + (rowHeight + rowSpace) * row, componentWidth, rowHeight);
-            c->onChange = [this, i] {
-                auto& locParam = getParameter(i);
+            c->onChange = [this, active, i] {
                 auto* locComp = dynamic_cast<ComboBox*>(getComponent(i));
+                auto& locParam = getParameter(i);
                 locParam.setValue((float)locComp->getSelectedItemIndex());
-                updateParameter(i);
+                m_processor.updateParameterValue(active, i, locParam.currentValue);
             };
+
+            auto tracker = std::make_unique<GestureTracker>(this, i);
+            c->addMouseListener(tracker.get(), true);
+            m_gestureTrackers.add(std::move(tracker));
 
             addAndMakeVisible(c.get());
             m_components.add(std::move(c));
@@ -75,12 +80,11 @@ void GenericEditor::resized() {
             if (param.isBoolean) {
                 c->setNumDecimalPlacesToDisplay(0);
                 c->setSliderSnapsToMousePosition(false);
-                auto handler = std::make_unique<OnClick>([this, i] {
+                auto handler = std::make_unique<OnClick>(this, [this, i] {
                     auto* locComp = dynamic_cast<Slider*>(getComponent(i));
                     auto newVal = locComp->getValue() == 0.0 ? 1.0 : 0.0;
                     locComp->setValue(newVal);
                 });
-                handler->setLogTagSource(this);
                 c->addMouseListener(handler.get(), true);
                 m_clickHandlers.add(std::move(handler));
             } else {
@@ -88,12 +92,16 @@ void GenericEditor::resized() {
             }
             c->setBounds(leftIndent + labelWidth, topIndent + (rowHeight + rowSpace) * row, componentWidth, rowHeight);
             c->setValue(param.getValue(), NotificationType::dontSendNotification);
-            c->onValueChange = [this, i] {
-                auto& locParam = getParameter(i);
+            c->onValueChange = [this, active, i] {
                 auto* locComp = dynamic_cast<Slider*>(getComponent(i));
+                auto& locParam = getParameter(i);
                 locParam.setValue((float)locComp->getValue());
-                updateParameter(i);
+                m_processor.updateParameterValue(active, i, locParam.currentValue);
             };
+
+            auto tracker = std::make_unique<GestureTracker>(this, i);
+            c->addMouseListener(tracker.get(), true);
+            m_gestureTrackers.add(std::move(tracker));
 
             addAndMakeVisible(c.get());
             m_components.add(std::move(c));
@@ -126,13 +134,29 @@ Client::Parameter& GenericEditor::getParameter(int paramIdx) {
 
 Component* GenericEditor::getComponent(int paramIdx) {
     traceScope();
-    return m_components.getReference(paramIdx).get();
+    if (paramIdx >= 0 && paramIdx < m_components.size()) {
+        return m_components.getReference(paramIdx).get();
+    }
+    return nullptr;
 }
 
-void GenericEditor::updateParameter(int paramIdx) {
+void GenericEditor::updateParamValue(int paramIdx) {
     traceScope();
-    m_processor.getClient().setParameterValue(m_processor.getActivePlugin(), paramIdx,
-                                              getParameter(paramIdx).currentValue);
+    if (auto* comp = getComponent(paramIdx)) {
+        if (!m_gestureTrackers.getReference(paramIdx)->isTracking) {
+            auto& plugin = m_processor.getLoadedPlugin(m_processor.getActivePlugin());
+            auto& param = plugin.params.getReference(paramIdx);
+            if (param.allValues.size() > 2) {
+                if (auto* combo = dynamic_cast<ComboBox*>(comp)) {
+                    combo->setSelectedId((int)param.getValue() + 1, NotificationType::dontSendNotification);
+                }
+            } else {
+                if (auto* slider = dynamic_cast<Slider*>(comp)) {
+                    slider->setValue(param.getValue(), NotificationType::dontSendNotification);
+                }
+            }
+        }
+    }
 }
 
 }  // namespace e47

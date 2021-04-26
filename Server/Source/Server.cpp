@@ -615,7 +615,7 @@ void Server::runServer() {
             if (nullptr != clnt) {
                 HandshakeRequest cfg;
                 int len = clnt->read(&cfg, sizeof(cfg), true);
-                if (len > 0 && cfg.version >= 4) {
+                if (len > 0 && cfg.version >= AG_PROTOCOL_VERSION) {
                     logln("new client " << clnt->getHostName());
                     logln("  version                   = " << cfg.version);
                     logln("  clientId                  = " << String::toHexString(cfg.clientId));
@@ -850,7 +850,7 @@ void Server::runSandbox() {
 }
 
 bool Server::sendHandshakeResponse(StreamingSocket* sock, bool sandboxEnabled, int port) {
-    HandshakeResponse resp = {3, 0, 0};
+    HandshakeResponse resp = {AG_PROTOCOL_VERSION, 0, 0};
     if (sandboxEnabled) {
         resp.setFlag(HandshakeResponse::SANDBOX_ENABLED);
     }

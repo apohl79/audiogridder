@@ -77,6 +77,8 @@ class Worker : public Thread, public LogTag {
     std::unique_ptr<KeyWatcher> m_keyWatcher;
 
     void sendKeys(const std::vector<uint16_t>& keysToPress);
+    void sendParamValueChanged(int idx, int paramIdx, float val);
+    void sendParamGestureChange(int idx, int paramIdx, bool guestureIsStarting);
 
     ENABLE_ASYNC_FUNCTORS();
 };

@@ -84,7 +84,9 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     m_unusedDummyPlugin.params.add(m_unusedParam);
 
     for (int i = 0; i < m_numberOfAutomationSlots; i++) {
-        addParameter(new Parameter(*this, i));
+        auto pparam = new Parameter(*this, i);
+        pparam->addListener(this);
+        addParameter(pparam);
     }
 
     // load plugins on reconnect
@@ -965,6 +967,81 @@ void AudioGridderAudioProcessor::getAllParameterValues(int idx) {
             } else {
                 logln("error: index mismatch in getAllParameterValues");
             }
+        }
+    }
+}
+
+void AudioGridderAudioProcessor::updateParameterValue(int idx, int paramIdx, float val) {
+    traceScope();
+
+    int slot = -1;
+
+    {
+        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+        if (idx < 0 || idx >= (int)m_loadedPlugins.size()) {
+            logln("idx out of range");
+            return;
+        }
+        if (paramIdx < 0 || paramIdx >= m_loadedPlugins[(size_t)idx].params.size()) {
+            logln("paramIdx out of range");
+            return;
+        }
+        auto& param = m_loadedPlugins[(size_t)idx].params.getReference(paramIdx);
+
+        param.currentValue = val;
+        slot = param.automationSlot;
+    }
+
+    if (slot > -1) {
+        auto* pparam = dynamic_cast<Parameter*>(getParameters()[slot]);
+        if (nullptr != pparam) {
+            pparam->setValueNotifyingHost(val);
+            return;
+        }
+    }
+
+    m_client->setParameterValue(idx, paramIdx, val);
+}
+
+void AudioGridderAudioProcessor::updateParameterGestureTracking(int idx, int paramIdx, bool starting) {
+    traceScope();
+
+    int slot = -1;
+
+    {
+        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+        if (idx < 0 || idx >= (int)m_loadedPlugins.size()) {
+            logln("idx out of range");
+            return;
+        }
+        if (paramIdx < 0 || paramIdx >= m_loadedPlugins[(size_t)idx].params.size()) {
+            logln("paramIdx out of range");
+            return;
+        }
+        auto& param = m_loadedPlugins[(size_t)idx].params.getReference(paramIdx);
+        slot = param.automationSlot;
+    }
+
+    if (slot > -1) {
+        auto* pparam = dynamic_cast<Parameter*>(getParameters()[slot]);
+        if (nullptr != pparam) {
+            if (starting) {
+                pparam->beginChangeGesture();
+            } else {
+                pparam->endChangeGesture();
+            }
+        }
+    }
+}
+
+void AudioGridderAudioProcessor::parameterValueChanged(int parameterIndex, float newValue) {
+    traceScope();
+    if (auto *e = dynamic_cast<AudioGridderAudioProcessorEditor*>(getActiveEditor())) {
+        auto* pparam = dynamic_cast<Parameter*>(getParameters()[parameterIndex]);
+        if (nullptr != pparam && m_activePlugin == pparam->m_idx) {
+            auto& param = getLoadedPlugin(pparam->m_idx).params.getReference(pparam->m_paramIdx);
+            param.currentValue = newValue;
+            e->updateParamValue(pparam->m_paramIdx);
         }
     }
 }

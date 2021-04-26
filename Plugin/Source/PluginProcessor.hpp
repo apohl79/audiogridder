@@ -18,7 +18,9 @@ using json = nlohmann::json;
 
 namespace e47 {
 
-class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate {
+class AudioGridderAudioProcessor : public AudioProcessor,
+                                   public AudioProcessorParameter::Listener,
+                                   public LogTagDelegate {
   public:
     AudioGridderAudioProcessor();
     ~AudioGridderAudioProcessor() override;
@@ -133,6 +135,8 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
     bool enableParamAutomation(int idx, int paramIdx, int slot = -1);
     void disableParamAutomation(int idx, int paramIdx);
     void getAllParameterValues(int idx);
+    void updateParameterValue(int idx, int paramIdx, float val);
+    void updateParameterGestureTracking(int idx, int paramIdx, bool starting);
     void increaseSCArea();
     void decreaseSCArea();
     void toggleFullscreenSCArea();
@@ -184,6 +188,10 @@ class AudioGridderAudioProcessor : public AudioProcessor, public LogTagDelegate 
 
     bool getTransferWhenPlayingOnly() const { return m_transferWhenPlayingOnly; }
     void setTransferWhenPlayingOnly(bool b) { m_transferWhenPlayingOnly = b; }
+
+    // AudioProcessorParameter::Listener
+    void parameterValueChanged(int parameterIndex, float newValue) override;
+    void parameterGestureChanged(int, bool) override {}
 
     // It looks like most hosts do not support dynamic parameter creation or changes to existing parameters. Logic
     // at least allows for the name to be updated. So we create slots at the start.

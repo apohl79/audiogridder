@@ -225,14 +225,22 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     logln("adding plugin " << id << "...");
     String err;
     bool success = m_audio->addPlugin(id, err);
-    std::shared_ptr<AudioPluginInstance> proc;
+    std::shared_ptr<AGProcessor> proc;
+    std::shared_ptr<AudioPluginInstance> plugin;
     json jresult;
     jresult["success"] = success;
     jresult["err"] = err.toStdString();
     if (success) {
-        proc = m_audio->getProcessor(m_audio->getSize() - 1)->getPlugin();
+        proc = m_audio->getProcessor(m_audio->getSize() - 1);
+        plugin = proc->getPlugin();
         jresult["latency"] = m_audio->getLatencySamples();
-        runOnMsgThreadSync([&] { jresult["hasEditor"] = proc->hasEditor(); });
+        runOnMsgThreadSync([&] { jresult["hasEditor"] = plugin->hasEditor(); });
+        proc->onParamValueChange = [this](int idx, int paramIdx, float val) {
+            sendParamValueChanged(idx, paramIdx, val);
+        };
+        proc->onParamGestureChange = [this](int idx, int paramIdx, bool gestureIsStarting) {
+            sendParamGestureChange(idx, paramIdx, gestureIsStarting);
+        };
     }
     Message<AddPluginResult> msgResult(this);
     PLD(msgResult).setJson(jresult);
@@ -249,13 +257,13 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     logln("sending presets...");
     String presets;
     bool first = true;
-    for (int i = 0; i < proc->getNumPrograms(); i++) {
+    for (int i = 0; i < plugin->getNumPrograms(); i++) {
         if (first) {
             first = false;
         } else {
             presets << "|";
         }
-        presets << proc->getProgramName(i);
+        presets << plugin->getProgramName(i);
     }
     Message<Presets> msgPresets(this);
     msgPresets.payload.setString(presets);
@@ -267,7 +275,7 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     logln("...ok");
     logln("sending parameters...");
     json jparams = json::array();
-    for (auto& param : proc->getParameters()) {
+    for (auto& param : plugin->getParameters()) {
         json jparam = {{"idx", param->getParameterIndex()},
                        {"name", param->getName(32).toStdString()},
                        {"defaultValue", param->getDefaultValue()},
@@ -317,7 +325,7 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     if (*msgSettings.payload.size > 0) {
         MemoryBlock block;
         block.append(msgSettings.payload.data, (size_t)*msgSettings.payload.size);
-        proc->setStateInformation(block.getData(), static_cast<int>(block.getSize()));
+        plugin->setStateInformation(block.getData(), static_cast<int>(block.getSize()));
     }
     logln("...ok");
     m_audio->addToRecentsList(id, m_cmdIn->getHostName());
@@ -480,11 +488,8 @@ void Worker::handleMessage(std::shared_ptr<Message<ParameterValue>> msg) {
     traceScope();
     auto p = m_audio->getProcessor(pDATA(msg)->idx)->getPlugin();
     if (nullptr != p) {
-        for (auto* param : p->getParameters()) {
-            if (pDATA(msg)->paramIdx == param->getParameterIndex()) {
-                param->setValue(pDATA(msg)->value);
-                return;
-            }
+        if (auto* param = p->getParameters()[pDATA(msg)->paramIdx]) {
+            param->setValue(pDATA(msg)->value);
         }
     }
 }
@@ -664,6 +669,22 @@ bool Worker::KeyWatcher::keyPressed(const KeyPress& kp, Component*) {
     }
     worker->sendKeys(keysToPress);
     return true;
+}
+
+void Worker::sendParamValueChanged(int idx, int paramIdx, float val) {
+    Message<ParameterValue> msg(this);
+    DATA(msg)->idx = idx;
+    DATA(msg)->paramIdx = paramIdx;
+    DATA(msg)->value = val;
+    msg.send(m_cmdOut.get());
+}
+
+void Worker::sendParamGestureChange(int idx, int paramIdx, bool guestureIsStarting) {
+    Message<ParameterGesture> msg(this);
+    DATA(msg)->idx = idx;
+    DATA(msg)->paramIdx = paramIdx;
+    DATA(msg)->gestureIsStarting = guestureIsStarting;
+    msg.send(m_cmdOut.get());
 }
 
 }  // namespace e47

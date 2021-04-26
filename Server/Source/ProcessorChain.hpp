@@ -17,12 +17,12 @@ namespace e47 {
 
 class ProcessorChain;
 
-class AGProcessor : public LogTagDelegate {
+class AGProcessor : public LogTagDelegate, public AudioProcessorParameter::Listener {
   public:
     static std::atomic_uint32_t loadedCount;
 
     AGProcessor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize);
-    ~AGProcessor();
+    ~AGProcessor() override;
 
     static String createPluginID(const PluginDescription& d);
     static String convertJUCEtoAGPluginID(const String& id);
@@ -68,6 +68,8 @@ class AGProcessor : public LogTagDelegate {
 
     bool load(String& err);
     void unload();
+
+    void setChainIndex(int idx) { m_chainIdx = idx; }
 
     template <typename T>
     bool processBlock(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
@@ -207,8 +209,27 @@ class AGProcessor : public LogTagDelegate {
     Point<int> getLastPosition() const { return m_lastPosition; }
     void setLastPosition(Point<int> p) { m_lastPosition = p; }
 
+    // AudioProcessorParameter::Listener
+    std::function<void(int idx, int paramIdx, float val)> onParamValueChange;
+    std::function<void(int idx, int paramIdx, bool gestureIsStarting)> onParamGestureChange;
+
+    void parameterValueChanged(int parameterIndex, float newValue) override {
+        traceScope();
+        if (onParamValueChange) {
+            onParamValueChange(m_chainIdx, parameterIndex, newValue);
+        }
+    }
+
+    void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override {
+        traceScope();
+        if (onParamGestureChange) {
+            onParamGestureChange(m_chainIdx, parameterIndex, gestureIsStarting);
+        }
+    }
+
   private:
     ProcessorChain& m_chain;
+    int m_chainIdx = -1;
     String m_id;
     double m_sampleRate;
     int m_blockSize;

@@ -35,6 +35,8 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     void setConnected(bool connected);
     void setCPULoad(float load);
 
+    void updateParamValue(int paramIdx);
+
   private:
     AudioGridderAudioProcessor& m_processor;
 

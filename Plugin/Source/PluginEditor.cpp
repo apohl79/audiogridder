@@ -1130,4 +1130,10 @@ bool AudioGridderAudioProcessorEditor::genericEditorEnabled() const {
     return ret;
 }
 
+void AudioGridderAudioProcessorEditor::updateParamValue(int paramIdx) {
+    if (genericEditorEnabled()) {
+        m_genericEditor.updateParamValue(paramIdx);
+    }
+}
+
 }  // namespace e47

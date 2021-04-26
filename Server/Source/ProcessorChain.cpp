@@ -143,6 +143,9 @@ bool AGProcessor::load(String& err) {
             }
             if (m_chain.initPluginInstance(this, err)) {
                 loaded = true;
+                for (auto* param: m_plugin->getParameters()) {
+                    param->addListener(this);
+                }
                 loadedCount++;
             } else {
                 std::lock_guard<std::mutex> lock(m_pluginMtx);
@@ -502,6 +505,7 @@ bool ProcessorChain::addPluginProcessor(const String& id, String& err) {
 void ProcessorChain::addProcessor(std::shared_ptr<AGProcessor> processor) {
     traceScope();
     std::lock_guard<std::mutex> lock(m_processors_mtx);
+    processor->setChainIndex((int)m_processors.size());
     m_processors.push_back(processor);
     updateNoLock();
 }
@@ -572,6 +576,8 @@ void ProcessorChain::exchangeProcessors(int idxA, int idxB) {
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     if (idxA > -1 && (size_t)idxA < m_processors.size() && idxB > -1 && (size_t)idxB < m_processors.size()) {
         std::swap(m_processors[(size_t)idxA], m_processors[(size_t)idxB]);
+        m_processors[(size_t)idxA]->setChainIndex(idxA);
+        m_processors[(size_t)idxB]->setChainIndex(idxB);
     }
 }
 

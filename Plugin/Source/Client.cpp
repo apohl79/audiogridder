@@ -108,6 +108,12 @@ void Client::run() {
                         case Key::Type:
                             handleMessage(Message<Any>::convert<Key>(msg));
                             break;
+                        case ParameterValue::Type:
+                            handleMessage(Message<Any>::convert<ParameterValue>(msg));
+                            break;
+                        case ParameterGesture::Type:
+                            handleMessage(Message<Any>::convert<ParameterGesture>(msg));
+                            break;
                         default:
                             logln("unknown message type " << msg->getType());
                     }
@@ -160,6 +166,14 @@ void Client::handleMessage(std::shared_ptr<Message<Key>> msg) {
 #else
     ignoreUnused(msg);
 #endif
+}
+
+void Client::handleMessage(std::shared_ptr<Message<ParameterValue>> msg) {
+    m_processor->updateParameterValue(pDATA(msg)->idx, pDATA(msg)->paramIdx, pDATA(msg)->value);
+}
+
+void Client::handleMessage(std::shared_ptr<Message<ParameterGesture>> msg) {
+    m_processor->updateParameterGestureTracking(pDATA(msg)->idx, pDATA(msg)->paramIdx, pDATA(msg)->gestureIsStarting);
 }
 
 void Client::setServer(const ServerInfo& srv) {
@@ -260,8 +274,8 @@ void Client::init() {
     logln("connecting server " << host << ":" << id);
     m_cmdOut = std::make_unique<StreamingSocket>();
     if (m_cmdOut->connect(host, port, 1000)) {
-        HandshakeRequest cfg = {4,      m_channelsIn,      m_channelsOut,      m_channelsSC,
-                                m_rate, m_samplesPerBlock, m_doublePrecission, getId()};
+        HandshakeRequest cfg = {AG_PROTOCOL_VERSION, m_channelsIn,       m_channelsOut, m_channelsSC, m_rate,
+                                m_samplesPerBlock,   m_doublePrecission, getId()};
         if (m_processor->getNoSrvPluginListFilter()) {
             cfg.setFlag(HandshakeRequest::NO_PLUGINLIST_FILTER);
         }
