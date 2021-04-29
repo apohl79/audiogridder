@@ -1063,8 +1063,8 @@ void AudioGridderAudioProcessorEditor::highlightPluginButton(int idx) {
 }
 
 void AudioGridderAudioProcessorEditor::unhighlightPluginButton(int idx) {
-        m_pluginButtons[(size_t)idx]->setActive(false);
-        m_pluginButtons[(size_t)idx]->setColour(PluginButton::textColourOffId, Colours::white);
+    m_pluginButtons[(size_t)idx]->setActive(false);
+    m_pluginButtons[(size_t)idx]->setColour(PluginButton::textColourOffId, Colours::white);
 }
 
 void AudioGridderAudioProcessorEditor::getPresetsMenu(PopupMenu& menu, const File& dir) {

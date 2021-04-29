@@ -143,7 +143,7 @@ bool AGProcessor::load(String& err) {
             }
             if (m_chain.initPluginInstance(this, err)) {
                 loaded = true;
-                for (auto* param: m_plugin->getParameters()) {
+                for (auto* param : m_plugin->getParameters()) {
                     param->addListener(this);
                 }
                 loadedCount++;

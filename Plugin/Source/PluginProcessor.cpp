@@ -762,6 +762,13 @@ bool AudioGridderAudioProcessor::loadPlugin(const ServerPlugin& plugin, String& 
 
 void AudioGridderAudioProcessor::unloadPlugin(int idx) {
     traceScope();
+
+    for (auto& p : getLoadedPlugin(idx).params) {
+        if (p.automationSlot > -1) {
+            disableParamAutomation(idx, p.idx);
+        }
+    }
+
     if (getLoadedPlugin(idx).ok) {
         suspendProcessing(true);
         m_client->delPlugin(idx);
@@ -785,6 +792,7 @@ void AudioGridderAudioProcessor::unloadPlugin(int idx) {
             }
         }
     }
+
     m_client->setLoadedPluginsString(getLoadedPluginsString());
 }
 
@@ -1036,7 +1044,7 @@ void AudioGridderAudioProcessor::updateParameterGestureTracking(int idx, int par
 
 void AudioGridderAudioProcessor::parameterValueChanged(int parameterIndex, float newValue) {
     traceScope();
-    if (auto *e = dynamic_cast<AudioGridderAudioProcessorEditor*>(getActiveEditor())) {
+    if (auto* e = dynamic_cast<AudioGridderAudioProcessorEditor*>(getActiveEditor())) {
         auto* pparam = dynamic_cast<Parameter*>(getParameters()[parameterIndex]);
         if (nullptr != pparam && m_activePlugin == pparam->m_idx) {
             auto& param = getLoadedPlugin(pparam->m_idx).params.getReference(pparam->m_paramIdx);
@@ -1174,7 +1182,7 @@ float AudioGridderAudioProcessor::Parameter::getValue() const {
 
 void AudioGridderAudioProcessor::Parameter::setValue(float newValue) {
     traceScope();
-    if (m_idx > -1 && m_paramIdx > -1) {
+    if (m_idx > -1 && m_idx < m_processor.getNumOfLoadedPlugins() && m_paramIdx > -1) {
         runOnMsgThreadAsync([this, newValue] {
             traceScope();
             m_processor.getClient().setParameterValue(m_idx, m_paramIdx, newValue);

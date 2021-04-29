@@ -236,7 +236,7 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
         jresult["latency"] = m_audio->getLatencySamples();
         runOnMsgThreadSync([&] { jresult["hasEditor"] = plugin->hasEditor(); });
         proc->onParamValueChange = [this](int idx, int paramIdx, float val) {
-            sendParamValueChanged(idx, paramIdx, val);
+            sendParamValueChange(idx, paramIdx, val);
         };
         proc->onParamGestureChange = [this](int idx, int paramIdx, bool gestureIsStarting) {
             sendParamGestureChange(idx, paramIdx, gestureIsStarting);
@@ -347,8 +347,7 @@ void Worker::handleMessage(std::shared_ptr<Message<DelPlugin>> msg) {
 void Worker::handleMessage(std::shared_ptr<Message<EditPlugin>> msg) {
     traceScope();
     int idx = pDATA(msg)->index;
-    auto proc = m_audio->getProcessor(idx);
-    if (nullptr != proc) {
+    if (auto proc = m_audio->getProcessor(idx)) {
         getApp()->getServer()->sandboxShowEditor();
         m_screen->showEditor(proc, pDATA(msg)->x, pDATA(msg)->y);
         m_activeEditorIdx = idx;
@@ -420,8 +419,7 @@ void Worker::handleMessage(std::shared_ptr<Message<Key>> msg) {
 
 void Worker::handleMessage(std::shared_ptr<Message<GetPluginSettings>> msg) {
     traceScope();
-    auto proc = m_audio->getProcessor(pPLD(msg).getNumber());
-    if (nullptr != proc) {
+    if (auto proc = m_audio->getProcessor(pPLD(msg).getNumber())) {
         MemoryBlock block;
         proc->getStateInformation(block);
         Message<PluginSettings> ret(this);
@@ -432,8 +430,7 @@ void Worker::handleMessage(std::shared_ptr<Message<GetPluginSettings>> msg) {
 
 void Worker::handleMessage(std::shared_ptr<Message<SetPluginSettings>> msg) {
     traceScope();
-    auto proc = m_audio->getProcessor(pPLD(msg).getNumber());
-    if (nullptr != proc) {
+    if (auto proc = m_audio->getProcessor(pPLD(msg).getNumber())) {
         Message<PluginSettings> msgSettings(this);
         if (!msgSettings.read(m_cmdIn.get())) {
             logln("failed to read PluginSettings message");
@@ -450,16 +447,14 @@ void Worker::handleMessage(std::shared_ptr<Message<SetPluginSettings>> msg) {
 
 void Worker::handleMessage(std::shared_ptr<Message<BypassPlugin>> msg) {
     traceScope();
-    auto proc = m_audio->getProcessor(pPLD(msg).getNumber());
-    if (nullptr != proc) {
+    if (auto proc = m_audio->getProcessor(pPLD(msg).getNumber())) {
         proc->suspendProcessing(true);
     }
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<UnbypassPlugin>> msg) {
     traceScope();
-    auto proc = m_audio->getProcessor(pPLD(msg).getNumber());
-    if (nullptr != proc) {
+    if (auto proc = m_audio->getProcessor(pPLD(msg).getNumber())) {
         proc->suspendProcessing(false);
     }
 }
@@ -478,18 +473,20 @@ void Worker::handleMessage(std::shared_ptr<Message<RecentsList>> msg) {
 
 void Worker::handleMessage(std::shared_ptr<Message<Preset>> msg) {
     traceScope();
-    auto p = m_audio->getProcessor(pDATA(msg)->idx)->getPlugin();
-    if (nullptr != p) {
-        p->setCurrentProgram(pDATA(msg)->preset);
+    if (auto proc = m_audio->getProcessor(pDATA(msg)->idx)) {
+        if (auto p = proc->getPlugin()) {
+            p->setCurrentProgram(pDATA(msg)->preset);
+        }
     }
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<ParameterValue>> msg) {
     traceScope();
-    auto p = m_audio->getProcessor(pDATA(msg)->idx)->getPlugin();
-    if (nullptr != p) {
-        if (auto* param = p->getParameters()[pDATA(msg)->paramIdx]) {
-            param->setValue(pDATA(msg)->value);
+    if (auto proc = m_audio->getProcessor(pDATA(msg)->idx)) {
+        if (auto p = proc->getPlugin()) {
+            if (auto* param = p->getParameters()[pDATA(msg)->paramIdx]) {
+                param->setValue(pDATA(msg)->value);
+            }
         }
     }
 }
@@ -671,7 +668,7 @@ bool Worker::KeyWatcher::keyPressed(const KeyPress& kp, Component*) {
     return true;
 }
 
-void Worker::sendParamValueChanged(int idx, int paramIdx, float val) {
+void Worker::sendParamValueChange(int idx, int paramIdx, float val) {
     Message<ParameterValue> msg(this);
     DATA(msg)->idx = idx;
     DATA(msg)->paramIdx = paramIdx;
