@@ -286,7 +286,7 @@ bool AudioGridderAudioProcessor::loadPreset(const File& file) {
     String err;
     auto j = configParseFile(file.getFullPathName(), &err);
     if (err.isEmpty() && !setState(j)) {
-        String mode = jsonGetValue(j, "Mode", mode);
+        String mode = jsonGetValue(j, "Mode", String());
         if (mode != m_mode) {
             err << "Can't load " << mode << " presets into " << m_mode << " plugins!";
         } else {
