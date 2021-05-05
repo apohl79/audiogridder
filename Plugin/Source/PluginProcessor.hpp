@@ -135,7 +135,7 @@ class AudioGridderAudioProcessor : public AudioProcessor,
     bool enableParamAutomation(int idx, int paramIdx, int slot = -1);
     void disableParamAutomation(int idx, int paramIdx);
     void getAllParameterValues(int idx);
-    void updateParameterValue(int idx, int paramIdx, float val);
+    void updateParameterValue(int idx, int paramIdx, float val, bool updateServer = true);
     void updateParameterGestureTracking(int idx, int paramIdx, bool starting);
     void increaseSCArea();
     void decreaseSCArea();

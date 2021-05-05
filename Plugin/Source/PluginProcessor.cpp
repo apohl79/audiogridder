@@ -431,7 +431,7 @@ void AudioGridderAudioProcessor::processBlockReal(AudioBuffer<T>& buffer, MidiBu
                 streamer->send(buffer, midiMessages, posInfo);
                 streamer->read(buffer, midiMessages);
                 if (m_client->getLatencySamples() != getLatencySamples()) {
-                    updateLatency(m_client->getLatencySamples());
+                    runOnMsgThreadAsync([this] { updateLatency(m_client->getLatencySamples()); });
                 }
             } else {
                 for (auto i = 0; i < buffer.getNumChannels(); ++i) {
@@ -979,7 +979,7 @@ void AudioGridderAudioProcessor::getAllParameterValues(int idx) {
     }
 }
 
-void AudioGridderAudioProcessor::updateParameterValue(int idx, int paramIdx, float val) {
+void AudioGridderAudioProcessor::updateParameterValue(int idx, int paramIdx, float val, bool updateServer) {
     traceScope();
 
     int slot = -1;
@@ -1003,12 +1003,15 @@ void AudioGridderAudioProcessor::updateParameterValue(int idx, int paramIdx, flo
     if (slot > -1) {
         auto* pparam = dynamic_cast<Parameter*>(getParameters()[slot]);
         if (nullptr != pparam) {
+            // this will trigger the server update as well
             pparam->setValueNotifyingHost(val);
             return;
         }
     }
 
-    m_client->setParameterValue(idx, paramIdx, val);
+    if (updateServer) {
+        m_client->setParameterValue(idx, paramIdx, val);
+    }
 }
 
 void AudioGridderAudioProcessor::updateParameterGestureTracking(int idx, int paramIdx, bool starting) {

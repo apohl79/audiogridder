@@ -169,7 +169,7 @@ void Client::handleMessage(std::shared_ptr<Message<Key>> msg) {
 }
 
 void Client::handleMessage(std::shared_ptr<Message<ParameterValue>> msg) {
-    m_processor->updateParameterValue(pDATA(msg)->idx, pDATA(msg)->paramIdx, pDATA(msg)->value);
+    m_processor->updateParameterValue(pDATA(msg)->idx, pDATA(msg)->paramIdx, pDATA(msg)->value, false);
 }
 
 void Client::handleMessage(std::shared_ptr<Message<ParameterGesture>> msg) {
