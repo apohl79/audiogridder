@@ -371,8 +371,9 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
                     if (idx != active) {
                         editFn();
                     } else if (!m_processor.isEditAlways()) {
-                        unhighlightPluginButton(active);
                         m_processor.hidePlugin();
+                        unhighlightPluginButton(active);
+                        resetPluginScreen();
                     }
                     break;
                 }
