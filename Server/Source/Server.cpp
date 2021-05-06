@@ -120,6 +120,7 @@ void Server::loadConfig() {
     }
     m_screenJpgQuality = jsonGetValue(cfg, "ScreenQuality", m_screenJpgQuality);
     m_screenLocalMode = jsonGetValue(cfg, "ScreenLocalMode", m_screenLocalMode);
+    m_pluginWindowsOnTop = jsonGetValue(cfg, "PluginWindowsOnTop", m_pluginWindowsOnTop);
     m_pluginexclude.clear();
     if (jsonHasValue(cfg, "ExcludePlugins")) {
         for (auto& s : cfg["ExcludePlugins"]) {
@@ -170,6 +171,7 @@ void Server::saveConfig() {
     j["ScreenQuality"] = m_screenJpgQuality;
     j["ScreenDiffDetection"] = m_screenDiffDetection;
     j["ScreenLocalMode"] = m_screenLocalMode;
+    j["PluginWindowsOnTop"] = m_pluginWindowsOnTop;
     j["ExcludePlugins"] = json::array();
     for (auto& p : m_pluginexclude) {
         j["ExcludePlugins"].push_back(p.toStdString());

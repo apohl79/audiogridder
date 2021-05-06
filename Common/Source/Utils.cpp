@@ -28,7 +28,7 @@ String GetLastErrorStr() {
 void windowToFront(Component* c) {
     setLogTagStatic("utils");
     traceScope();
-    if (nullptr != c) {
+    if (nullptr != c && !c->isAlwaysOnTop()) {
         c->setAlwaysOnTop(true);
         c->toFront(true);
         c->setAlwaysOnTop(false);

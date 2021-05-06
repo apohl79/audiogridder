@@ -305,10 +305,16 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
             m_localModeLbl.setAlpha(1);
             m_localMode.setEnabled(true);
             m_localMode.setAlpha(1);
+            m_pluginWindowsOnTopLbl.setAlpha(1);
+            m_pluginWindowsOnTop.setEnabled(true);
+            m_pluginWindowsOnTop.setAlpha(1);
         } else {
             m_localModeLbl.setAlpha(0.5);
             m_localMode.setEnabled(false);
             m_localMode.setAlpha(0.5);
+            m_pluginWindowsOnTopLbl.setAlpha(0.5);
+            m_pluginWindowsOnTop.setEnabled(false);
+            m_pluginWindowsOnTop.setAlpha(0.5);
         }
     };
     m_screenCapturingMode.onChange();
@@ -375,6 +381,17 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_localMode.setToggleState(m_app->getServer()->getScreenLocalMode(), NotificationType::dontSendNotification);
     m_localMode.setBounds(getCheckBoxBounds(row));
     addChildAndSetID(&m_localMode, "local");
+
+    row++;
+
+    m_pluginWindowsOnTopLbl.setText("Keep Plugin Windows on Top:", NotificationType::dontSendNotification);
+    m_pluginWindowsOnTopLbl.setBounds(getLabelBounds(row));
+    addChildAndSetID(&m_pluginWindowsOnTopLbl, "lbl");
+
+    m_pluginWindowsOnTop.setToggleState(m_app->getServer()->getPluginWindowsOnTop(),
+                                        NotificationType::dontSendNotification);
+    m_pluginWindowsOnTop.setBounds(getCheckBoxBounds(row));
+    addChildAndSetID(&m_pluginWindowsOnTop, "ontop");
 
     row++;
 
@@ -475,22 +492,26 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
                 appCpy->getServer()->setScreenCapturingFFmpegEncoder(ScreenRecorder::WEBP);
                 appCpy->getServer()->setScreenCapturingOff(false);
                 appCpy->getServer()->setScreenLocalMode(false);
+                appCpy->getServer()->setPluginWindowsOnTop(false);
                 break;
             case 2:
                 appCpy->getServer()->setScreenCapturingFFmpeg(true);
                 appCpy->getServer()->setScreenCapturingFFmpegEncoder(ScreenRecorder::MJPEG);
                 appCpy->getServer()->setScreenCapturingOff(false);
                 appCpy->getServer()->setScreenLocalMode(false);
+                appCpy->getServer()->setPluginWindowsOnTop(false);
                 break;
             case 3:
                 appCpy->getServer()->setScreenCapturingFFmpeg(false);
                 appCpy->getServer()->setScreenCapturingOff(false);
                 appCpy->getServer()->setScreenLocalMode(false);
+                appCpy->getServer()->setPluginWindowsOnTop(false);
                 break;
             case 4:
                 appCpy->getServer()->setScreenCapturingFFmpeg(false);
                 appCpy->getServer()->setScreenCapturingOff(true);
                 appCpy->getServer()->setScreenLocalMode(m_localMode.getToggleState());
+                appCpy->getServer()->setPluginWindowsOnTop(m_pluginWindowsOnTop.getToggleState());
                 break;
         }
         appCpy->getServer()->setScreenCapturingFFmpegQuality(

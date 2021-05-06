@@ -66,6 +66,8 @@ class Server : public Thread, public LogTag {
     void setScreenCapturingOff(bool b) { m_screenCapturingOff = b; }
     bool getScreenLocalMode() const { return m_screenLocalMode; }
     void setScreenLocalMode(bool b) { m_screenLocalMode = b; }
+    bool getPluginWindowsOnTop() const { return m_pluginWindowsOnTop; }
+    void setPluginWindowsOnTop(bool b) { m_pluginWindowsOnTop = b; }
     bool getScanForPlugins() const { return m_scanForPlugins; }
     void setScanForPlugins(bool b) { m_scanForPlugins = b; }
     bool getParallelPluginLoad() const { return m_parallelPluginLoad; }
@@ -123,6 +125,7 @@ class Server : public Thread, public LogTag {
     bool m_screenCapturingFFmpeg = true;
     bool m_screenCapturingOff = false;
     bool m_screenLocalMode = false;
+    bool m_pluginWindowsOnTop = false;
     ScreenRecorder::EncoderMode m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
     ScreenRecorder::EncoderQuality m_screenCapturingFFmpegQuality = ScreenRecorder::ENC_QUALITY_MEDIUM;
     StringArray m_vst3Folders;

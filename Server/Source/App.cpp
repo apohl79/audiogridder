@@ -436,6 +436,11 @@ void App::ProcessorWindow::createEditor() {
             setTopLeftPosition(m_processor->getLastPosition());
         }
         Component::setVisible(true);
+        if (getApp()->getServer()->getPluginWindowsOnTop()) {
+            setAlwaysOnTop(true);
+        } else {
+            windowToFront(this);
+        }
         startCapturing();
     } else {
         logln("failed to create editor");

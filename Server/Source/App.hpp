@@ -266,7 +266,6 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
             traceScope();
             if (m_processor->hasEditor()) {
                 createEditor();
-                windowToFront(this);
             }
         }
 
@@ -279,7 +278,6 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
             traceScope();
             if (m_processor->hasEditor()) {
                 createEditor();
-                windowToFront(this);
             }
         }
 
