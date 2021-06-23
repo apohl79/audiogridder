@@ -129,6 +129,7 @@ void Server::loadConfig() {
     }
     m_scanForPlugins = jsonGetValue(cfg, "ScanForPlugins", m_scanForPlugins);
     m_parallelPluginLoad = jsonGetValue(cfg, "ParallelPluginLoad", m_parallelPluginLoad);
+    m_coreDumps = jsonGetValue(cfg, "CoreDumps", m_coreDumps);
     m_sandboxing = jsonGetValue(cfg, "Sandboxing", m_sandboxing);
     m_sandboxCoreDumps = jsonGetValue(cfg, "SandboxCoreDumps", m_sandboxCoreDumps);
     m_sandboxLogAutoclean = jsonGetValue(cfg, "SandboxLogAutoclean", m_sandboxLogAutoclean);
@@ -178,6 +179,7 @@ void Server::saveConfig() {
     }
     j["ScanForPlugins"] = m_scanForPlugins;
     j["ParallelPluginLoad"] = m_parallelPluginLoad;
+    j["CoreDumps"] = m_coreDumps;
     j["Sandboxing"] = m_sandboxing;
     j["SandboxCoreDumps"] = m_sandboxCoreDumps;
     j["SandboxLogAutoclean"] = m_sandboxLogAutoclean;

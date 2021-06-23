@@ -88,7 +88,11 @@ void App::initialise(const String& commandLineParameters) {
             break;
         case SERVER: {
             traceScope();
-            CoreDump::initialize(appName, logName, false);
+            auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigServer));
+            bool enableCoreDumps = jsonGetValue(cfg, "CoreDumps", false);
+            if (enableCoreDumps) {
+                CoreDump::initialize(appName, logName, false);
+            }
             showSplashWindow();
             setSplashInfo("Starting server...");
             m_menuWindow = std::make_unique<MenuBarWindow>(this);

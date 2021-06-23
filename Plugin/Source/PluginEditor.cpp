@@ -960,6 +960,11 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
             Tracer::setEnabled(!Tracer::isEnabled());
             m_processor.saveConfig();
         });
+        subm.addItem("CoreDumps", true, m_processor.getCoreDumps(), [this] {
+            traceScope();
+            m_processor.setCoreDumps(!m_processor.getCoreDumps());
+            m_processor.saveConfig();
+        });
         m.addSubMenu("Diagnostics", subm);
         subm.clear();
 

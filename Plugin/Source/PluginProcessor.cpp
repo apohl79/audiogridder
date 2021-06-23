@@ -56,7 +56,6 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
 
     Tracer::initialize(appName, logName);
     Signals::initialize();
-    CoreDump::initialize(appName, logName, true);
     Metrics::initialize();
     WindowPositions::initialize();
 
@@ -76,6 +75,10 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
     updateLatency(0);
 
     loadConfig();
+
+    if (m_coreDumps) {
+        CoreDump::initialize(appName, logName, true);
+    }
 
     m_unusedParam.name = "(unassigned)";
     m_unusedDummyPlugin.name = "(unused)";
@@ -238,6 +241,7 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
         m_noSrvPluginListFilter = noSrvPluginListFilter;
         m_client->reconnect();
     }
+    m_coreDumps = jsonGetValue(j, "CoreDumps", m_coreDumps);
 }
 
 void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
@@ -272,6 +276,7 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
     jcfg["PresetsDir"] = m_presetsDir.toStdString();
     jcfg["DefaultPreset"] = m_defaultPreset.toStdString();
     jcfg["EditAlways"] = m_editAlways;
+    jcfg["CoreDumps"] = m_coreDumps;
 
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), jcfg);
 }

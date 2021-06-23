@@ -160,6 +160,8 @@ class AudioGridderAudioProcessor : public AudioProcessor,
     bool getSrvCanDisableSidechain() const { return m_serverCanDisableSidechain; }
     float getScaleFactor() const { return m_scale; }
     void setScaleFactor(float f) { m_scale = f; }
+    bool getCoreDumps() const { return m_coreDumps; }
+    void setCoreDumps(bool b) { m_coreDumps = b; }
     Array<ServerPlugin> getRecents();
     void updateRecents(const ServerPlugin& plugin);
 
@@ -297,6 +299,7 @@ class AudioGridderAudioProcessor : public AudioProcessor,
     bool m_confirmDelete = true;
     bool m_noSrvPluginListFilter = false;
     float m_scale = 1.0;
+    bool m_coreDumps = true;
 
     bool m_transferWhenPlayingOnly = false;
 

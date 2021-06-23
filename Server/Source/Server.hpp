@@ -74,6 +74,8 @@ class Server : public Thread, public LogTag {
     void setParallelPluginLoad(bool b) { m_parallelPluginLoad = b; }
     bool getSandboxing() const { return m_sandboxing; }
     void setSandboxing(bool b) { m_sandboxing = b; }
+    bool getCoreDumps() const { return m_coreDumps; }
+    void setCoreDumps(bool b) { m_coreDumps = b; }
     const KnownPluginList& getPluginList() const { return m_pluginlist; }
     KnownPluginList& getPluginList() { return m_pluginlist; }
     bool shouldExclude(const String& name);
@@ -133,6 +135,7 @@ class Server : public Thread, public LogTag {
     bool m_vstNoStandardFolders;
     bool m_scanForPlugins = true;
     bool m_parallelPluginLoad = false;
+    bool m_coreDumps = true;
     bool m_sandboxing = false;
     bool m_sandboxCoreDumps = false;
     bool m_sandboxLogAutoclean = true;
