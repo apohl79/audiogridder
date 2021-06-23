@@ -145,6 +145,7 @@ AudioGridderAudioProcessorEditor::~AudioGridderAudioProcessorEditor() {
     traceScope();
     stopAsyncFunctors();
     logln("destroying editor");
+    m_wantsScreenUpdates = false;
     m_processor.hidePlugin();
     m_processor.getClient().setPluginScreenUpdateCallback(nullptr);
     logln("editor destroyed");
@@ -356,6 +357,7 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
                     }
                 }
                 if (m_pluginButtons.size() == 0) {
+                    m_wantsScreenUpdates = false;
                     m_processor.getClient().setPluginScreenUpdateCallback(nullptr);
                     resetPluginScreen();
                 }
@@ -371,9 +373,12 @@ void AudioGridderAudioProcessorEditor::buttonClicked(Button* button, const Modif
                     if (idx != active) {
                         editFn();
                     } else if (!m_processor.isEditAlways()) {
+                        m_wantsScreenUpdates = false;
+                        m_processor.getClient().setPluginScreenUpdateCallback(nullptr);
                         m_processor.hidePlugin();
                         unhighlightPluginButton(active);
                         resetPluginScreen();
+                        resized();
                     }
                     break;
                 }
@@ -1022,6 +1027,7 @@ void AudioGridderAudioProcessorEditor::editPlugin(int idx) {
     m_stB.setVisible(true);
     m_processor.editPlugin(idx, getScreenX() + getWidth() + 10, getScreenY());
     if (genericEditorEnabled()) {
+        m_wantsScreenUpdates = false;
         m_processor.getClient().setPluginScreenUpdateCallback(nullptr);
         resetPluginScreen();
         m_genericEditor.resized();
@@ -1031,6 +1037,7 @@ void AudioGridderAudioProcessorEditor::editPlugin(int idx) {
         }
     } else {
         auto* p_processor = &m_processor;
+        m_wantsScreenUpdates = true;
         m_processor.getClient().setPluginScreenUpdateCallback(
             [this, idx, p_processor](std::shared_ptr<Image> img, int width, int height) {
                 traceScope();
@@ -1038,7 +1045,7 @@ void AudioGridderAudioProcessorEditor::editPlugin(int idx) {
                     runOnMsgThreadAsync([this, p_processor, img, width, height] {
                         traceScope();
                         auto p = dynamic_cast<AudioGridderAudioProcessorEditor*>(p_processor->getActiveEditor());
-                        if (this == p) {  // make sure the editor hasn't been closed
+                        if (this == p && m_wantsScreenUpdates) {  // make sure the editor hasn't been closed
                             setPluginScreen(img->createCopy(), width, height);
                             resized();
                         }

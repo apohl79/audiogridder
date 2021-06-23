@@ -22,16 +22,7 @@
 
 namespace e47 {
 
-AudioGridderAudioProcessor::AudioGridderAudioProcessor()
-    : AudioProcessor(BusesProperties()
-#if !JucePlugin_IsSynth && !JucePlugin_IsMidiEffect
-                         .withInput("Input", AudioChannelSet::discreteChannels(16), true)
-                         .withInput("Sidechain", AudioChannelSet::stereo(), false)
-#endif
-#if !JucePlugin_IsMidiEffect
-                         .withOutput("Output", AudioChannelSet::discreteChannels(16), true)
-#endif
-      ) {
+AudioGridderAudioProcessor::AudioGridderAudioProcessor() : AudioProcessor(createBusesProperties()) {
     initAsyncFunctors();
 
     Defaults::initPluginTheme();
@@ -104,7 +95,8 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor()
             for (auto& p : m_loadedPlugins) {
                 logln("loading " << p.name << " (" << p.id << ") [on connect]... ");
                 String err;
-                p.ok = m_client->addPlugin(p.id, p.presets, p.params, p.hasEditor, p.settings, err);
+                bool scDisabled;
+                p.ok = m_client->addPlugin(p.id, p.presets, p.params, p.hasEditor, scDisabled, p.settings, err);
                 if (p.ok) {
                     logln("...ok");
                 } else {
@@ -374,9 +366,25 @@ void AudioGridderAudioProcessor::prepareToPlay(double sampleRate, int samplesPer
         m_tray->start();
     }
 
-    int channelsIn = getMainBusNumInputChannels();
-    int channelsOut = getMainBusNumOutputChannels();
-    int channelsSC = getBusCount(true) == 2 ? getChannelCountOfBus(true, 1) : 0;
+    int channelsIn = 0;
+    int channelsSC = 0;
+    int channelsOut = getTotalNumOutputChannels();
+
+    for (int i = 0; i < getBusCount(true); i++) {
+        auto* bus = getBus(true, i);
+        if (bus->isEnabled()) {
+            if (bus->getName() != "Sidechain") {
+                channelsIn += bus->getNumberOfChannels();
+            } else {
+                channelsSC += bus->getNumberOfChannels();
+            }
+        }
+    }
+
+    channelsIn = jmin(channelsIn, 16);
+    channelsSC = jmin(channelsSC, 16);
+    channelsOut = jmin(channelsOut, 64);
+
     m_client->init(channelsIn, channelsOut, channelsSC, sampleRate, samplesPerBlock, isUsingDoublePrecision());
 
     m_prepared = true;
@@ -593,7 +601,6 @@ json AudioGridderAudioProcessor::getState(bool withServers) {
     json j;
     j["version"] = 2;
     j["Mode"] = m_mode.toStdString();
-    j["ServerCanDisableSidechain"] = m_serverCanDisableSidechain;
 
     if (withServers) {
         auto jservers = json::array();
@@ -645,8 +652,6 @@ bool AudioGridderAudioProcessor::setState(const json& j) {
             return false;
         }
     }
-
-    m_serverCanDisableSidechain = jsonGetValue(j, "ServerCanDisableSidechain", true);
 
     if (j.find("servers") != j.end()) {
         m_servers.clear();
@@ -745,10 +750,10 @@ bool AudioGridderAudioProcessor::loadPlugin(const ServerPlugin& plugin, String& 
     traceScope();
     StringArray presets;
     Array<e47::Client::Parameter> params;
-    bool hasEditor;
+    bool hasEditor, scDisabled;
     logln("loading " << plugin.getName() << " (" << plugin.getId() << ")...");
     suspendProcessing(true);
-    bool success = m_client->addPlugin(plugin.getId(), presets, params, hasEditor, "", err);
+    bool success = m_client->addPlugin(plugin.getId(), presets, params, hasEditor, scDisabled, "", err);
     suspendProcessing(false);
     if (success) {
         logln("...ok");
@@ -760,6 +765,12 @@ bool AudioGridderAudioProcessor::loadPlugin(const ServerPlugin& plugin, String& 
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
         m_loadedPlugins.push_back({plugin.getId(), plugin.getName(), "", presets, params, false, hasEditor, true});
         updateRecents(plugin);
+        if (scDisabled) {
+            AlertWindow::showMessageBoxAsync(
+                AlertWindow::InfoIcon, "Sidechain Disabled",
+                "The server had to disable the sidechain input of the chain to make >" + plugin.getName() + "< load.",
+                "OK");
+        }
     }
     m_client->setLoadedPluginsString(getLoadedPluginsString());
     return success;

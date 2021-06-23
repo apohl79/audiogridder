@@ -279,9 +279,6 @@ void Client::init() {
         if (m_processor->getNoSrvPluginListFilter()) {
             cfg.setFlag(HandshakeRequest::NO_PLUGINLIST_FILTER);
         }
-        if (m_processor->getSrvCanDisableSidechain()) {
-            cfg.setFlag(HandshakeRequest::CAN_DISABLE_SIDECHAIN);
-        }
 
         if (!send(m_cmdOut.get(), reinterpret_cast<const char*>(&cfg), sizeof(cfg))) {
             m_cmdOut->close();
@@ -444,8 +441,8 @@ void Client::quit() {
     msg.send(m_cmdOut.get());
 }
 
-bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params, bool& hasEditor, String settings,
-                       String& err) {
+bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params, bool& hasEditor, bool& scDisabled,
+                       String settings, String& err) {
     traceScope();
     if (!isReadyLockFree()) {
         return false;
@@ -516,6 +513,7 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
         }
         m_latency = jresult["latency"].get<int>();
         hasEditor = jresult["hasEditor"].get<bool>();
+        scDisabled = jresult["disabledSideChain"].get<bool>();
         return true;
     }
     return false;

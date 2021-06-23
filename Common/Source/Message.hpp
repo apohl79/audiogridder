@@ -86,7 +86,7 @@ StreamingSocket* accept(StreamingSocket*, int timeoutMs = 1000, std::function<bo
 /*
  * Client/Server handshake
  */
-static constexpr int AG_PROTOCOL_VERSION = 5;
+static constexpr int AG_PROTOCOL_VERSION = 6;
 
 struct HandshakeRequest {
     int version;
@@ -103,7 +103,7 @@ struct HandshakeRequest {
     uint32 unused3;
     uint32 unused4;
 
-    enum FLAGS : uint8 { NO_PLUGINLIST_FILTER = 1, CAN_DISABLE_SIDECHAIN = 2 };
+    enum FLAGS : uint8 { NO_PLUGINLIST_FILTER = 1 };
     void setFlag(uint8 f) { flags |= f; }
     bool isFlag(uint8 f) { return (flags & f) == f; }
 

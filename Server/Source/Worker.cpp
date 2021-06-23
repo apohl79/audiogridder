@@ -80,8 +80,7 @@ void Worker::run() {
     sock.reset(accept(m_masterSocket.get(), 2000));
     if (nullptr != sock && sock->isConnected()) {
         m_audio->init(std::move(sock), m_cfg.channelsIn, m_cfg.channelsOut, m_cfg.channelsSC, m_cfg.rate,
-                      m_cfg.samplesPerBlock, m_cfg.doublePrecission,
-                      m_cfg.isFlag(HandshakeRequest::CAN_DISABLE_SIDECHAIN));
+                      m_cfg.samplesPerBlock, m_cfg.doublePrecission);
         m_audio->startThread(Thread::realtimeAudioPriority);
     } else {
         logln("failed to establish audio connection");
@@ -224,6 +223,7 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     auto id = pPLD(msg).getString();
     logln("adding plugin " << id << "...");
     String err;
+    bool wasSidechainDisabled = m_audio->isSidechainDisabled();
     bool success = m_audio->addPlugin(id, err);
     std::shared_ptr<AGProcessor> proc;
     std::shared_ptr<AudioPluginInstance> plugin;
@@ -234,6 +234,7 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
         proc = m_audio->getProcessor(m_audio->getSize() - 1);
         plugin = proc->getPlugin();
         jresult["latency"] = m_audio->getLatencySamples();
+        jresult["disabledSideChain"] = !wasSidechainDisabled && m_audio->isSidechainDisabled();
         runOnMsgThreadSync([&] { jresult["hasEditor"] = plugin->hasEditor(); });
         proc->onParamValueChange = [this](int idx, int paramIdx, float val) {
             sendParamValueChange(idx, paramIdx, val);

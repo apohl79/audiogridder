@@ -278,7 +278,7 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
         return props;
     }
 
-    void setCanDisableSidechain(bool b) { m_canDisableSidechain = b; }
+    bool isSidechainDisabled() const { return m_sidechainDisabled; }
 
     void prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock) override;
     void releaseResources() override;
@@ -326,8 +326,7 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
     std::atomic<double> m_tailSecs{0.0};
 
     int m_extraChannels = 0;
-    bool m_canDisableSidechain = false;  // If plugins refuse to load, the sidechain input can be deactivated
-                                         // to be able to accept the plugins I/O layout.
+    bool m_hasSidechain = false;
     bool m_sidechainDisabled = false;
 
     template <typename T>

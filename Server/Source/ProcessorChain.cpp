@@ -361,6 +361,8 @@ bool ProcessorChain::updateChannels(int channelsIn, int channelsOut, int channel
         layout.inputBuses.add(AudioChannelSet::mono());
     } else if (channelsSC == 2) {
         layout.inputBuses.add(AudioChannelSet::stereo());
+    } else if (channelsSC > 0) {
+        layout.inputBuses.add(AudioChannelSet::discreteChannels(channelsIn));
     }
     if (channelsOut == 1) {
         layout.outputBuses.add(AudioChannelSet::mono());
@@ -376,6 +378,7 @@ bool ProcessorChain::updateChannels(int channelsIn, int channelsOut, int channel
     }
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     m_extraChannels = 0;
+    m_hasSidechain = channelsSC > 0;
     m_sidechainDisabled = false;
     for (auto& proc : m_processors) {
         setProcessorBusesLayout(proc.get());
@@ -392,8 +395,13 @@ bool ProcessorChain::setProcessorBusesLayout(AGProcessor* proc) {
     }
 
     auto layout = getBusesLayout();
-    bool hasSidechain = layout.inputBuses.size() > 1;
 
+    if (m_hasSidechain && m_sidechainDisabled) {
+        logln("the sidechain has been disabled, removing it from the standard layout");
+        layout.inputBuses.remove(1);
+    }
+
+    bool hasSidechain = m_hasSidechain && !m_sidechainDisabled;
     bool supported = plugin->checkBusesLayoutSupported(layout) && plugin->setBusesLayout(layout);
 
     if (!supported) {
@@ -411,16 +419,22 @@ bool ProcessorChain::setProcessorBusesLayout(AGProcessor* proc) {
                 logln("trying without sidechain bus");
                 layout.inputBuses.remove(1);
                 supported = plugin->checkBusesLayoutSupported(layout) && plugin->setBusesLayout(layout);
+                if (supported) {
+                    proc->setNeedsDisabledSidechain(true);
+                    m_sidechainDisabled = true;
+                }
             }
         }
-        if (!supported && (!hasSidechain || m_canDisableSidechain)) {
+        if (!supported) {
             if (hasSidechain) {
                 logln("disabling sidechain input to use the plugins I/O layout");
                 m_sidechainDisabled = true;
-                proc->setNeedsDisabledSidechain(true);
             }
 
-            logln("falling back to the plugin layout");
+            // when getting here, make sure we always disable the sidechain for this plugin
+            proc->setNeedsDisabledSidechain(true);
+
+            logln("falling back to the plugins default layout");
 
             // keep the processor's layout and calculate the neede extra channels
             auto procLayout = plugin->getBusesLayout();
@@ -543,7 +557,7 @@ void ProcessorChain::updateNoLock() {
                 supportsDouble = false;
             }
             m_extraChannels = jmax(m_extraChannels, proc->getExtraInChannels(), proc->getExtraOutChannels());
-            m_sidechainDisabled = m_sidechainDisabled || proc->getNeedsDisabledSidechain();
+            m_sidechainDisabled = m_hasSidechain && (m_sidechainDisabled || proc->getNeedsDisabledSidechain());
         }
     }
     if (latency != getLatencySamples()) {

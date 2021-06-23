@@ -51,6 +51,7 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     PluginButton m_newPluginButton;
     ImageComponent m_pluginScreen;
     bool m_pluginScreenEmpty = true;
+    std::atomic_bool m_wantsScreenUpdates{false};
     GenericEditor m_genericEditor;
     Viewport m_genericEditorView;
     ImageComponent m_srvIcon, m_settingsIcon, m_cpuIcon;

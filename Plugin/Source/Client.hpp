@@ -180,8 +180,8 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     using OnCloseCallback = std::function<void()>;
     void setOnCloseCallback(OnCloseCallback fn);
 
-    bool addPlugin(String id, StringArray& presets, Array<Parameter>& params, bool& hasEditor, String settings,
-                   String& err);
+    bool addPlugin(String id, StringArray& presets, Array<Parameter>& params, bool& hasEditor, bool& scDisabled,
+                   String settings, String& err);
     void delPlugin(int idx);
     void editPlugin(int idx, int x, int y);
     void hidePlugin();

@@ -32,7 +32,7 @@ class AudioWorker : public Thread, public LogTagDelegate {
     virtual ~AudioWorker() override;
 
     void init(std::unique_ptr<StreamingSocket> s, int channelsIn, int channelsOut, int channelsSC, double rate,
-              int samplesPerBlock, bool doublePrecission, bool canDisableSidechain);
+              int samplesPerBlock, bool doublePrecission);
 
     void run() override;
     void shutdown();
@@ -40,6 +40,7 @@ class AudioWorker : public Thread, public LogTagDelegate {
 
     int getChannelsIn() const { return m_channelsIn; }
     int getChannelsOut() const { return m_channelsOut; }
+    int getChannelsSC() const { return m_channelsSC; }
 
     bool addPlugin(const String& id, String& err);
     void delPlugin(int idx);
@@ -48,6 +49,7 @@ class AudioWorker : public Thread, public LogTagDelegate {
     int getSize() const { return static_cast<int>(m_chain->getSize()); }
     int getLatencySamples() const { return m_chain->getLatencySamples(); }
     void update() { m_chain->update(); }
+    bool isSidechainDisabled() const { return m_chain->isSidechainDisabled(); }
 
     float getParameterValue(int idx, int paramIdx) { return m_chain->getParameterValue(idx, paramIdx); }
 

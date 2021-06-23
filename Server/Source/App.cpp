@@ -429,7 +429,7 @@ Point<float> App::localPointToGlobal(Point<float> lp) {
 
 void App::ProcessorWindow::createEditor() {
     traceScope();
-    auto disp = Desktop::getInstance().getDisplays().getPrimaryDisplay();
+    auto* disp = Desktop::getInstance().getDisplays().getPrimaryDisplay();
     if (nullptr != disp) {
         m_totalRect = disp->totalArea;
     }

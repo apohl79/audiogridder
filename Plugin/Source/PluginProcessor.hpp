@@ -157,7 +157,6 @@ class AudioGridderAudioProcessor : public AudioProcessor,
     void setConfirmDelete(bool b) { m_confirmDelete = b; }
     bool getNoSrvPluginListFilter() const { return m_noSrvPluginListFilter; }
     void setNoSrvPluginListFilter(bool b) { m_noSrvPluginListFilter = b; }
-    bool getSrvCanDisableSidechain() const { return m_serverCanDisableSidechain; }
     float getScaleFactor() const { return m_scale; }
     void setScaleFactor(float f) { m_scale = f; }
     bool getCoreDumps() const { return m_coreDumps; }
@@ -308,11 +307,63 @@ class AudioGridderAudioProcessor : public AudioProcessor,
 
     SyncRemoteMode m_syncRemote = SYNC_WITH_EDITOR;
 
-    // Stay backward compatible: Previously we allocated extra channels for plugins that wanted it, to make them load.
-    // Now with sidechain support, we might mess up the input channels, like having a stereo plugin process the
-    // sidechain signal on a mono channel. With sidechains we can't do this anymore, but we can't break old sessions
-    // either. So for old sessions, we will allow the server deactivate the sidechain.
-    bool m_serverCanDisableSidechain = false;
+    bool m_instOutputMonoBuses = false;
+    int m_instNumOutputChannels = 16;
+
+    static BusesProperties createBusesProperties() {
+        int chIn, chOut, chSC;
+        chIn = chOut = chSC = 0;
+        bool useMultipleOutputBuses = false;
+
+#if !JucePlugin_IsSynth && !JucePlugin_IsMidiEffect
+        // FX
+        chIn = chOut = 16;
+        chSC = 2;
+#endif
+
+#if JucePlugin_IsSynth
+        // Instrument
+        chIn = 0;
+        chOut = 64;
+        chSC= 0;
+        useMultipleOutputBuses = true;
+#endif
+
+        auto bp = BusesProperties();
+
+        if (chIn == 1) {
+            bp = bp.withInput("Input", AudioChannelSet::mono(), true);
+        } else if (chIn == 2) {
+            bp = bp.withInput("Input", AudioChannelSet::stereo(), true);
+        } else if (chIn > 0) {
+            bp = bp.withInput("Input", AudioChannelSet::discreteChannels(chIn), true);
+        }
+
+        if (chOut == 1) {
+            bp = bp.withOutput("Output", AudioChannelSet::mono(), true);
+        } else if (chOut == 2) {
+            bp = bp.withOutput("Output", AudioChannelSet::stereo(), true);
+        } else if (chOut > 0) {
+            if (useMultipleOutputBuses) {
+                bp = bp.withOutput("Main", AudioChannelSet::stereo(), true);
+                for (int i = 2; i < chOut; i++) {
+                    bp = bp.withOutput("Mono " + String(i - 1), AudioChannelSet::mono(), true);
+                }
+            } else {
+                bp = bp.withOutput("Output", AudioChannelSet::discreteChannels(chOut), true);
+            }
+        }
+
+        if (chSC == 1) {
+            bp = bp.withInput("Sidechain", AudioChannelSet::mono(), false);
+        } else if (chSC == 2) {
+            bp = bp.withInput("Sidechain", AudioChannelSet::stereo(), false);
+        } else if (chSC > 0) {
+            bp = bp.withInput("Sidechain", AudioChannelSet::discreteChannels(chSC), false);
+        }
+
+        return bp;
+    }
 
     ENABLE_ASYNC_FUNCTORS();
 

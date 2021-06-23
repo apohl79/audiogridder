@@ -29,7 +29,7 @@ AudioWorker::~AudioWorker() {
 }
 
 void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channelsIn, int channelsOut, int channelsSC, double rate,
-                       int samplesPerBlock, bool doublePrecission, bool canDiableSidechain) {
+                       int samplesPerBlock, bool doublePrecission) {
     traceScope();
     m_socket = std::move(s);
     m_rate = rate;
@@ -44,7 +44,6 @@ void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channelsIn, int c
     if (m_doublePrecission && m_chain->supportsDoublePrecisionProcessing()) {
         m_chain->setProcessingPrecision(AudioProcessor::doublePrecision);
     }
-    m_chain->setCanDisableSidechain(canDiableSidechain);
     m_chain->updateChannels(channelsIn, channelsOut, channelsSC);
 }
 
