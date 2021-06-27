@@ -22,7 +22,8 @@ enum MouseEvType : uint8_t {
     OTHER_DOWN,
     OTHER_UP,
     OTHER_DRAG,
-    WHEEL
+    WHEEL,
+    DBL_CLICK
 };
 
 const std::unordered_map<std::string, int> VKeyMap = {

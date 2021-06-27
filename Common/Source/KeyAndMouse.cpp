@@ -35,6 +35,18 @@ void mouseEventReal(CGMouseButton button, CGEventType type, CGPoint location, CG
     CFRelease(event);
 }
 
+void mouseDoubleClickEventReal(CGPoint location, CGEventFlags flags) {
+    traceScope();
+    CGEventRef event = CGEventCreateMouseEvent(nullptr, kCGEventLeftMouseDown, location, kCGMouseButtonLeft);
+    CGEventSetIntegerValueField(event, kCGMouseEventClickState, 2);
+    CGEventSetFlags(event, flags | CGEventGetFlags(event));
+    CGEventSetType(event, kCGEventLeftMouseDown);
+    CGEventPost(kCGSessionEventTap, event);
+    CGEventSetType(event, kCGEventLeftMouseUp);
+    CGEventPost(kCGSessionEventTap, event);
+    CFRelease(event);
+}
+
 void mouseScrollEventReal(float deltaX, float deltaY) {
     traceScope();
     if (deltaX == 0 && deltaY == 0) {
@@ -111,6 +123,8 @@ inline std::pair<CGMouseButton, CGEventType> toMouseButtonType(MouseEvType t) {
             button = kCGMouseButtonLeft;
             type = kCGEventNull;
             break;
+        case MouseEvType::DBL_CLICK:
+            break;
     }
     return std::make_pair(button, type);
 }
@@ -147,6 +161,7 @@ void sendKey(WORD vk, bool keyDown, HWND hwnd = NULL) {
 
 void mouseEventReal(POINT pos, DWORD evFlags, uint64_t flags) {
     traceScope();
+
     INPUT event = {0};
     event.type = INPUT_MOUSE;
     event.mi.dx = pos.x;
@@ -167,7 +182,6 @@ void mouseEventReal(POINT pos, DWORD evFlags, uint64_t flags) {
         sendKey(VK_MENU, true);
     }
 
-    SetCursorPos(pos.x, pos.y);
     sendInput(&event);
 
     // modifiers up
@@ -182,15 +196,59 @@ void mouseEventReal(POINT pos, DWORD evFlags, uint64_t flags) {
     }
 }
 
+/*
+void mouseDoubleClickEventReal(POINT pos, uint64_t flags) {
+    traceScope();
+
+    INPUT event = {0};
+    event.type = INPUT_MOUSE;
+    event.mi.dx = pos.x;
+    event.mi.dy = pos.y;
+    event.mi.mouseData = 0;
+    event.mi.time = 0;
+    event.mi.dwExtraInfo = NULL;
+
+    // modifiers down
+    if ((flags & VK_SHIFT) == VK_SHIFT) {
+        sendKey(VK_SHIFT, true);
+    }
+    if ((flags & VK_CONTROL) == VK_CONTROL) {
+        sendKey(VK_CONTROL, true);
+    }
+    if ((flags & VK_MENU) == VK_MENU) {
+        sendKey(VK_MENU, true);
+    }
+
+    event.mi.dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTDOWN;
+    sendInput(&event);
+    event.mi.dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTUP;
+    sendInput(&event);
+    event.mi.dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTDOWN;
+    sendInput(&event);
+    event.mi.dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTUP;
+    sendInput(&event);
+
+    // modifiers up
+    if ((flags & VK_SHIFT) == VK_SHIFT) {
+        sendKey(VK_SHIFT, false);
+    }
+    if ((flags & VK_CONTROL) == VK_CONTROL) {
+        sendKey(VK_CONTROL, false);
+    }
+    if ((flags & VK_MENU) == VK_MENU) {
+        sendKey(VK_MENU, false);
+    }
+}
+*/
+
 void mouseScrollEventReal(POINT pos, DWORD deltaX, DWORD deltaY) {
     traceScope();
-    SetCursorPos(pos.x, pos.y);
 
     INPUT event = {0};
     event.type = INPUT_MOUSE;
     event.mi.time = 0;
-    event.mi.dx = 0;
-    event.mi.dy = 0;
+    event.mi.dx = pos.x;
+    event.mi.dy = pos.y;
     event.mi.dwExtraInfo = NULL;
     if (deltaX != 0) {
         event.mi.dwFlags = MOUSEEVENTF_HWHEEL;
@@ -248,15 +306,21 @@ inline POINT getScaledPoint(float x, float y) {
     HDC hDC = GetDC(0);
     float dpi = (GetDeviceCaps(hDC, LOGPIXELSX) + GetDeviceCaps(hDC, LOGPIXELSY)) / 2.0f;
     ReleaseDC(0, hDC);
+    auto* disp = Desktop::getInstance().getDisplays().getPrimaryDisplay();
     float sf = dpi / 96;
-    long lx = lroundf(x * sf);
-    long ly = lroundf(y * sf);
+    float xf = (float)0xffff / disp->totalArea.getWidth();
+    float yf = (float)0xffff / disp->totalArea.getHeight();
+    long lx = lroundf(x * sf * xf);
+    long ly = lroundf(y * sf * yf);
     return {lx, ly};
 }
 
 inline DWORD getMouseFlags(MouseEvType t) {
     DWORD flags = MOUSEEVENTF_ABSOLUTE;
     switch (t) {
+        case MouseEvType::LEFT_DRAG:
+        case MouseEvType::RIGHT_DRAG:
+        case MouseEvType::OTHER_DRAG:
         case MouseEvType::MOVE:
             flags |= MOUSEEVENTF_MOVE;
             break;
@@ -271,6 +335,12 @@ inline DWORD getMouseFlags(MouseEvType t) {
             break;
         case MouseEvType::RIGHT_DOWN:
             flags |= MOUSEEVENTF_RIGHTDOWN;
+            break;
+        case MouseEvType::OTHER_UP:
+            flags |= MOUSEEVENTF_MIDDLEUP;
+            break;
+        case MouseEvType::OTHER_DOWN:
+            flags |= MOUSEEVENTF_MIDDLEDOWN;
             break;
     }
     return flags;
@@ -354,13 +424,22 @@ inline WORD getVK(uint16_t keyCode) {
 
 void mouseEvent(MouseEvType t, float x, float y, uint64_t flags) {
 #if defined(JUCE_MAC)
-    auto bt = toMouseButtonType(t);
-    CGPoint loc = CGPointMake(x, y);
-    mouseEventReal(bt.first, bt.second, loc, flags);
+    if (t == MouseEvType::DBL_CLICK) {
+        CGPoint loc = CGPointMake(x, y);
+        mouseDoubleClickEventReal(loc, flags);
+    } else {
+        auto bt = toMouseButtonType(t);
+        CGPoint loc = CGPointMake(x, y);
+        mouseEventReal(bt.first, bt.second, loc, flags);
+    }
 #elif defined(JUCE_WINDOWS)
     auto pos = getScaledPoint(x, y);
-    auto mouseFlags = getMouseFlags(t);
-    mouseEventReal(pos, mouseFlags, flags);
+    if (t == MouseEvType::DBL_CLICK) {
+        // No dedicated handling needed, two down/up events will appear which will be detected as double click
+    } else {
+        auto mouseFlags = getMouseFlags(t);
+        mouseEventReal(pos, mouseFlags, flags);
+    }
 #endif
 }
 
@@ -400,6 +479,7 @@ void setShiftKey(uint64_t& flags) {
     flags |= VK_SHIFT;
 #endif
 }
+
 void setControlKey(uint64_t& flags) {
 #if defined(JUCE_MAC)
     flags |= kCGEventFlagMaskControl;
@@ -407,6 +487,7 @@ void setControlKey(uint64_t& flags) {
     flags |= VK_CONTROL;
 #endif
 }
+
 void setAltKey(uint64_t& flags) {
 #if defined(JUCE_MAC)
     flags |= kCGEventFlagMaskAlternate;

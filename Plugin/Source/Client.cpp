@@ -814,7 +814,11 @@ void Client::mouseUp(const MouseEvent& event) {
     }
 }
 
-void Client::mouseDoubleClick(const MouseEvent& /*event*/) {}
+void Client::mouseDoubleClick(const MouseEvent& event) {
+    traceScope();
+    sendMouseEvent(MouseEvType::DBL_CLICK, event.position, event.mods.isShiftDown(), event.mods.isCtrlDown(),
+                   event.mods.isAltDown());
+}
 
 void Client::mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wheel) {
     traceScope();
