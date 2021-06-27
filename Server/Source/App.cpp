@@ -351,6 +351,11 @@ void App::bringEditorToFront() {
     }
 }
 
+std::shared_ptr<AGProcessor> App::getCurrentWindowProc() {
+    std::lock_guard<std::mutex> lock(m_windowMtx);
+    return m_windowProc;
+}
+
 void App::moveEditor(int x, int y) {
     traceScope();
     if (getServer()->getScreenLocalMode()) {

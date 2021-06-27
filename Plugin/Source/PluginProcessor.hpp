@@ -325,7 +325,7 @@ class AudioGridderAudioProcessor : public AudioProcessor,
         // Instrument
         chIn = 0;
         chOut = 64;
-        chSC= 0;
+        chSC = 0;
         useMultipleOutputBuses = true;
 #endif
 

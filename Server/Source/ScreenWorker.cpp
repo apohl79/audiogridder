@@ -165,7 +165,7 @@ void ScreenWorker::showEditor(std::shared_ptr<AGProcessor> proc, int x, int y) {
     traceScope();
     logln("show editor for " << proc->getName() << " at " << x << "x" << y);
 
-    if (m_visible && proc == m_currentProc) {
+    if (m_visible && proc == m_currentProc && proc == getApp()->getCurrentWindowProc()) {
         logln("already showing editor");
         runOnMsgThreadAsync([this, x, y] {
             traceScope();

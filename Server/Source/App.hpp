@@ -65,6 +65,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     void hideEditor(Thread::ThreadID tid = nullptr);
     void bringEditorToFront();
     void moveEditor(int x, int y);
+    std::shared_ptr<AGProcessor> getCurrentWindowProc();
 
     void resetEditor();
     void restartEditor();
