@@ -274,8 +274,18 @@ void Client::init() {
     logln("connecting server " << host << ":" << id);
     m_cmdOut = std::make_unique<StreamingSocket>();
     if (m_cmdOut->connect(host, port, 1000)) {
-        HandshakeRequest cfg = {AG_PROTOCOL_VERSION, m_channelsIn,       m_channelsOut, m_channelsSC, m_rate,
-                                m_samplesPerBlock,   m_doublePrecission, getId()};
+        HandshakeRequest cfg = {AG_PROTOCOL_VERSION,
+                                m_channelsIn,
+                                m_channelsOut,
+                                m_channelsSC,
+                                m_rate,
+                                m_samplesPerBlock,
+                                m_doublePrecission,
+                                getId(),
+                                0,
+                                0,
+                                m_processor->getActiveChannels().toInt(),
+                                0};
         if (m_processor->getNoSrvPluginListFilter()) {
             cfg.setFlag(HandshakeRequest::NO_PLUGINLIST_FILTER);
         }
@@ -728,6 +738,8 @@ Array<Client::ParameterResult> Client::getAllParameterValues(int idx, int cnt) {
             if (idx == DATA(msgVal)->idx) {
                 ret.add({DATA(msgVal)->paramIdx, DATA(msgVal)->value});
             }
+        } else {
+            break;
         }
     }
     return ret;
@@ -1064,6 +1076,10 @@ bool Client::audioConnectionOk() {
     std::lock_guard<std::mutex> lock(m_audioMtx);
     return (nullptr != m_audioStreamerF && m_audioStreamerF->isOk()) ||
            (nullptr != m_audioStreamerD && m_audioStreamerD->isOk());
+}
+
+int Client::getNumActiveChannels() const {
+    return (int)m_processor->getActiveChannels().getNumActiveChannelsCombined();
 }
 
 }  // namespace e47

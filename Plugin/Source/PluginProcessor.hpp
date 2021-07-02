@@ -13,24 +13,48 @@
 #include "Client.hpp"
 #include "Utils.hpp"
 #include "json.hpp"
+#include "ChannelSet.hpp"
+#include "ChannelMapper.hpp"
 
 using json = nlohmann::json;
 
 namespace e47 {
 
+class WrapperTypeReaderAudioProcessor : public AudioProcessor {
+  public:
+    const String getName() const override { return {}; }
+    void prepareToPlay(double, int) override {}
+    void releaseResources() override {}
+    void processBlock(AudioBuffer<float>&, MidiBuffer&) override {}
+    double getTailLengthSeconds() const override { return 0.0; }
+    bool acceptsMidi() const override { return false; }
+    bool producesMidi() const override { return false; }
+    AudioProcessorEditor* createEditor() override { return nullptr; }
+    bool hasEditor() const override { return false; }
+    int getNumPrograms() override { return 1; }
+    int getCurrentProgram() override { return 0; }
+    void setCurrentProgram(int) override {}
+    const String getProgramName(int) override { return {}; }
+    void changeProgramName(int, const String&) override {}
+    void getStateInformation(juce::MemoryBlock&) override {}
+    void setStateInformation(const void*, int) override {}
+};
+
 class AudioGridderAudioProcessor : public AudioProcessor,
                                    public AudioProcessorParameter::Listener,
                                    public LogTagDelegate {
   public:
-    AudioGridderAudioProcessor();
+    AudioGridderAudioProcessor(WrapperType wt);
     ~AudioGridderAudioProcessor() override;
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
 
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
-    bool canAddBus(bool isInput) const override { return isInput == true; }
-    bool canRemoveBus(bool isInput) const override { return isInput == true; }
+    Array<std::pair<short, short>> getAUChannelInfo() const override;
+
+    bool canAddBus(bool /*isInput*/) const override { return true; }
+    bool canRemoveBus(bool /*isInput*/) const override { return true; }
     void numChannelsChanged() override;
 
     template <typename T>
@@ -109,7 +133,13 @@ class AudioGridderAudioProcessor : public AudioProcessor,
     SyncRemoteMode getSyncRemoteMode() const { return m_syncRemote; }
     void setSyncRemoteMode(SyncRemoteMode m) { m_syncRemote = m; }
 
-    // auto& getLoadedPlugins() const { return m_loadedPlugins; }
+    ChannelSet& getActiveChannels() { return m_activeChannels; }
+
+    void updateChannelMapping() {
+        m_channelMapper.createMapping(m_activeChannels);
+        m_channelMapper.print();
+    }
+
     int getNumOfLoadedPlugins() {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
         return (int)m_loadedPlugins.size();
@@ -307,26 +337,26 @@ class AudioGridderAudioProcessor : public AudioProcessor,
 
     SyncRemoteMode m_syncRemote = SYNC_WITH_EDITOR;
 
-    bool m_instOutputMonoBuses = false;
-    int m_instNumOutputChannels = 16;
+    ChannelSet m_activeChannels;
+    ChannelMapper m_channelMapper;
 
-    static BusesProperties createBusesProperties() {
-        int chIn, chOut, chSC;
-        chIn = chOut = chSC = 0;
+    static BusesProperties createBusesProperties(WrapperType wt) {
+        int chIn = Defaults::PLUGIN_CHANNELS_IN;
+        int chOut = Defaults::PLUGIN_CHANNELS_OUT;
+        int chSC = Defaults::PLUGIN_CHANNELS_SC;
         bool useMultipleOutputBuses = false;
-
-#if !JucePlugin_IsSynth && !JucePlugin_IsMidiEffect
-        // FX
-        chIn = chOut = 16;
-        chSC = 2;
-#endif
+        bool useMonoOutputBuses = true;
 
 #if JucePlugin_IsSynth
-        // Instrument
-        chIn = 0;
-        chOut = 64;
-        chSC = 0;
         useMultipleOutputBuses = true;
+        if (wt == WrapperType::wrapperType_AudioUnit) {
+            chOut = 2;
+            useMultipleOutputBuses = false;
+        } else if (wt == WrapperType::wrapperType_AAX) {
+            useMonoOutputBuses = false;
+        }
+#else
+        ignoreUnused(wt);
 #endif
 
         auto bp = BusesProperties();
@@ -346,8 +376,14 @@ class AudioGridderAudioProcessor : public AudioProcessor,
         } else if (chOut > 0) {
             if (useMultipleOutputBuses) {
                 bp = bp.withOutput("Main", AudioChannelSet::stereo(), true);
-                for (int i = 2; i < chOut; i++) {
-                    bp = bp.withOutput("Mono " + String(i - 1), AudioChannelSet::mono(), true);
+                if (useMonoOutputBuses) {
+                    for (int i = 2; i < chOut; i++) {
+                        bp = bp.withOutput("Mono " + String(i + 1), AudioChannelSet::mono(), true);
+                    }
+                } else {
+                    for (int i = 2; i < chOut; i += 2) {
+                        bp = bp.withOutput("Stereo " + String(i / 2 + 1), AudioChannelSet::mono(), true);
+                    }
                 }
             } else {
                 bp = bp.withOutput("Output", AudioChannelSet::discreteChannels(chOut), true);
@@ -355,14 +391,31 @@ class AudioGridderAudioProcessor : public AudioProcessor,
         }
 
         if (chSC == 1) {
-            bp = bp.withInput("Sidechain", AudioChannelSet::mono(), false);
+            bp = bp.withInput("Sidechain", AudioChannelSet::mono(), true);
         } else if (chSC == 2) {
-            bp = bp.withInput("Sidechain", AudioChannelSet::stereo(), false);
+            bp = bp.withInput("Sidechain", AudioChannelSet::stereo(), true);
         } else if (chSC > 0) {
-            bp = bp.withInput("Sidechain", AudioChannelSet::discreteChannels(chSC), false);
+            bp = bp.withInput("Sidechain", AudioChannelSet::discreteChannels(chSC), true);
         }
 
         return bp;
+    }
+
+    void printBusesLayout(const AudioProcessor::BusesLayout& l) const {
+        logln("input buses: " << l.inputBuses.size());
+        for (int i = 0; i < l.inputBuses.size(); i++) {
+            logln("  [" << i << "] " << l.inputBuses[i].size() << " channel(s)");
+            for (auto ct : l.inputBuses[i].getChannelTypes()) {
+                logln("    <- " << AudioChannelSet::getAbbreviatedChannelTypeName(ct));
+            }
+        }
+        logln("output buses: " << l.outputBuses.size());
+        for (int i = 0; i < l.outputBuses.size(); i++) {
+            logln("  [" << i << "] " << l.outputBuses[i].size() << " channel(s)");
+            for (auto ct : l.outputBuses[i].getChannelTypes()) {
+                logln("    -> " << AudioChannelSet::getAbbreviatedChannelTypeName(ct));
+            }
+        }
     }
 
     ENABLE_ASYNC_FUNCTORS();

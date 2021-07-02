@@ -15,6 +15,7 @@
 #include "ProcessorChain.hpp"
 #include "Message.hpp"
 #include "Utils.hpp"
+#include "ChannelMapper.hpp"
 
 namespace e47 {
 
@@ -31,8 +32,8 @@ class AudioWorker : public Thread, public LogTagDelegate {
     AudioWorker(LogTag* tag);
     virtual ~AudioWorker() override;
 
-    void init(std::unique_ptr<StreamingSocket> s, int channelsIn, int channelsOut, int channelsSC, double rate,
-              int samplesPerBlock, bool doublePrecission);
+    void init(std::unique_ptr<StreamingSocket> s, int channelsIn, int channelsOut, int channelsSC,
+              uint64 activeChannels, double rate, int samplesPerBlock, bool doublePrecission);
 
     void run() override;
     void shutdown();
@@ -67,12 +68,33 @@ class AudioWorker : public Thread, public LogTagDelegate {
     int m_channelsIn;
     int m_channelsOut;
     int m_channelsSC;
+    ChannelSet m_activeChannels;
+    ChannelMapper m_channelMapper;
     double m_rate;
     int m_samplesPerBlock;
     bool m_doublePrecission;
     std::shared_ptr<ProcessorChain> m_chain;
     static std::unordered_map<String, RecentsListType> m_recents;
     static std::mutex m_recentsMtx;
+
+    AudioBuffer<float> m_procBufferF;
+    AudioBuffer<double> m_procBufferD;
+
+    template <typename T>
+    AudioBuffer<T>* getProcBuffer();
+
+    template <>
+    AudioBuffer<float>* getProcBuffer() {
+        return &m_procBufferF;
+    }
+
+    template <>
+    AudioBuffer<double>* getProcBuffer() {
+        return &m_procBufferD;
+    }
+
+    template <typename T>
+    void processBlock(AudioBuffer<T>& buffer, MidiBuffer& midi);
 
     ENABLE_ASYNC_FUNCTORS();
 };

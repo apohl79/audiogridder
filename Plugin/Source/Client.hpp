@@ -150,6 +150,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     bool isServerLocalMode() const { return m_srvLocalMode; }
     int getChannelsIn() const { return m_channelsIn; }
     int getChannelsOut() const { return m_channelsOut; }
+    int getNumActiveChannels() const;
     double getSampleRate() const { return m_rate; }
     int getSamplesPerBlock() const { return m_samplesPerBlock; }
     int getLatencySamples() const { return m_latency + NUM_OF_BUFFERS * m_samplesPerBlock; }

@@ -10,6 +10,7 @@
 #include "Defaults.hpp"
 #include "App.hpp"
 #include "CPUInfo.hpp"
+#include "ChannelSet.hpp"
 
 #ifdef JUCE_MAC
 #include <sys/socket.h>
@@ -79,8 +80,8 @@ void Worker::run() {
     // start audio processing
     sock.reset(accept(m_masterSocket.get(), 2000));
     if (nullptr != sock && sock->isConnected()) {
-        m_audio->init(std::move(sock), m_cfg.channelsIn, m_cfg.channelsOut, m_cfg.channelsSC, m_cfg.rate,
-                      m_cfg.samplesPerBlock, m_cfg.doublePrecission);
+        m_audio->init(std::move(sock), m_cfg.channelsIn, m_cfg.channelsOut, m_cfg.channelsSC, m_cfg.activeChannels,
+                      m_cfg.rate, m_cfg.samplesPerBlock, m_cfg.doublePrecission);
         m_audio->startThread(Thread::realtimeAudioPriority);
     } else {
         logln("failed to establish audio connection");
@@ -503,8 +504,8 @@ void Worker::handleMessage(std::shared_ptr<Message<GetParameterValue>> msg) {
 
 void Worker::handleMessage(std::shared_ptr<Message<GetAllParameterValues>> msg) {
     traceScope();
-    auto p = m_audio->getProcessor(pPLD(msg).getNumber())->getPlugin();
-    if (nullptr != p) {
+    if (auto proc = m_audio->getProcessor(pPLD(msg).getNumber())) {
+        auto p = proc->getPlugin();
         for (auto* param : p->getParameters()) {
             Message<ParameterValue> ret(this);
             DATA(ret)->idx = pPLD(msg).getNumber();

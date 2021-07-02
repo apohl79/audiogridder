@@ -12,6 +12,7 @@
 #include "ServiceResponder.hpp"
 #include "CPUInfo.hpp"
 #include "WindowPositions.hpp"
+#include "ChannelSet.hpp"
 
 #ifdef JUCE_MAC
 #include <sys/socket.h>
@@ -628,6 +629,35 @@ void Server::runServer() {
                         logln("  channelsIn                = " << cfg.channelsIn);
                         logln("  channelsOut               = " << cfg.channelsOut);
                         logln("  channelsSC                = " << cfg.channelsSC);
+
+                        ChannelSet activeChannels(cfg.activeChannels, cfg.channelsIn > 0);
+                        activeChannels.setNumChannels(cfg.channelsIn + cfg.channelsSC, cfg.channelsOut);
+                        String active;
+                        if (cfg.channelsIn > 0) {
+                            active << "inputs: ";
+                            if (activeChannels.isInputRangeActive()) {
+                                active << "all";
+                            } else {
+                                bool first = true;
+                                for (auto ch : activeChannels.getActiveChannels(true)) {
+                                    active << (first ? "" : ",") << ch;
+                                    first = false;
+                                }
+                            }
+                            active << " ";
+                        }
+                        active << "outputs: ";
+                        if (activeChannels.isOutputRangeActive()) {
+                            active << "all";
+                        } else {
+                            bool first = true;
+                            for (auto ch : activeChannels.getActiveChannels(false)) {
+                                active << (first ? "" : ",") << ch;
+                                first = false;
+                            }
+                        }
+                        logln("  active channels           = " << active);
+
                         logln("  rate                      = " << cfg.rate);
                         logln("  samplesPerBlock           = " << cfg.samplesPerBlock);
                         logln("  doublePrecission          = " << static_cast<int>(cfg.doublePrecission));

@@ -22,6 +22,22 @@ static const String SANDBOX_CMD_PREFIX = "sandbox";
 static constexpr int SCAREA_STEPS = 30;
 static constexpr int SCAREA_FULLSCREEN = 0xFFFF;
 
+static constexpr int PLUGIN_CHANNELS_MAX = 64;
+
+#if JucePlugin_IsMidiEffect
+static constexpr int PLUGIN_CHANNELS_IN = 0;
+static constexpr int PLUGIN_CHANNELS_OUT = 0;
+static constexpr int PLUGIN_CHANNELS_SC = 0;
+#elif JucePlugin_IsSynth
+static constexpr int PLUGIN_CHANNELS_IN = 0;
+static constexpr int PLUGIN_CHANNELS_OUT = 64;
+static constexpr int PLUGIN_CHANNELS_SC = 0;
+#else
+static constexpr int PLUGIN_CHANNELS_IN = 16;
+static constexpr int PLUGIN_CHANNELS_OUT = 16;
+static constexpr int PLUGIN_CHANNELS_SC = 2;
+#endif
+
 #ifndef JUCE_WINDOWS
 static const String SERVER_CONFIG_FILE_OLD = "~/.audiogridderserver";
 static const String PLUGIN_CONFIG_FILE_OLD = "~/.audiogridder";

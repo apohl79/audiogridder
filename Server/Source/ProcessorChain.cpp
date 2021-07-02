@@ -498,6 +498,7 @@ bool ProcessorChain::initPluginInstance(AGProcessor* proc, String& err) {
     inst->setProcessingPrecision(prec);
     inst->prepareToPlay(getSampleRate(), getBlockSize());
     inst->setPlayHead(getPlayHead());
+    inst->enableAllBuses();
     if (prec == AudioProcessor::doublePrecision) {
         preProcessBlocks<double>(inst);
     } else {

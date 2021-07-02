@@ -854,7 +854,6 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
         subm.clear();
 
         m.addSeparator();
-
         m.addItem("Generic Editor", true, m_processor.getGenericEditor(), [this] {
             traceScope();
             m_processor.setGenericEditor(!m_processor.getGenericEditor());
@@ -863,10 +862,54 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
             editPlugin();
         });
 
-        m.addSeparator();
-        m.addItem("Show Monitor...", [this] { m_processor.showMonitor(); });
+#if !JucePlugin_IsMidiEffect
         m.addSeparator();
 
+        auto addBusChannelItems = [&](AudioProcessor::Bus* bus, size_t& ch) {
+            if (bus->isEnabled()) {
+                auto& layout = bus->getCurrentLayout();
+                bool isInput = bus->isInput();
+                for (int i = 0; i < bus->getNumberOfChannels(); i++) {
+                    auto name = bus->getName() + ": " + layout.getChannelTypeName(layout.getTypeOfChannel(i));
+                    subm.addItem(name, true, m_processor.getActiveChannels().isActive(ch, isInput),
+                                 [this, ch, isInput] {
+                                     m_processor.getActiveChannels().setActive(
+                                         ch, isInput, !m_processor.getActiveChannels().isActive(ch, isInput));
+                                     m_processor.updateChannelMapping();
+                                     m_processor.getClient().reconnect();
+                                 });
+                    ch++;
+                }
+            }
+        };
+
+        size_t ch;
+#if JucePlugin_IsSynth
+        ch = 0;
+        for (int busIdx = 0; busIdx < m_processor.getBusCount(false); busIdx++) {
+            addBusChannelItems(m_processor.getBus(false, busIdx), ch);
+        }
+        m.addSubMenu("Instrument Outputs...", subm);
+#else
+        subm.addSectionHeader("Inputs");
+        ch = 0;
+        for (int busIdx = 0; busIdx < m_processor.getBusCount(true); busIdx++) {
+            addBusChannelItems(m_processor.getBus(true, busIdx), ch);
+        }
+        subm.addSectionHeader("Outputs");
+        ch = 0;
+        for (int busIdx = 0; busIdx < m_processor.getBusCount(false); busIdx++) {
+            addBusChannelItems(m_processor.getBus(false, busIdx), ch);
+        }
+        m.addSubMenu("Active Channels...", subm);
+#endif
+        subm.clear();
+#endif
+
+        m.addSeparator();
+        m.addItem("Show Monitor...", [this] { m_processor.showMonitor(); });
+
+        m.addSeparator();
         subm.addItem("Show Category", true, m_processor.getMenuShowCategory(), [this] {
             traceScope();
             m_processor.setMenuShowCategory(!m_processor.getMenuShowCategory());
@@ -1136,7 +1179,7 @@ bool AudioGridderAudioProcessorEditor::genericEditorEnabled() const {
     bool ret = m_processor.getGenericEditor();
     if (!ret) {
         int active = m_processor.getActivePlugin();
-        if (active > -1) {
+        if (active > -1 && m_processor.getLoadedPlugin(active).ok) {
             ret = !m_processor.getLoadedPlugin(active).hasEditor;
         }
     }

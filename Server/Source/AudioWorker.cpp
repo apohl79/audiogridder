@@ -17,7 +17,9 @@ namespace e47 {
 std::unordered_map<String, AudioWorker::RecentsListType> AudioWorker::m_recents;
 std::mutex AudioWorker::m_recentsMtx;
 
-AudioWorker::AudioWorker(LogTag* tag) : Thread("AudioWorker"), LogTagDelegate(tag) { initAsyncFunctors(); }
+AudioWorker::AudioWorker(LogTag* tag) : Thread("AudioWorker"), LogTagDelegate(tag), m_channelMapper(tag) {
+    initAsyncFunctors();
+}
 
 AudioWorker::~AudioWorker() {
     traceScope();
@@ -28,8 +30,8 @@ AudioWorker::~AudioWorker() {
     waitForThreadAndLog(getLogTagSource(), this);
 }
 
-void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channelsIn, int channelsOut, int channelsSC, double rate,
-                       int samplesPerBlock, bool doublePrecission) {
+void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channelsIn, int channelsOut, int channelsSC,
+                       uint64 activeChannels, double rate, int samplesPerBlock, bool doublePrecission) {
     traceScope();
     m_socket = std::move(s);
     m_rate = rate;
@@ -38,6 +40,11 @@ void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channelsIn, int c
     m_channelsIn = channelsIn;
     m_channelsOut = channelsOut;
     m_channelsSC = channelsSC;
+    m_activeChannels = activeChannels;
+    m_activeChannels.setWithInput(m_channelsIn > 0);
+    m_activeChannels.setNumChannels(m_channelsIn + m_channelsSC, m_channelsOut);
+    m_channelMapper.createMapping(m_activeChannels);
+    m_channelMapper.print();
     m_chain =
         std::make_shared<ProcessorChain>(ProcessorChain::createBussesProperties(channelsIn, channelsOut, channelsSC));
     m_chain->setLogTagSource(getLogTagSource());
@@ -68,17 +75,17 @@ void AudioWorker::run() {
     while (!currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected()) {
         // Read audio chunk
         if (m_socket->waitUntilReady(true, 1000)) {
-            if (msg.readFromClient(m_socket.get(), bufferF, bufferD, midi, posInfo, m_chain->getExtraChannels(), &e,
-                                   *bytesIn)) {
+            if (msg.readFromClient(m_socket.get(), bufferF, bufferD, midi, posInfo, &e, *bytesIn)) {
                 duration.reset();
                 if (hasToSetPlayHead) {  // do not set the playhead before it's initialized
                     m_chain->setPlayHead(&playHead);
                     hasToSetPlayHead = false;
                 }
                 int bufferChannels = msg.isDouble() ? bufferD.getNumChannels() : bufferF.getNumChannels();
-                if (m_channelsOut > bufferChannels) {
-                    logln("error processing audio message: buffer has not enough channels: out channels is "
-                          << m_channelsOut << ", but buffer has " << bufferChannels);
+                int neededChannels = m_activeChannels.getNumActiveChannels(true);
+                if (neededChannels > bufferChannels) {
+                    logln("error processing audio message: buffer has not enough channels: needed channels is "
+                          << neededChannels << ", but buffer has " << bufferChannels);
                     m_chain->releaseResources();
                     m_socket->close();
                     break;
@@ -86,18 +93,18 @@ void AudioWorker::run() {
                 bool sendOk;
                 if (msg.isDouble()) {
                     if (m_chain->supportsDoublePrecisionProcessing()) {
-                        m_chain->processBlock(bufferD, midi);
+                        processBlock(bufferD, midi);
                     } else {
                         bufferF.makeCopyOf(bufferD);
-                        m_chain->processBlock(bufferF, midi);
+                        processBlock(bufferF, midi);
                         bufferD.makeCopyOf(bufferF);
                     }
                     sendOk = msg.sendToClient(m_socket.get(), bufferD, midi, m_chain->getLatencySamples(),
-                                              m_channelsOut, &e, *bytesOut);
+                                              bufferD.getNumChannels(), &e, *bytesOut);
                 } else {
-                    m_chain->processBlock(bufferF, midi);
+                    processBlock(bufferF, midi);
                     sendOk = msg.sendToClient(m_socket.get(), bufferF, midi, m_chain->getLatencySamples(),
-                                              m_channelsOut, &e, *bytesOut);
+                                              bufferF.getNumChannels(), &e, *bytesOut);
                 }
                 if (!sendOk) {
                     logln("error: failed to send audio data to client: " << e.toString());
@@ -117,6 +124,25 @@ void AudioWorker::run() {
     clear();
     signalThreadShouldExit();
     logln("audio processor terminated");
+}
+
+template <typename T>
+void AudioWorker::processBlock(AudioBuffer<T>& buffer, MidiBuffer& midi) {
+    int numChannels = jmax(m_channelsIn + m_channelsSC, m_channelsOut) + m_chain->getExtraChannels();
+    if (numChannels <= buffer.getNumChannels()) {
+        m_chain->processBlock(buffer, midi);
+    } else {
+        // we received less channels, now we need to map the input/output data
+        auto* procBuffer = getProcBuffer<T>();
+        procBuffer->setSize(numChannels, buffer.getNumSamples());
+        if (m_activeChannels.getNumActiveChannels(true) > 0) {
+            m_channelMapper.map(&buffer, procBuffer);
+        } else {
+            procBuffer->clear();
+        }
+        m_chain->processBlock(*procBuffer, midi);
+        m_channelMapper.mapReverse(procBuffer, &buffer);
+    }
 }
 
 void AudioWorker::shutdown() {

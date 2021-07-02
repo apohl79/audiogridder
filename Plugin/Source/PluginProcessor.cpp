@@ -22,7 +22,8 @@
 
 namespace e47 {
 
-AudioGridderAudioProcessor::AudioGridderAudioProcessor() : AudioProcessor(createBusesProperties()) {
+AudioGridderAudioProcessor::AudioGridderAudioProcessor(AudioProcessor::WrapperType wt)
+    : AudioProcessor(createBusesProperties(wt)), m_channelMapper(this) {
     initAsyncFunctors();
 
     Defaults::initPluginTheme();
@@ -82,6 +83,17 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor() : AudioProcessor(create
         pparam->addListener(this);
         addParameter(pparam);
     }
+
+#if JucePlugin_IsSynth
+    // activate main outs per default
+    m_activeChannels.setInputActive(0);
+    m_activeChannels.setInputActive(1);
+#elif !JucePlugin_IsMidiEffect
+    // activate all input/output channels per default
+    m_activeChannels.setRangeActive();
+#endif
+
+    m_channelMapper.setLogTagSource(this);
 
     // load plugins on reconnect
     m_client->setOnConnectCallback(safeLambda([this] {
@@ -366,9 +378,11 @@ void AudioGridderAudioProcessor::prepareToPlay(double sampleRate, int samplesPer
         m_tray->start();
     }
 
+    printBusesLayout(getBusesLayout());
+
     int channelsIn = 0;
     int channelsSC = 0;
-    int channelsOut = getTotalNumOutputChannels();
+    int channelsOut = 0;
 
     for (int i = 0; i < getBusCount(true); i++) {
         auto* bus = getBus(true, i);
@@ -381,12 +395,24 @@ void AudioGridderAudioProcessor::prepareToPlay(double sampleRate, int samplesPer
         }
     }
 
+    for (int i = 0; i < getBusCount(false); i++) {
+        auto* bus = getBus(false, i);
+        if (bus->isEnabled()) {
+            channelsOut += bus->getNumberOfChannels();
+        }
+    }
+
+    logln("uncapped channel config: " << channelsIn << ":" << channelsOut << "+" << channelsSC);
+
     channelsIn = jmin(channelsIn, 16);
     channelsSC = jmin(channelsSC, 16);
     channelsOut = jmin(channelsOut, 64);
+    m_activeChannels.setNumChannels(channelsIn + channelsSC, channelsOut);
+    updateChannelMapping();
 
     m_client->init(channelsIn, channelsOut, channelsSC, sampleRate, samplesPerBlock, isUsingDoublePrecision());
 
+    BigInteger i;
     m_prepared = true;
 }
 
@@ -402,10 +428,34 @@ bool AudioGridderAudioProcessor::isBusesLayoutSupported(const BusesLayout& layou
         layouts.getMainInputChannelSet().isDisabled()) {
         return false;
     }
-#else
-    ignoreUnused(layouts);
+#elif JucePlugin_IsSynth
+    for (auto& outbus : layouts.outputBuses) {
+        for (auto ct : outbus.getChannelTypes()) {
+            // make sure JuceAU::busIgnoresLayout returns false (see juce_AU_Wrapper.mm)
+            if (ct > 255) {
+                return false;
+            }
+        }
+    }
 #endif
-    return true;
+    int numOfInputs = 0, numOfOutputs = 0;
+    for (auto& bus : layouts.inputBuses) {
+        numOfInputs += bus.size();
+    }
+    for (auto& bus : layouts.outputBuses) {
+        numOfOutputs += bus.size();
+    }
+    return numOfInputs <= Defaults::PLUGIN_CHANNELS_MAX && numOfOutputs <= Defaults::PLUGIN_CHANNELS_MAX;
+}
+
+Array<std::pair<short, short>> AudioGridderAudioProcessor::getAUChannelInfo() const {
+#if JucePlugin_IsSynth
+    Array<std::pair<short, short>> info;
+    info.add({0, -(short)Defaults::PLUGIN_CHANNELS_OUT});
+    return info;
+#else
+    return {};
+#endif
 }
 
 void AudioGridderAudioProcessor::numChannelsChanged() {
@@ -433,23 +483,39 @@ void AudioGridderAudioProcessor::processBlockReal(AudioBuffer<T>& buffer, MidiBu
     AudioPlayHead::CurrentPositionInfo posInfo;
     phead->getCurrentPosition(posInfo);
 
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
-        buffer.clear(i, 0, buffer.getNumSamples());
+    // buffer to be send
+    int sendBufChannels = m_activeChannels.getNumActiveChannelsCombined();
+    AudioBuffer<T>* sendBuffer = sendBufChannels != buffer.getNumChannels()
+                                     ? new AudioBuffer<T>(sendBufChannels, buffer.getNumSamples())
+                                     : &buffer;
+
+#if JucePlugin_IsSynth || JucePlugin_IsMidiEffect
+    buffer.clear();
+#else
+    // clear inactive outputs if we need no mapping, as the mapper takes care otherwise
+    if (sendBuffer == &buffer) {
+        for (int ch = 0; ch < buffer.getNumChannels(); ch++) {
+            if (!m_activeChannels.isOutputActive(ch)) {
+                buffer.clear(ch, 0, buffer.getNumSamples());
+            }
+        }
     }
+#endif
 
     if (!m_transferWhenPlayingOnly || posInfo.isPlaying || posInfo.isRecording) {
         if ((buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) || midiMessages.getNumEvents() > 0) {
             auto streamer = m_client->getStreamer<T>();
             if (nullptr != streamer) {
-                streamer->send(buffer, midiMessages, posInfo);
-                streamer->read(buffer, midiMessages);
+                m_channelMapper.map(&buffer, sendBuffer);
+                streamer->send(*sendBuffer, midiMessages, posInfo);
+                streamer->read(*sendBuffer, midiMessages);
+                m_channelMapper.mapReverse(sendBuffer, &buffer);
+
                 if (m_client->getLatencySamples() != getLatencySamples()) {
                     runOnMsgThreadAsync([this] { updateLatency(m_client->getLatencySamples()); });
                 }
             } else {
-                for (auto i = 0; i < buffer.getNumChannels(); ++i) {
-                    buffer.clear(i, 0, buffer.getNumSamples());
-                }
+                buffer.clear();
             }
         }
     }
@@ -611,6 +677,8 @@ json AudioGridderAudioProcessor::getState(bool withServers) {
         j["activeServerStr"] = m_client->getServerHostAndID().toStdString();
     }
 
+    j["ActiveChannels"] = m_activeChannels.toInt();
+
     auto jplugs = json::array();
     {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
@@ -666,6 +734,12 @@ bool AudioGridderAudioProcessor::setState(const json& j) {
     } else if (j.find("activeServer") != j.end()) {
         activeServer = j["activeServer"].get<int>();
     }
+
+    if (jsonHasValue(j, "ActiveChannels")) {
+        m_activeChannels = jsonGetValue(j, "ActiveChannels", (uint64)3);
+        m_channelMapper.createMapping(m_activeChannels);
+    }
+
     {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
         m_loadedPlugins.clear();
@@ -698,6 +772,7 @@ bool AudioGridderAudioProcessor::setState(const json& j) {
             }
         }
     }
+
     if (activeServerStr.isNotEmpty()) {
         m_client->setServer(activeServerStr);
         m_client->reconnect();
@@ -1315,6 +1390,7 @@ void AudioGridderAudioProcessor::TrayConnection::timerCallback() {
 
 }  // namespace e47
 
-//==============================================================================
-// This creates new instances of the plugin..
-AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new e47::AudioGridderAudioProcessor(); }
+AudioProcessor* JUCE_CALLTYPE createPluginFilter() {
+    e47::WrapperTypeReaderAudioProcessor wr;
+    return new e47::AudioGridderAudioProcessor(wr.wrapperType);
+}

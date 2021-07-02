@@ -99,10 +99,10 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         if (m_client->NUM_OF_BUFFERS > 0) {
             if (buffer.getNumSamples() == m_client->getSamplesPerBlock() && m_workingSendSamples == 0) {
                 AudioMidiBuffer buf;
-                if (m_client->getChannelsIn() > 0) {
+                if (m_client->getChannelsIn() > 0) {  // fx
                     buf.audio.makeCopyOf(buffer);
-                } else {
-                    buf.channelsRequested = m_client->getChannelsOut();
+                } else {  // inst
+                    buf.channelsRequested = m_client->getNumActiveChannels();
                     buf.samplesRequested = m_client->getSamplesPerBlock();
                 }
                 buf.midi.addEvents(midi, 0, buffer.getNumSamples(), 0);
@@ -117,14 +117,14 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                 }
                 if (m_workingSendSamples >= m_client->getSamplesPerBlock()) {
                     AudioMidiBuffer buf;
-                    if (m_client->getChannelsIn() > 0) {
-                        buf.audio.setSize(m_client->getChannelsIn(), m_client->getSamplesPerBlock());
-                        for (int chan = 0; chan < m_client->getChannelsIn(); chan++) {
+                    if (m_client->getChannelsIn() > 0) {  // fx
+                        buf.audio.setSize(m_client->getNumActiveChannels(), m_client->getSamplesPerBlock());
+                        for (int chan = 0; chan < m_client->getNumActiveChannels(); chan++) {
                             buf.audio.copyFrom(chan, 0, m_workingSendBuf.audio, chan, 0,
                                                m_client->getSamplesPerBlock());
                         }
-                    } else {
-                        buf.channelsRequested = m_client->getChannelsOut();
+                    } else {  // inst
+                        buf.channelsRequested = m_client->getNumActiveChannels();
                         buf.samplesRequested = m_client->getSamplesPerBlock();
                     }
                     buf.midi.addEvents(m_workingSendBuf.midi, 0, m_client->getSamplesPerBlock(), 0);
@@ -140,10 +140,10 @@ class AudioStreamer : public Thread, public LogTagDelegate {
             }
         } else {
             AudioMidiBuffer buf;
-            if (m_client->getChannelsIn() > 0) {
+            if (m_client->getChannelsIn() > 0) {  // fx
                 buf.audio.makeCopyOf(buffer);
-            } else {
-                buf.channelsRequested = buffer.getNumChannels();
+            } else {  // inst
+                buf.channelsRequested = m_client->getNumActiveChannels();
                 buf.samplesRequested = buffer.getNumSamples();
             }
             buf.midi.addEvents(midi, 0, buffer.getNumSamples(), 0);
@@ -187,7 +187,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                     }
                 }
                 int maxCh = jmin(buffer.getNumChannels(), m_workingReadBuf.audio.getNumChannels());
-                // clear channels of the target buffer, that have no data in the src buffer
+                // clear channels of the target buffer, that we have no data for in the src buffer
                 for (int chan = maxCh; chan < buffer.getNumChannels(); chan++) {
                     buffer.clear(chan, 0, buffer.getNumSamples());
                 }

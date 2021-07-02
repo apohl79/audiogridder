@@ -99,9 +99,8 @@ struct HandshakeRequest {
     uint64 clientId;
     uint8 flags;
     uint8 unused1;
+    uint64 activeChannels;
     uint16 unused2;
-    uint32 unused3;
-    uint32 unused4;
 
     enum FLAGS : uint8 { NO_PLUGINLIST_FILTER = 1 };
     void setFlag(uint8 f) { flags |= f; }
@@ -118,6 +117,7 @@ struct HandshakeRequest {
         j["doublePrecission"] = doublePrecission;
         j["clientId"] = clientId;
         j["flags"] = flags;
+        j["activeChannels"] = activeChannels;
         return j;
     }
 
@@ -131,6 +131,7 @@ struct HandshakeRequest {
         doublePrecission = j["doublePrecission"].get<bool>();
         clientId = j["clientId"].get<uint64>();
         flags = j["flags"].get<uint8>();
+        activeChannels = j["activeChannels"].get<uint64>();
     }
 };
 
@@ -309,36 +310,22 @@ class AudioMessage : public LogTagDelegate {
         return true;
     }
 
-    template <typename T>
-    int prepareBufferForRead(AudioBuffer<T>& buffer, int totalChannels, int totalSamples) {
-        traceScope();
-        buffer.setSize(totalChannels, totalSamples);
-        // no data for extra channels
-        for (int chan = m_reqHeader.channels; chan < totalChannels; ++chan) {
-            buffer.clear(chan, 0, totalSamples);
-        }
-        // bytes to read
-        return m_reqHeader.samples * (int)sizeof(T);
-    }
-
     bool readFromClient(StreamingSocket* socket, AudioBuffer<float>& bufferF, AudioBuffer<double>& bufferD,
-                        MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo, int extraChannels,
-                        MessageHelper::Error* e, Meter& metric) {
+                        MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo, MessageHelper::Error* e,
+                        Meter& metric) {
         traceScope();
         if (socket->isConnected()) {
             if (!read(socket, &m_reqHeader, sizeof(m_reqHeader), 0, e, &metric)) {
                 MessageHelper::seterrstr(e, "request header");
                 return false;
             }
-            // Arbitrary additional channels to support plugins that have more than one input bus or stereo plugins
-            // processing a mono channel. Plugins that don't need it, should ignore the channels.
-            int totalChannels = jmax(m_reqHeader.channels, m_reqHeader.channelsRequested) + extraChannels;
-            int totalSamples = jmax(m_reqHeader.samples, m_reqHeader.samplesRequested);
-            int size;
+            int size = m_reqHeader.samples * (int)(m_reqHeader.isDouble ? sizeof(double) : sizeof(float));
             if (m_reqHeader.isDouble) {
-                size = prepareBufferForRead<double>(bufferD, totalChannels, totalSamples);
+                bufferD.setSize(jmax(m_reqHeader.channels, m_reqHeader.channelsRequested),
+                                jmax(m_reqHeader.samples, m_reqHeader.samplesRequested), false, true);
             } else {
-                size = prepareBufferForRead<float>(bufferF, totalChannels, totalSamples);
+                bufferF.setSize(jmax(m_reqHeader.channels, m_reqHeader.channelsRequested),
+                                jmax(m_reqHeader.samples, m_reqHeader.samplesRequested), false, true);
             }
             // Read the channel data from the client, if any
             for (int chan = 0; chan < m_reqHeader.channels; ++chan) {
