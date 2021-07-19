@@ -15,6 +15,13 @@ else
     DATE=$(date)
 fi
 
+TAG_BUILD=0
+
+if [ "$1" == "-tag" ]; then
+    TAG_BUILD=1
+    shift
+fi
+
 NUM_VER=$1
 STR_VER=$2
 
@@ -27,8 +34,6 @@ if [ -z "$STR_VER" ]; then
 fi
 
 echo "Setting version to: $NUM_VER $STR_VER"
-
-VERSION_NOW=$(cat package/VERSION)
 
 cat package/Version.hpp.in | sed "s/#STR_VER#/$STR_VER/" | sed "s/#STR_BUILD_DATE#/$DATE/" > Common/Source/Version.hpp
 cat package/AudioGridderPlugin.iss.in | sed "s/#STR_VER#/$STR_VER/" > package/AudioGridderPlugin.iss
@@ -46,4 +51,9 @@ if [ "$STR_VER" != "dev-build" ]; then
     mkdir -p ../Archive/Builds/$STR_VER/macos-arm64
     mkdir -p ../Archive/Builds/$STR_VER/macos-universal
     mkdir -p ../Archive/Builds/$STR_VER/linux
+
+    if [ $TAG_BUILD -gt 0 ]; then
+        GIT_TAG=$(echo "release_$STR_VER" | tr '[:upper:]' '[:lower:]' | sed 's/\./_/g' | sed 's/-/_/g')
+        git tag $GIT_TAG
+    fi
 fi
