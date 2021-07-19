@@ -964,6 +964,11 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
             m_processor.setEditAlways(!m_processor.isEditAlways());
             m_processor.saveConfig();
         });
+        m.addItem("Show Sidechain-Disabled Info", true, m_processor.getShowSidechainDisabledInfo(), [this] {
+            traceScope();
+            m_processor.setShowSidechainDisabledInfo(!m_processor.getShowSidechainDisabledInfo());
+            m_processor.saveConfig();
+        });
 
         subm.addItem("Always", true, m_processor.getTransferWhenPlayingOnly() == false, [this] {
             traceScope();

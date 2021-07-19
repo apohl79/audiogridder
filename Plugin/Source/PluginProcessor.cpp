@@ -246,6 +246,7 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
         m_client->reconnect();
     }
     m_coreDumps = jsonGetValue(j, "CoreDumps", m_coreDumps);
+    m_showSidechainDisabledInfo = jsonGetValue(j, "ShowSidechainDisabledInfo", m_showSidechainDisabledInfo);
 }
 
 void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
@@ -281,6 +282,7 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
     jcfg["DefaultPreset"] = m_defaultPreset.toStdString();
     jcfg["EditAlways"] = m_editAlways;
     jcfg["CoreDumps"] = m_coreDumps;
+    jcfg["ShowSidechainDisabledInfo"] = m_showSidechainDisabledInfo;
 
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), jcfg);
 }
@@ -840,11 +842,22 @@ bool AudioGridderAudioProcessor::loadPlugin(const ServerPlugin& plugin, String& 
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
         m_loadedPlugins.push_back({plugin.getId(), plugin.getName(), "", presets, params, false, hasEditor, true});
         updateRecents(plugin);
-        if (scDisabled) {
-            AlertWindow::showMessageBoxAsync(
-                AlertWindow::InfoIcon, "Sidechain Disabled",
-                "The server had to disable the sidechain input of the chain to make >" + plugin.getName() + "< load.",
-                "OK");
+        if (scDisabled && m_showSidechainDisabledInfo) {
+            struct cb : ModalComponentManager::Callback {
+                AudioGridderAudioProcessor* p;
+                cb(AudioGridderAudioProcessor* p_) : p(p_) {}
+                void modalStateFinished(int returnValue) override {
+                    if (returnValue == 0) {
+                        p->m_showSidechainDisabledInfo = false;
+                        p->saveConfig();
+                    }
+                }
+            };
+            AlertWindow::showOkCancelBox(AlertWindow::InfoIcon, "Sidechain Disabled",
+                                         "The server had to disable the sidechain input of the chain to make >" +
+                                             plugin.getName() +
+                                             "< load.\n\nPress CANCEL to permanently hide this message.",
+                                         "OK", "Cancel", nullptr, new cb(this));
         }
     }
     m_client->setLoadedPluginsString(getLoadedPluginsString());

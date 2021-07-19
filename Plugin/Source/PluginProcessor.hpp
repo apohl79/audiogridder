@@ -185,6 +185,8 @@ class AudioGridderAudioProcessor : public AudioProcessor,
     void setGenericEditor(bool b) { m_genericEditor = b; }
     bool getConfirmDelete() const { return m_confirmDelete; }
     void setConfirmDelete(bool b) { m_confirmDelete = b; }
+    bool getShowSidechainDisabledInfo() const { return m_showSidechainDisabledInfo; }
+    void setShowSidechainDisabledInfo(bool b) { m_showSidechainDisabledInfo = b; }
     bool getNoSrvPluginListFilter() const { return m_noSrvPluginListFilter; }
     void setNoSrvPluginListFilter(bool b) { m_noSrvPluginListFilter = b; }
     float getScaleFactor() const { return m_scale; }
@@ -326,6 +328,7 @@ class AudioGridderAudioProcessor : public AudioProcessor,
     bool m_menuShowCompany = true;
     bool m_genericEditor = false;
     bool m_confirmDelete = true;
+    bool m_showSidechainDisabledInfo = true;
     bool m_noSrvPluginListFilter = false;
     float m_scale = 1.0;
     bool m_coreDumps = true;
