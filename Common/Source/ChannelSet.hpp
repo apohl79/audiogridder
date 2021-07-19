@@ -9,6 +9,7 @@
 #define _CHANNELSET_HPP_
 
 #include <JuceHeader.h>
+#include <bitset>
 
 #include "Defaults.hpp"
 
