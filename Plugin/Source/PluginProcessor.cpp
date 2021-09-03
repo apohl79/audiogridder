@@ -179,7 +179,9 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor(AudioProcessor::WrapperTy
     }
 #endif
 
-    m_tray = std::make_unique<TrayConnection>(this);
+    if (!m_disableTray) {
+        m_tray = std::make_unique<TrayConnection>(this);
+    }
 }
 
 AudioGridderAudioProcessor::~AudioGridderAudioProcessor() {
@@ -247,6 +249,7 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
     }
     m_coreDumps = jsonGetValue(j, "CoreDumps", m_coreDumps);
     m_showSidechainDisabledInfo = jsonGetValue(j, "ShowSidechainDisabledInfo", m_showSidechainDisabledInfo);
+    m_disableTray = jsonGetValue(j, "DisableTray", m_disableTray);;
 }
 
 void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
@@ -283,6 +286,7 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
     jcfg["EditAlways"] = m_editAlways;
     jcfg["CoreDumps"] = m_coreDumps;
     jcfg["ShowSidechainDisabledInfo"] = m_showSidechainDisabledInfo;
+    jcfg["DisableTray"] = m_disableTray;
 
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), jcfg);
 }
@@ -376,7 +380,7 @@ void AudioGridderAudioProcessor::prepareToPlay(double sampleRate, int samplesPer
         m_client->startThread();
     }
 
-    if (!m_tray->isTimerRunning()) {
+    if (!m_disableTray && !m_tray->isTimerRunning()) {
         m_tray->start();
     }
 
@@ -1305,6 +1309,18 @@ String AudioGridderAudioProcessor::Parameter::getName(int maximumStringLength) c
         return name;
     } else {
         return name.dropLastCharacters(name.length() - maximumStringLength);
+    }
+}
+
+void AudioGridderAudioProcessor::setDisableTray(bool b) {
+    m_disableTray = b;
+    if (m_disableTray) {
+        m_tray.reset();
+    } else {
+        m_tray = std::make_unique<TrayConnection>(this);
+        if (m_prepared) {
+            m_tray->start();
+        }
     }
 }
 

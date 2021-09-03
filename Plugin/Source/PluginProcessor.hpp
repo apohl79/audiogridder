@@ -222,6 +222,9 @@ class AudioGridderAudioProcessor : public AudioProcessor,
     bool getTransferWhenPlayingOnly() const { return m_transferWhenPlayingOnly; }
     void setTransferWhenPlayingOnly(bool b) { m_transferWhenPlayingOnly = b; }
 
+    bool getDisableTray() const { return m_disableTray; }
+    void setDisableTray(bool b);
+
     // AudioProcessorParameter::Listener
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int, bool) override {}
@@ -273,7 +276,11 @@ class AudioGridderAudioProcessor : public AudioProcessor,
         std::atomic_bool connected{false};
 
         TrayConnection(AudioGridderAudioProcessor* p) : LogTagDelegate(p), m_processor(p) {}
-        ~TrayConnection() override { disconnect(); }
+
+        ~TrayConnection() override {
+            disconnect();
+            stopTimer();
+        }
 
         void start() { startTimer(500); }
 
@@ -334,6 +341,7 @@ class AudioGridderAudioProcessor : public AudioProcessor,
     bool m_coreDumps = true;
 
     bool m_transferWhenPlayingOnly = false;
+    bool m_disableTray = false;
 
     TrackProperties m_trackProperties;
     std::mutex m_trackPropertiesMtx;

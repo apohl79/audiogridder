@@ -969,6 +969,11 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
             m_processor.setShowSidechainDisabledInfo(!m_processor.getShowSidechainDisabledInfo());
             m_processor.saveConfig();
         });
+        m.addItem("Disable Tray App", true, m_processor.getDisableTray(), [this] {
+            traceScope();
+            m_processor.setDisableTray(!m_processor.getDisableTray());
+            m_processor.saveConfig();
+        });
 
         subm.addItem("Always", true, m_processor.getTransferWhenPlayingOnly() == false, [this] {
             traceScope();
