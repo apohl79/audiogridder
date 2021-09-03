@@ -268,9 +268,11 @@ void Client::init() {
     }
     LockByID lock(*this, INIT2);
     m_error = true;
+#if !JucePlugin_IsMidiEffect
     if (m_channelsOut == 0 || m_rate == 0.0 || m_samplesPerBlock == 0) {
         return;
     }
+#endif
     logln("connecting server " << host << ":" << id);
     m_cmdOut = std::make_unique<StreamingSocket>();
     if (m_cmdOut->connect(host, port, 1000)) {
