@@ -529,6 +529,11 @@ void AudioGridderAudioProcessor::processBlockReal(AudioBuffer<T>& buffer, MidiBu
 
 void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<float>& buffer, MidiBuffer& /* midiMessages */) {
     traceScope();
+
+    if (getLatencySamples() == 0) {
+        return;
+    }
+
     ScopedNoDenormals noDenormals;
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
@@ -546,7 +551,9 @@ void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<float>& buffer
         buffer.clear(i, 0, buffer.getNumSamples());
     }
 
-    if (m_bypassBufferF.size() < totalNumOutputChannels) {
+    std::lock_guard<std::mutex> lock(m_bypassBufferMtx);
+
+    if (m_bypassBufferF.getNumChannels() < totalNumOutputChannels) {
         logln("bypass buffer has less channels than needed");
         for (auto i = 0; i < totalNumOutputChannels; ++i) {
             buffer.clear(i, 0, buffer.getNumSamples());
@@ -554,19 +561,17 @@ void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<float>& buffer
         return;
     }
 
-    for (auto c = 0; c < totalNumOutputChannels; ++c) {
-        std::lock_guard<std::mutex> lock(m_bypassBufferMtx);
-        auto& buf = m_bypassBufferF.getReference(c);
-        for (auto s = 0; s < buffer.getNumSamples(); ++s) {
-            buf.add(buffer.getSample(c, s));
-            buffer.setSample(c, s, buf.getFirst());
-            buf.remove(0);
-        }
-    }
+    m_bypassBufferF.write(buffer.getArrayOfReadPointers(), buffer.getNumSamples());
+    m_bypassBufferF.read(buffer.getArrayOfWritePointers(), buffer.getNumSamples());
 }
 
 void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<double>& buffer, MidiBuffer& /* midiMessages */) {
     traceScope();
+
+    if (getLatencySamples() == 0) {
+        return;
+    }
+
     ScopedNoDenormals noDenormals;
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
@@ -584,7 +589,9 @@ void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<double>& buffe
         buffer.clear(i, 0, buffer.getNumSamples());
     }
 
-    if (m_bypassBufferD.size() < totalNumOutputChannels) {
+    std::lock_guard<std::mutex> lock(m_bypassBufferMtx);
+
+    if (m_bypassBufferD.getNumChannels() < totalNumOutputChannels) {
         logln("bypass buffer has less channels than needed");
         for (auto i = 0; i < totalNumOutputChannels; ++i) {
             buffer.clear(i, 0, buffer.getNumSamples());
@@ -592,15 +599,8 @@ void AudioGridderAudioProcessor::processBlockBypassed(AudioBuffer<double>& buffe
         return;
     }
 
-    for (auto c = 0; c < totalNumOutputChannels; ++c) {
-        std::lock_guard<std::mutex> lock(m_bypassBufferMtx);
-        auto& buf = m_bypassBufferD.getReference(c);
-        for (auto s = 0; s < buffer.getNumSamples(); ++s) {
-            buf.add(buffer.getSample(c, s));
-            buffer.setSample(c, s, buf.getFirst());
-            buf.remove(0);
-        }
-    }
+    m_bypassBufferD.write(buffer.getArrayOfReadPointers(), buffer.getNumSamples());
+    m_bypassBufferD.read(buffer.getArrayOfWritePointers(), buffer.getNumSamples());
 }
 
 void AudioGridderAudioProcessor::updateLatency(int samples) {
@@ -608,40 +608,16 @@ void AudioGridderAudioProcessor::updateLatency(int samples) {
     if (!m_prepared) {
         return;
     }
+
     logln("updating latency samples to " << samples);
     setLatencySamples(samples);
     int channels = getTotalNumOutputChannels();
+
     std::lock_guard<std::mutex> lock(m_bypassBufferMtx);
-    while (m_bypassBufferF.size() < channels) {
-        Array<float> buf;
-        for (int i = 0; i < samples; i++) {
-            buf.add(0);
-        }
-        m_bypassBufferF.add(std::move(buf));
-    }
-    while (m_bypassBufferD.size() < channels) {
-        Array<double> buf;
-        for (int i = 0; i < samples; i++) {
-            buf.add(0);
-        }
-        m_bypassBufferD.add(std::move(buf));
-    }
-    for (int c = 0; c < channels; c++) {
-        auto& bufF = m_bypassBufferF.getReference(c);
-        while (bufF.size() > samples) {
-            bufF.remove(0);
-        }
-        while (bufF.size() < samples) {
-            bufF.add(0);
-        }
-        auto& bufD = m_bypassBufferD.getReference(c);
-        while (bufD.size() > samples) {
-            bufD.remove(0);
-        }
-        while (bufD.size() < samples) {
-            bufD.add(0);
-        }
-    }
+    m_bypassBufferF.resize(channels, samples * 2);
+    m_bypassBufferF.setReadOffset(samples);
+    m_bypassBufferD.resize(channels, samples * 2);
+    m_bypassBufferD.setReadOffset(samples);
 }
 
 bool AudioGridderAudioProcessor::hasEditor() const { return true; }

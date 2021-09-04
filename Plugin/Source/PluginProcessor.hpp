@@ -15,6 +15,7 @@
 #include "json.hpp"
 #include "ChannelSet.hpp"
 #include "ChannelMapper.hpp"
+#include "AudioRingBuffer.hpp"
 
 using json = nlohmann::json;
 
@@ -325,8 +326,8 @@ class AudioGridderAudioProcessor : public AudioProcessor,
     LoadedPlugin m_unusedDummyPlugin;
     Client::Parameter m_unusedParam;
 
-    Array<Array<float>> m_bypassBufferF;
-    Array<Array<double>> m_bypassBufferD;
+    AudioRingBuffer<float> m_bypassBufferF;
+    AudioRingBuffer<double> m_bypassBufferD;
     std::mutex m_bypassBufferMtx;
 
     String m_settingsA, m_settingsB;
