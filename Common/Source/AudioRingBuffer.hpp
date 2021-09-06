@@ -32,7 +32,7 @@ class AudioRingBuffer {
 
     void clear() {
         for (size_t c = 0; c < m_buffer.size(); c++) {
-            memset(m_buffer[c].data(), 0, sizeof(T));
+            memset(m_buffer[c].data(), 0, m_samples * sizeof(T));
         }
     }
 
@@ -105,6 +105,9 @@ class AudioRingBuffer {
             incWriteOffset((int)samplesToWritePart2);
         }
     }
+
+    const T* getChannelData(int c) const { return m_buffer[(size_t)c].data(); }
+    T* getChannelData(int c) { return m_buffer[(size_t)c].data(); }
 
   private:
     size_t m_channels = 0;

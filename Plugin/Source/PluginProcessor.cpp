@@ -615,8 +615,10 @@ void AudioGridderAudioProcessor::updateLatency(int samples) {
 
     std::lock_guard<std::mutex> lock(m_bypassBufferMtx);
     m_bypassBufferF.resize(channels, samples * 2);
+    m_bypassBufferF.clear();
     m_bypassBufferF.setReadOffset(samples);
     m_bypassBufferD.resize(channels, samples * 2);
+    m_bypassBufferD.clear();
     m_bypassBufferD.setReadOffset(samples);
 }
 
