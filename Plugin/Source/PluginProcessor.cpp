@@ -12,7 +12,7 @@
 #include "ServiceReceiver.hpp"
 #include "Version.hpp"
 #include "Signals.hpp"
-#include "CoreDump.hpp"
+#include "Sentry.hpp"
 #include "AudioStreamer.hpp"
 #include "WindowPositions.hpp"
 
@@ -43,8 +43,8 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor(AudioProcessor::WrapperTy
 
     m_client = std::make_unique<Client>(this);
     setLogTagSource(m_client.get());
-    logln(m_mode << " plugin loaded (version: " << AUDIOGRIDDER_VERSION << ", build date: " << AUDIOGRIDDER_BUILD_DATE
-                 << ")");
+    logln(m_mode << " plugin loaded, " << getWrapperTypeDescription(wrapperType)
+                 << " (version: " << AUDIOGRIDDER_VERSION << ", build date: " << AUDIOGRIDDER_BUILD_DATE << ")");
 
     Tracer::initialize(appName, logName);
     Signals::initialize();
@@ -68,8 +68,8 @@ AudioGridderAudioProcessor::AudioGridderAudioProcessor(AudioProcessor::WrapperTy
 
     loadConfig();
 
-    if (m_coreDumps) {
-        CoreDump::initialize(appName, logName, true);
+    if (supportsCrashReporting() && m_crashReporting) {
+        Sentry::initialize();
     }
 
     m_unusedParam.name = "(unassigned)";
@@ -198,6 +198,7 @@ AudioGridderAudioProcessor::~AudioGridderAudioProcessor() {
     logln("plugin unloaded");
     Tracer::cleanup();
     AGLogger::cleanup();
+    Sentry::cleanup();
 }
 
 void AudioGridderAudioProcessor::loadConfig() {
@@ -247,9 +248,9 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
         m_noSrvPluginListFilter = noSrvPluginListFilter;
         m_client->reconnect();
     }
-    m_coreDumps = jsonGetValue(j, "CoreDumps", m_coreDumps);
+    m_crashReporting = jsonGetValue(j, "CrashReporting", m_crashReporting);
     m_showSidechainDisabledInfo = jsonGetValue(j, "ShowSidechainDisabledInfo", m_showSidechainDisabledInfo);
-    m_disableTray = jsonGetValue(j, "DisableTray", m_disableTray);;
+    m_disableTray = jsonGetValue(j, "DisableTray", m_disableTray);
 }
 
 void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
@@ -284,7 +285,7 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
     jcfg["PresetsDir"] = m_presetsDir.toStdString();
     jcfg["DefaultPreset"] = m_defaultPreset.toStdString();
     jcfg["EditAlways"] = m_editAlways;
-    jcfg["CoreDumps"] = m_coreDumps;
+    jcfg["CrashReporting"] = m_crashReporting;
     jcfg["ShowSidechainDisabledInfo"] = m_showSidechainDisabledInfo;
     jcfg["DisableTray"] = m_disableTray;
 
@@ -418,7 +419,6 @@ void AudioGridderAudioProcessor::prepareToPlay(double sampleRate, int samplesPer
 
     m_client->init(channelsIn, channelsOut, channelsSC, sampleRate, samplesPerBlock, isUsingDoublePrecision());
 
-    BigInteger i;
     m_prepared = true;
 }
 

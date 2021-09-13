@@ -104,6 +104,61 @@ inline String getLogFileName(const String& appName, const String& filePrefix, co
     return path;
 }
 
+inline String getSentryDbPath() {
+    return File::getSpecialLocation(File::tempDirectory).getChildFile("ag_sentrydb").getFullPathName();
+}
+
+inline String getSentryCrashpadPath() {
+#ifndef AG_SENTRY_CRASHPAD_PATH
+#define AG_SENTRY_CRASHPAD_PATH ""
+#endif
+    String path = AG_SENTRY_CRASHPAD_PATH;
+
+    if (File(path).existsAsFile()) {
+        return path;
+    }
+
+    String filename = "crashpad_handler";
+#if JUCE_WINDOWS
+    filename << ".exe";
+#endif
+
+    // everything is shipped as bundle on macOS and we are putting crashpad inside, on the other platform lets just
+    // check if crashpad exists in the same dir as the executable
+    path = File::getSpecialLocation(File::SpecialLocationType::currentExecutableFile)
+               .getSiblingFile(filename)
+               .getFullPathName();
+    if (File(path).existsAsFile()) {
+        return path;
+    }
+
+#if JUCE_WINDOWS
+    // on windows we ship crashpad in the same dirs as the exe files, for plugins we look for it in the tray app folder
+    String appName;
+#if AG_PLUGIN
+    appName = "AudioGridderPluginTray";
+#else
+    appName = "AudioGridderServer";
+#endif
+    auto sep = File::getSeparatorString();
+    path = File::getSpecialLocation(File::globalApplicationsDirectory).getFullPathName();
+    path << sep << appName << sep << filename;
+    if (File(path).existsAsFile()) {
+        return path;
+    }
+#endif
+
+#if JUCE_LINUX
+    // the install script puts crashpad into /usr/local/bin
+    path = "/usr/local/bin/" + filename;
+    if (File(path).existsAsFile()) {
+        return path;
+    }
+#endif
+
+    return {};
+}
+
 enum ConfigFile {
     ConfigServer,
     ConfigServerRun,

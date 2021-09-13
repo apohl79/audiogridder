@@ -469,14 +469,14 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     row++;
 
     label = std::make_unique<Label>();
-    label->setText("Try to generate core dumps when crashing:", NotificationType::dontSendNotification);
+    label->setText("Send crash reports (please enable if you have issues!):", NotificationType::dontSendNotification);
     label->setBounds(getLabelBounds(row));
     addChildAndSetID(label.get(), "lbl");
     m_components.push_back(std::move(label));
 
-    m_coreDumps.setBounds(getCheckBoxBounds(row));
-    m_coreDumps.setToggleState(m_app->getServer()->getCoreDumps(), NotificationType::dontSendNotification);
-    addChildAndSetID(&m_coreDumps, "dumps");
+    m_crashReporting.setBounds(getCheckBoxBounds(row));
+    m_crashReporting.setToggleState(m_app->getServer()->getCrashReporting(), NotificationType::dontSendNotification);
+    addChildAndSetID(&m_crashReporting, "dumps");
 
     row++;
 
@@ -498,7 +498,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
         appCpy->getServer()->setScanForPlugins(m_scanForPlugins.getToggleState());
         appCpy->getServer()->setParallelPluginLoad(m_parallelPluginLoad.getToggleState());
         appCpy->getServer()->setSandboxing(m_sandbox.getToggleState());
-        appCpy->getServer()->setCoreDumps(m_coreDumps.getToggleState());
+        appCpy->getServer()->setCrashReporting(m_crashReporting.getToggleState());
         switch (m_screenCapturingMode.getSelectedId()) {
             case 1:
                 appCpy->getServer()->setScreenCapturingFFmpeg(true);

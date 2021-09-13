@@ -27,6 +27,9 @@ target_sources(AudioGridderServer PRIVATE ${AG_SOURCES_SERVER} ${AG_SOURCES_COMM
 
 target_compile_definitions(AudioGridderServer PRIVATE
   AG_SERVER
+  AG_SENTRY_ENABLED=${AG_SENTRY_ENABLED}
+  AG_SENTRY_DSN="${AG_SENTRY_DSN}"
+  AG_SENTRY_CRASHPAD_PATH="${AG_SENTRY_CRASHPAD_PATH}"
   JUCE_PLUGINHOST_VST3=1
   JUCE_PLUGINHOST_VST=1
   JUCE_WEB_BROWSER=0
@@ -54,13 +57,15 @@ target_link_libraries(AudioGridderServer PRIVATE
   juce::juce_recommended_lto_flags
   juce::juce_recommended_warning_flags
   ${FFMPEG_LIBRARIES}
-  ${WEBP_LIBRARIES})
+  ${WEBP_LIBRARIES}
+  ${SENTRY_LIBRARIES})
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   target_link_libraries(AudioGridderServer PRIVATE "-framework AVFoundation -framework CoreMedia")
   if(AG_MACOS_TARGET STRGREATER_EQUAL 10.8)
     target_link_libraries(AudioGridderServer PRIVATE "-framework VideoToolbox")
   endif()
+  ag_bundle_add_crashpad(AudioGridderServer)
   ag_bundle_sign(AudioGridderServer)
   if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND AG_ENABLE_DEBUG_COPY_STEP)
     ag_bundle_copy(AudioGridderServer /Applications/Debug)

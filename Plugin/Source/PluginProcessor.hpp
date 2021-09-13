@@ -27,6 +27,7 @@ class WrapperTypeReaderAudioProcessor : public AudioProcessor {
     void prepareToPlay(double, int) override {}
     void releaseResources() override {}
     void processBlock(AudioBuffer<float>&, MidiBuffer&) override {}
+    void processBlock(AudioBuffer<double>&, MidiBuffer&) override {}
     double getTailLengthSeconds() const override { return 0.0; }
     bool acceptsMidi() const override { return false; }
     bool producesMidi() const override { return false; }
@@ -192,8 +193,9 @@ class AudioGridderAudioProcessor : public AudioProcessor,
     void setNoSrvPluginListFilter(bool b) { m_noSrvPluginListFilter = b; }
     float getScaleFactor() const { return m_scale; }
     void setScaleFactor(float f) { m_scale = f; }
-    bool getCoreDumps() const { return m_coreDumps; }
-    void setCoreDumps(bool b) { m_coreDumps = b; }
+    bool getCrashReporting() const { return m_crashReporting; }
+    void setCrashReporting(bool b) { m_crashReporting = b; }
+    bool supportsCrashReporting() const { return wrapperType != wrapperType_AAX; }
     Array<ServerPlugin> getRecents();
     void updateRecents(const ServerPlugin& plugin);
 
@@ -339,7 +341,7 @@ class AudioGridderAudioProcessor : public AudioProcessor,
     bool m_showSidechainDisabledInfo = true;
     bool m_noSrvPluginListFilter = false;
     float m_scale = 1.0;
-    bool m_coreDumps = true;
+    bool m_crashReporting = true;
 
     bool m_transferWhenPlayingOnly = false;
     bool m_disableTray = false;

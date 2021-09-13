@@ -1,2 +1,3 @@
 #!/bin/sh
-install tray/AudioGridderPluginTray /usr/local/bin
+install bin/AudioGridderPluginTray /usr/local/bin
+install bin/crashpad_handler /usr/local/bin

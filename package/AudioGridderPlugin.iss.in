@@ -6,16 +6,16 @@ DefaultGroupName=AudioGridder
 OutputBaseFilename=AudioGridderPlugin_#STR_VER#
 
 [Files]
-Source: "..\build-win-10-x86_64\Plugin\AudioGridderFx_artefacts\RelWithDebInfo\VST3\AudioGridder.vst3\Contents\x86_64-win\AudioGridder.vst3"; DestDir: {code:GetVST3Dir}; Flags: ignoreversion
-Source: "..\build-win-10-x86_64\Plugin\AudioGridderInst_artefacts\RelWithDebInfo\VST3\AudioGridderInst.vst3\Contents\x86_64-win\AudioGridderInst.vst3"; DestDir: {code:GetVST3Dir}; Flags: ignoreversion
-Source: "..\build-win-10-x86_64\Plugin\AudioGridderMidi_artefacts\RelWithDebInfo\VST3\AudioGridderMidi.vst3\Contents\x86_64-win\AudioGridderMidi.vst3"; DestDir: {code:GetVST3Dir}; Flags: ignoreversion
-Source: "..\build-win-10-x86_64\Plugin\AudioGridderFx_artefacts\RelWithDebInfo\VST\AudioGridder.dll"; DestDir: {code:GetVST2Dir}; Flags: ignoreversion
-Source: "..\build-win-10-x86_64\Plugin\AudioGridderInst_artefacts\RelWithDebInfo\VST\AudioGridderInst.dll"; DestDir: {code:GetVST2Dir}; Flags: ignoreversion
-Source: "..\build-win-10-x86_64\Plugin\AudioGridderMidi_artefacts\RelWithDebInfo\VST\AudioGridderMidi.dll"; DestDir: {code:GetVST2Dir}; Flags: ignoreversion
-Source: "..\build-win-10-x86_64\Plugin\AudioGridderFx_artefacts\RelWithDebInfo\AAX\*"; Excludes: "*.exp,*.lib,*.pdb"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins; Flags: ignoreversion recursesubdirs
-Source: "..\build-win-10-x86_64\Plugin\AudioGridderInst_artefacts\RelWithDebInfo\AAX\*"; Excludes: "*.exp,*.lib,*.pdb"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins; Flags: ignoreversion recursesubdirs
-Source: "..\build-win-10-x86_64\Plugin\AudioGridderMidi_artefacts\RelWithDebInfo\AAX\*"; Excludes: "*.exp,*.lib,*.pdb"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins; Flags: ignoreversion recursesubdirs
-Source: "..\build-win-10-x86_64\PluginTray\AudioGridderPluginTray_artefacts\RelWithDebInfo\AudioGridderPluginTray.exe"; DestDir: {commonpf64}\AudioGridderPluginTray; Flags: ignoreversion
+Source: "..\build-windows-x86_64\lib\VST3\AudioGridder.vst3"; DestDir: {code:GetVST3Dir}; Flags: ignoreversion
+Source: "..\build-windows-x86_64\lib\VST3\AudioGridderInst.vst3"; DestDir: {code:GetVST3Dir}; Flags: ignoreversion
+Source: "..\build-windows-x86_64\lib\VST3\AudioGridderMidi.vst3"; DestDir: {code:GetVST3Dir}; Flags: ignoreversion
+Source: "..\build-windows-x86_64\lib\VST\AudioGridder.dll"; DestDir: {code:GetVST2Dir}; Flags: ignoreversion
+Source: "..\build-windows-x86_64\lib\VST\AudioGridderInst.dll"; DestDir: {code:GetVST2Dir}; Flags: ignoreversion
+Source: "..\build-windows-x86_64\lib\VST\AudioGridderMidi.dll"; DestDir: {code:GetVST2Dir}; Flags: ignoreversion
+Source: "..\build-windows-x86_64\lib\AAX\AudioGridder.aaxplugin"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins; Flags: ignoreversion recursesubdirs
+Source: "..\build-windows-x86_64\lib\AAX\AudioGridderInst.aaxplugin"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins; Flags: ignoreversion recursesubdirs
+Source: "..\build-windows-x86_64\lib\AAX\AudioGridderMidi.aaxplugin"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins; Flags: ignoreversion recursesubdirs
+Source: "..\build-windows-x86_64\bin\AudioGridderPluginTray.exe"; DestDir: {commonpf64}\AudioGridderPluginTray; Flags: ignoreversion
 
 [Code]
 var

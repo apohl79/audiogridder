@@ -145,4 +145,12 @@ void AGLogger::setEnabled(bool b) {
     m_enabled = b;
 }
 
+File AGLogger::getLogFile() {
+    std::lock_guard<std::mutex> lock(m_instMtx);
+    if (nullptr != m_inst) {
+        return m_inst->m_file;
+    }
+    return {};
+}
+
 }  // namespace e47

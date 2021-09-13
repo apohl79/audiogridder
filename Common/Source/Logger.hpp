@@ -29,6 +29,7 @@ class AGLogger : public Thread {
 
     static bool isEnabled() { return m_enabled; }
     static void setEnabled(bool b);
+    static File getLogFile();
 
   private:
     File m_file;

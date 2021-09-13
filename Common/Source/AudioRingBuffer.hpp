@@ -12,7 +12,7 @@
 
 namespace e47 {
 
-template<typename T>
+template <typename T>
 class AudioRingBuffer {
   public:
     AudioRingBuffer() {}

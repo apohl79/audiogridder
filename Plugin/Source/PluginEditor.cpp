@@ -571,17 +571,14 @@ void AudioGridderAudioProcessorEditor::setConnected(bool connected) {
             m_pluginButtons[i]->setEnabled(m_processor.getLoadedPlugin((int)i).ok);
         }
         auto active = m_processor.getActivePlugin();
-        bool editing = false;
         if (active > -1) {
             editPlugin();
-            editing = true;
         } else if (m_processor.isEditAlways()) {
             auto lastActive = m_processor.getLastActivePlugin();
             if (lastActive < 0) {
                 lastActive = 0;
             }
             editPlugin(lastActive);
-            editing = true;
         }
         if (m_processor.getClient().isServerLocalMode() && nullptr == m_positionTracker) {
             m_positionTracker = std::make_unique<PositionTracker>(this);
@@ -1018,11 +1015,13 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
             Tracer::setEnabled(!Tracer::isEnabled());
             m_processor.saveConfig();
         });
-        subm.addItem("CoreDumps", true, m_processor.getCoreDumps(), [this] {
-            traceScope();
-            m_processor.setCoreDumps(!m_processor.getCoreDumps());
-            m_processor.saveConfig();
-        });
+        if (m_processor.supportsCrashReporting()) {
+            subm.addItem("Send Crash Reports", true, m_processor.getCrashReporting(), [this] {
+                traceScope();
+                m_processor.setCrashReporting(!m_processor.getCrashReporting());
+                m_processor.saveConfig();
+            });
+        }
         m.addSubMenu("Diagnostics", subm);
         subm.clear();
 

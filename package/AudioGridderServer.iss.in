@@ -6,7 +6,8 @@ DefaultGroupName=AudioGridder
 OutputBaseFilename=AudioGridderServer_#STR_VER#
 
 [Files]
-Source: "..\build-win-10-x86_64\Server\AudioGridderServer_artefacts\RelWithDebInfo\AudioGridderServer.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\build-windows-x86_64\bin\AudioGridderServer.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\build-windows-x86_64\bin\crashpad_handler.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\AudioGridderServer"; Filename: "{app}\AudioGridderServer.exe"

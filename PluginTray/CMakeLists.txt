@@ -27,6 +27,9 @@ target_sources(AudioGridderPluginTray PRIVATE ${AG_SOURCES_PLUGIN_TRAY} ${AG_SOU
 
 target_compile_definitions(AudioGridderPluginTray PRIVATE
   AG_PLUGIN_TRAY
+  AG_SENTRY_ENABLED=${AG_SENTRY_ENABLED}
+  AG_SENTRY_DSN="${AG_SENTRY_DSN}"
+  AG_SENTRY_CRASHPAD_PATH="${AG_SENTRY_CRASHPAD_PATH}"
   JUCE_WEB_BROWSER=0
   JUCE_USE_CURL=0
   JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING
@@ -47,9 +50,11 @@ target_link_libraries(AudioGridderPluginTray PRIVATE
   juce::juce_gui_extra
   juce::juce_recommended_config_flags
   juce::juce_recommended_lto_flags
-  juce::juce_recommended_warning_flags)
+  juce::juce_recommended_warning_flags
+  ${SENTRY_LIBRARIES})
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  ag_bundle_add_crashpad(AudioGridderPluginTray)
   ag_bundle_sign(AudioGridderPluginTray)
   if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND AG_ENABLE_DEBUG_COPY_STEP)
     ag_bundle_copy(AudioGridderPluginTray /Applications/Debug)

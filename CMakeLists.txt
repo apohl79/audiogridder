@@ -12,18 +12,15 @@ set(AG_AAX_PLUGIN_ENABLED FALSE)
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   set(AG_MACOS_TARGET 10.8 CACHE STRING "macOS target, default is 10.8")
   set(AG_VST2_SDK_DEFAULT "$ENV{HOME}/audio/vstsdk2.4")
-  set(AG_AAX_SDK_DEFAULT "$ENV{HOME}/audio/AAX_SDK_2p3p2")
+  set(AG_AAX_SDK_DEFAULT "$ENV{HOME}/audio/aax-sdk-2-4-0-beta")
   set(AG_AAX_SDK ${AG_AAX_SDK_DEFAULT} CACHE STRING "AAX SDK Folder")
   set(CMAKE_OSX_DEPLOYMENT_TARGET ${AG_MACOS_TARGET})
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
   set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
-  # No Pro Tools/AAX support for arm64 yet
-  if(CMAKE_OSX_ARCHITECTURES STREQUAL "x86_64")
-    set(AG_AAX_PLUGIN_ENABLED TRUE)
-  endif()
+  set(AG_AAX_PLUGIN_ENABLED TRUE)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   set(AG_VST2_SDK_DEFAULT "z:/vstsdk2.4")
-  set(AG_AAX_SDK_DEFAULT "z:/AAX_SDK_2p3p2")
+  set(AG_AAX_SDK_DEFAULT "z:/aax-sdk-2-4-0-beta")
   set(AG_AAX_SDK ${AG_AAX_SDK_DEFAULT} CACHE STRING "AAX SDK Folder")
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
   set(AG_AAX_PLUGIN_ENABLED TRUE)
@@ -45,8 +42,42 @@ option(AG_WITH_TRACEREADER "Enable tracereader build." off)
 option(AG_ENABLE_DYNAMIC_LINKING "Enable dynamic linking of ffmpeg/webp." off)
 option(AG_ENABLE_CODE_SIGNING "Enable code signing." on)
 option(AG_ENABLE_DEBUG_COPY_STEP "Enable copying binaries after building in Debug mode (on macOS)." on)
+option(AG_ENABLE_SENTRY "Enable crash reporting via sentry." off)
+
+if(AG_DEPS_ROOT)
+  if(NOT FFMPEG_ROOT)
+    set(FFMPEG_ROOT ${AG_DEPS_ROOT} CACHE STRING "FFMPEG directory")
+  endif()
+  if(NOT SENTRY_ROOT)
+    set(SENTRY_ROOT ${AG_DEPS_ROOT} CACHE STRING "Sentry directory")
+  endif()
+  if(NOT BOOST_ROOT)
+    set(BOOST_ROOT ${AG_DEPS_ROOT} CACHE STRING "Boost directory")
+  endif()
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(CURL_INCLUDE_DIR ${AG_DEPS_ROOT}/include)
+    set(CURL_LIBRARY ${AG_DEPS_ROOT}/lib/libcurl.lib )
+  endif()
+endif()
+
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/lib)
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/lib)
+  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/lib)
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/lib)
+endif()
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/bin)
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+
+if(NOT AG_ENABLE_DYNAMIC_LINKING)
+  set(Boost_USE_STATIC_LIBS ON)
+endif()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  set(AG_ENABLE_CODE_SIGNING OFF)
+endif()
 
 find_package(FFmpeg REQUIRED)
 find_package(WebP REQUIRED)
@@ -63,6 +94,60 @@ link_directories(${WEBP_LIBRARY_DIRS})
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/Common/Source AG_SOURCES_COMMON)
 list(REMOVE_ITEM AG_SOURCES_COMMON "${CMAKE_CURRENT_SOURCE_DIR}/Common/Source/TraceReader.cpp")
 
+if($ENV{AG_ENABLE_SENTRY})
+  set(AG_ENABLE_SENTRY on)
+  set(AG_SENTRY_DSN $ENV{AG_SENTRY_DSN})
+endif()
+
+if(AG_ENABLE_SENTRY)
+  set(SENTRY_INCLUDE_DIR ${SENTRY_ROOT}/include)
+  message(STATUS "Using Sentry: ${SENTRY_ROOT}")
+  message(STATUS "Using Sentry DSN: ${AG_SENTRY_DSN}")
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(SENTRY_LIBRARIES
+      ${SENTRY_ROOT}/lib/crashpad_compat.lib
+      ${SENTRY_ROOT}/lib/crashpad_minidump.lib
+      ${SENTRY_ROOT}/lib/crashpad_snapshot.lib
+      ${SENTRY_ROOT}/lib/crashpad_util.lib
+      ${SENTRY_ROOT}/lib/mini_chromium.lib
+      ${SENTRY_ROOT}/lib/crashpad_client.lib
+      ${SENTRY_ROOT}/lib/crashpad_zlib.lib
+      ${SENTRY_ROOT}/lib/crashpad_tools.lib
+      ${SENTRY_ROOT}/lib/crashpad_handler_lib.lib
+      ${SENTRY_ROOT}/lib/sentry.lib
+      winhttp.lib)
+  else()
+    find_package(CURL REQUIRED)
+    set(SENTRY_LIBRARIES
+      ${SENTRY_ROOT}/lib/libcrashpad_client.a
+      ${SENTRY_ROOT}/lib/libcrashpad_handler_lib.a
+      ${SENTRY_ROOT}/lib/libcrashpad_minidump.a
+      ${SENTRY_ROOT}/lib/libcrashpad_snapshot.a
+      ${SENTRY_ROOT}/lib/libcrashpad_tools.a
+      ${SENTRY_ROOT}/lib/libcrashpad_util.a
+      ${SENTRY_ROOT}/lib/libmini_chromium.a
+      ${SENTRY_ROOT}/lib/libsentry.a
+      ${CURL_LIBRARIES})
+  endif()
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    list(APPEND SENTRY_LIBRARIES "-framework Security" bsm)
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    list(INSERT SENTRY_LIBRARIES 0 "-Wl,--start-group")
+    list(APPEND SENTRY_LIBRARIES "-Wl,--end-group")
+  endif()
+
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(AG_SENTRY_CRASHPAD_PATH "${SENTRY_ROOT}/bin/crashpad_handler")
+  else()
+    set(AG_SENTRY_CRASHPAD_PATH "")
+  endif()
+
+  set(AG_SENTRY_ENABLED 1)
+else()
+  set(AG_SENTRY_ENABLED 0)
+endif()
+
 if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   set(AG_WITH_TRACEREADER on)
 endif()
@@ -71,16 +156,32 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   set(AG_WITH_SERVER off)
 endif()
 
+macro(ag_bundle_add_crashpad target_name)
+  if(AG_ENABLE_SENTRY)
+    add_custom_target(${target_name}_CRASHPAD ALL DEPENDS ${target_name}
+      COMMAND
+        ${CMAKE_COMMAND} -E echo "Adding crashpad to bundle $<TARGET_BUNDLE_DIR:${target_name}>"
+      COMMAND
+        cp ${CMAKE_BINARY_DIR}/bin/crashpad_handler $<TARGET_BUNDLE_DIR:${target_name}>/Contents/MacOS
+      )
+  else()
+    add_custom_target(${target_name}_CRASHPAD ALL DEPENDS ${target_name}
+      COMMAND
+        ${CMAKE_COMMAND} -E echo "Sentry disabled, not adding crashpad to $<TARGET_BUNDLE_DIR:${target_name}>"
+      )
+  endif()
+endmacro()
+
 macro(ag_bundle_sign target_name)
   if(AG_ENABLE_CODE_SIGNING)
-    add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}
+    add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}_CRASHPAD
       COMMAND
         ${CMAKE_COMMAND} -E echo "Signing bundle $<TARGET_BUNDLE_DIR:${target_name}>"
       COMMAND
         /usr/bin/codesign --force --sign AudioGridder --timestamp=none $<TARGET_BUNDLE_DIR:${target_name}>
       )
   else()
-    add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}
+    add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}_CRASHPAD
       COMMAND
         ${CMAKE_COMMAND} -E echo "Code signing disabled. Not signing bundle $<TARGET_BUNDLE_DIR:${target_name}>"
       )
@@ -110,7 +211,7 @@ else()
         COMMAND
           ${CMAKE_COMMAND} -E echo "Signing AAX plugin $<TARGET_FILE_NAME:${target_name}>"
         COMMAND
-          aax_sign.bat $<TARGET_FILE_DIR:${target_name}>../../..
+          aax_sign.bat $<TARGET_FILE:${target_name}>
       )
     else()
       add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}

@@ -44,13 +44,13 @@ echo $STR_VER > package/VERSION
 echo $NUM_VER > package/VERSION.num
 
 if [ "$STR_VER" != "dev-build" ]; then
-    mkdir -p ../Archive/Builds/$STR_VER/win/vst
-    mkdir -p ../Archive/Builds/$STR_VER/win/vst3
-    mkdir -p ../Archive/Builds/$STR_VER/macos-x86_64
-    mkdir -p ../Archive/Builds/$STR_VER/macos-10.7-x86_64
-    mkdir -p ../Archive/Builds/$STR_VER/macos-arm64
-    mkdir -p ../Archive/Builds/$STR_VER/macos-universal
-    mkdir -p ../Archive/Builds/$STR_VER/linux
+    #mkdir -p ../Archive/Builds/$STR_VER/win/vst
+    #mkdir -p ../Archive/Builds/$STR_VER/win/vst3
+    #mkdir -p ../Archive/Builds/$STR_VER/macos-x86_64
+    #mkdir -p ../Archive/Builds/$STR_VER/macos-10.7-x86_64
+    #mkdir -p ../Archive/Builds/$STR_VER/macos-arm64
+    #mkdir -p ../Archive/Builds/$STR_VER/macos-universal
+    #mkdir -p ../Archive/Builds/$STR_VER/linux
 
     if [ $TAG_BUILD -gt 0 ]; then
         GIT_TAG=$(echo "release_$STR_VER" | tr '[:upper:]' '[:lower:]' | sed 's/\./_/g' | sed 's/-/_/g')

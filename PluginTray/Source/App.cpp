@@ -8,6 +8,7 @@
 #include "App.hpp"
 #include "Version.hpp"
 #include "ServiceReceiver.hpp"
+#include "Sentry.hpp"
 
 namespace e47 {
 
@@ -15,6 +16,7 @@ void App::initialise(const String& /*commandLineParameters*/) {
 #ifdef JUCE_MAC
     Process::setDockIconVisible(false);
 #endif
+    auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigPlugin));
     auto args = getCommandLineParameterArray();
     for (int i = 0; i < args.size(); i++) {
         if (args[i] == "-keeprunning") {
@@ -27,11 +29,15 @@ void App::initialise(const String& /*commandLineParameters*/) {
     }
     AGLogger::initialize("Tray", "AudioGridderTray_", "");
     ServiceReceiver::initialize(0);
+    if (jsonGetValue(cfg, "CrashReporting", true)) {
+        Sentry::initialize();
+    }
 }
 
 void App::shutdown() {
     AGLogger::cleanup();
     ServiceReceiver::cleanup(0);
+    Sentry::cleanup();
 }
 
 void App::loadConfig() {

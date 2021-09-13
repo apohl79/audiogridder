@@ -30,8 +30,14 @@ function build() {
     sudo xcode-select -s $toolchain
 
     rm -rf $builddir
-    cmake -B $builddir -DCMAKE_BUILD_TYPE=$buildtype -DFFMPEG_ROOT=$HOME/audio/ag-deps-$os-$target-$arch -DCMAKE_OSX_ARCHITECTURES=$arch -DAG_MACOS_TARGET=$target
+
+    cmake -B $builddir -DCMAKE_BUILD_TYPE=$buildtype -DAG_DEPS_ROOT=$HOME/audio/ag-deps-$os-$target-$arch -DCMAKE_OSX_ARCHITECTURES=$arch -DAG_MACOS_TARGET=$target
     cmake --build $builddir -j12
+
+    if [ -n "$AG_ENABLE_SENTRY" ]; then
+        echo "copying crashpad..."
+        cp $HOME/audio/ag-deps-$os-$target-$arch/bin/crashpad_handler $builddir/bin
+    fi
 
     echo "restoring toolchain..."
     sudo xcode-select -s $toolchain_bak
@@ -50,11 +56,8 @@ function build() {
             package package/AudioGridderServer$macos_target-$arch.pkgproj package/build/AudioGridderServer.pkg package/build/AudioGridderServer_${VERSION}_macOS$macos_target-$arch.pkg
         fi
 
-        rsync -a build-$os-$target-$arch/Server/AudioGridderServer_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/$os$macos_target-$arch/
-        rsync -a build-$os-$target-$arch/PluginTray/AudioGridderPluginTray_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/$os$macos_target-$arch/
-        rsync -a build-$os-$target-$arch/Plugin/AudioGridderFx_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/$os$macos_target-$arch/
-        rsync -a build-$os-$target-$arch/Plugin/AudioGridderInst_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/$os$macos_target-$arch/
-        rsync -a build-$os-$target-$arch/Plugin/AudioGridderMidi_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/$os$macos_target-$arch/
+        rsync -a build-$os-$target-$arch/bin/ ../Archive/Builds/$VERSION/$os$macos_target-$arch/
+        rsync -a build-$os-$target-$arch/lib/ ../Archive/Builds/$VERSION/$os$macos_target-$arch/
     fi
 }
 
@@ -75,11 +78,8 @@ else
     build macos arm64 11.1 /Library/Developer/CommandLineTools 0
 
     package/createUniversalBinaries.sh
-    rsync -a build-macos-universal/Server/AudioGridderServer_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/macos-universal/
-    rsync -a build-macos-universal/PluginTray/AudioGridderPluginTray_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/macos-universal/
-    rsync -a build-macos-universal/Plugin/AudioGridderFx_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/macos-universal/
-    rsync -a build-macos-universal/Plugin/AudioGridderInst_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/macos-universal/
-    rsync -a build-macos-universal/Plugin/AudioGridderMidi_artefacts/RelWithDebInfo/ ../Archive/Builds/$VERSION/macos-universal/
+    rsync -a build-macos-universal/bin/ ../Archive/Builds/$VERSION/macos-universal/
+    rsync -a build-macos-universal/lib/ ../Archive/Builds/$VERSION/macos-universal/
 
     package package/AudioGridderPlugin-universal.pkgproj package/build/AudioGridderPlugin.pkg package/build/AudioGridderPlugin_${VERSION}_macOS-universal.pkg
     package package/AudioGridderServer-universal.pkgproj package/build/AudioGridderServer.pkg package/build/AudioGridderServer_${VERSION}_macOS-universal.pkg

@@ -38,7 +38,7 @@
 									<key>GID</key>
 									<integer>80</integer>
 									<key>PATH</key>
-									<string>../build-macos-10.7-x86_64/Server/AudioGridderServer_artefacts/RelWithDebInfo/AudioGridderServer.app</string>
+									<string>../build-macos-10.7-x86_64/bin/AudioGridderServer.app</string>
 									<key>PATH_TYPE</key>
 									<integer>1</integer>
 									<key>PERMISSIONS</key>

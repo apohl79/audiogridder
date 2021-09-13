@@ -9,7 +9,7 @@
 #include "Server.hpp"
 #include "Screen.h"
 #include "Signals.hpp"
-#include "CoreDump.hpp"
+#include "Sentry.hpp"
 
 #ifdef JUCE_WINDOWS
 #include <windows.h>
@@ -89,9 +89,9 @@ void App::initialise(const String& commandLineParameters) {
         case SERVER: {
             traceScope();
             auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigServer));
-            bool enableCoreDumps = jsonGetValue(cfg, "CoreDumps", false);
-            if (enableCoreDumps) {
-                CoreDump::initialize(appName, logName, false);
+            bool enableCrashReports = jsonGetValue(cfg, "CrashReporting", true);
+            if (enableCrashReports) {
+                Sentry::initialize();
             }
             showSplashWindow();
             setSplashInfo("Starting server...");
@@ -118,11 +118,11 @@ void App::initialise(const String& commandLineParameters) {
             Process::setDockIconVisible(false);
 #endif
             auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigServer));
-            bool enableCoreDumps = jsonGetValue(cfg, "SandboxCoreDumps", false);
-            bool enableLogAutoclean = jsonGetValue(cfg, "SandboxLogAutoclean", true);
-            if (enableCoreDumps) {
-                CoreDump::initialize(appName, logName, false);
+            bool enableCrashReports = jsonGetValue(cfg, "CrashReporting", true);
+            if (enableCrashReports) {
+                Sentry::initialize();
             }
+            bool enableLogAutoclean = jsonGetValue(cfg, "SandboxLogAutoclean", true);
             if (enableLogAutoclean) {
                 AGLogger::deleteFileAtFinish();
                 Tracer::deleteFileAtFinish();
@@ -236,6 +236,7 @@ void App::shutdown() {
 
     Tracer::cleanup();
     AGLogger::cleanup();
+    Sentry::cleanup();
     setApplicationReturnValue((int)m_exitCode);
 }
 

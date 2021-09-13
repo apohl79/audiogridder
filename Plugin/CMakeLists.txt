@@ -50,6 +50,9 @@ macro(ag_add_plugin type)
 
   target_compile_definitions(AudioGridder${type} PRIVATE
     AG_PLUGIN
+    AG_SENTRY_ENABLED=${AG_SENTRY_ENABLED}
+    AG_SENTRY_DSN="${AG_SENTRY_DSN}"
+    AG_SENTRY_CRASHPAD_PATH="${AG_SENTRY_CRASHPAD_PATH}"
     JUCE_VST3_CAN_REPLACE_VST2=0
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
@@ -66,16 +69,23 @@ macro(ag_add_plugin type)
     juce::juce_gui_extra
     ${FFMPEG_LIBRARIES}
     ${WEBP_LIBRARIES}
+    ${SENTRY_LIBRARIES}
     PUBLIC
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags)
 
   if(AG_AAX_PLUGIN_ENABLED)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+      ag_bundle_add_crashpad(AudioGridder${type}_AAX)
+    endif()
     ag_bundle_sign_aax(AudioGridder${type}_AAX)
   endif()
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    ag_bundle_add_crashpad(AudioGridder${type}_AU)
+    ag_bundle_add_crashpad(AudioGridder${type}_VST)
+    ag_bundle_add_crashpad(AudioGridder${type}_VST3)
     ag_bundle_sign(AudioGridder${type}_AU)
     ag_bundle_sign(AudioGridder${type}_VST)
     ag_bundle_sign(AudioGridder${type}_VST3)
@@ -91,6 +101,24 @@ macro(ag_add_plugin type)
         ag_bundle_copy(AudioGridder${type}_AAX ${AG_AAX_DEST})
       endif()
     endif()
+  endif()
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set_target_properties(AudioGridder${type}_VST PROPERTIES
+      ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/lib/VST
+      LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/lib/VST
+      ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/lib/VST
+      LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/lib/VST)
+    set_target_properties(AudioGridder${type}_VST3 PROPERTIES
+      ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/lib/VST3
+      LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/lib/VST3
+      ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/lib/VST3
+      LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/lib/VST3)
+    set_target_properties(AudioGridder${type}_AAX PROPERTIES
+      ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/lib/AAX
+      LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/lib/AAX
+      ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/lib/AAX
+      LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/lib/AAX)
   endif()
 endmacro()
 

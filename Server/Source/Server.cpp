@@ -130,9 +130,8 @@ void Server::loadConfig() {
     }
     m_scanForPlugins = jsonGetValue(cfg, "ScanForPlugins", m_scanForPlugins);
     m_parallelPluginLoad = jsonGetValue(cfg, "ParallelPluginLoad", m_parallelPluginLoad);
-    m_coreDumps = jsonGetValue(cfg, "CoreDumps", m_coreDumps);
+    m_crashReporting = jsonGetValue(cfg, "CrashReporting", m_crashReporting);
     m_sandboxing = jsonGetValue(cfg, "Sandboxing", m_sandboxing);
-    m_sandboxCoreDumps = jsonGetValue(cfg, "SandboxCoreDumps", m_sandboxCoreDumps);
     m_sandboxLogAutoclean = jsonGetValue(cfg, "SandboxLogAutoclean", m_sandboxLogAutoclean);
 }
 
@@ -180,9 +179,8 @@ void Server::saveConfig() {
     }
     j["ScanForPlugins"] = m_scanForPlugins;
     j["ParallelPluginLoad"] = m_parallelPluginLoad;
-    j["CoreDumps"] = m_coreDumps;
+    j["CrashReporting"] = m_crashReporting;
     j["Sandboxing"] = m_sandboxing;
-    j["SandboxCoreDumps"] = m_sandboxCoreDumps;
     j["SandboxLogAutoclean"] = m_sandboxLogAutoclean;
 
     File cfg(Defaults::getConfigFileName(Defaults::ConfigServer));
@@ -615,6 +613,7 @@ void Server::runServer() {
     logln("creating listener " << (m_host.length() == 0 ? "*" : m_host) << ":" << (m_port + getId()));
     if (m_masterSocket.createListener(m_port + getId(), m_host)) {
         logln("server started: ID=" << getId() << ", PORT=" << m_port + getId() << ", NAME=" << m_name);
+        //raise(SIGSEGV);
         while (!currentThreadShouldExit()) {
             auto* clnt = accept(&m_masterSocket, 1000, [] { return currentThreadShouldExit(); });
             if (nullptr != clnt) {

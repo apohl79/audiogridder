@@ -79,7 +79,7 @@
 															<key>GID</key>
 															<integer>0</integer>
 															<key>PATH</key>
-															<string>../build-macos-10.8-x86_64/Plugin/AudioGridderFx_artefacts/RelWithDebInfo/AU/AudioGridder.component</string>
+															<string>../build-macos-10.8-x86_64/lib/AudioGridder.component</string>
 															<key>PATH_TYPE</key>
 															<integer>1</integer>
 															<key>PERMISSIONS</key>
@@ -107,7 +107,7 @@
 															<key>GID</key>
 															<integer>0</integer>
 															<key>PATH</key>
-															<string>../build-macos-10.8-x86_64/Plugin/AudioGridderInst_artefacts/RelWithDebInfo/AU/AudioGridderInst.component</string>
+															<string>../build-macos-10.8-x86_64/lib/AudioGridderInst.component</string>
 															<key>PATH_TYPE</key>
 															<integer>1</integer>
 															<key>PERMISSIONS</key>
@@ -135,7 +135,7 @@
 															<key>GID</key>
 															<integer>0</integer>
 															<key>PATH</key>
-															<string>../build-macos-10.8-x86_64/Plugin/AudioGridderMidi_artefacts/RelWithDebInfo/AU/AudioGridderMidi.component</string>
+															<string>../build-macos-10.8-x86_64/lib/AudioGridderMidi.component</string>
 															<key>PATH_TYPE</key>
 															<integer>1</integer>
 															<key>PERMISSIONS</key>
@@ -689,7 +689,7 @@
 															<key>GID</key>
 															<integer>0</integer>
 															<key>PATH</key>
-															<string>../build-macos-10.8-x86_64/Plugin/AudioGridderFx_artefacts/RelWithDebInfo/VST3/AudioGridder.vst3</string>
+															<string>../build-macos-10.8-x86_64/lib/AudioGridder.vst3</string>
 															<key>PATH_TYPE</key>
 															<integer>1</integer>
 															<key>PERMISSIONS</key>
@@ -717,7 +717,7 @@
 															<key>GID</key>
 															<integer>0</integer>
 															<key>PATH</key>
-															<string>../build-macos-10.8-x86_64/Plugin/AudioGridderInst_artefacts/RelWithDebInfo/VST3/AudioGridderInst.vst3</string>
+															<string>../build-macos-10.8-x86_64/lib/AudioGridderInst.vst3</string>
 															<key>PATH_TYPE</key>
 															<integer>1</integer>
 															<key>PERMISSIONS</key>
@@ -745,7 +745,7 @@
 															<key>GID</key>
 															<integer>0</integer>
 															<key>PATH</key>
-															<string>../build-macos-10.8-x86_64/Plugin/AudioGridderMidi_artefacts/RelWithDebInfo/VST3/AudioGridderMidi.vst3</string>
+															<string>../build-macos-10.8-x86_64/lib/AudioGridderMidi.vst3</string>
 															<key>PATH_TYPE</key>
 															<integer>1</integer>
 															<key>PERMISSIONS</key>
@@ -1297,7 +1297,7 @@
 															<key>GID</key>
 															<integer>0</integer>
 															<key>PATH</key>
-															<string>../build-macos-10.8-x86_64/Plugin/AudioGridderFx_artefacts/RelWithDebInfo/VST/AudioGridder.vst</string>
+															<string>../build-macos-10.8-x86_64/lib/AudioGridder.vst</string>
 															<key>PATH_TYPE</key>
 															<integer>1</integer>
 															<key>PERMISSIONS</key>
@@ -1325,7 +1325,7 @@
 															<key>GID</key>
 															<integer>0</integer>
 															<key>PATH</key>
-															<string>../build-macos-10.8-x86_64/Plugin/AudioGridderInst_artefacts/RelWithDebInfo/VST/AudioGridderInst.vst</string>
+															<string>../build-macos-10.8-x86_64/lib/AudioGridderInst.vst</string>
 															<key>PATH_TYPE</key>
 															<integer>1</integer>
 															<key>PERMISSIONS</key>
@@ -1353,7 +1353,7 @@
 															<key>GID</key>
 															<integer>0</integer>
 															<key>PATH</key>
-															<string>../build-macos-10.8-x86_64/Plugin/AudioGridderMidi_artefacts/RelWithDebInfo/VST/AudioGridderMidi.vst</string>
+															<string>../build-macos-10.8-x86_64/lib/AudioGridderMidi.vst</string>
 															<key>PATH_TYPE</key>
 															<integer>1</integer>
 															<key>PERMISSIONS</key>
@@ -1876,7 +1876,7 @@
 															<array>
 																<dict>
 																	<key>BUNDLE_CAN_DOWNGRADE</key>
-																	<false/>
+																	<true/>
 																	<key>BUNDLE_POSTINSTALL_PATH</key>
 																	<dict>
 																		<key>PATH_TYPE</key>
@@ -1892,7 +1892,7 @@
 																	<key>GID</key>
 																	<integer>80</integer>
 																	<key>PATH</key>
-																	<string>../build-macos-10.8-x86_64/Plugin/AudioGridderFx_artefacts/RelWithDebInfo/AAX/AudioGridder.aaxplugin</string>
+																	<string>../build-macos-10.8-x86_64/lib/AudioGridder.aaxplugin</string>
 																	<key>PATH_TYPE</key>
 																	<integer>1</integer>
 																	<key>PERMISSIONS</key>
@@ -1904,7 +1904,7 @@
 																</dict>
 																<dict>
 																	<key>BUNDLE_CAN_DOWNGRADE</key>
-																	<false/>
+																	<true/>
 																	<key>BUNDLE_POSTINSTALL_PATH</key>
 																	<dict>
 																		<key>PATH_TYPE</key>
@@ -1920,7 +1920,7 @@
 																	<key>GID</key>
 																	<integer>80</integer>
 																	<key>PATH</key>
-																	<string>../build-macos-10.8-x86_64/Plugin/AudioGridderInst_artefacts/RelWithDebInfo/AAX/AudioGridderInst.aaxplugin</string>
+																	<string>../build-macos-10.8-x86_64/lib/AudioGridderInst.aaxplugin</string>
 																	<key>PATH_TYPE</key>
 																	<integer>1</integer>
 																	<key>PERMISSIONS</key>
@@ -1932,7 +1932,7 @@
 																</dict>
 																<dict>
 																	<key>BUNDLE_CAN_DOWNGRADE</key>
-																	<false/>
+																	<true/>
 																	<key>BUNDLE_POSTINSTALL_PATH</key>
 																	<dict>
 																		<key>PATH_TYPE</key>
@@ -1948,7 +1948,7 @@
 																	<key>GID</key>
 																	<integer>80</integer>
 																	<key>PATH</key>
-																	<string>../build-macos-10.8-x86_64/Plugin/AudioGridderMidi_artefacts/RelWithDebInfo/AAX/AudioGridderMidi.aaxplugin</string>
+																	<string>../build-macos-10.8-x86_64/lib/AudioGridderMidi.aaxplugin</string>
 																	<key>PATH_TYPE</key>
 																	<integer>1</integer>
 																	<key>PERMISSIONS</key>
@@ -2473,7 +2473,7 @@
 									<key>GID</key>
 									<integer>80</integer>
 									<key>PATH</key>
-									<string>../build-macos-10.8-x86_64/PluginTray/AudioGridderPluginTray_artefacts/RelWithDebInfo/AudioGridderPluginTray.app</string>
+									<string>../build-macos-10.8-x86_64/bin/AudioGridderPluginTray.app</string>
 									<key>PATH_TYPE</key>
 									<integer>1</integer>
 									<key>PERMISSIONS</key>
