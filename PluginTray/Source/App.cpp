@@ -35,6 +35,7 @@ void App::initialise(const String& /*commandLineParameters*/) {
 }
 
 void App::shutdown() {
+    m_srv.stop();
     AGLogger::cleanup();
     ServiceReceiver::cleanup(0);
     Sentry::cleanup();
