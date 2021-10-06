@@ -55,10 +55,10 @@ void signalHandler(int signum) {
 }
 
 void initialize() {
-    signal(SIGABRT, signalHandler);
-    signal(SIGFPE, signalHandler);
+    //signal(SIGABRT, signalHandler);
+    //signal(SIGFPE, signalHandler);
 #ifdef JUCE_WINDOWS
-    signal(SIGSEGV, signalHandler);
+    //signal(SIGSEGV, signalHandler);
 #else
     signal(SIGPIPE, SIG_IGN);
 #endif
