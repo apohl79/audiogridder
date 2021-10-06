@@ -145,6 +145,7 @@ AudioGridderAudioProcessorEditor::~AudioGridderAudioProcessorEditor() {
     traceScope();
     stopAsyncFunctors();
     logln("destroying editor");
+    m_positionTracker.reset();
     m_wantsScreenUpdates = false;
     m_processor.hidePlugin();
     m_processor.getClient().setPluginScreenUpdateCallback(nullptr);

@@ -191,6 +191,7 @@ AudioGridderAudioProcessor::~AudioGridderAudioProcessor() {
     m_client->signalThreadShouldExit();
     m_client->close();
     waitForThreadAndLog(m_client.get(), m_client.get());
+    m_tray.reset();
     logln("plugin shutdown: cleaning up");
     WindowPositions::cleanup();
     Metrics::cleanup();
