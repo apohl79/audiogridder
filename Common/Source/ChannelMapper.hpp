@@ -67,11 +67,13 @@ class ChannelMapper : public LogTagDelegate {
 
     template <typename T>
     void map(const AudioBuffer<T>* src, AudioBuffer<T>* dst) const {
+        traceScope();
         mapInternal(src, dst, false);
     }
 
     template <typename T>
     void mapReverse(const AudioBuffer<T>* src, AudioBuffer<T>* dst) const {
+        traceScope();
         mapInternal(src, dst, true);
     }
 
@@ -121,6 +123,7 @@ class ChannelMapper : public LogTagDelegate {
         // clear any other channel in the dst buffer, that can't be mapped
         for (int ch = 0; ch < dst->getNumChannels(); ch++) {
             if (mapped.find(ch) == mapped.end()) {
+                traceln("clearing unmapped channel " << ch);
                 dst->clear(ch, 0, dst->getNumSamples());
             }
         }
@@ -144,9 +147,21 @@ class ChannelMapper : public LogTagDelegate {
 
     template <typename T>
     void copyChannel(const AudioBuffer<T>* src, int chSrc, AudioBuffer<T>* dst, int chDst) const {
-        assert(chSrc >= 0 && chSrc < src->getNumChannels());
-        assert(chDst >= 0 && chDst < dst->getNumChannels());
-        assert(src->getNumSamples() == dst->getNumSamples());
+        traceScope();
+        traceln("copying channel " << chSrc << " to " << chDst);
+        if (chSrc < 0 || chSrc >= src->getNumChannels()) {
+            logln("channel mapper can't copy ch " << chSrc << " to " << chDst << ": src channel out of range");
+            return;
+        }
+        if (chDst < 0 || chDst >= dst->getNumChannels()) {
+            logln("channel mapper can't copy ch " << chSrc << " to " << chDst << ": dst channel out of range");
+            return;
+        }
+        if (src->getNumSamples() != dst->getNumSamples()) {
+            logln("channel mapper can't copy ch " << chSrc << " to " << chDst
+                                                  << ": src and dst buffers have different numbers of samples");
+            return;
+        }
         dst->copyFrom(chDst, 0, *src, chSrc, 0, src->getNumSamples());
     }
 };
