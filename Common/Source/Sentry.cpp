@@ -32,18 +32,27 @@ void initialize() {
 #if AG_SENTRY_ENABLED
     auto crashpadPath = Defaults::getSentryCrashpadPath();
     setLogTagStatic("sentry");
-    logln("sentryEnabled = " << (int)l_sentryEnabled << ", sentryInitialized = " << (int)l_sentryInitialized);
     if (l_sentryEnabled && crashpadPath.isNotEmpty() && !l_sentryInitialized.exchange(true)) {
-        logln("initializing sentry: db path is '" << Defaults::getSentryDbPath() << "', crashpad path is '"
-                                                  << crashpadPath << "'");
+        logln("initializing crash reporting...");
         sentry_options_t* options = sentry_options_new();
         sentry_options_set_dsn(options, AG_SENTRY_DSN);
         sentry_options_set_handler_path(options, crashpadPath.toRawUTF8());
         sentry_options_set_database_path(options, Defaults::getSentryDbPath().toRawUTF8());
 
-        auto logfile = AGLogger::getLogFile().getFullPathName();
-        if (logfile.isNotEmpty()) {
-            sentry_options_add_attachment(options, logfile.toRawUTF8());
+        if (AGLogger::isEnabled()) {
+            auto logfile = AGLogger::getLogFile().getFullPathName();
+            if (logfile.isNotEmpty()) {
+                logln("  attaching logfile: " << AGLogger::getLogFile().getFileName());
+                sentry_options_add_attachment(options, logfile.toRawUTF8());
+            }
+        }
+
+        if (Tracer::isEnabled()) {
+            auto tracefile = Tracer::getTraceFile().getFullPathName();
+            if (tracefile.isNotEmpty()) {
+                logln("  attaching tracefile: " << Tracer::getTraceFile().getFileName());
+                sentry_options_add_attachment(options, tracefile.toRawUTF8());
+            }
         }
 
         sentry_init(options);

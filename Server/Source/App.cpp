@@ -88,11 +88,6 @@ void App::initialise(const String& commandLineParameters) {
             break;
         case SERVER: {
             traceScope();
-            auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigServer));
-            bool enableCrashReports = jsonGetValue(cfg, "CrashReporting", true);
-            if (enableCrashReports) {
-                Sentry::initialize();
-            }
             showSplashWindow();
             setSplashInfo("Starting server...");
             m_menuWindow = std::make_unique<MenuBarWindow>(this);
@@ -118,10 +113,6 @@ void App::initialise(const String& commandLineParameters) {
             Process::setDockIconVisible(false);
 #endif
             auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigServer));
-            bool enableCrashReports = jsonGetValue(cfg, "CrashReporting", true);
-            if (enableCrashReports) {
-                Sentry::initialize();
-            }
             bool enableLogAutoclean = jsonGetValue(cfg, "SandboxLogAutoclean", true);
             if (enableLogAutoclean) {
                 AGLogger::deleteFileAtFinish();

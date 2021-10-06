@@ -13,6 +13,7 @@
 #include "CPUInfo.hpp"
 #include "WindowPositions.hpp"
 #include "ChannelSet.hpp"
+#include "Sentry.hpp"
 
 #ifdef JUCE_MAC
 #include <sys/socket.h>
@@ -39,6 +40,10 @@ void Server::initialize() {
     Metrics::initialize();
     CPUInfo::initialize();
     WindowPositions::initialize();
+
+    if (m_crashReporting) {
+        Sentry::initialize();
+    }
 
     if (!getOpt("sandboxMode", false)) {
         Metrics::getStatistic<TimeStatistic>("audio")->enableExtData(true);

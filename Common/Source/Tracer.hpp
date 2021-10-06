@@ -24,6 +24,7 @@ void traceMessage(uint64 tagId, const String& tagName, const String& tagExtra, c
 void initialize(const String& appName, const String& filePrefix);
 void cleanup();
 void deleteFileAtFinish();
+File getTraceFile();
 
 void setEnabled(bool b);
 bool isEnabled();

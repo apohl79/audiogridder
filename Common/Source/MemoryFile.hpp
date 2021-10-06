@@ -30,6 +30,7 @@ class MemoryFile : LogTagDelegate {
     void open(bool overwriteIfExists = false);
     void close();
     void deleteFile() const { m_file.deleteFile(); }
+    File getFile() const { return m_file; }
 
     char* data() { return m_data; }
     size_t size() { return m_size; }
