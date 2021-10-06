@@ -381,7 +381,7 @@ void AudioGridderAudioProcessor::prepareToPlay(double sampleRate, int samplesPer
         m_client->startThread();
     }
 
-    if (!m_disableTray && !m_tray->isTimerRunning()) {
+    if (!m_disableTray && m_tray != nullptr && !m_tray->isTimerRunning()) {
         m_tray->start();
     }
 
@@ -1216,7 +1216,7 @@ void AudioGridderAudioProcessor::resetSettingsAB() {
 }
 
 Array<ServerPlugin> AudioGridderAudioProcessor::getRecents() {
-    if (m_tray->connected) {
+    if (m_tray != nullptr && m_tray->connected) {
         return m_tray->getRecents();
     } else {
         return m_client->getRecents();
@@ -1224,7 +1224,7 @@ Array<ServerPlugin> AudioGridderAudioProcessor::getRecents() {
 }
 
 void AudioGridderAudioProcessor::updateRecents(const ServerPlugin& plugin) {
-    if (m_tray->connected) {
+    if (m_tray != nullptr && m_tray->connected) {
         m_tray->sendMessage(
             PluginTrayMessage(PluginTrayMessage::UPDATE_RECENTS, {{"plugin", plugin.toString().toStdString()}}));
     }
