@@ -136,7 +136,9 @@ void Server::loadConfig() {
     m_scanForPlugins = jsonGetValue(cfg, "ScanForPlugins", m_scanForPlugins);
     m_parallelPluginLoad = jsonGetValue(cfg, "ParallelPluginLoad", m_parallelPluginLoad);
     m_crashReporting = jsonGetValue(cfg, "CrashReporting", m_crashReporting);
+    logln("crash reporting is " << (m_crashReporting ? "enabled" : "disabled"));
     m_sandboxing = jsonGetValue(cfg, "Sandboxing", m_sandboxing);
+    logln("sanboxing is " << (m_sandboxing ? "enabled" : "disabled"));
     m_sandboxLogAutoclean = jsonGetValue(cfg, "SandboxLogAutoclean", m_sandboxLogAutoclean);
 }
 
