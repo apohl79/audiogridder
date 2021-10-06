@@ -40,23 +40,31 @@ class AudioRingBuffer {
     int getNumSamples() const noexcept { return (int)m_samples; }
 
     void setReadOffset(int offset) {
-        m_readOffset = (size_t)offset;
-        m_readOffset %= m_samples;
+        if (m_samples > 0) {
+            m_readOffset = (size_t)offset;
+            m_readOffset %= m_samples;
+        }
     }
 
     void incReadOffset(int offsetToAdd) {
-        m_readOffset += (size_t)offsetToAdd;
-        m_readOffset %= m_samples;
+        if (m_samples > 0) {
+            m_readOffset += (size_t)offsetToAdd;
+            m_readOffset %= m_samples;
+        }
     }
 
     void setWriteOffset(int offset) {
-        m_writeOffset = (size_t)offset;
-        m_writeOffset %= m_samples;
+        if (m_samples > 0) {
+            m_writeOffset = (size_t)offset;
+            m_writeOffset %= m_samples;
+        }
     }
 
     void incWriteOffset(int offsetToAdd) {
-        m_writeOffset += (size_t)offsetToAdd;
-        m_writeOffset %= m_samples;
+        if (m_samples > 0) {
+            m_writeOffset += (size_t)offsetToAdd;
+            m_writeOffset %= m_samples;
+        }
     }
 
     void read(T** dst, int numSamples) {
