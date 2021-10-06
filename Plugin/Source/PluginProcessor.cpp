@@ -251,6 +251,7 @@ void AudioGridderAudioProcessor::loadConfig(const json& j, bool isUpdate) {
     m_crashReporting = jsonGetValue(j, "CrashReporting", m_crashReporting);
     m_showSidechainDisabledInfo = jsonGetValue(j, "ShowSidechainDisabledInfo", m_showSidechainDisabledInfo);
     m_disableTray = jsonGetValue(j, "DisableTray", m_disableTray);
+    m_disableRecents = jsonGetValue(j, "DisableRecents", m_disableRecents);
 }
 
 void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
@@ -288,6 +289,7 @@ void AudioGridderAudioProcessor::saveConfig(int numOfBuffers) {
     jcfg["CrashReporting"] = m_crashReporting;
     jcfg["ShowSidechainDisabledInfo"] = m_showSidechainDisabledInfo;
     jcfg["DisableTray"] = m_disableTray;
+    jcfg["DisableRecents"] = m_disableRecents;
 
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), jcfg);
 }
@@ -1216,15 +1218,18 @@ void AudioGridderAudioProcessor::resetSettingsAB() {
 }
 
 Array<ServerPlugin> AudioGridderAudioProcessor::getRecents() {
-    if (m_tray != nullptr && m_tray->connected) {
-        return m_tray->getRecents();
-    } else {
-        return m_client->getRecents();
+    if (!m_disableRecents) {
+        if (m_tray != nullptr && m_tray->connected) {
+            return m_tray->getRecents();
+        } else {
+            return m_client->getRecents();
+        }
     }
+    return {};
 }
 
 void AudioGridderAudioProcessor::updateRecents(const ServerPlugin& plugin) {
-    if (m_tray != nullptr && m_tray->connected) {
+    if (!m_disableRecents && m_tray != nullptr && m_tray->connected) {
         m_tray->sendMessage(
             PluginTrayMessage(PluginTrayMessage::UPDATE_RECENTS, {{"plugin", plugin.toString().toStdString()}}));
     }

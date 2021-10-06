@@ -227,6 +227,8 @@ class AudioGridderAudioProcessor : public AudioProcessor,
 
     bool getDisableTray() const { return m_disableTray; }
     void setDisableTray(bool b);
+    bool getDisableRecents() const { return m_disableRecents; }
+    void setDisableRecents(bool b) { m_disableRecents = b; }
 
     // AudioProcessorParameter::Listener
     void parameterValueChanged(int parameterIndex, float newValue) override;
@@ -345,6 +347,7 @@ class AudioGridderAudioProcessor : public AudioProcessor,
 
     bool m_transferWhenPlayingOnly = false;
     bool m_disableTray = false;
+    bool m_disableRecents = false;
 
     TrackProperties m_trackProperties;
     std::mutex m_trackPropertiesMtx;

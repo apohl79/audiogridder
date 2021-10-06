@@ -917,6 +917,11 @@ void AudioGridderAudioProcessorEditor::mouseUp(const MouseEvent& event) {
             m_processor.setMenuShowCompany(!m_processor.getMenuShowCompany());
             m_processor.saveConfig();
         });
+        subm.addItem("Disable Recents", true, m_processor.getDisableRecents(), [this] {
+            traceScope();
+            m_processor.setDisableRecents(!m_processor.getDisableRecents());
+            m_processor.saveConfig();
+        });
         subm.addItem("Disable Server Filter", true, m_processor.getNoSrvPluginListFilter(), [this] {
             traceScope();
             m_processor.setNoSrvPluginListFilter(!m_processor.getNoSrvPluginListFilter());
