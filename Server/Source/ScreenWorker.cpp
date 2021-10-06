@@ -242,13 +242,11 @@ void ScreenWorker::showEditor(std::shared_ptr<AGProcessor> proc, int x, int y) {
 }
 
 void ScreenWorker::hideEditor() {
-    traceScope();
     logln("hiding editor");
 
     auto tid = getThreadId();
 
     runOnMsgThreadAsync([this, tid] {
-        traceScope();
         logln("hiding editor (msg thread)");
         getApp()->hideEditor(tid);
 
