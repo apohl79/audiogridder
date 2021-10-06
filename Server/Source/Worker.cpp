@@ -327,7 +327,10 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     if (*msgSettings.payload.size > 0) {
         MemoryBlock block;
         block.append(msgSettings.payload.data, (size_t)*msgSettings.payload.size);
-        plugin->setStateInformation(block.getData(), static_cast<int>(block.getSize()));
+        // restore the plugin state on the message thread, so we can hopefully avoid instabilities with parameter
+        // changes a plugin might make from this method.
+        runOnMsgThreadSync(
+            [&block, plugin] { plugin->setStateInformation(block.getData(), static_cast<int>(block.getSize())); });
     }
     logln("...ok");
     m_audio->addToRecentsList(id, m_cmdIn->getHostName());
