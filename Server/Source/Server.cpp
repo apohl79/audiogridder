@@ -724,7 +724,7 @@ void Server::runServer() {
                     while (!masterSocket->createListener(workerPort, m_host)) {
                         workerPort++;
                         if (workerPort > Defaults::CLIENT_PORT + 1000) {
-                            logln("failed to create listener");
+                            logln("failed to create client listener");
                             clnt->close();
                             delete clnt;
                             clnt = nullptr;
@@ -786,7 +786,7 @@ void Server::runServer() {
             }
         }
     } else {
-        logln("failed to create listener");
+        logln("failed to create master listener");
         runOnMsgThreadAsync([this] {
             traceScope();
             uint32 ec = App::EXIT_OK;
@@ -826,7 +826,7 @@ void Server::runSandbox() {
     while (!masterSocket->createListener(m_port, m_host)) {
         m_port++;
         if (m_port > Defaults::CLIENT_PORT + 1000) {
-            logln("failed to create listener");
+            logln("failed to create client listener");
             getApp()->prepareShutdown(App::EXIT_SANDBOX_BIND_ERROR);
             return;
         }
