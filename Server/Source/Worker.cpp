@@ -426,7 +426,8 @@ void Worker::handleMessage(std::shared_ptr<Message<GetPluginSettings>> msg) {
     traceScope();
     if (auto proc = m_audio->getProcessor(pPLD(msg).getNumber())) {
         MemoryBlock block;
-        proc->getStateInformation(block);
+        // Load plugin state on the message thread
+        runOnMsgThreadSync([proc, &block] { proc->getStateInformation(block); });
         Message<PluginSettings> ret(this);
         ret.payload.setData(block.begin(), static_cast<int>(block.getSize()));
         ret.send(m_cmdIn.get());
@@ -445,7 +446,9 @@ void Worker::handleMessage(std::shared_ptr<Message<SetPluginSettings>> msg) {
         if (*msgSettings.payload.size > 0) {
             MemoryBlock block;
             block.append(msgSettings.payload.data, (size_t)*msgSettings.payload.size);
-            proc->setStateInformation(block.getData(), static_cast<int>(block.getSize()));
+            // Set plugin state on the message thread
+            runOnMsgThreadSync(
+                [proc, &block] { proc->setStateInformation(block.getData(), static_cast<int>(block.getSize())); });
         }
     }
 }
