@@ -147,7 +147,7 @@ class Server : public Thread, public LogTag {
 
     HashMap<String, uint32, DefaultHashFunctions, CriticalSection> m_sandboxLoadedCount;
 
-    std::atomic_bool m_sandboxReady{true};
+    std::atomic_bool m_sandboxReady{false};
     std::atomic_bool m_sandboxConnectedToMaster{false};
     HandshakeRequest m_sandboxConfig;
     String m_sandboxHasScreen;
