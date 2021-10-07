@@ -168,6 +168,9 @@ void AGProcessor::unload() {
             if (m_prepared) {
                 m_plugin->releaseResources();
             }
+            for (auto* param : m_plugin->getParameters()) {
+                param->removeListener(this);
+            }
             p = m_plugin;
             m_plugin.reset();
             loadedCount--;
