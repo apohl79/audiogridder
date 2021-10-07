@@ -62,7 +62,7 @@ class Worker : public Thread, public LogTag {
     HandshakeRequest m_cfg;
     std::shared_ptr<AudioWorker> m_audio;
     std::shared_ptr<ScreenWorker> m_screen;
-    int m_activeEditorIdx = -1;
+    std::atomic_int m_activeEditorIdx{-1};
     std::atomic_bool m_shutdown{false};
     MessageFactory m_msgFactory;
 

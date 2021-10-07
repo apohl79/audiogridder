@@ -379,21 +379,23 @@ void Worker::handleMessage(std::shared_ptr<Message<Mouse>> msg) {
     auto ev = *pDATA(msg);
     runOnMsgThreadAsync([this, ev] {
         traceScope();
-        auto point = getApp()->localPointToGlobal(Point<float>(ev.x, ev.y));
-        if (ev.type == MouseEvType::WHEEL) {
-            mouseScrollEvent(point.x, point.y, ev.deltaX, ev.deltaY, ev.isSmooth);
-        } else {
-            uint64_t flags = 0;
-            if (ev.isShiftDown) {
-                setShiftKey(flags);
+        if (m_activeEditorIdx > -1) {
+            auto point = getApp()->localPointToGlobal(Point<float>(ev.x, ev.y));
+            if (ev.type == MouseEvType::WHEEL) {
+                mouseScrollEvent(point.x, point.y, ev.deltaX, ev.deltaY, ev.isSmooth);
+            } else {
+                uint64_t flags = 0;
+                if (ev.isShiftDown) {
+                    setShiftKey(flags);
+                }
+                if (ev.isCtrlDown) {
+                    setControlKey(flags);
+                }
+                if (ev.isAltDown) {
+                    setAltKey(flags);
+                }
+                mouseEvent(ev.type, point.x, point.y, flags);
             }
-            if (ev.isCtrlDown) {
-                setControlKey(flags);
-            }
-            if (ev.isAltDown) {
-                setAltKey(flags);
-            }
-            mouseEvent(ev.type, point.x, point.y, flags);
         }
     });
 }
@@ -402,23 +404,25 @@ void Worker::handleMessage(std::shared_ptr<Message<Key>> msg) {
     traceScope();
     runOnMsgThreadAsync([this, msg] {
         traceScope();
-        auto* codes = pPLD(msg).getKeyCodes();
-        auto num = pPLD(msg).getKeyCount();
-        uint16_t key = 0;
-        uint64_t flags = 0;
-        for (int i = 0; i < num; i++) {
-            if (isShiftKey(codes[i])) {
-                setShiftKey(flags);
-            } else if (isControlKey(codes[i])) {
-                setControlKey(flags);
-            } else if (isAltKey(codes[i])) {
-                setAltKey(flags);
-            } else {
-                key = codes[i];
+        if (m_activeEditorIdx > -1) {
+            auto* codes = pPLD(msg).getKeyCodes();
+            auto num = pPLD(msg).getKeyCount();
+            uint16_t key = 0;
+            uint64_t flags = 0;
+            for (int i = 0; i < num; i++) {
+                if (isShiftKey(codes[i])) {
+                    setShiftKey(flags);
+                } else if (isControlKey(codes[i])) {
+                    setControlKey(flags);
+                } else if (isAltKey(codes[i])) {
+                    setAltKey(flags);
+                } else {
+                    key = codes[i];
+                }
             }
+            keyEventDown(key, flags);
+            keyEventUp(key, flags);
         }
-        keyEventDown(key, flags);
-        keyEventUp(key, flags);
     });
 }
 
