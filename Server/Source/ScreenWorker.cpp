@@ -52,7 +52,7 @@ void ScreenWorker::run() {
 void ScreenWorker::runFFmpeg() {
     traceScope();
     Message<ScreenCapture> msg;
-    while (!currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected()) {
+    while (isOk()) {
         std::unique_lock<std::mutex> lock(m_currentImageLock);
         m_currentImageCv.wait(lock, [this] { return m_updated; });
         m_updated = false;
@@ -61,6 +61,7 @@ void ScreenWorker::runFFmpeg() {
             if (m_imageBuf.size() <= Message<ScreenCapture>::MAX_SIZE) {
                 msg.payload.setImage(m_width, m_height, m_scale, m_imageBuf.data(), m_imageBuf.size());
                 lock.unlock();
+                std::lock_guard<std::mutex> socklock(m_mtx);
                 msg.send(m_socket.get());
             } else {
                 logln(
@@ -79,7 +80,7 @@ void ScreenWorker::runNative() {
     JPEGImageFormat jpg;
     bool diffDetect = getApp()->getServer()->getScreenDiffDetection();
     uint32_t captureCount = 0;
-    while (!currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected()) {
+    while (isOk()) {
         std::unique_lock<std::mutex> lock(m_currentImageLock);
         m_currentImageCv.wait(lock, [this] { return m_updated; });
         m_updated = false;
@@ -140,6 +141,7 @@ void ScreenWorker::runNative() {
                         }
                     } else {
                         msg.payload.setImage(m_width, m_height, 1, mos.getData(), mos.getDataSize());
+                        std::lock_guard<std::mutex> socklock(m_mtx);
                         msg.send(m_socket.get());
                     }
                 }
@@ -147,6 +149,7 @@ void ScreenWorker::runNative() {
         } else {
             // another client took over, notify this one
             msg.payload.setImage(0, 0, 0, nullptr, 0);
+            std::lock_guard<std::mutex> socklock(m_mtx);
             msg.send(m_socket.get());
         }
     }

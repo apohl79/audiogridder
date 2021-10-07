@@ -54,6 +54,11 @@ void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channelsIn, int c
     m_chain->updateChannels(channelsIn, channelsOut, channelsSC);
 }
 
+bool AudioWorker::waitForData() {
+    std::lock_guard<std::mutex> lock(m_mtx);
+    return m_socket->waitUntilReady(true, 50);
+}
+
 void AudioWorker::run() {
     traceScope();
     logln("audio processor started");
@@ -72,10 +77,11 @@ void AudioWorker::run() {
     bool hasToSetPlayHead = true;
 
     MessageHelper::Error e;
-    while (!currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected()) {
+    while (isOk()) {
         // Read audio chunk
-        if (m_socket->waitUntilReady(true, 1000)) {
+        if (waitForData()) {
             if (msg.readFromClient(m_socket.get(), bufferF, bufferD, midi, posInfo, &e, *bytesIn)) {
+                std::lock_guard<std::mutex> lock(m_mtx);
                 duration.reset();
                 if (hasToSetPlayHead) {  // do not set the playhead before it's initialized
                     m_chain->setPlayHead(&playHead);

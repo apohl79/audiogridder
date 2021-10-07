@@ -23,6 +23,11 @@ class ScreenWorker : public Thread, public LogTagDelegate {
 
     void init(std::unique_ptr<StreamingSocket> s);
 
+    bool isOk() {
+        std::lock_guard<std::mutex> lock(m_mtx);
+        return !currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected();
+    }
+
     void run();
     void runNative();
     void runFFmpeg();
@@ -32,6 +37,7 @@ class ScreenWorker : public Thread, public LogTagDelegate {
     void hideEditor();
 
   private:
+    std::mutex m_mtx;
     std::unique_ptr<StreamingSocket> m_socket;
 
     // Native capturing

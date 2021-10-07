@@ -39,6 +39,11 @@ class AudioWorker : public Thread, public LogTagDelegate {
     void shutdown();
     void clear();
 
+    bool isOk() {
+        std::lock_guard<std::mutex> lock(m_mtx);
+        return !currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected();
+    }
+
     int getChannelsIn() const { return m_channelsIn; }
     int getChannelsOut() const { return m_channelsOut; }
     int getChannelsSC() const { return m_channelsSC; }
@@ -64,6 +69,7 @@ class AudioWorker : public Thread, public LogTagDelegate {
     void addToRecentsList(const String& id, const String& host);
 
   private:
+    std::mutex m_mtx;
     std::unique_ptr<StreamingSocket> m_socket;
     int m_channelsIn;
     int m_channelsOut;
@@ -79,6 +85,8 @@ class AudioWorker : public Thread, public LogTagDelegate {
 
     AudioBuffer<float> m_procBufferF;
     AudioBuffer<double> m_procBufferD;
+
+    bool waitForData();
 
     template <typename T>
     AudioBuffer<T>* getProcBuffer();
