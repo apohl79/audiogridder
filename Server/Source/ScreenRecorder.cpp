@@ -345,12 +345,15 @@ bool ScreenRecorder::prepareOutput() {
     m_outputCodecCtx->time_base.num = 1;
     m_outputCodecCtx->time_base.den = 30;
     if (m_downScale) {
+        logln("prepareOutput: down scaling active: " << m_scale);
         m_outputCodecCtx->width = (int)(m_captureRect.getWidth() / m_scale);
         m_outputCodecCtx->height = (int)(m_captureRect.getHeight() / m_scale);
     } else {
         m_outputCodecCtx->width = (int)(m_captureRect.getWidth());
         m_outputCodecCtx->height = (int)(m_captureRect.getHeight());
     }
+    logln("prepareOutput: setting output codec context dimensions to " << m_outputCodecCtx->width << "x"
+                                                                       << m_outputCodecCtx->height);
     AVDictionary* opts = nullptr;
     switch (m_encMode) {
         case WEBP:
@@ -369,6 +372,7 @@ bool ScreenRecorder::prepareOutput() {
     }
 
     if (nullptr == m_outputFrame) {
+        logln("prepareOutput: allocating new output frame");
         m_outputFrame = av_frame_alloc();
         if (nullptr == m_outputFrame) {
             logln("prepareOutput: unable to allocate AVFrame");
@@ -380,11 +384,25 @@ bool ScreenRecorder::prepareOutput() {
     m_outputFrame->width = m_outputCodecCtx->width;
     m_outputFrame->height = m_outputCodecCtx->height;
     m_outputFrame->format = m_outputCodecCtx->pix_fmt;
-    m_outputFrameBuf = (uint8_t*)av_malloc(
+
+    auto outputFrameBufSize =
         (size_t)av_image_get_buffer_size(m_outputCodecCtx->pix_fmt, m_outputFrame->width, m_outputFrame->height, 1) +
-        AV_INPUT_BUFFER_PADDING_SIZE);
-    av_image_fill_arrays(m_outputFrame->data, m_outputFrame->linesize, m_outputFrameBuf, m_outputCodecCtx->pix_fmt,
-                         m_outputFrame->width, m_outputFrame->height, 1);
+        AV_INPUT_BUFFER_PADDING_SIZE;
+
+    logln("prepareOutput: allocating output frame buffer with " << outputFrameBufSize << " bytes");
+    m_outputFrameBuf = (uint8_t*)av_malloc(outputFrameBufSize);
+
+    if (nullptr == m_outputFrameBuf) {
+        logln("prepareOutput: unable to allocate output frame buffer");
+        return false;
+    }
+
+    ret = av_image_fill_arrays(m_outputFrame->data, m_outputFrame->linesize, m_outputFrameBuf,
+                               m_outputCodecCtx->pix_fmt, m_outputFrame->width, m_outputFrame->height, 1);
+    if (ret < 0) {
+        logln("prepareOutput: av_image_fill_arrays failed: " << ret);
+        return false;
+    }
 
     m_swsCtx = sws_getContext(m_captureRect.getWidth(), m_captureRect.getHeight(), m_captureCodecCtx->pix_fmt,
                               m_outputFrame->width, m_outputFrame->height, m_outputCodecCtx->pix_fmt, SWS_FAST_BILINEAR,
