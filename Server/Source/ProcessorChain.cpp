@@ -24,7 +24,11 @@ AGProcessor::AGProcessor(ProcessorChain& chain, const String& id, double sampleR
 AGProcessor::~AGProcessor() { unload(); }
 
 String AGProcessor::createPluginID(const PluginDescription& d) {
-    return d.pluginFormatName + "-" + d.name + "-" + String::toHexString(d.uid);
+    return d.pluginFormatName + "-" + d.name + "-" + String::toHexString(d.uniqueId);
+}
+
+String AGProcessor::createPluginIDDeprecated(const PluginDescription& d) {
+    return d.pluginFormatName + "-" + d.name + "-" + String::toHexString(d.deprecatedUid);
 }
 
 String AGProcessor::convertJUCEtoAGPluginID(const String& id) {
@@ -76,7 +80,9 @@ std::unique_ptr<PluginDescription> AGProcessor::findPluginDescritpion(const Stri
     auto convertedId = convertJUCEtoAGPluginID(id);
     for (auto& desc : pluglist.getTypes()) {
         auto descId = createPluginID(desc);
-        if (descId == id || descId == convertedId) {
+        // JUCE changed the plugin ID format, lets check for the deprecated format too
+        auto descIdDeprecated = createPluginIDDeprecated(desc);
+        if (descId == id || descId == convertedId || descIdDeprecated == id || descIdDeprecated == convertedId) {
             plugdesc = std::make_unique<PluginDescription>(desc);
         }
     }

@@ -74,9 +74,7 @@ void cleanup() {
 
 void deleteFileAtFinish() { l_deleteFile = true; }
 
-File getTraceFile() {
-    return l_file.getFile();
-}
+File getTraceFile() { return l_file.getFile(); }
 
 void setEnabled(bool b) {
     if (b && !l_file.isOpen()) {

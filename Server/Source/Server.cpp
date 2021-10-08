@@ -417,7 +417,8 @@ bool Server::scanPlugin(const String& id, const String& format) {
     for (auto& t : newlist.getTypes()) {
         logln("adding plugin description:");
         logln("  name            = " << t.name << " (" << t.descriptiveName << ")");
-        logln("  uid             = " << t.uid);
+        logln("  uniqueId        = " << t.uniqueId);
+        logln("  deprecatedUid   = " << t.deprecatedUid);
         logln("  id string       = " << AGProcessor::createPluginID(t));
         logln("  manufacturer    = " << t.manufacturerName);
         logln("  category        = " << t.category);
@@ -620,7 +621,6 @@ void Server::runServer() {
     logln("creating listener " << (m_host.length() == 0 ? "*" : m_host) << ":" << (m_port + getId()));
     if (m_masterSocket.createListener(m_port + getId(), m_host)) {
         logln("server started: ID=" << getId() << ", PORT=" << m_port + getId() << ", NAME=" << m_name);
-        //raise(SIGSEGV);
         while (!currentThreadShouldExit()) {
             auto* clnt = accept(&m_masterSocket, 1000, [] { return currentThreadShouldExit(); });
             if (nullptr != clnt) {

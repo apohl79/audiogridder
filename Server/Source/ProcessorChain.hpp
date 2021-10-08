@@ -25,6 +25,7 @@ class AGProcessor : public LogTagDelegate, public AudioProcessorParameter::Liste
     ~AGProcessor() override;
 
     static String createPluginID(const PluginDescription& d);
+    static String createPluginIDDeprecated(const PluginDescription& d);
     static String convertJUCEtoAGPluginID(const String& id);
 
     inline static String createString(const PluginDescription& d) {
