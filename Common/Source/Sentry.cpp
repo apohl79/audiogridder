@@ -10,6 +10,7 @@
 #include "Sentry.hpp"
 #include "Defaults.hpp"
 #include "Utils.hpp"
+#include "Version.hpp"
 
 #ifndef AG_SENTRY_ENABLED
 #define AG_SENTRY_ENABLED 0
@@ -34,8 +35,11 @@ void initialize() {
     setLogTagStatic("sentry");
     if (l_sentryEnabled && crashpadPath.isNotEmpty() && !l_sentryInitialized.exchange(true)) {
         logln("initializing crash reporting...");
+        String rel = "audiogridder-";
+        rel << AUDIOGRIDDER_VERSION;
         sentry_options_t* options = sentry_options_new();
         sentry_options_set_dsn(options, AG_SENTRY_DSN);
+        sentry_options_set_release(options, rel.toRawUTF8());
         sentry_options_set_handler_path(options, crashpadPath.toRawUTF8());
         sentry_options_set_database_path(options, Defaults::getSentryDbPath().toRawUTF8());
 
