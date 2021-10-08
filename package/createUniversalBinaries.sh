@@ -16,6 +16,9 @@ function runlipo() {
 }
 
 function create() {
+    if [ -d $TARGET/$1 ]; then
+        rm -rf $TARGET/$1
+    fi
     mkdir -p $TARGET/$1
     rsync -a $SRC_X86/$1/ $TARGET/$1/
     for FILE in $(find $TARGET/$1 -type f | grep MacOS | grep -v __Pace_Eden); do

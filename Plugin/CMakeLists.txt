@@ -76,9 +76,6 @@ macro(ag_add_plugin type)
     juce::juce_recommended_warning_flags)
 
   if(AG_AAX_PLUGIN_ENABLED)
-    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-      ag_bundle_add_crashpad(AudioGridder${type}_AAX)
-    endif()
     ag_bundle_sign_aax(AudioGridder${type}_AAX)
   endif()
 
