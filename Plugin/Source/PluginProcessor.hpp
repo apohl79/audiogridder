@@ -276,18 +276,16 @@ class AudioGridderAudioProcessor : public AudioProcessor,
         ENABLE_ASYNC_FUNCTORS();
     };
 
-    class TrayConnection : public InterprocessConnection, public Timer, public LogTagDelegate {
+    class TrayConnection : public InterprocessConnection, public Thread, public LogTagDelegate {
       public:
         std::atomic_bool connected{false};
 
-        TrayConnection(AudioGridderAudioProcessor* p) : LogTagDelegate(p), m_processor(p) {}
+        TrayConnection(AudioGridderAudioProcessor* p)
+            : InterprocessConnection(false), Thread("TrayConnection"), LogTagDelegate(p), m_processor(p) {}
 
-        ~TrayConnection() override {
-            disconnect();
-            stopTimer();
-        }
+        ~TrayConnection() override { stopThread(-1); }
 
-        void start() { startTimer(500); }
+        void run() override;
 
         void connectionMade() override { connected = true; }
         void connectionLost() override { connected = false; }
@@ -295,8 +293,6 @@ class AudioGridderAudioProcessor : public AudioProcessor,
         void sendStatus();
         void showMonitor();
         void sendMessage(const PluginTrayMessage& msg);
-
-        void timerCallback() override;
 
         Array<ServerPlugin> getRecents() {
             std::lock_guard<std::mutex> lock(m_recentsMtx);
@@ -307,6 +303,7 @@ class AudioGridderAudioProcessor : public AudioProcessor,
         AudioGridderAudioProcessor* m_processor;
         Array<ServerPlugin> m_recents;
         std::mutex m_recentsMtx;
+        std::mutex m_sendMtx;
     };
 
   private:

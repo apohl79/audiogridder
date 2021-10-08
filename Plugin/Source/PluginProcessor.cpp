@@ -384,8 +384,8 @@ void AudioGridderAudioProcessor::prepareToPlay(double sampleRate, int samplesPer
         m_client->startThread();
     }
 
-    if (!m_disableTray && m_tray != nullptr && !m_tray->isTimerRunning()) {
-        m_tray->start();
+    if (!m_disableTray && m_tray != nullptr && !m_tray->isThreadRunning()) {
+        m_tray->startThread();
     }
 
     printBusesLayout(getBusesLayout());
@@ -1303,7 +1303,7 @@ void AudioGridderAudioProcessor::setDisableTray(bool b) {
     } else {
         m_tray = std::make_unique<TrayConnection>(this);
         if (m_prepared) {
-            m_tray->start();
+            m_tray->startThread();
         }
     }
 }
@@ -1359,46 +1359,50 @@ void AudioGridderAudioProcessor::TrayConnection::showMonitor() {
 void AudioGridderAudioProcessor::TrayConnection::sendMessage(const PluginTrayMessage& msg) {
     MemoryBlock block;
     msg.serialize(block);
+    std::lock_guard<std::mutex> lock(m_sendMtx);
     InterprocessConnection::sendMessage(block);
 }
 
-void AudioGridderAudioProcessor::TrayConnection::timerCallback() {
-    if (!connected) {
-        if (!connectToSocket("localhost", Defaults::PLUGIN_TRAY_PORT, 100)) {
-            String path = File::getSpecialLocation(File::globalApplicationsDirectory).getFullPathName();
+void AudioGridderAudioProcessor::TrayConnection::run() {
+    while (!currentThreadShouldExit()) {
+        if (!connected) {
+            if (!connectToSocket("localhost", Defaults::PLUGIN_TRAY_PORT, 100)) {
+                String path = File::getSpecialLocation(File::globalApplicationsDirectory).getFullPathName();
 #ifdef JUCE_MAC
 #ifdef DEBUG
-            path << "/Debug";
+                path << "/Debug";
 #endif
-            path << "/AudioGridderPluginTray.app/Contents/MacOS/AudioGridderPluginTray";
+                path << "/AudioGridderPluginTray.app/Contents/MacOS/AudioGridderPluginTray";
 #elif JUCE_WINDOWS
-            path << "/AudioGridderPluginTray/AudioGridderPluginTray.exe";
+                path << "/AudioGridderPluginTray/AudioGridderPluginTray.exe";
 #elif JUCE_LINUX
-            path << "/local/bin/AudioGridderPluginTray";
+                path << "/local/bin/AudioGridderPluginTray";
 #endif
-            if (File(path).existsAsFile()) {
-                logln("tray connection failed, trying to run tray app: " << path);
-                ChildProcess proc;
-                if (!proc.start(path, 0)) {
-                    logln("failed to start tray app");
+                if (File(path).existsAsFile()) {
+                    logln("tray connection failed, trying to run tray app: " << path);
+                    ChildProcess proc;
+                    if (!proc.start(path, 0)) {
+                        logln("failed to start tray app");
+                    }
+                } else {
+                    logln("no tray app available");
+                    static std::once_flag once;
+                    std::call_once(once, [] {
+                        AlertWindow::showMessageBoxAsync(
+                            AlertWindow::WarningIcon, "Error",
+                            "AudioGridder tray application not found! Please uninstall the "
+                            "AudioGridder plugin and reinstall it!",
+                            "OK");
+                    });
                 }
-            } else {
-                logln("no tray app available");
-                static std::once_flag once;
-                std::call_once(once, [] {
-                    AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Error",
-                                                     "AudioGridder tray application not found! Please uninstall the "
-                                                     "AudioGridder plugin and reinstall it!",
-                                                     "OK");
-                });
+                sleepExitAware(2500);
             }
-            // stop the timer here and reactivate it later to give the try app some time to start
-            stopTimer();
-            callAfterDelay(3000, [this] { start(); });
+        } else {
+            sendStatus();
         }
-    } else {
-        sendStatus();
+        sleepExitAware(500);
     }
+    disconnect();
 }
 
 }  // namespace e47
