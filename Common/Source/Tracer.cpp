@@ -14,7 +14,7 @@
 namespace e47 {
 namespace Tracer {
 
-#define NUM_OF_TRACE_RECORDS 250000  // ~50MB
+#define NUM_OF_TRACE_RECORDS 25000  // ~5MB
 
 std::atomic_bool l_tracerEnabled{false};
 std::atomic_uint64_t l_index{0};
