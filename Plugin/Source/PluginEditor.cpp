@@ -551,7 +551,7 @@ int AudioGridderAudioProcessorEditor::getPluginIndex(const String& name) {
 void AudioGridderAudioProcessorEditor::focusOfChildComponentChanged(FocusChangeType cause) {
     traceScope();
     bool focus = hasKeyboardFocus(true);
-    logln("focus change: has focus is " << (int)focus << ", cause is " << cause);
+    //logln("focus change: has focus is " << (int)focus << ", cause is " << cause);
     if (focus) {
         // reactivate the plugin screen
         int active = m_processor.getActivePlugin();
