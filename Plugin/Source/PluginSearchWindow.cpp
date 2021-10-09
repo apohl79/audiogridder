@@ -59,7 +59,7 @@ PluginSearchWindow::~PluginSearchWindow() {
 }
 
 void PluginSearchWindow::hide() {
-    traceScope();
+    logln("hiding serach window (delete)");
     delete this;
 }
 
