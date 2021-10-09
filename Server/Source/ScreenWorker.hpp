@@ -53,7 +53,7 @@ class ScreenWorker : public Thread, public LogTagDelegate {
     std::condition_variable m_currentImageCv;
 
     std::atomic_bool m_visible{false};
-    std::shared_ptr<AGProcessor> m_currentProc;
+    AGProcessor* m_currentProc;
 
     ENABLE_ASYNC_FUNCTORS();
 };
