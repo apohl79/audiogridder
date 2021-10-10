@@ -105,8 +105,8 @@ void Worker::run() {
 
     // enter message loop
     logln("command processor started");
-    while (!currentThreadShouldExit() && nullptr != m_cmdIn && m_cmdIn->isConnected() && m_audio->isOk() &&
-           m_screen->isOk()) {
+    while (!currentThreadShouldExit() && nullptr != m_cmdIn && m_cmdIn->isConnected() && m_audio->isOkNoLock() &&
+           m_screen->isOkNoLock()) {
         MessageHelper::Error e;
         std::shared_ptr<Message<Any>> msg;
         msg = m_msgFactory.getNextMessage(m_cmdIn.get(), &e);

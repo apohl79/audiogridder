@@ -25,8 +25,11 @@ class ScreenWorker : public Thread, public LogTagDelegate {
 
     bool isOk() {
         std::lock_guard<std::mutex> lock(m_mtx);
-        return !currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected();
+        m_wasOk = !currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected();
+        return m_wasOk;
     }
+
+    bool isOkNoLock() const { return m_wasOk; }
 
     void run();
     void runNative();
@@ -38,6 +41,7 @@ class ScreenWorker : public Thread, public LogTagDelegate {
 
   private:
     std::mutex m_mtx;
+    std::atomic_bool m_wasOk{true};
     std::unique_ptr<StreamingSocket> m_socket;
 
     // Native capturing

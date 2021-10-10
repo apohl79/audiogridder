@@ -10,6 +10,9 @@
 #include "ImageDiff.hpp"
 #include "App.hpp"
 
+#include <chrono>
+using namespace std::chrono_literals;
+
 namespace e47 {
 
 ScreenWorker::ScreenWorker(LogTag* tag) : Thread("ScreenWorker"), LogTagDelegate(tag) { initAsyncFunctors(); }
@@ -54,19 +57,19 @@ void ScreenWorker::runFFmpeg() {
     Message<ScreenCapture> msg;
     while (isOk()) {
         std::unique_lock<std::mutex> lock(m_currentImageLock);
-        m_currentImageCv.wait(lock, [this] { return m_updated; });
-        m_updated = false;
-
-        if (m_imageBuf.size() > 0) {
-            if (m_imageBuf.size() <= Message<ScreenCapture>::MAX_SIZE) {
-                msg.payload.setImage(m_width, m_height, m_scale, m_imageBuf.data(), m_imageBuf.size());
-                lock.unlock();
-                std::lock_guard<std::mutex> socklock(m_mtx);
-                msg.send(m_socket.get());
-            } else {
-                logln(
-                    "plugin screen image data exceeds max message size, Message::MAX_SIZE has to be "
-                    "increased.");
+        if (m_currentImageCv.wait_for(lock, 50ms, [this] { return m_updated; })) {
+            m_updated = false;
+            if (m_imageBuf.size() > 0) {
+                if (m_imageBuf.size() <= Message<ScreenCapture>::MAX_SIZE) {
+                    msg.payload.setImage(m_width, m_height, m_scale, m_imageBuf.data(), m_imageBuf.size());
+                    lock.unlock();
+                    std::lock_guard<std::mutex> socklock(m_mtx);
+                    msg.send(m_socket.get());
+                } else {
+                    logln(
+                        "plugin screen image data exceeds max message size, Message::MAX_SIZE has to be "
+                        "increased.");
+                }
             }
         }
     }
