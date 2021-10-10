@@ -99,11 +99,15 @@ class LogTag {
     uint64 getId() const { return m_tagId; }
 
     const LogTag* getLogTagSource() const { return this; }
-    String getLogTag() const { return getTaggedStr(m_tagName, String::toHexString(m_tagId), m_tagExtra, true); }
-    String getLogTagNoTime() const { return getTaggedStr(m_tagName, String::toHexString(m_tagId), m_tagExtra, false); }
+    String getLogTag() const {
+        return m_tagId == 0 ? "" : getTaggedStr(m_tagName, String::toHexString(m_tagId), m_tagExtra, true);
+    }
+    String getLogTagNoTime() const {
+        return m_tagId == 0 ? "" : getTaggedStr(m_tagName, String::toHexString(m_tagId), m_tagExtra, false);
+    }
 
   protected:
-    uint64 m_tagId;
+    uint64 m_tagId = 0;
     String m_tagName;
     String m_tagExtra;
 };
