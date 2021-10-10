@@ -1300,7 +1300,7 @@ void AudioGridderAudioProcessor::setDisableTray(bool b) {
     m_disableTray = b;
     if (m_disableTray) {
         m_tray.reset();
-    } else {
+    } else if (nullptr == m_tray) {
         m_tray = std::make_unique<TrayConnection>(this);
         if (m_prepared) {
             m_tray->startThread();

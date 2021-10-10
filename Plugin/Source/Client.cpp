@@ -61,6 +61,9 @@ void Client::run() {
         }
         m_processor->loadConfig(cfg, true);
 
+        // Start/stop tray connection, if the setting changed
+        m_processor->setDisableTray(m_processor->getDisableTray());
+
         // Try to auto connect to the first available host discovered via mDNS
         if (m_srvHost.isEmpty()) {
             auto servers = m_processor->getServersMDNS();
