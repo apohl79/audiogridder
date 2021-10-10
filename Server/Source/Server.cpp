@@ -417,8 +417,8 @@ bool Server::scanPlugin(const String& id, const String& format) {
     for (auto& t : newlist.getTypes()) {
         logln("adding plugin description:");
         logln("  name            = " << t.name << " (" << t.descriptiveName << ")");
-        logln("  uniqueId        = " << t.uniqueId);
-        logln("  deprecatedUid   = " << t.deprecatedUid);
+        logln("  uniqueId        = " << String::toHexString(t.uniqueId));
+        logln("  deprecatedUid   = " << String::toHexString(t.deprecatedUid));
         logln("  id string       = " << AGProcessor::createPluginID(t));
         logln("  manufacturer    = " << t.manufacturerName);
         logln("  category        = " << t.category);
