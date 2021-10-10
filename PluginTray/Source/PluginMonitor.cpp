@@ -227,6 +227,9 @@ void PluginMonitor::update() {
     bool allOk = true;
     for (auto& c : m_app->getServer().getConnections()) {
         allOk = allOk && c->status.ok;
+        if (!allOk) {
+            break;
+        }
     }
 
     bool show = ((!allOk && windowAutoShow) || windowAlwaysShow);
@@ -234,14 +237,13 @@ void PluginMonitor::update() {
 
     if (show) {
         windowActive = true;
+        m_hideCounter = 0;
     } else if (hide) {
-        windowActive = false;
+        m_hideCounter = 20;
     }
 
     if (show && nullptr == m_window) {
         m_window = std::make_unique<PluginMonitorWindow>(this, m_app);
-    } else if (nullptr != m_window && hide) {
-        m_window.reset();
     }
 
     if (nullptr != m_window) {
@@ -251,8 +253,15 @@ void PluginMonitor::update() {
 
 void PluginMonitor::timerCallback() {
     if (m_needsUpdate) {
-        MessageManager::callAsync([this] { update(); });
+        update();
         m_needsUpdate = false;
+    }
+    if (m_hideCounter > 0) {
+        m_hideCounter--;
+        if (m_hideCounter == 0) {
+            windowActive = false;
+            m_window.reset();
+        }
     }
 }
 

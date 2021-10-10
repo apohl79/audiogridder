@@ -94,6 +94,7 @@ class PluginMonitor : public LogTag, public Timer {
 
     void hideWindow() {
         windowAlwaysShow = false;
+        m_hideCounter = 0;
         m_window.reset();
     }
 
@@ -105,6 +106,7 @@ class PluginMonitor : public LogTag, public Timer {
     App* m_app;
     std::unique_ptr<PluginMonitorWindow> m_window;
     std::atomic_bool m_needsUpdate{false};
+    std::atomic_int m_hideCounter;
 
     void update();
 };
