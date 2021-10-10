@@ -35,7 +35,7 @@ fi
 
 echo "Setting version to: $NUM_VER $STR_VER"
 
-cat package/Version.hpp.in | sed "s/#STR_VER#/$STR_VER/" | sed "s/#STR_BUILD_DATE#/$DATE/" > Common/Source/Version.hpp
+cat package/Version.hpp.in | sed "s/#STR_VER#/$STR_VER/" | sed "s/#STR_BUILD_DATE#/$DATE/" | sed "s/#NUM_VER#/$NUM_VER/" > Common/Source/Version.hpp
 cat package/AudioGridderPlugin.iss.in | sed "s/#STR_VER#/$STR_VER/" > package/AudioGridderPlugin.iss
 cat package/AudioGridderServer.iss.in | sed "s/#STR_VER#/$STR_VER/" > package/AudioGridderServer.iss
 cat package/archiveWin.bat.in | sed "s/#STR_VER#/$STR_VER/g" > package/archiveWin.bat

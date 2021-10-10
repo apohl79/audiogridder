@@ -35,13 +35,21 @@ void initialize() {
     setLogTagStatic("sentry");
     if (l_sentryEnabled && crashpadPath.isNotEmpty() && !l_sentryInitialized.exchange(true)) {
         logln("initializing crash reporting...");
-        String rel = "audiogridder-";
-        rel << AUDIOGRIDDER_VERSION;
         sentry_options_t* options = sentry_options_new();
         sentry_options_set_dsn(options, AG_SENTRY_DSN);
-        sentry_options_set_release(options, rel.toRawUTF8());
         sentry_options_set_handler_path(options, crashpadPath.toRawUTF8());
         sentry_options_set_database_path(options, Defaults::getSentryDbPath().toRawUTF8());
+
+        if (String(AUDIOGRIDDER_VERSION) != "dev-build") {
+            StringArray parts = StringArray::fromTokens(AUDIOGRIDDER_VERSION, "-", {});
+            StringArray version = StringArray::fromTokens(AUDIOGRIDDER_VERSION_NUM, ".", {});
+            String rel = "release_";
+            rel << version[0] << "_" << version[1] << "_" << version[2];
+            if (parts.size() > 1) {
+                rel << "_" << parts[1];
+            }
+            sentry_options_set_release(options, rel.toRawUTF8());
+        }
 
         if (AGLogger::isEnabled()) {
             auto logfile = AGLogger::getLogFile().getFullPathName();
