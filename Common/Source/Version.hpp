@@ -10,8 +10,8 @@
 
 #define AUDIOGRIDDER_VERSION "dev-build"
 #define AUDIOGRIDDER_VERSIONW L"dev-build"
-#define AUDIOGRIDDER_VERSION_NUM ""
-#define AUDIOGRIDDER_VERSION_NUMW L""
+#define AUDIOGRIDDER_VERSION_NUM "1.2.0"
+#define AUDIOGRIDDER_VERSION_NUMW L"1.2.0"
 #define AUDIOGRIDDER_BUILD_DATE ""
 
 #endif /* Version_hpp */
