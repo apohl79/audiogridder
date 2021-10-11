@@ -196,6 +196,8 @@ void App::prepareShutdown(uint32 exitCode) {
     m_exitCode = exitCode;
 
     std::thread([this] {
+        Thread::setCurrentThreadName("ShutdownThread");
+
         traceScope();
 
         if (m_server != nullptr) {
