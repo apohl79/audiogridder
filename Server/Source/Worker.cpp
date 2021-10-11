@@ -681,6 +681,7 @@ bool Worker::KeyWatcher::keyPressed(const KeyPress& kp, Component*) {
 }
 
 void Worker::sendParamValueChange(int idx, int paramIdx, float val) {
+    logln("sending parameter update (index=" << idx << ", parame index=" << paramIdx << ") new value is " << val);
     Message<ParameterValue> msg(this);
     DATA(msg)->idx = idx;
     DATA(msg)->paramIdx = paramIdx;
@@ -689,6 +690,8 @@ void Worker::sendParamValueChange(int idx, int paramIdx, float val) {
 }
 
 void Worker::sendParamGestureChange(int idx, int paramIdx, bool guestureIsStarting) {
+    logln("sending gesture change (index=" << idx << ", parame index=" << paramIdx << ") "
+                                           << (guestureIsStarting ? "starting" : "end"));
     Message<ParameterGesture> msg(this);
     DATA(msg)->idx = idx;
     DATA(msg)->paramIdx = paramIdx;

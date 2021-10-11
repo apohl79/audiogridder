@@ -1089,6 +1089,9 @@ void AudioGridderAudioProcessor::updateParameterValue(int idx, int paramIdx, flo
         slot = param.automationSlot;
     }
 
+    logln("parameter update (slot=" << slot << ", index=" << idx << ", param index=" << paramIdx << ") new value is "
+                                    << val << " [" << (updateServer ? "" : "NOT ") << "updating server]");
+
     if (slot > -1) {
         auto* pparam = dynamic_cast<Parameter*>(getParameters()[slot]);
         if (nullptr != pparam) {
@@ -1096,6 +1099,8 @@ void AudioGridderAudioProcessor::updateParameterValue(int idx, int paramIdx, flo
             pparam->setValueNotifyingHost(val);
             return;
         }
+    } else {
+        logln("parameter update ignored: unassigned parameter");
     }
 
     if (updateServer) {
@@ -1125,6 +1130,8 @@ void AudioGridderAudioProcessor::updateParameterGestureTracking(int idx, int par
     if (slot > -1) {
         auto* pparam = dynamic_cast<Parameter*>(getParameters()[slot]);
         if (nullptr != pparam) {
+            logln("parameter (slot=" << pparam->m_slotId << ", index=" << pparam->m_idx << ", param index="
+                                     << pparam->m_paramIdx << ") " << (starting ? "begin" : "end") << " gesture");
             if (starting) {
                 pparam->beginChangeGesture();
             } else {
@@ -1136,6 +1143,7 @@ void AudioGridderAudioProcessor::updateParameterGestureTracking(int idx, int par
 
 void AudioGridderAudioProcessor::parameterValueChanged(int parameterIndex, float newValue) {
     traceScope();
+    // update generic editor
     if (auto* e = dynamic_cast<AudioGridderAudioProcessorEditor*>(getActiveEditor())) {
         auto* pparam = dynamic_cast<Parameter*>(getParameters()[parameterIndex]);
         if (nullptr != pparam && m_activePlugin == pparam->m_idx) {
