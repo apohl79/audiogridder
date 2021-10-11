@@ -197,6 +197,7 @@ void ScreenRecorder::resume(Rectangle<int> rect) {
         m_thread->detach();
     }
     m_thread = std::make_unique<std::thread>([this, rect] {
+        Thread::setCurrentThreadName("ScreenRecorder");
         traceScope();
         bool ready = true;
         if (rect.isEmpty()) {
