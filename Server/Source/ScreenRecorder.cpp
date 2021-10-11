@@ -196,6 +196,7 @@ void ScreenRecorder::resume(Rectangle<int> rect) {
         logln("error: detaching thread in resume()");
         m_thread->detach();
     }
+    m_threadRunning = true;
     m_thread = std::make_unique<std::thread>([this, rect] {
         Thread::setCurrentThreadName("ScreenRecorder");
         traceScope();
@@ -212,7 +213,6 @@ void ScreenRecorder::resume(Rectangle<int> rect) {
         }
         m_threadRunning = false;
     });
-    m_threadRunning = true;
 }
 
 bool ScreenRecorder::updateArea(Rectangle<int> rect) {
