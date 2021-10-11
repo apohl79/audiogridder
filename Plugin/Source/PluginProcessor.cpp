@@ -1095,8 +1095,9 @@ void AudioGridderAudioProcessor::updateParameterValue(int idx, int paramIdx, flo
     if (slot > -1) {
         auto* pparam = dynamic_cast<Parameter*>(getParameters()[slot]);
         if (nullptr != pparam) {
-            // this will trigger the server update as well
-            pparam->setValueNotifyingHost(val);
+            // this will trigger the server update as well, need to call this on the message thread or automation
+            // recording does not work for VST3
+            runOnMsgThreadSync([pparam, val] { pparam->setValueNotifyingHost(val); });
             return;
         }
     } else {
@@ -1132,10 +1133,11 @@ void AudioGridderAudioProcessor::updateParameterGestureTracking(int idx, int par
         if (nullptr != pparam) {
             logln("parameter (slot=" << pparam->m_slotId << ", index=" << pparam->m_idx << ", param index="
                                      << pparam->m_paramIdx << ") " << (starting ? "begin" : "end") << " gesture");
+            // need to call this on the message thread or automation recording does not work for VST3
             if (starting) {
-                pparam->beginChangeGesture();
+                runOnMsgThreadSync([pparam] { pparam->beginChangeGesture(); });
             } else {
-                pparam->endChangeGesture();
+                runOnMsgThreadSync([pparam] { pparam->endChangeGesture(); });
             }
         }
     }
