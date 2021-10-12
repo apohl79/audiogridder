@@ -16,6 +16,7 @@ Source: "..\build-windows-x86_64\lib\AAX\AudioGridder.aaxplugin"; DestDir: {comm
 Source: "..\build-windows-x86_64\lib\AAX\AudioGridderInst.aaxplugin"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins; Flags: ignoreversion recursesubdirs
 Source: "..\build-windows-x86_64\lib\AAX\AudioGridderMidi.aaxplugin"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins; Flags: ignoreversion recursesubdirs
 Source: "..\build-windows-x86_64\bin\AudioGridderPluginTray.exe"; DestDir: {commonpf64}\AudioGridderPluginTray; Flags: ignoreversion
+Source: "..\build-windows-x86_64\bin\crashpad_handler.exe"; DestDir: {commonpf64}\AudioGridderPluginTray; Flags: ignoreversion
 
 [Code]
 var
