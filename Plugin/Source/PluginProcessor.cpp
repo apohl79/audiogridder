@@ -1070,77 +1070,84 @@ void AudioGridderAudioProcessor::getAllParameterValues(int idx) {
 
 void AudioGridderAudioProcessor::updateParameterValue(int idx, int paramIdx, float val, bool updateServer) {
     traceScope();
+    runOnMsgThreadAsync([this, idx, paramIdx, val, updateServer] {
+        traceScope();
 
-    int slot = -1;
+        int slot = -1;
 
-    {
-        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
-        if (idx < 0 || idx >= (int)m_loadedPlugins.size()) {
-            logln("idx out of range");
-            return;
+        {
+            std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+            if (idx < 0 || idx >= (int)m_loadedPlugins.size()) {
+                logln("idx out of range");
+                return;
+            }
+            if (paramIdx < 0 || paramIdx >= m_loadedPlugins[(size_t)idx].params.size()) {
+                logln("paramIdx out of range");
+                return;
+            }
+            auto& param = m_loadedPlugins[(size_t)idx].params.getReference(paramIdx);
+
+            param.currentValue = val;
+            slot = param.automationSlot;
         }
-        if (paramIdx < 0 || paramIdx >= m_loadedPlugins[(size_t)idx].params.size()) {
-            logln("paramIdx out of range");
-            return;
+
+        logln("parameter update (slot=" << slot << ", index=" << idx << ", param index=" << paramIdx
+                                        << ") new value is " << val << " [" << (updateServer && slot < 0 ? "" : "NOT ")
+                                        << "updating server]");
+
+        if (slot > -1) {
+            auto* pparam = dynamic_cast<Parameter*>(getParameters()[slot]);
+            if (nullptr != pparam) {
+                // this will trigger the server update as well, need to call this on the message thread or automation
+                // recording does not work for VST3
+                pparam->setValueNotifyingHost(val);
+                return;
+            }
+        } else {
+            logln("parameter update ignored: unassigned parameter");
         }
-        auto& param = m_loadedPlugins[(size_t)idx].params.getReference(paramIdx);
 
-        param.currentValue = val;
-        slot = param.automationSlot;
-    }
-
-    logln("parameter update (slot=" << slot << ", index=" << idx << ", param index=" << paramIdx << ") new value is "
-                                    << val << " [" << (updateServer ? "" : "NOT ") << "updating server]");
-
-    if (slot > -1) {
-        auto* pparam = dynamic_cast<Parameter*>(getParameters()[slot]);
-        if (nullptr != pparam) {
-            // this will trigger the server update as well, need to call this on the message thread or automation
-            // recording does not work for VST3
-            runOnMsgThreadSync([pparam, val] { pparam->setValueNotifyingHost(val); });
-            return;
+        if (updateServer) {
+            m_client->setParameterValue(idx, paramIdx, val);
         }
-    } else {
-        logln("parameter update ignored: unassigned parameter");
-    }
-
-    if (updateServer) {
-        m_client->setParameterValue(idx, paramIdx, val);
-    }
+    });
 }
 
 void AudioGridderAudioProcessor::updateParameterGestureTracking(int idx, int paramIdx, bool starting) {
     traceScope();
+    runOnMsgThreadAsync([this, idx, paramIdx, starting] {
+        traceScope();
 
-    int slot = -1;
+        int slot = -1;
 
-    {
-        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
-        if (idx < 0 || idx >= (int)m_loadedPlugins.size()) {
-            logln("idx out of range");
-            return;
+        {
+            std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+            if (idx < 0 || idx >= (int)m_loadedPlugins.size()) {
+                logln("idx out of range");
+                return;
+            }
+            if (paramIdx < 0 || paramIdx >= m_loadedPlugins[(size_t)idx].params.size()) {
+                logln("paramIdx out of range");
+                return;
+            }
+            auto& param = m_loadedPlugins[(size_t)idx].params.getReference(paramIdx);
+            slot = param.automationSlot;
         }
-        if (paramIdx < 0 || paramIdx >= m_loadedPlugins[(size_t)idx].params.size()) {
-            logln("paramIdx out of range");
-            return;
-        }
-        auto& param = m_loadedPlugins[(size_t)idx].params.getReference(paramIdx);
-        slot = param.automationSlot;
-    }
 
-    if (slot > -1) {
-        auto* pparam = dynamic_cast<Parameter*>(getParameters()[slot]);
-        if (nullptr != pparam) {
-            logln("parameter (slot=" << pparam->m_slotId << ", index=" << pparam->m_idx << ", param index="
-                                     << pparam->m_paramIdx << ") " << (starting ? "begin" : "end") << " gesture");
-            // need to call this on the message thread or automation recording does not work for VST3
-            if (starting) {
-                runOnMsgThreadSync([pparam] { pparam->beginChangeGesture(); });
-            } else {
-                runOnMsgThreadSync([pparam] { pparam->endChangeGesture(); });
+        if (slot > -1) {
+            auto* pparam = dynamic_cast<Parameter*>(getParameters()[slot]);
+            if (nullptr != pparam) {
+                logln("parameter (slot=" << pparam->m_slotId << ", index=" << pparam->m_idx << ", param index="
+                                         << pparam->m_paramIdx << ") " << (starting ? "begin" : "end") << " gesture");
+                // need to call this on the message thread or automation recording does not work for VST3
+                if (starting) {
+                    pparam->beginChangeGesture();
+                } else {
+                    pparam->endChangeGesture();
+                }
             }
         }
-    }
+    });
 }
 
 void AudioGridderAudioProcessor::parameterValueChanged(int parameterIndex, float newValue) {
