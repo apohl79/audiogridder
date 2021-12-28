@@ -89,7 +89,11 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
                     }
                     app->hideSplashWindow();
                 });
+#ifdef JUCE_WINDOWS
+                String info = L"\xa9 2020-2021 Andreas Pohl, https://audiogridder.com";
+#else
                 String info = L"© 2020-2021 Andreas Pohl, https://audiogridder.com";
+#endif
                 app->setSplashInfo(info);
             });
             const char* logoNoMac = Images::logowintray_png;
@@ -128,7 +132,11 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
                     }
                     m_app->hideSplashWindow();
                 });
+#ifdef JUCE_WINDOWS
+                String info = L"\xa9 2020-2021 Andreas Pohl, https://audiogridder.com";
+#else
                 String info = L"© 2020-2021 Andreas Pohl, https://audiogridder.com";
+#endif
                 m_app->setSplashInfo(info);
             });
             menu.addItem("Restart", [this] { m_app->prepareShutdown(App::EXIT_RESTART); });
