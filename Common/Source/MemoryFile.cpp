@@ -29,8 +29,9 @@ void MemoryFile::open(bool overwriteIfExists) {
     }
     void* m = nullptr;
 #ifdef JUCE_WINDOWS
-    m_fd = CreateFileA(m_file.getFullPathName().getCharPointer(), (GENERIC_READ | GENERIC_WRITE), FILE_SHARE_READ, NULL,
-                       overwriteIfExists ? CREATE_ALWAYS : OPEN_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, NULL);
+    m_fd = CreateFileA(m_file.getFullPathName().getCharPointer(), (GENERIC_READ | GENERIC_WRITE),
+                       (FILE_SHARE_READ | FILE_SHARE_WRITE), NULL, overwriteIfExists ? CREATE_ALWAYS : OPEN_ALWAYS,
+                       FILE_ATTRIBUTE_TEMPORARY, NULL);
     if (m_fd == INVALID_HANDLE_VALUE) {
         logln("CreateFileA failed: " << GetLastErrorStr());
         return;
