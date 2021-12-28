@@ -59,7 +59,7 @@ PluginSearchWindow::~PluginSearchWindow() {
 }
 
 void PluginSearchWindow::hide() {
-    logln("hiding serach window (delete)");
+    logln("hiding serach window 0x" << String::toHexString((uint64)this) << " (delete)");
     delete this;
 }
 
