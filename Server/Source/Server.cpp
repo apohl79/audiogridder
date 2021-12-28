@@ -214,11 +214,13 @@ void Server::loadKnownPluginList() {
     for (auto& desc : m_pluginlist.getTypes()) {
         std::unique_ptr<AudioPluginFormat> fmt;
         if (desc.pluginFormatName == "AudioUnit") {
-#ifdef JUCE_MAC
+#if JUCE_MAC
             fmt = std::make_unique<AudioUnitPluginFormat>();
 #endif
         } else if (desc.pluginFormatName == "VST") {
+#if JUCE_PLUGINHOST_VST
             fmt = std::make_unique<VSTPluginFormat>();
+#endif
         } else if (desc.pluginFormatName == "VST3") {
             fmt = std::make_unique<VST3PluginFormat>();
         }
@@ -391,10 +393,14 @@ void Server::addPlugins(const std::vector<String>& names, std::function<void(boo
 bool Server::scanPlugin(const String& id, const String& format) {
     std::unique_ptr<AudioPluginFormat> fmt;
     if (!format.compare("VST")) {
+#if JUCE_PLUGINHOST_VST
         fmt = std::make_unique<VSTPluginFormat>();
+#else
+        return false;
+#endif
     } else if (!format.compare("VST3")) {
         fmt = std::make_unique<VST3PluginFormat>();
-#ifdef JUCE_MAC
+#if JUCE_MAC
     } else if (!format.compare("AudioUnit")) {
         fmt = std::make_unique<AudioUnitPluginFormat>();
 #endif
@@ -477,7 +483,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
     traceScope();
     logln("scanning for plugins...");
     std::vector<std::unique_ptr<AudioPluginFormat>> fmts;
-#ifdef JUCE_MAC
+#if JUCE_MAC
     if (m_enableAU) {
         fmts.push_back(std::make_unique<AudioUnitPluginFormat>());
     }
@@ -485,9 +491,11 @@ void Server::scanForPlugins(const std::vector<String>& include) {
     if (m_enableVST3) {
         fmts.push_back(std::make_unique<VST3PluginFormat>());
     }
+#if JUCE_PLUGINHOST_VST
     if (m_enableVST2) {
         fmts.push_back(std::make_unique<VSTPluginFormat>());
     }
+#endif
 
     std::set<String> neverSeenList = m_pluginexclude;
 
