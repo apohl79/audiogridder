@@ -9,7 +9,7 @@ supported on macOS and Windows.
 
 ```
 # Checkout the code
-git clone https://github.com/apohl79/audiogridder.git
+git clone --recurse-submodules https://github.com/apohl79/audiogridder.git
 cd audiogridder
 
 # Checkout the dependencies
