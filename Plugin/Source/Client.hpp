@@ -17,7 +17,7 @@
 #include "Metrics.hpp"
 #include "ImageReader.hpp"
 
-JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE("-Wzero-as-null-pointer-constant")
+JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE("-Wzero-as-null-pointer-constant", "-Wsign-conversion")
 #include <boost/lockfree/spsc_queue.hpp>
 JUCE_END_IGNORE_WARNINGS_GCC_LIKE
 
