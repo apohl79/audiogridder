@@ -63,7 +63,8 @@ brew install audiogridder-server
 # Compatibility
 
 - Server: macOS 10.7+, Windows 7+
-- Plugin: macOS 10.7+, Windows 7+, Linux 64bit
+- Plugin: macOS 10.7+, Windows 7+, Linux
+- AudioGridder is 64bit only
 - The server supports AudioUnit (macOS only) and VST2/VST3 plugins
 - The plugin is available as VST2/VST3, AAX and AudioUnit (macOS only)
 - Tested DAWs: Cubase 10 Pro, Logic Pro X, Pro Tools 2020.12/12, Reaper, Ableton Live
@@ -74,3 +75,9 @@ AudioGridder is free. If you use it, please consider supporting the project with
 
 [![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=MF9TGYY8P8GG4)
 [![donorbox](https://d1iczxrky3cnb2.cloudfront.net/button-small-blue.png)](https://donorbox.org/audiogridder?default_interval=o)
+
+# Contributing
+
+Pull requests are welcome! Please follow the
+[development guide](https://github.com/apohl79/audiogridder/DEVELOP.md)
+if you'd like to contribute to the project and to get started.
