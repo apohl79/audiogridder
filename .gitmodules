@@ -1,0 +1,3 @@
+[submodule "JUCE"]
+	path = JUCE
+	url = git@github.com:apohl79/JUCE.git

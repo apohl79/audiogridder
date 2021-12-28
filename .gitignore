@@ -9,7 +9,6 @@ package/VERSION
 package/archiveWin.bat
 build-*
 debug-sym-*
-JUCE
 GPATH
 GRTAGS
 GTAGS
