@@ -15,7 +15,12 @@ macro(ag_add_plugin type)
     set(productname "${productname}${type}")
   endif()
 
-  set(AG_FORMATS AU VST3 VST)
+  set(AG_FORMATS AU VST3)
+
+  if(AG_VST2_PLUGIN_ENABLED)
+    list(APPEND AG_FORMATS VST)
+  endif()
+
   if(AG_AAX_PLUGIN_ENABLED)
     list(APPEND AG_FORMATS AAX)
   endif()
@@ -82,19 +87,27 @@ macro(ag_add_plugin type)
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     ag_bundle_add_crashpad(AudioGridder${type}_AU)
-    ag_bundle_add_crashpad(AudioGridder${type}_VST)
     ag_bundle_add_crashpad(AudioGridder${type}_VST3)
     ag_bundle_sign(AudioGridder${type}_AU)
-    ag_bundle_sign(AudioGridder${type}_VST)
     ag_bundle_sign(AudioGridder${type}_VST3)
+
+    if(AG_VST2_PLUGIN_ENABLED)
+      ag_bundle_add_crashpad(AudioGridder${type}_VST)
+      ag_bundle_sign(AudioGridder${type}_VST)
+    endif()
+
     if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND AG_ENABLE_DEBUG_COPY_STEP)
       get_target_property(AG_AU_DEST AudioGridder${type} JUCE_AU_COPY_DIR)
-      get_target_property(AG_VST_DEST AudioGridder${type} JUCE_VST_COPY_DIR)
       get_target_property(AG_VST3_DEST AudioGridder${type} JUCE_VST3_COPY_DIR)
       get_target_property(AG_AAX_DEST AudioGridder${type} JUCE_AAX_COPY_DIR)
       ag_bundle_copy(AudioGridder${type}_AU ${AG_AU_DEST})
-      ag_bundle_copy(AudioGridder${type}_VST ${AG_VST_DEST})
       ag_bundle_copy(AudioGridder${type}_VST3 ${AG_VST3_DEST})
+
+      if(AG_VST2_PLUGIN_ENABLED)
+        get_target_property(AG_VST_DEST AudioGridder${type} JUCE_VST_COPY_DIR)
+        ag_bundle_copy(AudioGridder${type}_VST ${AG_VST_DEST})
+      endif()
+
       if(AG_AAX_PLUGIN_ENABLED)
         ag_bundle_copy(AudioGridder${type}_AAX ${AG_AAX_DEST})
       endif()
@@ -102,21 +115,27 @@ macro(ag_add_plugin type)
   endif()
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    set_target_properties(AudioGridder${type}_VST PROPERTIES
-      ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/lib/VST
-      LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/lib/VST
-      ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/lib/VST
-      LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/lib/VST)
     set_target_properties(AudioGridder${type}_VST3 PROPERTIES
       ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/lib/VST3
       LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/lib/VST3
       ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/lib/VST3
       LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/lib/VST3)
-    set_target_properties(AudioGridder${type}_AAX PROPERTIES
-      ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/lib/AAX
-      LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/lib/AAX
-      ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/lib/AAX
-      LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/lib/AAX)
+
+    if(AG_VST2_PLUGIN_ENABLED)
+      set_target_properties(AudioGridder${type}_VST PROPERTIES
+        ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/lib/VST
+        LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/lib/VST
+        ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/lib/VST
+        LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/lib/VST)
+    endif()
+
+    if(AG_AAX_PLUGIN_ENABLED)
+      set_target_properties(AudioGridder${type}_AAX PROPERTIES
+        ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/lib/AAX
+        LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/lib/AAX
+        ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/lib/AAX
+        LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/lib/AAX)
+    endif()
   endif()
 endmacro()
 
