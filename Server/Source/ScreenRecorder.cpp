@@ -13,9 +13,9 @@ namespace e47 {
 
 String ScreenRecorder::m_inputFmtName;
 String ScreenRecorder::m_inputStreamUrl;
-AVInputFormat* ScreenRecorder::m_inputFmt = nullptr;
+const AVInputFormat* ScreenRecorder::m_inputFmt = nullptr;
+const AVCodec* ScreenRecorder::m_outputCodec = nullptr;
 AVFormatContext* ScreenRecorder::m_captureFmtCtx = nullptr;
-AVCodec* ScreenRecorder::m_outputCodec = nullptr;
 bool ScreenRecorder::m_initialized = false;
 
 ScreenRecorder::EncoderMode ScreenRecorder::m_encMode = ScreenRecorder::WEBP;

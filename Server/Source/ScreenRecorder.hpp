@@ -57,9 +57,9 @@ class ScreenRecorder : public LogTag {
   private:
     static String m_inputFmtName;
     static String m_inputStreamUrl;
-    static AVInputFormat* m_inputFmt;
+    static const AVInputFormat* m_inputFmt;
     static AVFormatContext* m_captureFmtCtx;
-    AVCodec* m_captureCodec = nullptr;
+    const AVCodec* m_captureCodec = nullptr;
     AVCodecContext* m_captureCodecCtx = nullptr;
     AVFrame* m_captureFrame = nullptr;
     AVFrame* m_cropFrame = nullptr;
@@ -67,7 +67,7 @@ class ScreenRecorder : public LogTag {
     AVStream* m_captureStream = nullptr;
     int m_captureStreamIndex = -1;
 
-    static AVCodec* m_outputCodec;
+    static const AVCodec* m_outputCodec;
     AVCodecContext* m_outputCodecCtx = nullptr;
     AVFrame* m_outputFrame = nullptr;
     uint8_t* m_outputFrameBuf = nullptr;

@@ -47,7 +47,7 @@ class ImageReader : public LogTagDelegate {
     int m_width = 0;
     int m_height = 0;
     double m_scale = 1;
-    AVCodec* m_inputCodec = nullptr;
+    const AVCodec* m_inputCodec = nullptr;
     AVCodecContext* m_inputCodecCtx = nullptr;
     AVFrame* m_inputFrame = nullptr;
     AVFrame* m_outputFrame = nullptr;
