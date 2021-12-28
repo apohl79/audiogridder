@@ -548,7 +548,7 @@ int AudioGridderAudioProcessorEditor::getPluginIndex(const String& name) {
     return -1;
 }
 
-void AudioGridderAudioProcessorEditor::focusOfChildComponentChanged(FocusChangeType cause) {
+void AudioGridderAudioProcessorEditor::focusOfChildComponentChanged(FocusChangeType /*cause*/) {
     traceScope();
     bool focus = hasKeyboardFocus(true);
     // logln("focus change: has focus is " << (int)focus << ", cause is " << cause);
