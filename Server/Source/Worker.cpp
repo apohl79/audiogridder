@@ -277,37 +277,39 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     logln("...ok");
     logln("sending parameters...");
     json jparams = json::array();
-    for (auto& param : plugin->getParameters()) {
-        json jparam = {{"idx", param->getParameterIndex()},
-                       {"name", param->getName(32).toStdString()},
-                       {"defaultValue", param->getDefaultValue()},
-                       {"currentValue", param->getValue()},
-                       {"category", param->getCategory()},
-                       {"label", param->getLabel().toStdString()},
-                       {"numSteps", param->getNumSteps()},
-                       {"isBoolean", param->isBoolean()},
-                       {"isDiscrete", param->isDiscrete()},
-                       {"isMeta", param->isMetaParameter()},
-                       {"isOrientInv", param->isOrientationInverted()},
-                       {"minValue", param->getText(0.0f, 20).toStdString()},
-                       {"maxValue", param->getText(1.0f, 20).toStdString()}};
-        jparam["allValues"] = json::array();
-        for (auto& val : param->getAllValueStrings()) {
-            jparam["allValues"].push_back(val.toStdString());
-        }
-        if (jparam["allValues"].size() == 0 && param->isDiscrete() && param->getNumSteps() < 64) {
-            // try filling values manually
-            float step = 1.0f / (param->getNumSteps() - 1);
-            for (int i = 0; i < param->getNumSteps(); i++) {
-                auto val = param->getText(step * i, 32);
-                if (val.isEmpty()) {
-                    break;
-                }
+    runOnMsgThreadSync([plugin, &jparams] {
+        for (auto& param : plugin->getParameters()) {
+            json jparam = {{"idx", param->getParameterIndex()},
+                           {"name", param->getName(32).toStdString()},
+                           {"defaultValue", param->getDefaultValue()},
+                           {"currentValue", param->getValue()},
+                           {"category", param->getCategory()},
+                           {"label", param->getLabel().toStdString()},
+                           {"numSteps", param->getNumSteps()},
+                           {"isBoolean", param->isBoolean()},
+                           {"isDiscrete", param->isDiscrete()},
+                           {"isMeta", param->isMetaParameter()},
+                           {"isOrientInv", param->isOrientationInverted()},
+                           {"minValue", param->getText(0.0f, 20).toStdString()},
+                           {"maxValue", param->getText(1.0f, 20).toStdString()}};
+            jparam["allValues"] = json::array();
+            for (auto& val : param->getAllValueStrings()) {
                 jparam["allValues"].push_back(val.toStdString());
             }
+            if (jparam["allValues"].size() == 0 && param->isDiscrete() && param->getNumSteps() < 64) {
+                // try filling values manually
+                float step = 1.0f / (param->getNumSteps() - 1);
+                for (int i = 0; i < param->getNumSteps(); i++) {
+                    auto val = param->getText(step * i, 32);
+                    if (val.isEmpty()) {
+                        break;
+                    }
+                    jparam["allValues"].push_back(val.toStdString());
+                }
+            }
+            jparams.push_back(jparam);
         }
-        jparams.push_back(jparam);
-    }
+    });
     Message<Parameters> msgParams(this);
     PLD(msgParams).setJson(jparams);
     if (!msgParams.send(m_cmdIn.get())) {
