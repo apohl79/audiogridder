@@ -41,10 +41,6 @@ void Server::initialize() {
     CPUInfo::initialize();
     WindowPositions::initialize();
 
-    if (m_crashReporting) {
-        Sentry::initialize();
-    }
-
     if (!getOpt("sandboxMode", false)) {
         Metrics::getStatistic<TimeStatistic>("audio")->enableExtData(true);
         Metrics::getStatistic<TimeStatistic>("audio")->getMeter().enableExtData(true);
@@ -569,6 +565,10 @@ void Server::runServer() {
     saveConfig();
     saveKnownPluginList();
 
+    if (m_crashReporting) {
+        Sentry::initialize();
+    }
+
     for (auto& type : m_pluginlist.getTypes()) {
         if ((type.pluginFormatName == "AudioUnit" && !m_enableAU) ||
             (type.pluginFormatName == "VST" && !m_enableVST2) || (type.pluginFormatName == "VST3" && !m_enableVST3)) {
@@ -814,6 +814,10 @@ void Server::runServer() {
 
 void Server::runSandbox() {
     traceScope();
+
+    if (m_crashReporting) {
+        Sentry::initialize();
+    }
 
     m_sandboxController = std::make_unique<SandboxSlave>(*this);
 
