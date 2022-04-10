@@ -16,7 +16,7 @@ namespace e47 {
 
 class GenericEditor : public Component, public LogTag {
   public:
-    GenericEditor(AudioGridderAudioProcessor& processor);
+    GenericEditor(PluginProcessor& processor);
     ~GenericEditor() override;
 
     void paint(juce::Graphics&) override;
@@ -24,7 +24,7 @@ class GenericEditor : public Component, public LogTag {
     void updateParamValue(int paramIdx);
 
   private:
-    AudioGridderAudioProcessor& m_processor;
+    PluginProcessor& m_processor;
 
     Array<std::unique_ptr<Component>> m_labels;
     Array<std::unique_ptr<Component>> m_components;
@@ -45,7 +45,7 @@ class GenericEditor : public Component, public LogTag {
     struct GestureTracker : MouseListener, LogTagDelegate {
         int idx;
         bool isTracking = false;
-        AudioGridderAudioProcessor& processor;
+        PluginProcessor& processor;
 
         GestureTracker(GenericEditor* e, int i) : LogTagDelegate(e), idx(i), processor(e->m_processor) {}
 

@@ -17047,6 +17047,12 @@ class basic_json {
                 return m_value.object->empty();
             }
 
+            case value_t::boolean:
+            case value_t::number_float:
+            case value_t::number_integer:
+            case value_t::number_unsigned:
+            case value_t::string:
+            case value_t::discarded:
             default: {
                 // all other types are nonempty
                 return false;

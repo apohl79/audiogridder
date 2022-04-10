@@ -9,6 +9,7 @@
 
 #include "PluginListComponent.hpp"
 #include "App.hpp"
+#include "Server.hpp"
 #include "Utils.hpp"
 
 namespace e47 {

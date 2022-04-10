@@ -62,19 +62,19 @@ class AudioStreamer : public Thread, public LogTagDelegate {
     void run() {
         traceScope();
         logln("audio streamer ready");
-        while (!currentThreadShouldExit() && !m_error && m_socket->isConnected()) {
+        while (!threadShouldExit() && !m_error && m_socket->isConnected()) {
             while (m_writeQ.read_available() > 0) {
                 AudioMidiBuffer buf;
                 m_writeQ.pop(buf);
                 m_durationLocal.reset();
                 m_durationGlobal.reset();
-                if (!sendReal(buf)) {
+                if (!sendInternal(buf)) {
                     logln("error: " << getInstanceString() << ": send failed");
                     setError();
                     return;
                 }
                 MessageHelper::Error err;
-                if (!readReal(buf, &err)) {
+                if (!readInternal(buf, &err)) {
                     logln("error: " << getInstanceString() << ": read failed: " << err.toString());
                     setError();
                     return;
@@ -150,7 +150,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
             buf.posInfo = posInfo;
             m_durationLocal.reset();
             m_durationGlobal.reset();
-            if (!sendReal(buf)) {
+            if (!sendInternal(buf)) {
                 logln("error: " << getInstanceString() << ": send failed");
                 setError();
             }
@@ -205,7 +205,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         } else {
             buf.audio.setSize(buffer.getNumChannels(), buffer.getNumSamples());
             MessageHelper::Error err;
-            if (!readReal(buf, &err)) {
+            if (!readInternal(buf, &err)) {
                 logln("error: " << getInstanceString() << ": read failed: " << err.toString());
                 setError();
                 return;
@@ -267,13 +267,13 @@ class AudioStreamer : public Thread, public LogTagDelegate {
 
     bool waitWrite() {
         traceScope();
-        if (m_error || currentThreadShouldExit()) {
+        if (m_error || threadShouldExit()) {
             return false;
         }
         if (m_writeQ.read_available() == 0) {
             std::unique_lock<std::mutex> lock(m_writeMtx);
             return m_writeCv.wait_for(lock, std::chrono::seconds(1),
-                                      [this] { return m_writeQ.read_available() > 0 || currentThreadShouldExit(); });
+                                      [this] { return m_writeQ.read_available() > 0 || threadShouldExit(); });
         }
         return true;
     }
@@ -337,14 +337,14 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         }
     }
 
-    bool sendReal(AudioMidiBuffer& buffer) {
+    bool sendInternal(AudioMidiBuffer& buffer) {
         traceScope();
         AudioMessage msg(m_client);
         return msg.sendToServer(m_socket.get(), buffer.audio, buffer.midi, buffer.posInfo, buffer.channelsRequested,
                                 buffer.samplesRequested, nullptr, *m_bytesOutMeter);
     }
 
-    bool readReal(AudioMidiBuffer& buffer, MessageHelper::Error* e) {
+    bool readInternal(AudioMidiBuffer& buffer, MessageHelper::Error* e) {
         traceScope();
         AudioMessage msg(m_client);
         if (buffer.audio.getNumChannels() < buffer.channelsRequested ||

@@ -2,19 +2,84 @@
 #
 # Author: Andreas Pohl
 
-import os, argparse, sys, shutil, glob, subprocess, zipfile
+import os, argparse, sys, shutil, glob, subprocess, zipfile, locale, ssl
+from urllib import request
+
+lastLogMsgLen = 0
+preferredEncoding = locale.getpreferredencoding()
+
+def log(msg, newLine=True):
+    global lastLogMsgLen
+    end = ''
+    if lastLogMsgLen > 0:
+        clearStr = ' ' * lastLogMsgLen
+        print('\r' + clearStr + '\r', end='')
+    if newLine:
+        end = '\n'
+        lastLogMsgLen = 0
+    else:
+        lastLogMsgLen = len(msg)
+    print(msg, end=end)
 
 def execute(cmd):
-    print('>>> ' + cmd)
+    log('>>> ' + cmd)
     if os.system(cmd) != 0:
         sys.exit(1)
 
-def executeReadOutput(cmd):
-    print('>>> ' + cmd)
-    return subprocess.run(cmd.split(' '), stdout=subprocess.PIPE).stdout.decode('utf8').rstrip()
+def execute2(cmd, filterOutput=None, successString=None, failureString=None, errLog=None):
+    log('>>> ' + ' '.join(cmd))
 
-def getPlatform(args):
-    if args is not None and args.platform is not None:
+    success = False
+    failure = False
+    checkRc = False
+
+    if successString is None:
+        checkRc = True
+
+    allOutput = []
+
+    with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as p:
+        for l in iter(p.stdout.readline, b''):
+            l = l.decode(preferredEncoding).rstrip()
+            if filterOutput is None:
+                log(l)
+            else:
+                allOutput.append(l)
+                if filterOutput in l:
+                    log(l)
+
+            if successString is not None and successString in l:
+                success = True
+            if failureString is not None and failureString in l:
+                failure = True
+
+        p.wait()
+
+        if checkRc:
+            success = p.returncode == 0
+
+        if not success or failure:
+            log("!!! command failed: returncode={}, success={}, failure={}".format(p.returncode, success, failure))
+            if errLog is not None:
+                with open(errLog, 'w', encoding=preferredEncoding) as f:
+                    for l in allOutput:
+                        f.write(l + '\n')
+                log('... (see ' + errLog + ' for the full log)')
+                for l in allOutput[-20:]:
+                    log(l)
+            else:
+                for l in allOutput:
+                    log(l)
+            sys.exit(1)
+        elif p.returncode != 0:
+            log("warning: process returned {}".format(p.returncode))
+
+def executeReadOutput(cmd):
+    log('>>> ' + cmd)
+    return subprocess.run(cmd.split(' '), stdout=subprocess.PIPE).stdout.decode(preferredEncoding).rstrip()
+
+def getPlatform(args=None):
+    if args is not None and 'platform' in vars(args) and args.platform is not None:
         return args.platform
     if sys.platform == 'darwin':
         return 'macos'
@@ -24,7 +89,7 @@ def getPlatform(args):
         return 'windows'
 
 def getArch(args):
-    if args is not None and args.arch is not None:
+    if args is not None and 'arch' in vars(args) and args.arch is not None:
         return args.arch
     platform = getPlatform(args)
     if platform in ('macos', 'linux'):
@@ -35,7 +100,7 @@ def getArch(args):
 def getPlatformArch(args):
     platform = getPlatform(args)
     s = platform
-    if platform == 'macos':
+    if platform == 'macos' and args is not None and 'macostarget' in vars(args):
         s += '-' + args.macostarget
     s += '-' + getArch(args)
     return s
@@ -51,18 +116,18 @@ def getDebugSymDir(args):
 
 def getDepsDir(args):
     depsDir = args.depsroot
-    if depsDir is None:
+    if depsDir is None or not os.path.isdir(depsDir):
         depsDir = os.environ.get('AG_DEPS_ROOT')
-    if not os.path.isdir(depsDir):
-        print('error: ' + depsDir + ' does not exist')
+    if depsDir is None or not os.path.isdir(depsDir):
+        log('error: missing dependcies root, use --deps-root')
         exit(1)
     return os.path.abspath(depsDir).replace('\\', '/') + '/' + getPlatformArch(args)
 
 def getSDKsDir(args):
     sdksDir = args.sdksroot
-    if sdksDir is None:
-        depsDir = os.environ.get('AG_SDKS_ROOT')
-    if not os.path.isdir(sdksDir):
+    if sdksDir is None or not os.path.isdir(sdksDir):
+        sdksDir = os.environ.get('AG_SDKS_ROOT')
+    if sdksDir is None or not os.path.isdir(sdksDir):
         return None
     return os.path.abspath(sdksDir).replace('\\', '/')
 
@@ -71,7 +136,7 @@ def getVersion():
         if getPlatform(None) == 'macos':
             execute('package/setversion.sh')
         else:
-            print('can only set version from macos')
+            log('can only set version from macos')
             return 'dev-build'
     with open('package/VERSION') as f:
         return f.readline().rstrip()
@@ -92,11 +157,11 @@ def setMacToolchain(args, toolchain=None):
         newToolchain = toolchain
     lastToolchain = executeReadOutput('xcode-select -p')
     if newToolchain != lastToolchain and os.path.isdir(newToolchain):
-        print('required toolchain not selected, trying xcode-select')
+        log('required toolchain not selected, trying xcode-select')
         execute('sudo xcode-select -s ' + newToolchain)
     else:
         newToolchain = lastToolchain
-    print('Using toolchain: ' + newToolchain)
+    log('Using toolchain: ' + newToolchain)
     return (newToolchain, lastToolchain, newToolchain + '/SDKs/MacOS.sdk')
 
 def conf(args):
@@ -142,6 +207,8 @@ def conf(args):
         cmake_params.append('-DAG_ENABLE_CODE_SIGNING=OFF')
     if args.disablecopystep:
         cmake_params.append('-DAG_ENABLE_DEBUG_COPY_STEP=OFF')
+    if args.withtests:
+        cmake_params.append('-DAG_WITH_TESTS=ON')
 
     cmake_command = 'cmake ' + ' '.join(cmake_params)
     execute(cmake_command)
@@ -177,7 +244,7 @@ def build(args):
     if args.debugsymbols:
         debSymDir = getDebugSymDir(args)
 
-        print('Creating debug symbols in ' + debSymDir + ' ...')
+        log('Creating debug symbols in ' + debSymDir + ' ...')
 
         if os.path.isdir(debSymDir):
             shutil.rmtree((debSymDir))
@@ -303,7 +370,7 @@ def packReal(platform, arch, version, buildDir, macosTarget):
         execute('"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /Obuild AudioGridderServer.iss')
         execute('"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /Obuild AudioGridderPlugin.iss')
 
-        print('creating installers archive...')
+        log('creating installers archive...')
         os.chdir('build')
         with zipfile.ZipFile('AudioGridder_' + version + '-Windows-Installers.zip', 'w',
                              compression=zipfile.ZIP_DEFLATED) as zf:
@@ -311,7 +378,7 @@ def packReal(platform, arch, version, buildDir, macosTarget):
             zf.write('AudioGridderPlugin_' + version + '.exe')
             zf.close()
 
-        print('creating no-installers archive...')
+        log('creating no-installers archive...')
         os.chdir('../../' + buildDir)
         with zipfile.ZipFile('../package/build/AudioGridder_' + version + '-Windows.zip', 'w',
                              compression=zipfile.ZIP_DEFLATED) as zf:
@@ -329,16 +396,16 @@ def packReal(platform, arch, version, buildDir, macosTarget):
         os.makedirs('package/build/linux/vst3/AudioGridderMidi.vst3/Contents/x86_64-linux', exist_ok=True)
         os.makedirs('package/build/linux/bin', exist_ok=True)
 
-        print('copying vst plugins...')
+        log('copying vst plugins...')
         for src in glob.glob(buildDir + '/lib/lib*.so'):
             dst = src.replace(buildDir + '/lib/lib', 'package/build/linux/vst/')
             shutil.copyfile(src, dst)
-        print('copying vst3 plugins...')
+        log('copying vst3 plugins...')
         for src in glob.glob(buildDir + '/lib/AudioGridder*.so'):
             name = src.replace(buildDir + '/lib/', '').replace('.so', '')
             dst = 'package/build/linux/vst3/' + name + '.vst3/Contents/x86_64-linux/' + name + '.so'
             shutil.copyfile(src, dst)
-        print('copying binaries...')
+        log('copying binaries...')
         shutil.copy(buildDir + '/bin/AudioGridderPluginTray', 'package/build/linux/bin')
         shutil.copy(buildDir + '/bin/crashpad_handler', 'package/build/linux/bin')
 
@@ -369,13 +436,78 @@ def archive(args):
     debSymDir = getDebugSymDir(args)
 
     if not os.path.isdir(debSymDir):
-        print('error: ' + debSymDir + ' does not exists')
+        log('error: ' + debSymDir + ' does not exists')
         exit(1)
 
-    print('copying ' + debSymDir + ' -> ' + targetDir + ' ...')
+    log('copying ' + debSymDir + ' -> ' + targetDir + ' ...')
     if os.path.isdir(targetDir + '/' + debSymDir):
         shutil.rmtree(targetDir + '/' + debSymDir)
     shutil.copytree(debSymDir, targetDir + '/' + debSymDir)
+
+def downloadFile(url, target):
+    log('-> downloading ' + target)
+
+    # disable ssl verify
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    with request.urlopen(url, context=ctx) as u, open(target, 'wb') as f:
+        f.write(u.read())
+
+def extractFile(f):
+    log('-> extracting ' + f)
+    with zipfile.ZipFile(f, 'r') as zf:
+        zf.extractall(os.path.dirname(f))
+
+def tests(args):
+    buildDir = getBuildDir(args)
+    platform = getPlatform(args)
+
+    if not os.path.isdir('TestsData'):
+        log('downloading tests data...')
+        os.mkdir('TestsData')
+        os.mkdir('TestsData/macos')
+        os.mkdir('TestsData/windows')
+        downloadFile('http://stone-voices.ru/download.php?file=dreverb_1.0_mac_86_64.zip',
+                     'TestsData/macos/dreverb_1.0_mac_86_64.zip')
+        downloadFile('http://stone-voices.ru/download.php?file=dreverb_1.0_win_86_64.zip',
+                     'TestsData/windows/dreverb_1.0_win_86_64.zip')
+        downloadFile('https://3fef17d2-0d9a-400d-abff-458b86c18a2a.usrfiles.com/archives/3fef17_50d7b255dbd34b3ca8c99c4e4db85bca.zip',
+                     'TestsData/macos/2rulessynth1.1-mac.zip')
+        downloadFile('https://3fef17d2-0d9a-400d-abff-458b86c18a2a.usrfiles.com/archives/3fef17_26e379c8b1734ac4bd485cd2596ac970.zip',
+                     'TestsData/windows/2rulessynth1.1-win.zip')
+
+        log('extracting tests data...')
+        for f in glob.glob('TestsData/**/*.zip'):
+            extractFile(f)
+
+    for t in ['testrunner-server']:
+        if platform == 'windows':
+            t = t + '.exe'
+
+        filterOutput = '|testrunner|'
+        errLog = 'tests-' + getPlatformArch(args) + '.log'
+
+        if args.verbose:
+            filterOutput = None
+            errLog = None
+
+        if os.path.isfile(buildDir + '/bin/' + t):
+            if platform == 'windows':
+                if shutil.which("gdb.exe"):
+                    execute2(['gdb', '.\\' + buildDir + '\\bin\\' + t, '--batch', '--ex', 'run', '--ex', 'thread apply all bt'],
+                             filterOutput=filterOutput, errLog=errLog)
+                else:
+                    execute2(['.\\' + buildDir + '\\bin\\' + t], filterOutput=filterOutput, errLog=errLog)
+            elif platform == 'macos':
+                execute2(['lldb', buildDir + '/bin/' + t , '-o', 'run', '-o', 'bt all', '-o', 'exit'],
+                         filterOutput=filterOutput, successString='exited with status = 0', errLog=errLog)
+            else:
+                execute2(['gdb', buildDir + '/bin/' + t, '--batch', '--ex', 'run', '--ex', 'thread apply all bt'],
+                         filterOutput=filterOutput, successString='exited normally', errLog=errLog)
+        else:
+            log('error: unit test runner ' + t + ' missing')
+            sys.exit(1)
 
 def main():
     parser = argparse.ArgumentParser(description='AudioGridder Build Script.')
@@ -405,6 +537,8 @@ def main():
                              help='Disable code signing (default: %(default)s)')
     parser_conf.add_argument('--disable-copy-step', dest='disablecopystep', action='store_true', default=False,
                              help='Disable copying plugins into plugin folders in Debug mode on MacOS (default: %(default)s)')
+    parser_conf.add_argument('--enable-tests', dest='withtests', action='store_true', default=False,
+                             help='Enable unit tests (default: %(default)s)')
     parser_conf.add_argument('--deps-root', dest='depsroot', type=str, default='audiogridder-deps',
                              help='Dependencies root directory (git clone https://github.com/apohl79/audiogridder-deps.git)')
     parser_conf.add_argument('--sdks-root', dest='sdksroot', type=str, default='audiogridder-sdks',
@@ -478,6 +612,14 @@ def main():
     parser_archive.add_argument('--dest', dest='dest', metavar='DIR', type=str, required=True,
                                 help='Destination directory')
 
+    parser_tests = subparsers.add_parser('tests', help='Run the unit tests')
+    parser_tests.add_argument('-b', '--build-dir', dest='builddir', type=str, default=None,
+                              help='Build directory, if not set it will be "build-<platform>-<arch>"')
+    parser_tests.add_argument('--arch', dest='arch', type=str, default='x86_64',
+                              help='CPU architecture (default: %(default)s)')
+    parser_tests.add_argument('-v', '--verbose', dest='verbose', action='store_true', default=False,
+                              help='Show tests log (default: %(default)s)')
+
     args = parser.parse_args()
 
     newToolchain = ''
@@ -501,6 +643,8 @@ def main():
         upload(args)
     elif args.mode == 'archive':
         archive(args)
+    elif args.mode == 'tests':
+        tests(args)
     else:
         parser.print_usage()
 

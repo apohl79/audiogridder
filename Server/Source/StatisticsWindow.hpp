@@ -52,7 +52,7 @@ class StatisticsWindow : public DocumentWindow, public LogTag {
 
         void run() override {
             traceScope();
-            while (!currentThreadShouldExit()) {
+            while (!threadShouldExit()) {
                 runOnMsgThreadAsync([this] { m_fn(); });
                 // Relax
                 sleepExitAware(1000);

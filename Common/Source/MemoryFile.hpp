@@ -23,7 +23,30 @@ class MemoryFile : LogTagDelegate {
     MemoryFile() {}
     MemoryFile(LogTag* tag, const String& path, size_t size);
     MemoryFile(LogTag* tag, const File& file, size_t size);
+    MemoryFile(const MemoryFile& other)
+        : LogTagDelegate(other.getLogTagSource()),
+          m_file(other.m_file),
+          m_fd(other.m_fd),
+#ifdef JUCE_WINDOWS
+          m_mapped_hndl(other.m_mapped_hndl),
+#endif
+          m_data(other.m_data),
+          m_size(other.m_size) {
+    }
     ~MemoryFile();
+
+    MemoryFile& operator=(const MemoryFile& rhs) {
+        if (this != &rhs) {
+            m_file = rhs.m_file;
+            m_fd = rhs.m_fd;
+#ifdef JUCE_WINDOWS
+            m_mapped_hndl = rhs.m_mapped_hndl;
+#endif
+            m_data = rhs.m_data;
+            m_size = rhs.m_size;
+        }
+        return *this;
+    }
 
     bool exists() const { return m_file.exists(); }
     bool isOpen() const { return nullptr != m_data; }

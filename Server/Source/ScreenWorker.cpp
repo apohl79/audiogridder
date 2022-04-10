@@ -9,9 +9,8 @@
 #include "Message.hpp"
 #include "ImageDiff.hpp"
 #include "App.hpp"
-
-#include <chrono>
-using namespace std::chrono_literals;
+#include "Server.hpp"
+#include "Processor.hpp"
 
 namespace e47 {
 
@@ -40,13 +39,9 @@ void ScreenWorker::run() {
     } else if (!getApp()->getServer()->getScreenCapturingOff()) {
         runNative();
     } else {
-        while (!currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected()) {
+        while (!threadShouldExit() && nullptr != m_socket && m_socket->isConnected()) {
             sleepExitAware(100);
         }
-    }
-
-    if (m_visible) {
-        hideEditor();
     }
 
     logln("screen processor terminated");
@@ -116,11 +111,11 @@ void ScreenWorker::runNative() {
                 logln("resetting editor window");
                 runOnMsgThreadAsync([this] {
                     traceScope();
-                    getApp()->resetEditor();
+                    getApp()->resetEditor(m_currentTid);
                 });
                 runOnMsgThreadAsync([this] {
                     traceScope();
-                    getApp()->restartEditor();
+                    getApp()->restartEditor(m_currentTid);
                 });
             } else {
                 if (diffPxCount > 0) {
@@ -161,38 +156,47 @@ void ScreenWorker::runNative() {
 void ScreenWorker::shutdown() {
     traceScope();
     signalThreadShouldExit();
+    if (m_visible) {
+        hideEditor();
+    }
     std::lock_guard<std::mutex> lock(m_currentImageLock);
     m_currentImage = nullptr;
     m_updated = true;
     m_currentImageCv.notify_one();
 }
 
-void ScreenWorker::showEditor(std::shared_ptr<AGProcessor> proc, int x, int y) {
+void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> proc, int x, int y) {
     traceScope();
-    logln("show editor for " << proc->getName() << " at " << x << "x" << y);
+    logln("showing editor for " << proc->getName() << " at " << x << "x" << y);
 
-    if (m_visible && proc.get() == m_currentProc && proc == getApp()->getCurrentWindowProc()) {
+    m_currentTid = tid;
+
+    if (m_visible && proc.get() == m_currentProc && proc == getApp()->getCurrentWindowProc(m_currentTid)) {
         logln("already showing editor");
         runOnMsgThreadAsync([this, x, y] {
             traceScope();
-            getApp()->moveEditor(x, y);
-            getApp()->bringEditorToFront();
+            getApp()->moveEditor(m_currentTid, x, y);
+            getApp()->bringEditorToFront(m_currentTid);
         });
         return;
     }
 
-    auto tid = getThreadId();
+    runOnMsgThreadAsync([this] {
+        traceScope();
+        if (getApp()->getServer()->getScreenCapturingOff()) {
+            getApp()->hideEditor(m_currentTid, false);
+        } else {
+            // we allow only one plugin UI at a time when capturing the screen, so we hide all
+            getApp()->hideEditor(nullptr, false);
+        }
+    });
 
     if (getApp()->getServer()->getScreenCapturingFFmpeg()) {
-        runOnMsgThreadAsync([this] {
+        runOnMsgThreadAsync([this, proc] {
             traceScope();
-            getApp()->resetEditor();
-        });
-        runOnMsgThreadAsync([this, proc, tid, x, y] {
-            traceScope();
-            getApp()->showEditor(proc, tid, [this](const uint8_t* data, int size, int w, int h, double scale) {
+            getApp()->showEditor(proc, m_currentTid, [this](const uint8_t* data, int size, int w, int h, double scale) {
                 traceScope();
-                if (currentThreadShouldExit()) {
+                if (threadShouldExit()) {
                     return;
                 }
                 std::lock_guard<std::mutex> lock(m_currentImageLock);
@@ -206,24 +210,19 @@ void ScreenWorker::showEditor(std::shared_ptr<AGProcessor> proc, int x, int y) {
                 m_updated = true;
                 m_currentImageCv.notify_one();
             });
-            getApp()->moveEditor(x, y);
         });
     } else {
-        runOnMsgThreadAsync([this] {
-            traceScope();
-            getApp()->resetEditor();
-        });
-        runOnMsgThreadAsync([this, proc, tid, x, y] {
+        runOnMsgThreadAsync([this, proc] {
             traceScope();
             m_currentImageLock.lock();
             m_currentImage.reset();
             m_lastImage.reset();
             m_currentImageLock.unlock();
 
-            getApp()->showEditor(proc, tid, [this](std::shared_ptr<Image> i, int w, int h) {
+            getApp()->showEditor(proc, m_currentTid, [this](std::shared_ptr<Image> i, int w, int h) {
                 traceScope();
                 if (nullptr != i) {
-                    if (currentThreadShouldExit()) {
+                    if (threadShouldExit()) {
                         return;
                     }
                     std::lock_guard<std::mutex> lock(m_currentImageLock);
@@ -239,9 +238,14 @@ void ScreenWorker::showEditor(std::shared_ptr<AGProcessor> proc, int x, int y) {
                     m_currentImageCv.notify_one();
                 }
             });
-            getApp()->moveEditor(x, y);
         });
     }
+
+    runOnMsgThreadAsync([this, x, y] {
+        traceScope();
+        getApp()->moveEditor(m_currentTid, x, y);
+        getApp()->bringEditorToFront(m_currentTid);
+    });
 
     m_visible = true;
     m_currentProc = proc.get();
@@ -250,9 +254,7 @@ void ScreenWorker::showEditor(std::shared_ptr<AGProcessor> proc, int x, int y) {
 void ScreenWorker::hideEditor() {
     logln("hiding editor");
 
-    auto tid = getThreadId();
-
-    runOnMsgThreadAsync([this, tid] {
+    runOnMsgThreadAsync([this, tid = m_currentTid] {
         logln("hiding editor (msg thread)");
         getApp()->hideEditor(tid);
 
@@ -263,6 +265,7 @@ void ScreenWorker::hideEditor() {
 
     m_visible = false;
     m_currentProc = nullptr;
+    m_currentTid = nullptr;
 }
 
 }  // namespace e47

@@ -79,6 +79,8 @@ class TimeStatistic : public BasicStatistic, public LogTag {
     class Duration {
       public:
         Duration(std::shared_ptr<TimeStatistic> t = nullptr) : m_timer(t), m_start(Time::getHighResolutionTicks()) {}
+        Duration(const Duration& other)
+            : m_timer(other.m_timer), m_start(other.m_start), m_finished(other.m_finished) {}
         ~Duration() { update(); }
 
         void finish() {

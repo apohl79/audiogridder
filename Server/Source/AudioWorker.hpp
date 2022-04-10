@@ -32,8 +32,7 @@ class AudioWorker : public Thread, public LogTagDelegate {
     AudioWorker(LogTag* tag);
     virtual ~AudioWorker() override;
 
-    void init(std::unique_ptr<StreamingSocket> s, int channelsIn, int channelsOut, int channelsSC,
-              uint64 activeChannels, double rate, int samplesPerBlock, bool doublePrecission);
+    void init(std::unique_ptr<StreamingSocket> s, HandshakeRequest cfg);
 
     void run() override;
     void shutdown();
@@ -41,7 +40,7 @@ class AudioWorker : public Thread, public LogTagDelegate {
 
     bool isOk() {
         std::lock_guard<std::mutex> lock(m_mtx);
-        m_wasOk = !currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected();
+        m_wasOk = !threadShouldExit() && nullptr != m_socket && m_socket->isConnected();
         return m_wasOk;
     }
 
@@ -51,10 +50,10 @@ class AudioWorker : public Thread, public LogTagDelegate {
     int getChannelsOut() const { return m_channelsOut; }
     int getChannelsSC() const { return m_channelsSC; }
 
-    bool addPlugin(const String& id, String& err);
+    bool addPlugin(const String& id, const String& settings, String& err);
     void delPlugin(int idx);
     void exchangePlugins(int idxA, int idxB);
-    std::shared_ptr<AGProcessor> getProcessor(int idx) const { return m_chain->getProcessor(idx); }
+    std::shared_ptr<Processor> getProcessor(int idx) const { return m_chain->getProcessor(idx); }
     int getSize() const { return static_cast<int>(m_chain->getSize()); }
     int getLatencySamples() const { return m_chain->getLatencySamples(); }
     void update() { m_chain->update(); }
@@ -80,7 +79,7 @@ class AudioWorker : public Thread, public LogTagDelegate {
     int m_channelsSC;
     ChannelSet m_activeChannels;
     ChannelMapper m_channelMapper;
-    double m_rate;
+    double m_sampleRate;
     int m_samplesPerBlock;
     bool m_doublePrecission;
     std::shared_ptr<ProcessorChain> m_chain;

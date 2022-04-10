@@ -61,7 +61,7 @@ void CPUInfo::run() {
     memset(lastValues.data(), 0, lastValues.size() * sizeof(float));
     size_t valueIdx = 0;
 
-    while (!currentThreadShouldExit()) {
+    while (!threadShouldExit()) {
         const int waitTime = 1000;
 
 #if defined(JUCE_MAC)

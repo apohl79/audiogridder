@@ -11,6 +11,7 @@
 #include "Defaults.hpp"
 #include "App.hpp"
 #include "Metrics.hpp"
+#include "Processor.hpp"
 
 namespace e47 {
 
@@ -30,28 +31,27 @@ AudioWorker::~AudioWorker() {
     waitForThreadAndLog(getLogTagSource(), this);
 }
 
-void AudioWorker::init(std::unique_ptr<StreamingSocket> s, int channelsIn, int channelsOut, int channelsSC,
-                       uint64 activeChannels, double rate, int samplesPerBlock, bool doublePrecission) {
+void AudioWorker::init(std::unique_ptr<StreamingSocket> s, HandshakeRequest cfg) {
     traceScope();
     m_socket = std::move(s);
-    m_rate = rate;
-    m_samplesPerBlock = samplesPerBlock;
-    m_doublePrecission = doublePrecission;
-    m_channelsIn = channelsIn;
-    m_channelsOut = channelsOut;
-    m_channelsSC = channelsSC;
-    m_activeChannels = activeChannels;
+    m_sampleRate = cfg.sampleRate;
+    m_samplesPerBlock = cfg.samplesPerBlock;
+    m_doublePrecission = cfg.doublePrecission;
+    m_channelsIn = cfg.channelsIn;
+    m_channelsOut = cfg.channelsOut;
+    m_channelsSC = cfg.channelsSC;
+    m_activeChannels = cfg.activeChannels;
     m_activeChannels.setWithInput(m_channelsIn > 0);
     m_activeChannels.setNumChannels(m_channelsIn + m_channelsSC, m_channelsOut);
     m_channelMapper.createMapping(m_activeChannels);
     m_channelMapper.print();
-    m_chain =
-        std::make_shared<ProcessorChain>(ProcessorChain::createBussesProperties(channelsIn, channelsOut, channelsSC));
+    m_chain = std::make_shared<ProcessorChain>(
+        ProcessorChain::createBussesProperties(m_channelsIn, m_channelsOut, m_channelsSC), cfg);
     m_chain->setLogTagSource(getLogTagSource());
     if (m_doublePrecission && m_chain->supportsDoublePrecisionProcessing()) {
         m_chain->setProcessingPrecision(AudioProcessor::doublePrecision);
     }
-    m_chain->updateChannels(channelsIn, channelsOut, channelsSC);
+    m_chain->updateChannels(m_channelsIn, m_channelsOut, m_channelsSC);
 }
 
 bool AudioWorker::waitForData() {
@@ -73,7 +73,7 @@ void AudioWorker::run() {
     auto bytesOut = Metrics::getStatistic<Meter>("NetBytesOut");
 
     ProcessorChain::PlayHead playHead(&posInfo);
-    m_chain->prepareToPlay(m_rate, m_samplesPerBlock);
+    m_chain->prepareToPlay(m_sampleRate, m_samplesPerBlock);
     bool hasToSetPlayHead = true;
 
     MessageHelper::Error e;
@@ -163,9 +163,9 @@ void AudioWorker::clear() {
     }
 }
 
-bool AudioWorker::addPlugin(const String& id, String& err) {
+bool AudioWorker::addPlugin(const String& id, const String& settings, String& err) {
     traceScope();
-    return m_chain->addPluginProcessor(id, err);
+    return m_chain->addPluginProcessor(id, settings, err);
 }
 
 void AudioWorker::delPlugin(int idx) {
@@ -189,14 +189,14 @@ String AudioWorker::getRecentsList(String host) const {
     auto& recents = m_recents[host];
     String list;
     for (auto& r : recents) {
-        list += AGProcessor::createString(r) + "\n";
+        list += Processor::createString(r) + "\n";
     }
     return list;
 }
 
 void AudioWorker::addToRecentsList(const String& id, const String& host) {
     traceScope();
-    auto plug = AGProcessor::findPluginDescritpion(id);
+    auto plug = Processor::findPluginDescritpion(id);
     if (plug != nullptr) {
         std::lock_guard<std::mutex> lock(m_recentsMtx);
         auto& recents = m_recents[host];

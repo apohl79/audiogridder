@@ -57,7 +57,7 @@ class ServiceReceiver : public Thread, public LogTag {
 
     HashMap<uint64, std::function<void()>> m_updateFn;
 
-    Array<ServerInfo> getServersReal();
+    Array<ServerInfo> getServersInternal();
     bool updateServers();
 };
 

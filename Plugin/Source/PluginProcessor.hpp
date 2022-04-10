@@ -42,12 +42,10 @@ class WrapperTypeReaderAudioProcessor : public AudioProcessor {
     void setStateInformation(const void*, int) override {}
 };
 
-class AudioGridderAudioProcessor : public AudioProcessor,
-                                   public AudioProcessorParameter::Listener,
-                                   public LogTagDelegate {
+class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::Listener, public LogTagDelegate {
   public:
-    AudioGridderAudioProcessor(WrapperType wt);
-    ~AudioGridderAudioProcessor() override;
+    PluginProcessor(WrapperType wt);
+    ~PluginProcessor() override;
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
@@ -60,10 +58,10 @@ class AudioGridderAudioProcessor : public AudioProcessor,
     void numChannelsChanged() override;
 
     template <typename T>
-    void processBlockReal(AudioBuffer<T>& buf, MidiBuffer& midi);
+    void processBlockInternal(AudioBuffer<T>& buf, MidiBuffer& midi);
 
-    void processBlock(AudioBuffer<float>& buf, MidiBuffer& midi) override { processBlockReal(buf, midi); }
-    void processBlock(AudioBuffer<double>& buf, MidiBuffer& midi) override { processBlockReal(buf, midi); }
+    void processBlock(AudioBuffer<float>& buf, MidiBuffer& midi) override { processBlockInternal(buf, midi); }
+    void processBlock(AudioBuffer<double>& buf, MidiBuffer& midi) override { processBlockInternal(buf, midi); }
 
     void processBlockBypassed(AudioBuffer<float>& buf, MidiBuffer& midi) override;
     void processBlockBypassed(AudioBuffer<double>& buf, MidiBuffer& midi) override;
@@ -238,8 +236,8 @@ class AudioGridderAudioProcessor : public AudioProcessor,
     // at least allows for the name to be updated. So we create slots at the start.
     class Parameter : public AudioProcessorParameter, public LogTagDelegate {
       public:
-        Parameter(AudioGridderAudioProcessor& processor, int slot) : m_processor(processor), m_slotId(slot) {
-            setLogTagSource(m_processor.getLogTagSource());
+        Parameter(PluginProcessor& proc, int slot) : m_proc(proc), m_slotId(slot) {
+            setLogTagSource(m_proc.getLogTagSource());
             initAsyncFunctors();
         }
         ~Parameter() override {
@@ -259,13 +257,13 @@ class AudioGridderAudioProcessor : public AudioProcessor,
         bool isMetaParameter() const override { return getParam().isMeta; }
 
       private:
-        friend AudioGridderAudioProcessor;
-        AudioGridderAudioProcessor& m_processor;
+        friend PluginProcessor;
+        PluginProcessor& m_proc;
         int m_idx = -1;
         int m_paramIdx = 0;
         int m_slotId = 0;
 
-        const LoadedPlugin& getPlugin() const { return m_processor.getLoadedPlugin(m_idx); }
+        const LoadedPlugin& getPlugin() const { return m_proc.getLoadedPlugin(m_idx); }
         const Client::Parameter& getParam() const { return getPlugin().params.getReference(m_paramIdx); }
 
         void reset() {
@@ -280,7 +278,7 @@ class AudioGridderAudioProcessor : public AudioProcessor,
       public:
         std::atomic_bool connected{false};
 
-        TrayConnection(AudioGridderAudioProcessor* p)
+        TrayConnection(PluginProcessor* p)
             : InterprocessConnection(false), Thread("TrayConnection"), LogTagDelegate(p), m_processor(p) {}
 
         ~TrayConnection() override { stopThread(-1); }
@@ -291,6 +289,7 @@ class AudioGridderAudioProcessor : public AudioProcessor,
         void connectionLost() override { connected = false; }
         void messageReceived(const MemoryBlock& message) override;
         void sendStatus();
+        void sendStop();
         void showMonitor();
         void sendMessage(const PluginTrayMessage& msg);
 
@@ -300,7 +299,7 @@ class AudioGridderAudioProcessor : public AudioProcessor,
         }
 
       private:
-        AudioGridderAudioProcessor* m_processor;
+        PluginProcessor* m_processor;
         Array<ServerPlugin> m_recents;
         std::mutex m_recentsMtx;
         std::mutex m_sendMtx;
@@ -434,7 +433,7 @@ class AudioGridderAudioProcessor : public AudioProcessor,
 
     ENABLE_ASYNC_FUNCTORS();
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioGridderAudioProcessor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };
 
 }  // namespace e47

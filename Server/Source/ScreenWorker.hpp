@@ -25,7 +25,7 @@ class ScreenWorker : public Thread, public LogTagDelegate {
 
     bool isOk() {
         std::lock_guard<std::mutex> lock(m_mtx);
-        m_wasOk = !currentThreadShouldExit() && nullptr != m_socket && m_socket->isConnected();
+        m_wasOk = !threadShouldExit() && nullptr != m_socket && m_socket->isConnected();
         return m_wasOk;
     }
 
@@ -36,7 +36,7 @@ class ScreenWorker : public Thread, public LogTagDelegate {
     void runFFmpeg();
     void shutdown();
 
-    void showEditor(std::shared_ptr<AGProcessor> proc, int x, int y);
+    void showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> proc, int x, int y);
     void hideEditor();
 
   private:
@@ -57,7 +57,8 @@ class ScreenWorker : public Thread, public LogTagDelegate {
     std::condition_variable m_currentImageCv;
 
     std::atomic_bool m_visible{false};
-    AGProcessor* m_currentProc;
+    Processor* m_currentProc;
+    Thread::ThreadID m_currentTid = nullptr;
 
     ENABLE_ASYNC_FUNCTORS();
 };

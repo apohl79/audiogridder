@@ -51,10 +51,10 @@ void initialize() {
             sentry_options_set_release(options, rel.toRawUTF8());
         }
 
-        if (AGLogger::isEnabled()) {
-            auto logfile = AGLogger::getLogFile().getFullPathName();
+        if (Logger::isEnabled()) {
+            auto logfile = Logger::getLogFile().getFullPathName();
             if (logfile.isNotEmpty()) {
-                logln("  attaching logfile: " << AGLogger::getLogFile().getFileName());
+                logln("  attaching logfile: " << Logger::getLogFile().getFileName());
                 sentry_options_add_attachment(options, logfile.toRawUTF8());
             }
         }

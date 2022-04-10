@@ -26,7 +26,7 @@ namespace e47 {
 setLogTagStatic("keyandmouse");
 
 #if defined(JUCE_MAC)
-void mouseEventReal(CGMouseButton button, CGEventType type, CGPoint location, CGEventFlags flags) {
+void mouseEventInternal(CGMouseButton button, CGEventType type, CGPoint location, CGEventFlags flags) {
     traceScope();
     CGEventRef event = CGEventCreateMouseEvent(nullptr, type, location, button);
     CGEventSetType(event, type);
@@ -35,7 +35,7 @@ void mouseEventReal(CGMouseButton button, CGEventType type, CGPoint location, CG
     CFRelease(event);
 }
 
-void mouseDoubleClickEventReal(CGPoint location, CGEventFlags flags) {
+void mouseDoubleClickEventInternal(CGPoint location, CGEventFlags flags) {
     traceScope();
     CGEventRef event = CGEventCreateMouseEvent(nullptr, kCGEventLeftMouseDown, location, kCGMouseButtonLeft);
     CGEventSetIntegerValueField(event, kCGMouseEventClickState, 2);
@@ -47,7 +47,7 @@ void mouseDoubleClickEventReal(CGPoint location, CGEventFlags flags) {
     CFRelease(event);
 }
 
-void mouseScrollEventReal(float deltaX, float deltaY) {
+void mouseScrollEventInternal(float deltaX, float deltaY) {
     traceScope();
     if (deltaX == 0 && deltaY == 0) {
         return;
@@ -63,7 +63,7 @@ void mouseScrollEventReal(float deltaX, float deltaY) {
     CFRelease(event);
 }
 
-void keyEventReal(uint16_t keyCode, uint64_t flags, bool keyDown, bool currentProcessOnly) {
+void keyEventInternal(uint16_t keyCode, uint64_t flags, bool keyDown, bool currentProcessOnly) {
     traceScope();
     CGEventRef ev = CGEventCreateKeyboardEvent(nullptr, keyCode, keyDown);
     CGEventSetFlags(ev, flags | CGEventGetFlags(ev));
@@ -159,7 +159,7 @@ void sendKey(WORD vk, bool keyDown, HWND hwnd = NULL) {
     }
 }
 
-void mouseEventReal(POINT pos, DWORD evFlags, uint64_t flags) {
+void mouseEventInternal(POINT pos, DWORD evFlags, uint64_t flags) {
     traceScope();
 
     INPUT event = {0};
@@ -197,7 +197,7 @@ void mouseEventReal(POINT pos, DWORD evFlags, uint64_t flags) {
 }
 
 /*
-void mouseDoubleClickEventReal(POINT pos, uint64_t flags) {
+void mouseDoubleClickEventInternal(POINT pos, uint64_t flags) {
     traceScope();
 
     INPUT event = {0};
@@ -241,7 +241,7 @@ void mouseDoubleClickEventReal(POINT pos, uint64_t flags) {
 }
 */
 
-void mouseScrollEventReal(POINT pos, DWORD deltaX, DWORD deltaY) {
+void mouseScrollEventInternal(POINT pos, DWORD deltaX, DWORD deltaY) {
     traceScope();
 
     INPUT event = {0};
@@ -262,7 +262,7 @@ void mouseScrollEventReal(POINT pos, DWORD deltaX, DWORD deltaY) {
     }
 }
 
-void keyEventReal(WORD vk, uint64_t flags, bool keyDown, void* nativeHandle) {
+void keyEventInternal(WORD vk, uint64_t flags, bool keyDown, void* nativeHandle) {
     traceScope();
 
     auto hwnd = (HWND)nativeHandle;
@@ -426,11 +426,11 @@ void mouseEvent(MouseEvType t, float x, float y, uint64_t flags) {
 #if defined(JUCE_MAC)
     if (t == MouseEvType::DBL_CLICK) {
         CGPoint loc = CGPointMake(x, y);
-        mouseDoubleClickEventReal(loc, flags);
+        mouseDoubleClickEventInternal(loc, flags);
     } else {
         auto bt = toMouseButtonType(t);
         CGPoint loc = CGPointMake(x, y);
-        mouseEventReal(bt.first, bt.second, loc, flags);
+        mouseEventInternal(bt.first, bt.second, loc, flags);
     }
 #elif defined(JUCE_WINDOWS)
     auto pos = getScaledPoint(x, y);
@@ -438,7 +438,7 @@ void mouseEvent(MouseEvType t, float x, float y, uint64_t flags) {
         // No dedicated handling needed, two down/up events will appear which will be detected as double click
     } else {
         auto mouseFlags = getMouseFlags(t);
-        mouseEventReal(pos, mouseFlags, flags);
+        mouseEventInternal(pos, mouseFlags, flags);
     }
 #endif
 }
@@ -450,25 +450,25 @@ void mouseScrollEvent(float x, float y, float deltaX, float deltaY, bool isSmoot
 
     if (isSmooth) {
         const float scale = 0.5f / 256.0f;
-        mouseScrollEventReal(deltaX / scale, deltaY / scale);
+        mouseScrollEventInternal(deltaX / scale, deltaY / scale);
     } else {
         const float scale = 10.0f / 256.0f;
-        mouseScrollEventReal(deltaX / scale, deltaY / scale);
+        mouseScrollEventInternal(deltaX / scale, deltaY / scale);
     }
 #elif defined(JUCE_WINDOWS)
     ignoreUnused(isSmooth);
 
     auto pos = getScaledPoint(x, y);
-    mouseScrollEventReal(pos, lround(deltaX * 512), lround(deltaY * 512));
+    mouseScrollEventInternal(pos, lround(deltaX * 512), lround(deltaY * 512));
 #endif
 }
 
 void keyEvent(uint16_t keyCode, uint64_t flags, bool keyDown, bool currentProcessOnly, void* nativeHandle) {
 #if defined(JUCE_MAC)
     ignoreUnused(nativeHandle);
-    keyEventReal(keyCode, flags, keyDown, currentProcessOnly);
+    keyEventInternal(keyCode, flags, keyDown, currentProcessOnly);
 #elif defined(JUCE_WINDOWS)
-    keyEventReal(getVK(keyCode), flags, keyDown, currentProcessOnly ? nativeHandle : nullptr);
+    keyEventInternal(getVK(keyCode), flags, keyDown, currentProcessOnly ? nativeHandle : nullptr);
 #endif
 }
 

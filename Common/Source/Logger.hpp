@@ -14,39 +14,49 @@
 
 namespace e47 {
 
-class AGLogger : public Thread {
+class Logger : public Thread {
   public:
-    AGLogger(const String& appName, const String& filePrefix);
-    ~AGLogger() override;
+    Logger(const String& appName, const String& filePrefix);
+    ~Logger() override;
     void run() override;
 
     static void log(String msg);
 
-    static void initialize(const String& appName, const String& filePrefix, const String& configFile);
+    static void initialize(const String& appName, const String& filePrefix, const String& configFile,
+                           bool logDirectly = false);
+
+    static void initialize() {
+        initialize({}, {}, {}, true);
+        setLogToErr(true);
+    }
+
     static void deleteFileAtFinish();
-    static std::shared_ptr<AGLogger> getInstance();
+    static std::shared_ptr<Logger> getInstance();
     static void cleanup();
 
     static bool isEnabled() { return m_enabled; }
     static void setEnabled(bool b);
     static File getLogFile();
+    static void setLogToErr(bool b);
+    static void setLogDirectly(bool b);
 
   private:
     File m_file;
     std::ofstream m_outstream;
     bool m_deleteFile = false;
+    bool m_logDirectly = false;
     std::queue<String> m_msgQ[2];
     size_t m_msgQIdx = 0;
     std::mutex m_mtx;
     std::condition_variable m_cv;
 
-#ifdef JUCE_DEBUG
     bool m_logToErr = false;
-#endif
+    bool m_debugger = false;
 
-    void logReal(String msg);
+    void logToQueue(String msg);
+    void logMsg(const String& msg);
 
-    static std::shared_ptr<AGLogger> m_inst;
+    static std::shared_ptr<Logger> m_inst;
     static std::mutex m_instMtx;
     static size_t m_instRefCount;
 
@@ -56,7 +66,17 @@ class AGLogger : public Thread {
 class LogTag {
   public:
     LogTag(const String& name) : m_tagId((uint64)this), m_tagName(name) {}
+    LogTag(const LogTag& other) : m_tagId(other.m_tagId), m_tagName(other.m_tagName), m_tagExtra(other.m_tagExtra) {}
     virtual ~LogTag() {}
+
+    LogTag& operator=(const LogTag& rhs) {
+        if (this != &rhs) {
+            m_tagId = rhs.m_tagId;
+            m_tagName = rhs.m_tagName;
+            m_tagExtra = rhs.m_tagExtra;
+        }
+        return *this;
+    }
 
     static inline String getStrWithLeadingZero(int n, int digits = 2) {
         String s = "";

@@ -165,11 +165,11 @@ void Metrics::aggregate1s() {
 void Metrics::run() {
     traceScope();
     int count = 1;
-    while (!currentThreadShouldExit()) {
+    while (!threadShouldExit()) {
         int sleepstep = 50;
         int sleepfor = 10000 / sleepstep;
         int sleepcount = 0;
-        while (!currentThreadShouldExit() && sleepfor-- > 0) {
+        while (!threadShouldExit() && sleepfor-- > 0) {
             Thread::sleep(sleepstep);
             sleepcount += sleepstep;
             if (sleepcount % 1000 == 0) {
@@ -177,7 +177,7 @@ void Metrics::run() {
                 aggregate1s();
             }
         }
-        if (!currentThreadShouldExit()) {
+        if (!threadShouldExit()) {
             aggregateAndShow(count == 0);
             ++count %= 6;
         }

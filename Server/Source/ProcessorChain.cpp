@@ -6,306 +6,10 @@
  */
 
 #include "ProcessorChain.hpp"
+#include "Processor.hpp"
 #include "App.hpp"
 
 namespace e47 {
-
-std::atomic_uint32_t AGProcessor::loadedCount{0};
-std::mutex AGProcessor::m_pluginLoaderMtx;
-
-AGProcessor::AGProcessor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize)
-    : LogTagDelegate(chain.getLogTagSource()),
-      m_chain(chain),
-      m_id(id),
-      m_sampleRate(sampleRate),
-      m_blockSize(blockSize),
-      m_parallelLoadAllowed(getApp()->getServer()->getParallelPluginLoad()) {}
-
-AGProcessor::~AGProcessor() { unload(); }
-
-String AGProcessor::createPluginID(const PluginDescription& d) {
-    return d.pluginFormatName + "-" + d.name + "-" + String::toHexString(d.deprecatedUid);
-}
-
-String AGProcessor::convertJUCEtoAGPluginID(const String& id) {
-    // JUCE uses the fromat: <AU|VST|VST3>-<Name>-<File Name Hash>-<Plugin ID>
-    int pos;
-    String format, name, fileHash, pluginId;
-
-    if ((pos = id.indexOfChar(0, '-')) > -1) {
-        format = id.substring(0, pos);
-        if (format != "AudioUnit" && format != "VST" && format != "VST3") {
-            return {};
-        }
-        name = id.substring(pos + 1);
-    } else {
-        return {};
-    }
-    if ((pos = name.lastIndexOfChar('-')) > -1) {
-        pluginId = name.substring(pos + 1);
-        name = name.substring(0, pos);
-    } else {
-        return {};
-    }
-    if ((pos = name.lastIndexOfChar('-')) > -1) {
-        fileHash = name.substring(pos + 1).toLowerCase();
-        name = name.substring(0, pos);
-    } else {
-        return {};
-    }
-
-    for (auto c : fileHash) {
-        // only hex chars allowed
-        if (c < '0' || (c > '9' && c < 'a') || c > 'f') {
-            return {};
-        }
-    }
-
-    auto convertedId = format + "-" + name + "-" + pluginId;
-
-    setLogTagStatic("agprocessor");
-    logln("sucessfully converted JUCE ID " << id << " to AG ID " << convertedId);
-
-    return convertedId;
-}
-
-std::unique_ptr<PluginDescription> AGProcessor::findPluginDescritpion(const String& id) {
-    auto& pluglist = getApp()->getPluginList();
-    std::unique_ptr<PluginDescription> plugdesc;
-    // the passed ID could be a JUCE ID, lets try to convert it to an AG ID
-    auto convertedId = convertJUCEtoAGPluginID(id);
-    for (auto& desc : pluglist.getTypes()) {
-        auto descId = createPluginID(desc);
-        if (descId == id || descId == convertedId) {
-            plugdesc = std::make_unique<PluginDescription>(desc);
-        }
-    }
-    // fallback with filename
-    if (nullptr == plugdesc) {
-        plugdesc = pluglist.getTypeForFile(id);
-    }
-    return plugdesc;
-}
-
-std::shared_ptr<AudioPluginInstance> AGProcessor::loadPlugin(PluginDescription& plugdesc, double sampleRate,
-                                                             int blockSize, String& err) {
-    setLogTagStatic("agprocessor");
-    traceScope();
-    String err2;
-    AudioPluginFormatManager plugmgr;
-    plugmgr.addDefaultFormats();
-    std::shared_ptr<AudioPluginInstance> inst;
-    runOnMsgThreadSync([&] {
-        traceScope();
-        inst = std::shared_ptr<AudioPluginInstance>(
-            plugmgr.createPluginInstance(plugdesc, sampleRate, blockSize, err2).release(),
-            [](AudioPluginInstance* p) { MessageManager::callAsync([p] { delete p; }); });
-    });
-    if (nullptr == inst) {
-        err = "failed loading plugin ";
-        err << plugdesc.fileOrIdentifier << ": " << err2;
-        logln(err);
-    }
-    return inst;
-}
-
-std::shared_ptr<AudioPluginInstance> AGProcessor::loadPlugin(const String& id, double sampleRate, int blockSize,
-                                                             String& err) {
-    setLogTagStatic("agprocessor");
-    traceScope();
-    auto plugdesc = findPluginDescritpion(id);
-    if (nullptr != plugdesc) {
-        return loadPlugin(*plugdesc, sampleRate, blockSize, err);
-    } else {
-        err = "failed to find plugin descriptor";
-        logln(err);
-    }
-    return nullptr;
-}
-
-bool AGProcessor::load(String& err) {
-    traceScope();
-    bool loaded = false;
-    std::shared_ptr<AudioPluginInstance> p;
-    {
-        std::lock_guard<std::mutex> lock(m_pluginMtx);
-        p = m_plugin;
-    }
-    if (nullptr == p) {
-        if (!m_parallelLoadAllowed) {
-            m_pluginLoaderMtx.lock();
-        }
-        p = loadPlugin(m_id, m_sampleRate, m_blockSize, err);
-        if (nullptr != p) {
-            {
-                std::lock_guard<std::mutex> lock(m_pluginMtx);
-                m_plugin = p;
-            }
-            if (m_chain.initPluginInstance(this, err)) {
-                loaded = true;
-                for (auto* param : m_plugin->getParameters()) {
-                    param->addListener(this);
-                }
-                loadedCount++;
-            } else {
-                std::lock_guard<std::mutex> lock(m_pluginMtx);
-                m_plugin.reset();
-            }
-        }
-        if (!m_parallelLoadAllowed) {
-            m_pluginLoaderMtx.unlock();
-        }
-    }
-    return loaded;
-}
-
-void AGProcessor::unload() {
-    traceScope();
-    std::shared_ptr<AudioPluginInstance> p;
-    {
-        std::lock_guard<std::mutex> lock(m_pluginMtx);
-        if (nullptr != m_plugin) {
-            if (m_prepared) {
-                m_plugin->releaseResources();
-            }
-            for (auto* param : m_plugin->getParameters()) {
-                param->removeListener(this);
-            }
-            p = m_plugin;
-            m_plugin.reset();
-            loadedCount--;
-        }
-    }
-    if (!m_parallelLoadAllowed) {
-        m_pluginLoaderMtx.lock();
-    }
-    p.reset();
-    if (!m_parallelLoadAllowed) {
-        m_pluginLoaderMtx.unlock();
-    }
-}
-
-void AGProcessor::processBlockBypassed(AudioBuffer<float>& buffer) {
-    auto totalNumInputChannels = m_chain.getTotalNumInputChannels();
-    auto totalNumOutputChannels = m_chain.getTotalNumOutputChannels();
-
-    if (totalNumInputChannels > buffer.getNumChannels()) {
-        logln("buffer has less channels than main input channels");
-        totalNumInputChannels = buffer.getNumChannels();
-    }
-    if (totalNumOutputChannels > buffer.getNumChannels()) {
-        logln("buffer has less channels than main output channels");
-        totalNumOutputChannels = buffer.getNumChannels();
-    }
-
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
-        buffer.clear(i, 0, buffer.getNumSamples());
-    }
-
-    if (m_bypassBufferF.size() < totalNumOutputChannels) {
-        logln("bypass buffer has less channels than needed, buffer: " << m_bypassBufferF.size()
-                                                                      << ", needed: " << totalNumOutputChannels);
-        for (auto i = 0; i < totalNumOutputChannels; ++i) {
-            buffer.clear(i, 0, buffer.getNumSamples());
-        }
-        return;
-    }
-
-    for (auto c = 0; c < totalNumOutputChannels; ++c) {
-        auto& buf = m_bypassBufferF.getReference(c);
-        for (auto s = 0; s < buffer.getNumSamples(); ++s) {
-            buf.add(buffer.getSample(c, s));
-            buffer.setSample(c, s, buf.getFirst());
-            buf.remove(0);
-        }
-    }
-}
-
-void AGProcessor::processBlockBypassed(AudioBuffer<double>& buffer) {
-    auto totalNumInputChannels = m_chain.getTotalNumInputChannels();
-    auto totalNumOutputChannels = m_chain.getTotalNumOutputChannels();
-
-    if (totalNumInputChannels > buffer.getNumChannels()) {
-        logln("buffer has less channels than main input channels");
-        totalNumInputChannels = buffer.getNumChannels();
-    }
-    if (totalNumOutputChannels > buffer.getNumChannels()) {
-        logln("buffer has less channels than main output channels");
-        totalNumOutputChannels = buffer.getNumChannels();
-    }
-
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
-        buffer.clear(i, 0, buffer.getNumSamples());
-    }
-
-    if (m_bypassBufferD.size() < totalNumOutputChannels) {
-        logln("bypass buffer has less channels than needed");
-        for (auto i = 0; i < totalNumOutputChannels; ++i) {
-            buffer.clear(i, 0, buffer.getNumSamples());
-        }
-        return;
-    }
-
-    for (auto c = 0; c < totalNumOutputChannels; ++c) {
-        auto& buf = m_bypassBufferD.getReference(c);
-        for (auto s = 0; s < buffer.getNumSamples(); ++s) {
-            buf.add(buffer.getSample(c, s));
-            buffer.setSample(c, s, buf.getFirst());
-            buf.remove(0);
-        }
-    }
-}
-
-void AGProcessor::suspendProcessing(const bool shouldBeSuspended) {
-    traceScope();
-    auto p = getPlugin();
-    if (nullptr != p) {
-        if (shouldBeSuspended) {
-            p->suspendProcessing(true);
-            p->releaseResources();
-        } else {
-            p->prepareToPlay(m_chain.getSampleRate(), m_chain.getBlockSize());
-            p->suspendProcessing(false);
-        }
-    }
-}
-
-void AGProcessor::updateLatencyBuffers() {
-    traceScope();
-    logln("updating latency buffers for " << m_lastKnownLatency << " samples");
-    auto p = getPlugin();
-    int channels = p->getTotalNumOutputChannels();
-    while (m_bypassBufferF.size() < channels) {
-        Array<float> buf;
-        for (int i = 0; i < m_lastKnownLatency; i++) {
-            buf.add(0);
-        }
-        m_bypassBufferF.add(std::move(buf));
-    }
-    while (m_bypassBufferD.size() < channels) {
-        Array<double> buf;
-        for (int i = 0; i < m_lastKnownLatency; i++) {
-            buf.add(0);
-        }
-        m_bypassBufferD.add(std::move(buf));
-    }
-    for (int c = 0; c < channels; c++) {
-        auto& bufF = m_bypassBufferF.getReference(c);
-        while (bufF.size() > m_lastKnownLatency) {
-            bufF.remove(0);
-        }
-        while (bufF.size() < m_lastKnownLatency) {
-            bufF.add(0);
-        }
-        auto& bufD = m_bypassBufferD.getReference(c);
-        while (bufD.size() > m_lastKnownLatency) {
-            bufD.remove(0);
-        }
-        while (bufD.size() < m_lastKnownLatency) {
-            bufD.add(0);
-        }
-    }
-}
 
 void ProcessorChain::prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock) {
     traceScope();
@@ -325,30 +29,16 @@ void ProcessorChain::releaseResources() {
 }
 
 void ProcessorChain::processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMessages) {
-    traceScope();
-    auto start_proc = Time::getHighResolutionTicks();
-    processBlockReal(buffer, midiMessages);
-    auto end_proc = Time::getHighResolutionTicks();
-    double time_proc = Time::highResolutionTicksToSeconds(end_proc - start_proc);
-    if (time_proc > 0.02) {
-        logln("warning: chain (" << toString() << "): high audio processing time: " << time_proc);
-    }
+    processBlockInternal(buffer, midiMessages);
 }
 
 void ProcessorChain::processBlock(AudioBuffer<double>& buffer, MidiBuffer& midiMessages) {
-    traceScope();
-    auto start_proc = Time::getHighResolutionTicks();
-    processBlockReal(buffer, midiMessages);
-    auto end_proc = Time::getHighResolutionTicks();
-    double time_proc = Time::highResolutionTicksToSeconds(end_proc - start_proc);
-    if (time_proc > 0.02) {
-        logln("warning: chain (" << toString() << "): high audio processing time: " << time_proc);
-    }
+    processBlockInternal(buffer, midiMessages);
 }
 
 double ProcessorChain::getTailLengthSeconds() const { return m_tailSecs; }
 
-bool ProcessorChain::supportsDoublePrecisionProcessing() const { return m_supportsDoublePrecission; }
+bool ProcessorChain::supportsDoublePrecisionProcessing() const { return m_supportsDoublePrecision; }
 
 bool ProcessorChain::updateChannels(int channelsIn, int channelsOut, int channelsSC) {
     traceScope();
@@ -389,11 +79,10 @@ bool ProcessorChain::updateChannels(int channelsIn, int channelsOut, int channel
     return true;
 }
 
-bool ProcessorChain::setProcessorBusesLayout(AGProcessor* proc) {
+bool ProcessorChain::setProcessorBusesLayout(Processor* proc) {
     traceScope();
 
-    auto plugin = proc->getPlugin();
-    if (nullptr == plugin) {
+    if (!proc->isLoaded()) {
         return false;
     }
 
@@ -405,7 +94,7 @@ bool ProcessorChain::setProcessorBusesLayout(AGProcessor* proc) {
     }
 
     bool hasSidechain = m_hasSidechain && !m_sidechainDisabled;
-    bool supported = plugin->checkBusesLayoutSupported(layout) && plugin->setBusesLayout(layout);
+    bool supported = proc->checkBusesLayoutSupported(layout) && proc->setBusesLayout(layout);
 
     if (!supported) {
         logln("standard layout not supported");
@@ -416,12 +105,12 @@ bool ProcessorChain::setProcessorBusesLayout(AGProcessor* proc) {
                 logln("trying with mono sidechain bus");
                 layout.inputBuses.remove(1);
                 layout.inputBuses.add(AudioChannelSet::mono());
-                supported = plugin->checkBusesLayoutSupported(layout) && plugin->setBusesLayout(layout);
+                supported = proc->checkBusesLayoutSupported(layout) && proc->setBusesLayout(layout);
             }
             if (!supported) {
                 logln("trying without sidechain bus");
                 layout.inputBuses.remove(1);
-                supported = plugin->checkBusesLayoutSupported(layout) && plugin->setBusesLayout(layout);
+                supported = proc->checkBusesLayoutSupported(layout) && proc->setBusesLayout(layout);
                 if (supported) {
                     proc->setNeedsDisabledSidechain(true);
                     m_sidechainDisabled = true;
@@ -440,7 +129,7 @@ bool ProcessorChain::setProcessorBusesLayout(AGProcessor* proc) {
             logln("falling back to the plugins default layout");
 
             // keep the processor's layout and calculate the neede extra channels
-            auto procLayout = plugin->getBusesLayout();
+            auto procLayout = proc->getBusesLayout();
 
             // main bus IN
             int extraInChannels = procLayout.getMainInputChannels() - layout.getMainInputChannels();
@@ -483,44 +172,43 @@ int ProcessorChain::getExtraChannels() {
     return m_extraChannels;
 }
 
-bool ProcessorChain::initPluginInstance(AGProcessor* proc, String& err) {
+bool ProcessorChain::initPluginInstance(Processor* proc, String& err) {
     traceScope();
     if (!setProcessorBusesLayout(proc)) {
         err = "failed to find working I/O configuration";
         return false;
     }
-    auto inst = proc->getPlugin();
     AudioProcessor::ProcessingPrecision prec = AudioProcessor::singlePrecision;
     if (isUsingDoublePrecision() && supportsDoublePrecisionProcessing()) {
-        if (inst->supportsDoublePrecisionProcessing()) {
+        if (proc->supportsDoublePrecisionProcessing()) {
             prec = AudioProcessor::doublePrecision;
         } else {
-            logln("host wants double precission but plugin '" << inst->getName() << "' does not support it");
+            logln("host wants double precission but plugin '" << proc->getName() << "' does not support it");
         }
     }
-    inst->setProcessingPrecision(prec);
-    inst->prepareToPlay(getSampleRate(), getBlockSize());
-    inst->setPlayHead(getPlayHead());
-    inst->enableAllBuses();
+    proc->setProcessingPrecision(prec);
+    proc->prepareToPlay(getSampleRate(), getBlockSize());
+    proc->setPlayHead(getPlayHead());
+    proc->enableAllBuses();
     if (prec == AudioProcessor::doublePrecision) {
-        preProcessBlocks<double>(inst);
+        preProcessBlocks<double>(proc);
     } else {
-        preProcessBlocks<float>(inst);
+        preProcessBlocks<float>(proc);
     }
     return true;
 }
 
-bool ProcessorChain::addPluginProcessor(const String& id, String& err) {
+bool ProcessorChain::addPluginProcessor(const String& id, const String& settings, String& err) {
     traceScope();
-    auto proc = std::make_shared<AGProcessor>(*this, id, getSampleRate(), getBlockSize());
-    if (proc->load(err)) {
-        addProcessor(proc);
+    auto proc = std::make_shared<Processor>(*this, id, getSampleRate(), getBlockSize());
+    if (proc->load(settings, err)) {
+        addProcessor(std::move(proc));
         return true;
     }
     return false;
 }
 
-void ProcessorChain::addProcessor(std::shared_ptr<AGProcessor> processor) {
+void ProcessorChain::addProcessor(std::shared_ptr<Processor> processor) {
     traceScope();
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     processor->setChainIndex((int)m_processors.size());
@@ -554,10 +242,9 @@ void ProcessorChain::updateNoLock() {
     m_extraChannels = 0;
     m_sidechainDisabled = false;
     for (auto& proc : m_processors) {
-        auto p = proc->getPlugin();
-        if (nullptr != p) {
-            latency += p->getLatencySamples();
-            if (!p->supportsDoublePrecisionProcessing()) {
+        if (nullptr != proc) {
+            latency += proc->getLatencySamples();
+            if (!proc->supportsDoublePrecisionProcessing()) {
                 supportsDouble = false;
             }
             m_extraChannels = jmax(m_extraChannels, proc->getExtraInChannels(), proc->getExtraOutChannels());
@@ -568,7 +255,7 @@ void ProcessorChain::updateNoLock() {
         logln("updating latency samples to " << latency);
         setLatencySamples(latency);
     }
-    m_supportsDoublePrecission = supportsDouble;
+    m_supportsDoublePrecision = supportsDouble;
     auto it = m_processors.rbegin();
     while (it != m_processors.rend() && (*it)->isSuspended()) {
         it++;
@@ -580,7 +267,7 @@ void ProcessorChain::updateNoLock() {
     }
 }
 
-std::shared_ptr<AGProcessor> ProcessorChain::getProcessor(int index) {
+std::shared_ptr<Processor> ProcessorChain::getProcessor(int index) {
     traceScope();
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     if (index > -1 && (size_t)index < m_processors.size()) {
@@ -603,16 +290,11 @@ float ProcessorChain::getParameterValue(int idx, int paramIdx) {
     traceScope();
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     if (idx > -1 && (size_t)idx < m_processors.size()) {
-        auto p = m_processors[(size_t)idx]->getPlugin();
-        if (nullptr != p) {
-            for (auto& param : p->getParameters()) {
-                if (paramIdx == param->getParameterIndex()) {
-                    return param->getValue();
-                }
-            }
+        if (auto p = m_processors[(size_t)idx]) {
+            return p->getParameterValue(paramIdx);
         }
     }
-    return 0;
+    return 0.0f;
 }
 
 void ProcessorChain::clear() {
@@ -640,6 +322,53 @@ String ProcessorChain::toString() {
         }
     }
     return ret;
+}
+
+template <typename T>
+void ProcessorChain::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
+    traceScope();
+
+    auto start_proc = Time::getHighResolutionTicks();
+
+    int latency = 0;
+    if (getBusCount(true) > 1 && m_sidechainDisabled) {
+        auto sidechainBuffer = getBusBuffer(buffer, true, 1);
+        sidechainBuffer.clear();
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(m_processors_mtx);
+        for (auto& proc : m_processors) {
+            if (proc->processBlock(buffer, midiMessages)) {
+                latency += proc->getLatencySamples();
+            }
+        }
+    }
+
+    if (latency != getLatencySamples()) {
+        logln("updating latency samples to " << latency);
+        setLatencySamples(latency);
+    }
+
+    auto end_proc = Time::getHighResolutionTicks();
+    double time_proc = Time::highResolutionTicksToSeconds(end_proc - start_proc);
+    if (time_proc > 0.02) {
+        logln("warning: chain (" << toString() << "): high audio processing time: " << time_proc);
+    }
+}
+
+template <typename T>
+void ProcessorChain::preProcessBlocks(Processor* proc) {
+    traceScope();
+    MidiBuffer midi;
+    int channels = jmax(getTotalNumInputChannels(), getTotalNumOutputChannels()) + m_extraChannels;
+    AudioBuffer<T> buf(channels, getBlockSize());
+    buf.clear();
+    int samplesProcessed = 0;
+    do {
+        proc->processBlock(buf, midi);
+        samplesProcessed += getBlockSize();
+    } while (samplesProcessed < 16384);
 }
 
 }  // namespace e47

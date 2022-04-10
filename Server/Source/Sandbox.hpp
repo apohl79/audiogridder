@@ -39,7 +39,7 @@ class SandboxPeer : public LogTagDelegate {
     ENABLE_ASYNC_FUNCTORS();
 };
 
-struct SandboxMaster : ChildProcessMaster, SandboxPeer {
+struct SandboxMaster : ChildProcessCoordinator, SandboxPeer {
     SandboxMaster(Server& server, const String& id);
 
     String id;
@@ -51,11 +51,11 @@ struct SandboxMaster : ChildProcessMaster, SandboxPeer {
 
   protected:
     // SandboxPeer
-    bool sendMessage(const MemoryBlock& data) override { return sendMessageToSlave(data); }
+    bool sendMessage(const MemoryBlock& data) override { return sendMessageToWorker(data); }
     void handleMessage(const SandboxMessage&) override;
 };
 
-struct SandboxSlave : ChildProcessSlave, SandboxPeer {
+struct SandboxSlave : ChildProcessWorker, SandboxPeer {
     SandboxSlave(Server& server);
 
     // ChildProcessSlave
@@ -65,7 +65,7 @@ struct SandboxSlave : ChildProcessSlave, SandboxPeer {
 
   protected:
     // SandboxPeer
-    bool sendMessage(const MemoryBlock& data) override { return sendMessageToMaster(data); }
+    bool sendMessage(const MemoryBlock& data) override { return sendMessageToCoordinator(data); }
     void handleMessage(const SandboxMessage&) override;
 };
 

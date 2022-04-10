@@ -22,7 +22,7 @@ namespace e47 {
 
 std::atomic_uint32_t Client::count{0};
 
-Client::Client(AudioGridderAudioProcessor* processor)
+Client::Client(PluginProcessor* processor)
     : Thread("Client"), LogTag("client"), m_processor(processor), m_msgFactory(this) {
     initAsyncFunctors();
     count++;
@@ -44,7 +44,7 @@ void Client::run() {
     uint32 loops = 0;
     MessageFactory msgFactory(this);
     bool lastState = isReady();
-    while (!currentThreadShouldExit()) {
+    while (!threadShouldExit()) {
         // Check for config updates from other clients
         auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigPlugin));
         int newNum;
@@ -74,7 +74,7 @@ void Client::run() {
 
         // Health check & reconnect
         if ((!isReady(LOAD_PLUGIN_TIMEOUT + 5000) || m_needsReconnect) && m_srvHost.isNotEmpty() &&
-            !currentThreadShouldExit()) {
+            !threadShouldExit()) {
             logln("(re)connecting...");
             close();
             init();
@@ -103,7 +103,7 @@ void Client::run() {
 
         if (isReadyLockFree()) {
             TimeStatistic::Timeout timeout(1000);
-            while (timeout.getMillisecondsLeft() > 0 && !currentThreadShouldExit()) {
+            while (timeout.getMillisecondsLeft() > 0 && !threadShouldExit()) {
                 MessageHelper::Error err;
                 auto msg = msgFactory.getNextMessage(m_cmdIn.get(), &err, 100);
                 if (nullptr != msg) {
@@ -464,7 +464,7 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
     };
     MessageHelper::Error e;
     Message<AddPlugin> msg(this);
-    PLD(msg).setString(id);
+    PLD(msg).setJson({{"id", id.toStdString()}, {"settings", settings.toStdString()}});
     LockByID lock(*this, ADDPLUGIN);
     TimeStatistic::Timeout timeout(LOAD_PLUGIN_TIMEOUT);
     if (msg.send(m_cmdOut.get())) {
@@ -515,17 +515,17 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
             }
             params.add(std::move(newParam));
         }
-        Message<PluginSettings> msgSettings(this);
-        if (settings.isNotEmpty()) {
-            MemoryBlock block;
-            block.fromBase64Encoding(settings);
-            msgSettings.payload.setData(block.begin(), static_cast<int>(block.getSize()));
-        }
-        if (!msgSettings.send(m_cmdOut.get())) {
-            err = "failed to send settings";
-            logln(err);
-            return false;
-        }
+        // Message<PluginSettings> msgSettings(this);
+        // if (settings.isNotEmpty()) {
+        //    MemoryBlock block;
+        //    block.fromBase64Encoding(settings);
+        //    msgSettings.payload.setData(block.begin(), static_cast<int>(block.getSize()));
+        //}
+        // if (!msgSettings.send(m_cmdOut.get())) {
+        //    err = "failed to send settings";
+        //    logln(err);
+        //    return false;
+        //}
         m_latency = jresult["latency"].get<int>();
         hasEditor = jresult["hasEditor"].get<bool>();
         scDisabled = jresult["disabledSideChain"].get<bool>();
@@ -768,8 +768,8 @@ void Client::ScreenReceiver::run() {
                 m_client->setPluginScreen(nullptr, 0, 0);
             }
         }
-    } while (!currentThreadShouldExit() && (err.code == MessageHelper::E_NONE || err.code == MessageHelper::E_TIMEOUT));
-    if (!currentThreadShouldExit()) {
+    } while (!threadShouldExit() && (err.code == MessageHelper::E_NONE || err.code == MessageHelper::E_TIMEOUT));
+    if (!threadShouldExit()) {
         logln("screen receiver failed to read message: " << err.toString());
         signalThreadShouldExit();
     }

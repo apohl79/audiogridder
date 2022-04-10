@@ -45,7 +45,7 @@ struct Scope {
         if (enabled) {
             auto end = Time::getHighResolutionTicks();
             double ms = Time::highResolutionTicksToSeconds(end - start) * 1000;
-            traceMessage(tagId, tagName, tagExtra, file, line, func, "exit (took " + String(ms) + "ms)");
+            traceMessage(tagId, tagName, tagExtra, file, line, func, "<< exit (took " + String(ms) + "ms)");
         }
     }
 };

@@ -18,7 +18,7 @@ namespace e47 {
 
 class PluginSearchWindow : public TopLevelWindow, public KeyListener, public LogTagDelegate {
   public:
-    PluginSearchWindow(float x, float y, AudioGridderAudioProcessor& p);
+    PluginSearchWindow(float x, float y, PluginProcessor& p);
     ~PluginSearchWindow() override;
 
     void paint(Graphics&) override;
@@ -52,7 +52,7 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
     void mouseExit(const MouseEvent&) override;
 
   private:
-    AudioGridderAudioProcessor& m_processor;
+    PluginProcessor& m_processor;
     TextEditor m_search;
     TreeView m_tree;
     bool m_showType;

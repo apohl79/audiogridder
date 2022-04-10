@@ -11,6 +11,7 @@
 #include <JuceHeader.h>
 
 #include "Utils.hpp"
+#include "SharedInstance.hpp"
 
 #include <thread>
 
@@ -35,7 +36,7 @@ JUCE_END_IGNORE_WARNINGS_GCC_LIKE
 
 namespace e47 {
 
-class ScreenRecorder : public LogTag {
+class ScreenRecorder : public LogTag, public SharedInstance<ScreenRecorder> {
   public:
     using CaptureCallback = std::function<void(const uint8_t* data, int size, int width, int height, double scale)>;
 
@@ -44,8 +45,8 @@ class ScreenRecorder : public LogTag {
     ScreenRecorder();
     ~ScreenRecorder();
 
-    void start(Rectangle<int> rect, CaptureCallback fn);
-    void resume(Rectangle<int> rect = {});
+    void start(juce::Rectangle<int> rect, CaptureCallback fn);
+    void resume(juce::Rectangle<int> rect = {});
     void stop();
 
     bool isRecording() const { return m_capture; }
@@ -77,7 +78,7 @@ class ScreenRecorder : public LogTag {
 
     SwsContext* m_swsCtx = nullptr;
 
-    Rectangle<int> m_captureRect;
+    juce::Rectangle<int> m_captureRect;
     int m_pxSize = 0;
 
     static EncoderMode m_encMode;
@@ -88,10 +89,9 @@ class ScreenRecorder : public LogTag {
     std::unique_ptr<std::thread> m_thread;
     std::atomic_bool m_threadRunning{false};
     std::atomic_bool m_capture{false};
+    std::mutex m_startStopMtx;
 
     CaptureCallback m_callback;
-
-    bool updateArea(Rectangle<int> rect);
 
     bool prepareInput();
     bool prepareOutput();

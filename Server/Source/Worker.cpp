@@ -6,6 +6,8 @@
  */
 
 #include "Worker.hpp"
+#include "Server.hpp"
+#include "Processor.hpp"
 #include "KeyAndMouse.hpp"
 #include "Defaults.hpp"
 #include "App.hpp"
@@ -24,7 +26,7 @@ namespace e47 {
 std::atomic_uint32_t Worker::count{0};
 std::atomic_uint32_t Worker::runCount{0};
 
-Worker::Worker(std::shared_ptr<StreamingSocket> masterSocket, const HandshakeRequest& cfg)
+Worker::Worker(std::shared_ptr<StreamingSocket> masterSocket, const HandshakeRequest& cfg, int sandboxMode)
     : Thread("Worker"),
       LogTag("worker"),
       m_masterSocket(masterSocket),
@@ -32,6 +34,7 @@ Worker::Worker(std::shared_ptr<StreamingSocket> masterSocket, const HandshakeReq
       m_audio(std::make_shared<AudioWorker>(this)),
       m_screen(std::make_shared<ScreenWorker>(this)),
       m_msgFactory(this),
+      m_sandboxMode(sandboxMode),
       m_keyWatcher(std::make_unique<KeyWatcher>(this)) {
     traceScope();
     initAsyncFunctors();
@@ -60,7 +63,7 @@ void Worker::run() {
         logln("failed to set master socket non-blocking");
     }
 
-    m_cmdIn.reset(accept(m_masterSocket.get(), 2000));
+    m_cmdIn.reset(accept(m_masterSocket.get(), 5000));
     if (nullptr != m_cmdIn && m_cmdIn->isConnected()) {
         logln("client connected " << m_cmdIn->getHostName());
     } else {
@@ -80,32 +83,35 @@ void Worker::run() {
     // start audio processing
     sock.reset(accept(m_masterSocket.get(), 2000));
     if (nullptr != sock && sock->isConnected()) {
-        m_audio->init(std::move(sock), m_cfg.channelsIn, m_cfg.channelsOut, m_cfg.channelsSC, m_cfg.activeChannels,
-                      m_cfg.rate, m_cfg.samplesPerBlock, m_cfg.doublePrecission);
+        m_audio->init(std::move(sock), m_cfg);
         m_audio->startThread(Thread::realtimeAudioPriority);
     } else {
         logln("failed to establish audio connection");
     }
 
     // start screen capturing
-    sock.reset(accept(m_masterSocket.get(), 2000));
-    if (nullptr != sock && sock->isConnected()) {
-        m_screen->init(std::move(sock));
-        m_screen->startThread();
-    } else {
-        logln("failed to establish screen connection");
+    if (m_sandboxMode != Server::SANDBOX_PLUGIN) {
+        sock.reset(accept(m_masterSocket.get(), 2000));
+        if (nullptr != sock && sock->isConnected()) {
+            m_screen->init(std::move(sock));
+            m_screen->startThread();
+        } else {
+            logln("failed to establish screen connection");
+        }
     }
 
     m_masterSocket->close();
     m_masterSocket.reset();
 
     // send list of plugins
-    auto msgPL = std::make_shared<Message<PluginList>>(this);
-    handleMessage(msgPL);
+    if (m_sandboxMode != Server::SANDBOX_PLUGIN) {
+        auto msgPL = std::make_shared<Message<PluginList>>(this);
+        handleMessage(msgPL);
+    }
 
     // enter message loop
     logln("command processor started");
-    while (!currentThreadShouldExit() && nullptr != m_cmdIn && m_cmdIn->isConnected() && m_audio->isOkNoLock() &&
+    while (!threadShouldExit() && nullptr != m_cmdIn && m_cmdIn->isConnected() && m_audio->isOkNoLock() &&
            m_screen->isOkNoLock()) {
         MessageHelper::Error e;
         std::shared_ptr<Message<Any>> msg;
@@ -178,6 +184,9 @@ void Worker::run() {
                 case PluginList::Type:
                     handleMessage(Message<Any>::convert<PluginList>(msg));
                     break;
+                case GetScreenBounds::Type:
+                    handleMessage(Message<Any>::convert<GetScreenBounds>(msg));
+                    break;
                 default:
                     logln("unknown message type " << msg->getType());
             }
@@ -188,10 +197,14 @@ void Worker::run() {
     }
 
     shutdown();
-    m_audio->waitForThreadToExit(-1);
-    m_audio.reset();
-    m_screen->waitForThreadToExit(-1);
-    m_screen.reset();
+    if (nullptr != m_audio) {
+        m_audio->waitForThreadToExit(-1);
+        m_audio.reset();
+    }
+    if (nullptr != m_screen) {
+        m_screen->waitForThreadToExit(-1);
+        m_screen.reset();
+    }
     logln("command processor terminated");
     runCount--;
 }
@@ -221,28 +234,31 @@ void Worker::handleMessage(std::shared_ptr<Message<Quit>> /* msg */) {
 
 void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     traceScope();
-    auto id = pPLD(msg).getString();
+    auto jmsg = pPLD(msg).getJson();
+    auto id = jsonGetValue(jmsg, "id", String());
+    auto settings = jsonGetValue(jmsg, "settings", String());
     logln("adding plugin " << id << "...");
     String err;
     bool wasSidechainDisabled = m_audio->isSidechainDisabled();
-    bool success = m_audio->addPlugin(id, err);
-    std::shared_ptr<AGProcessor> proc;
-    std::shared_ptr<AudioPluginInstance> plugin;
+    bool success = m_audio->addPlugin(id, settings, err);
+    std::shared_ptr<Processor> proc;
     json jresult;
     jresult["success"] = success;
     jresult["err"] = err.toStdString();
     if (success) {
         proc = m_audio->getProcessor(m_audio->getSize() - 1);
-        plugin = proc->getPlugin();
         jresult["latency"] = m_audio->getLatencySamples();
         jresult["disabledSideChain"] = !wasSidechainDisabled && m_audio->isSidechainDisabled();
-        runOnMsgThreadSync([&] { jresult["hasEditor"] = plugin->hasEditor(); });
-        proc->onParamValueChange = [this](int idx, int paramIdx, float val) {
-            sendParamValueChange(idx, paramIdx, val);
-        };
-        proc->onParamGestureChange = [this](int idx, int paramIdx, bool gestureIsStarting) {
-            sendParamGestureChange(idx, paramIdx, gestureIsStarting);
-        };
+        jresult["name"] = proc->getName().toStdString();
+        jresult["hasEditor"] = proc->hasEditor();
+        jresult["supportsDoublePrecision"] = proc->supportsDoublePrecisionProcessing();
+        jresult["tailSeconds"] = proc->getTailLengthSeconds();
+        jresult["numOutputChannels"] = proc->getTotalNumOutputChannels();
+        proc->setCallbacks([this](int idx, int paramIdx, float val) { sendParamValueChange(idx, paramIdx, val); },
+                           [this](int idx, int paramIdx, bool gestureIsStarting) {
+                               sendParamGestureChange(idx, paramIdx, gestureIsStarting);
+                           },
+                           [this](Message<Key>& m) { m.send(m_cmdOut.get()); });
     }
     Message<AddPluginResult> msgResult(this);
     PLD(msgResult).setJson(jresult);
@@ -259,13 +275,13 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     logln("sending presets...");
     String presets;
     bool first = true;
-    for (int i = 0; i < plugin->getNumPrograms(); i++) {
+    for (int i = 0; i < proc->getNumPrograms(); i++) {
         if (first) {
             first = false;
         } else {
             presets << "|";
         }
-        presets << plugin->getProgramName(i);
+        presets << proc->getProgramName(i);
     }
     Message<Presets> msgPresets(this);
     msgPresets.payload.setString(presets);
@@ -276,63 +292,12 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     }
     logln("...ok");
     logln("sending parameters...");
-    json jparams = json::array();
-    runOnMsgThreadSync([plugin, &jparams] {
-        for (auto& param : plugin->getParameters()) {
-            json jparam = {{"idx", param->getParameterIndex()},
-                           {"name", param->getName(32).toStdString()},
-                           {"defaultValue", param->getDefaultValue()},
-                           {"currentValue", param->getValue()},
-                           {"category", param->getCategory()},
-                           {"label", param->getLabel().toStdString()},
-                           {"numSteps", param->getNumSteps()},
-                           {"isBoolean", param->isBoolean()},
-                           {"isDiscrete", param->isDiscrete()},
-                           {"isMeta", param->isMetaParameter()},
-                           {"isOrientInv", param->isOrientationInverted()},
-                           {"minValue", param->getText(0.0f, 20).toStdString()},
-                           {"maxValue", param->getText(1.0f, 20).toStdString()}};
-            jparam["allValues"] = json::array();
-            for (auto& val : param->getAllValueStrings()) {
-                jparam["allValues"].push_back(val.toStdString());
-            }
-            if (jparam["allValues"].size() == 0 && param->isDiscrete() && param->getNumSteps() < 64) {
-                // try filling values manually
-                float step = 1.0f / (param->getNumSteps() - 1);
-                for (int i = 0; i < param->getNumSteps(); i++) {
-                    auto val = param->getText(step * i, 32);
-                    if (val.isEmpty()) {
-                        break;
-                    }
-                    jparam["allValues"].push_back(val.toStdString());
-                }
-            }
-            jparams.push_back(jparam);
-        }
-    });
     Message<Parameters> msgParams(this);
-    PLD(msgParams).setJson(jparams);
+    PLD(msgParams).setJson(proc->getParameters());
     if (!msgParams.send(m_cmdIn.get())) {
         logln("failed to send Parameters message");
         m_cmdIn->close();
         return;
-    }
-    logln("...ok");
-    logln("reading plugin settings...");
-    Message<PluginSettings> msgSettings(this);
-    MessageHelper::Error e;
-    if (!msgSettings.read(m_cmdIn.get(), &e, 10000)) {
-        logln("failed to read PluginSettings message:" << e.toString());
-        m_cmdIn->close();
-        return;
-    }
-    if (*msgSettings.payload.size > 0) {
-        MemoryBlock block;
-        block.append(msgSettings.payload.data, (size_t)*msgSettings.payload.size);
-        // restore the plugin state on the message thread, so we can hopefully avoid instabilities with parameter
-        // changes a plugin might make from this method.
-        runOnMsgThreadSync(
-            [&block, plugin] { plugin->setStateInformation(block.getData(), static_cast<int>(block.getSize())); });
     }
     logln("...ok");
     m_audio->addToRecentsList(id, m_cmdIn->getHostName());
@@ -356,10 +321,10 @@ void Worker::handleMessage(std::shared_ptr<Message<EditPlugin>> msg) {
     int idx = pDATA(msg)->index;
     if (auto proc = m_audio->getProcessor(idx)) {
         getApp()->getServer()->sandboxShowEditor();
-        m_screen->showEditor(proc, pDATA(msg)->x, pDATA(msg)->y);
+        m_screen->showEditor(getThreadId(), proc, pDATA(msg)->x, pDATA(msg)->y);
         m_activeEditorIdx = idx;
         if (getApp()->getServer()->getScreenLocalMode()) {
-            runOnMsgThreadAsync([this] { getApp()->addKeyListener(m_keyWatcher.get()); });
+            runOnMsgThreadAsync([this] { getApp()->addKeyListener(getThreadId(), m_keyWatcher.get()); });
         }
     }
 }
@@ -382,7 +347,7 @@ void Worker::handleMessage(std::shared_ptr<Message<Mouse>> msg) {
     runOnMsgThreadAsync([this, ev] {
         traceScope();
         if (m_activeEditorIdx > -1) {
-            auto point = getApp()->localPointToGlobal(Point<float>(ev.x, ev.y));
+            auto point = getApp()->localPointToGlobal(getThreadId(), Point<float>(ev.x, ev.y));
             if (ev.type == MouseEvType::WHEEL) {
                 mouseScrollEvent(point.x, point.y, ev.deltaX, ev.deltaY, ev.isSmooth);
             } else {
@@ -488,20 +453,14 @@ void Worker::handleMessage(std::shared_ptr<Message<RecentsList>> msg) {
 void Worker::handleMessage(std::shared_ptr<Message<Preset>> msg) {
     traceScope();
     if (auto proc = m_audio->getProcessor(pDATA(msg)->idx)) {
-        if (auto p = proc->getPlugin()) {
-            p->setCurrentProgram(pDATA(msg)->preset);
-        }
+        proc->setCurrentProgram(pDATA(msg)->preset);
     }
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<ParameterValue>> msg) {
     traceScope();
     if (auto proc = m_audio->getProcessor(pDATA(msg)->idx)) {
-        if (auto p = proc->getPlugin()) {
-            if (auto* param = p->getParameters()[pDATA(msg)->paramIdx]) {
-                param->setValue(pDATA(msg)->value);
-            }
-        }
+        proc->setParameterValue(pDATA(msg)->paramIdx, pDATA(msg)->value);
     }
 }
 
@@ -517,12 +476,11 @@ void Worker::handleMessage(std::shared_ptr<Message<GetParameterValue>> msg) {
 void Worker::handleMessage(std::shared_ptr<Message<GetAllParameterValues>> msg) {
     traceScope();
     if (auto proc = m_audio->getProcessor(pPLD(msg).getNumber())) {
-        auto p = proc->getPlugin();
-        for (auto* param : p->getParameters()) {
+        for (auto& param : proc->getAllParamaterValues()) {
             Message<ParameterValue> ret(this);
             DATA(ret)->idx = pPLD(msg).getNumber();
-            DATA(ret)->paramIdx = param->getParameterIndex();
-            DATA(ret)->value = param->getValue();
+            DATA(ret)->paramIdx = param.paramIdx;
+            DATA(ret)->value = param.value;
             ret.send(m_cmdIn.get());
         }
     }
@@ -530,7 +488,7 @@ void Worker::handleMessage(std::shared_ptr<Message<GetAllParameterValues>> msg) 
 
 void Worker::handleMessage(std::shared_ptr<Message<UpdateScreenCaptureArea>> msg) {
     traceScope();
-    getApp()->updateScreenCaptureArea(pPLD(msg).getNumber());
+    getApp()->updateScreenCaptureArea(getThreadId(), pPLD(msg).getNumber());
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<Rescan>> msg) {
@@ -578,11 +536,29 @@ void Worker::handleMessage(std::shared_ptr<Message<PluginList>> msg) {
             inputMatch = plugin.descriptiveName.containsIgnoreCase(filterStr);
         }
         if (inputMatch) {
-            list += AGProcessor::createString(plugin) + "\n";
+            list += Processor::createString(plugin) + "\n";
         }
     }
     pPLD(msg).setString(list);
     msg->send(m_cmdIn.get());
+}
+
+void Worker::handleMessage(std::shared_ptr<Message<GetScreenBounds>> /*msg*/) {
+    traceScope();
+    Message<ScreenBounds> res(this);
+    if (auto proc = getApp()->getCurrentWindowProc(getThreadId())) {
+        auto rect = proc->getScreenBounds();
+        DATA(res)->x = rect.getX();
+        DATA(res)->y = rect.getY();
+        DATA(res)->w = rect.getWidth();
+        DATA(res)->h = rect.getHeight();
+    } else {
+        DATA(res)->x = 0;
+        DATA(res)->y = 0;
+        DATA(res)->w = 0;
+        DATA(res)->h = 0;
+    }
+    res.send(m_cmdIn.get());
 }
 
 void Worker::sendKeys(const std::vector<uint16_t>& keysToPress) {

@@ -10,7 +10,7 @@
 
 namespace e47 {
 
-PluginSearchWindow::PluginSearchWindow(float x, float y, AudioGridderAudioProcessor& p)
+PluginSearchWindow::PluginSearchWindow(float x, float y, PluginProcessor& p)
     : TopLevelWindow("Search", true),
       LogTagDelegate(&p.getClient()),
       m_processor(p),

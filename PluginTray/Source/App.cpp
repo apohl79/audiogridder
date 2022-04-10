@@ -27,7 +27,7 @@ void App::initialise(const String& /*commandLineParameters*/) {
         quit();
         return;
     }
-    AGLogger::initialize("Tray", "AudioGridderTray_", "");
+    Logger::initialize("Tray", "AudioGridderTray_", "");
     ServiceReceiver::initialize(0);
     if (jsonGetValue(cfg, "CrashReporting", true)) {
         Sentry::initialize();
@@ -36,7 +36,7 @@ void App::initialise(const String& /*commandLineParameters*/) {
 
 void App::shutdown() {
     m_srv.stop();
-    AGLogger::cleanup();
+    Logger::cleanup();
     ServiceReceiver::cleanup(0);
     Sentry::cleanup();
 }
@@ -206,6 +206,10 @@ void App::Connection::messageReceived(const MemoryBlock& message) {
                                                 << ")");
             m_app->getMonitor().refresh();
         }
+    } else if (msg.type == PluginTrayMessage::STOP) {
+        logln("received stop message");
+        disconnect();
+        connected = false;
     } else {
         m_app->handleMessage(msg, *this);
     }
@@ -222,7 +226,7 @@ void App::Server::checkConnections() {
     int removed = 0;
     while (i < m_connections.size()) {
         auto c = m_connections[i];
-        bool timeout = Time::currentTimeMillis() - c->status.lastUpdated > 5000;
+        bool timeout = Time::currentTimeMillis() - c->status.lastUpdated > 15000;
         bool dead = (c->initialized && !c->connected);
         if (timeout || dead) {
             logln("lost connection " << String::toHexString((uint64)c.get()) << " (name=" << c->status.name
@@ -239,7 +243,7 @@ void App::Server::checkConnections() {
     } else {
         m_noConnectionCounter = 0;
     }
-    if (m_noConnectionCounter > 5 && !m_app->getKeepRunning()) {
+    if (m_noConnectionCounter > 3 && !m_app->getKeepRunning()) {
         m_app->quit();
     } else {
         if (removed > 0) {

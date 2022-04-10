@@ -6,10 +6,17 @@
  */
 
 #include "App.hpp"
+#include "Defaults.hpp"
 #include "Server.hpp"
 #include "Screen.h"
 #include "Signals.hpp"
 #include "Sentry.hpp"
+#include "Processor.hpp"
+#include "MenuBarWindow.hpp"
+#include "ServerSettingsWindow.hpp"
+#include "PluginListWindow.hpp"
+#include "StatisticsWindow.hpp"
+#include "SplashWindow.hpp"
 
 #ifdef JUCE_WINDOWS
 #include <windows.h>
@@ -19,12 +26,17 @@
 
 namespace e47 {
 
+App::App() : LogTag("app") { initAsyncFunctors(); }
+App::~App() { stopAsyncFunctors(); }
+
 void App::initialise(const String& commandLineParameters) {
     auto args = getCommandLineParameterArray();
-    enum Modes { SCAN, MASTER, SERVER, SANDBOX };
+    enum Modes { SCAN, MASTER, SERVER, SANDBOX_CHAIN, SANDBOX_PLUGIN };
     Modes mode = MASTER;
-    String fileToScan = "";
-    int srvid = -1;
+    String fileToScan, pluginId, error;
+    int workerPort = 0, srvId = -1;
+    json jconfig;
+    bool log = false;
     for (int i = 0; i < args.size(); i++) {
         if (!args[i].compare("-scan") && args.size() >= i + 2) {
             fileToScan = args[i + 1];
@@ -32,11 +44,31 @@ void App::initialise(const String& commandLineParameters) {
         } else if (!args[i].compare("-server")) {
             mode = SERVER;
         } else if (args[i].startsWith("--" + Defaults::SANDBOX_CMD_PREFIX)) {
-            mode = SANDBOX;
+            mode = SANDBOX_CHAIN;
+        } else if (!args[i].compare("-load")) {
+            mode = SANDBOX_PLUGIN;
+        } else if (!args[i].compare("-log")) {
+            log = true;
+        } else if (!args[i].compare("-pluginid")) {
+            pluginId = args[i + 1];
+        } else if (!args[i].compare("-workerport")) {
+            workerPort = args[i + 1].getIntValue();
         } else if (!args[i].compare("-id")) {
-            srvid = args[i + 1].getIntValue();
+            srvId = args[i + 1].getIntValue();
+        } else if (!args[i].compare("-config")) {
+            MemoryBlock config;
+            if (config.fromBase64Encoding(args[i + 1])) {
+                try {
+                    jconfig = json::parse(config.begin(), config.end());
+                } catch (json::parse_error& e) {
+                    error << "failed to parse -config value: " << e.what();
+                }
+            } else {
+                error << "failed to decode -config value";
+            }
         }
     }
+    String cfgFile = Defaults::getConfigFileName(Defaults::ConfigServer, {{"id", String(srvId)}});
     String appName;
     String logName = getApplicationName() + "_";
     switch (mode) {
@@ -48,26 +80,41 @@ void App::initialise(const String& commandLineParameters) {
             logName = fileToScan + "_";
             logName = logName.replaceCharacters(":/\\|. ", "------").trimCharactersAtStart("-");
             break;
+        case SANDBOX_PLUGIN:
+            appName = "Sandbox-Plugin";
+            logName = pluginId + "_";
+            break;
         case SERVER:
             appName = "Server";
             break;
-        case SANDBOX:
-            appName = "Sandbox";
+        case SANDBOX_CHAIN:
+            appName = "Sandbox-Chain";
             break;
     }
-    AGLogger::initialize(appName, logName, Defaults::getConfigFileName(Defaults::ConfigServer));
+    Logger::initialize(appName, logName, cfgFile);
     Tracer::initialize(appName, logName);
     Signals::initialize();
     Defaults::initServerTheme();
 
+    if (log) {
+        Logger::setLogToErr(true);
+    }
+
     logln("commandline: " << commandLineParameters);
+
+    if (error.isNotEmpty()) {
+        logln(error);
+        setApplicationReturnValue(1);
+        quit();
+        return;
+    }
 
     switch (mode) {
         case SCAN:
 #ifdef JUCE_MAC
             Process::setDockIconVisible(false);
 #endif
-            AGLogger::setEnabled(true);
+            Logger::setEnabled(true);
             if (fileToScan.length() > 0) {
                 auto parts = StringArray::fromTokens(fileToScan, "|", "");
                 String id = parts[0];
@@ -76,7 +123,7 @@ void App::initialise(const String& commandLineParameters) {
                     format = parts[1];
                 }
                 logln("scan mode: format=" << format << " id=" << id);
-                bool success = Server::scanPlugin(id, format);
+                bool success = Server::scanPlugin(id, format, srvId > -1 ? srvId : 0);
                 logln("..." << (success ? "success" : "failed"));
                 setApplicationReturnValue(success ? 0 : 1);
                 quit();
@@ -99,29 +146,49 @@ void App::initialise(const String& commandLineParameters) {
             }
 #endif
             json opts;
-            if (srvid > -1) {
-                opts["ID"] = srvid;
+            if (srvId > -1) {
+                opts["ID"] = srvId;
             }
             m_server = std::make_shared<Server>(opts);
             m_server->initialize();
             m_server->startThread();
             break;
         }
-        case SANDBOX: {
+        case SANDBOX_CHAIN: {
             traceScope();
 #ifdef JUCE_MAC
             Process::setDockIconVisible(false);
 #endif
-            auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigServer));
+            auto cfg = configParseFile(cfgFile);
             bool enableLogAutoclean = jsonGetValue(cfg, "SandboxLogAutoclean", true);
             if (enableLogAutoclean) {
-                AGLogger::deleteFileAtFinish();
+                Logger::deleteFileAtFinish();
                 Tracer::deleteFileAtFinish();
             }
-            json opts;
-            opts["sandboxMode"] = true;
-            opts["commandLine"] = commandLineParameters.toStdString();
+            json opts = {{"sandboxMode", "chain"}, {"commandLine", commandLineParameters.toStdString()}};
+            if (srvId > -1) {
+                opts["ID"] = srvId;
+            }
             m_server = std::make_shared<Server>(opts);
+            m_server->initialize();
+            m_server->startThread();
+            break;
+        }
+        case SANDBOX_PLUGIN: {
+            traceScope();
+#ifdef JUCE_MAC
+            Process::setDockIconVisible(false);
+#endif
+            json opts = {{"sandboxMode", "plugin"},
+                         {"commandLine", commandLineParameters.toStdString()},
+                         {"pluginId", pluginId.toStdString()},
+                         {"workerPort", workerPort},
+                         {"config", jconfig}};
+            if (srvId > -1) {
+                opts["ID"] = srvId;
+            }
+            m_server = std::make_shared<Server>(opts);
+            m_server->setHost("127.0.0.1");
             m_server->initialize();
             m_server->startThread();
             break;
@@ -134,14 +201,14 @@ void App::initialise(const String& commandLineParameters) {
                 appState.deleteRecursively();
             }
 #endif
-            m_child = std::make_unique<std::thread>([this, srvid] {
+            m_child = std::make_unique<std::thread>([this, srvId] {
                 ChildProcess proc;
                 StringArray proc_args;
                 proc_args.add(File::getSpecialLocation(File::currentExecutableFile).getFullPathName());
                 proc_args.add("-server");
-                if (srvid > -1) {
+                if (srvId > -1) {
                     proc_args.add("-id");
-                    proc_args.add(String(srvid));
+                    proc_args.add(String(srvId));
                 }
                 uint32 ec = 0;
                 bool done = false;
@@ -228,7 +295,7 @@ void App::shutdown() {
     }
 
     Tracer::cleanup();
-    AGLogger::cleanup();
+    Logger::cleanup();
     Sentry::cleanup();
     setApplicationReturnValue((int)m_exitCode);
 }
@@ -270,187 +337,315 @@ void App::restartServer(bool rescan) {
 
 const KnownPluginList& App::getPluginList() { return m_server->getPluginList(); }
 
-void App::showEditor(std::shared_ptr<AGProcessor> proc, Thread::ThreadID tid, WindowCaptureCallbackNative func) {
+template <typename T>
+void App::showEditorInternal(std::shared_ptr<Processor> proc, Thread::ThreadID tid, T func) {
     traceScope();
+
+    if (tid == nullptr) {
+        logln("showEditor failed: tid is nullptr");
+        return;
+    }
+
     if (proc->hasEditor()) {
-        std::lock_guard<std::mutex> lock(m_windowMtx);
-        forgetEditorIfNeeded();
-        if (m_window != nullptr) {
-            logln("show editor: resetting existing processor window");
-            m_window->setVisible(false);
-            m_window.reset();
+        std::lock_guard<std::mutex> lock(m_windowsMtx);
+
+        logln("showing editor: tid=0x" << String::toHexString((uint64)tid));
+
+        auto& helper = m_windows[(uint64)tid];
+
+        if (helper.window != nullptr) {
+            logln("showEditor: resetting existing processor window");
+            helper.reset();
         }
-        m_windowOwner = tid;
-        m_windowProc = proc;
-        m_windowFuncNative = func;
-        m_window = std::make_unique<ProcessorWindow>(m_windowProc, m_windowFuncNative);
+
+        helper.processor = proc;
+        helper.window = std::make_unique<ProcessorWindow>(proc, func);
+
 #ifdef JUCE_MAC
-        Process::setDockIconVisible(true);
+        if (getServer()->getSandboxMode() != Server::SANDBOX_PLUGIN ||
+            getServer()->getSandboxModeRuntime() == Server::SANDBOX_PLUGIN) {
+            Process::setDockIconVisible(true);
+        }
 #endif
     } else {
-        logln("show editor failed: '" << proc->getName() << "' has no editor");
+        logln("showEditor failed: '" << proc->getName() << "' has no editor");
     }
 }
 
-void App::showEditor(std::shared_ptr<AGProcessor> proc, Thread::ThreadID tid, WindowCaptureCallbackFFmpeg func) {
-    traceScope();
-    if (proc->hasEditor()) {
-        std::lock_guard<std::mutex> lock(m_windowMtx);
-        forgetEditorIfNeeded();
-        if (m_window != nullptr) {
-            logln("show editor: resetting existing processor window");
-            m_window->setVisible(false);
-            m_window.reset();
-        }
-        m_windowOwner = tid;
-        m_windowProc = proc;
-        m_windowFuncFFmpeg = func;
-        m_window = std::make_unique<ProcessorWindow>(m_windowProc, m_windowFuncFFmpeg);
-#ifdef JUCE_MAC
-        Process::setDockIconVisible(true);
-#endif
-    } else {
-        logln("show editor failed: '" << proc->getName() << "' has no editor");
-    }
+void App::showEditor(std::shared_ptr<Processor> proc, Thread::ThreadID tid,
+                     ProcessorWindow::CaptureCallbackFFmpeg func) {
+    showEditorInternal(proc, tid, func);
 }
 
-void App::hideEditor(Thread::ThreadID tid) {
+void App::showEditor(std::shared_ptr<Processor> proc, Thread::ThreadID tid,
+                     ProcessorWindow::CaptureCallbackNative func) {
+    showEditorInternal(proc, tid, func);
+}
+
+void App::hideEditor(Thread::ThreadID tid, bool updateMacOSDock) {
     traceScope();
-    if (tid == nullptr || tid == m_windowOwner) {
-        std::lock_guard<std::mutex> lock(m_windowMtx);
-        forgetEditorIfNeeded();
-        if (m_window != nullptr) {
-            m_window->setVisible(false);
-            m_window.reset();
+
+    std::lock_guard<std::mutex> lock(m_windowsMtx);
+
+    if (tid == nullptr) {
+        if (!m_windows.empty()) {
+            logln("hiding all editors");
+
+            // hide all windows
+            for (auto it = m_windows.begin(); it != m_windows.end();) {
+                it->second.reset();
+                it = m_windows.erase(it);
+            }
+        }
+    } else {
+        logln("hiding editor: tid=0x" << String::toHexString((uint64)tid));
+
+        auto it = m_windows.find((uint64)tid);
+        if (it != m_windows.end()) {
+            it->second.reset();
+            m_windows.erase(it);
         } else {
-            logln("hide editor called with no active processor window");
+            logln("failed to hide editor: tid does not match a window owner");
         }
-        m_windowOwner = nullptr;
-        m_windowProc.reset();
-        m_windowFuncNative = nullptr;
-        m_windowFuncFFmpeg = nullptr;
+    }
+
 #ifdef JUCE_MAC
+    if (updateMacOSDock &&
+        (getServer()->getSandboxMode() != Server::SANDBOX_PLUGIN ||
+         getServer()->getSandboxModeRuntime() == Server::SANDBOX_PLUGIN) &&
+        m_windows.empty()) {
         Process::setDockIconVisible(false);
+    }
+#else
+    ignoreUnused(updateMacOSDock);
 #endif
-    } else {
-        logln("failed to hide editor: tid does not match window owner");
-    }
 }
 
-void App::bringEditorToFront() {
+void App::ProcessorWindowHelper::reset() {
+    if (nullptr != window) {
+        if (nullptr != processor && nullptr == processor->getActiveEditor() && window->hasEditor()) {
+            window->forgetEditor();
+        }
+        window->setVisible(false);
+    }
+    window.reset();
+    processor.reset();
+}
+
+void App::bringEditorToFront(Thread::ThreadID tid) {
     traceScope();
-    std::lock_guard<std::mutex> lock(m_windowMtx);
-    if (m_window != nullptr) {
-        windowToFront(m_window.get());
+
+    logln("bringing editor to front: tid=0x" << String::toHexString((uint64)tid));
+
+    std::lock_guard<std::mutex> lock(m_windowsMtx);
+
+    auto it = m_windows.find((uint64)tid);
+    if (it != m_windows.end()) {
+        if (it->second.window != nullptr) {
+            it->second.window->toTop();
+        }
+    } else {
+        logln("bringEditorToFront failed: no window for tid");
     }
 }
 
-std::shared_ptr<AGProcessor> App::getCurrentWindowProc() {
-    std::lock_guard<std::mutex> lock(m_windowMtx);
-    return m_windowProc;
+std::shared_ptr<Processor> App::getCurrentWindowProc(Thread::ThreadID tid) {
+    std::lock_guard<std::mutex> lock(m_windowsMtx);
+    auto it = m_windows.find((uint64)tid);
+    if (it != m_windows.end()) {
+        return it->second.processor;
+    }
+    return nullptr;
 }
 
-void App::moveEditor(int x, int y) {
+void App::moveEditor(Thread::ThreadID tid, int x, int y) {
     traceScope();
     if (getServer()->getScreenLocalMode()) {
-        logln("window move to " << x << "x" << y);
-        std::lock_guard<std::mutex> lock(m_windowMtx);
-        if (m_window != nullptr) {
-            m_window->setBounds(x, y, m_window->getWidth(), m_window->getHeight());
+        logln("moving editor: tid=0x" << String::toHexString((uint64)tid));
+
+        std::lock_guard<std::mutex> lock(m_windowsMtx);
+
+        auto it = m_windows.find((uint64)tid);
+        if (it != m_windows.end()) {
+            if (it->second.window != nullptr) {
+                logln("moving editor window to " << x << "x" << y);
+                it->second.window->move(x, y);
+            }
+        } else {
+            logln("moveEditor failed: no window for tid");
         }
     }
 }
 
-void App::resetEditor() {
+void App::resetEditor(Thread::ThreadID tid) {
     traceScope();
-    std::lock_guard<std::mutex> lock(m_windowMtx);
-    forgetEditorIfNeeded();
-    if (m_window != nullptr) {
-        logln("resetting processor window");
-        m_window->setVisible(false);
-        m_window.reset();
+
+    std::lock_guard<std::mutex> lock(m_windowsMtx);
+
+    auto it = m_windows.find((uint64)tid);
+    if (it != m_windows.end()) {
+        it->second.window.reset();
     }
 }
 
-void App::restartEditor() {
+void App::restartEditor(Thread::ThreadID tid) {
     traceScope();
-    std::lock_guard<std::mutex> lock(m_windowMtx);
-    forgetEditorIfNeeded();
-    if (m_windowProc != nullptr) {
-        logln("recreating processor window");
-        m_window = std::make_unique<ProcessorWindow>(m_windowProc, m_windowFuncNative);
-    }
-}
 
-void App::forgetEditorIfNeeded() {
-    traceScope();
-    // No lock, locked already
-    if (m_windowProc != nullptr && m_windowProc->getActiveEditor() == nullptr && m_window != nullptr) {
-        logln("forgetting editor");
-        m_window->forgetEditor();
-    }
-}
+    std::lock_guard<std::mutex> lock(m_windowsMtx);
 
-void App::addKeyListener(KeyListener* l) {
-    traceScope();
-    std::lock_guard<std::mutex> lock(m_windowMtx);
-    if (m_window != nullptr) {
-        m_window->addKeyListener(l);
-    }
-}
-
-void App::updateScreenCaptureArea(int val) {
-    traceScope();
-    std::lock_guard<std::mutex> lock(m_windowMtx);
-    if (m_windowProc != nullptr && m_window != nullptr) {
-        m_windowProc->updateScreenCaptureArea(val);
-        m_window->updateScreenCaptureArea();
-    }
-}
-
-Point<float> App::localPointToGlobal(Point<float> lp) {
-    traceScope();
-    std::lock_guard<std::mutex> lock(m_windowMtx);
-    if (m_windowProc != nullptr) {
-        auto* ed = m_windowProc->getActiveEditor();
-        if (ed != nullptr) {
-            return ed->localPointToGlobal(lp);
-        } else {
-            logln("failed to resolve local to global point: processor has no active editor, trying to restart editor");
-            m_windowMtx.unlock();
-            restartEditor();
+    auto it = m_windows.find((uint64)tid);
+    if (it != m_windows.end()) {
+        if (it->second.processor != nullptr) {
+            logln("recreating processor window");
+            if (nullptr != it->second.callbackFFmpeg) {
+                it->second.window = std::make_unique<ProcessorWindow>(it->second.processor, it->second.callbackFFmpeg);
+            } else if (nullptr != it->second.callbackNative) {
+                it->second.window = std::make_unique<ProcessorWindow>(it->second.processor, it->second.callbackNative);
+            }
         }
     } else {
-        logln("failed to resolve local to global point: no active processor");
+        logln("restartEditor failed: no window for tid");
     }
+}
+
+void App::addKeyListener(Thread::ThreadID tid, KeyListener* l) {
+    traceScope();
+
+    std::lock_guard<std::mutex> lock(m_windowsMtx);
+
+    auto it = m_windows.find((uint64)tid);
+    if (it != m_windows.end() && it->second.window != nullptr) {
+        it->second.window->addKeyListener(l);
+    }
+}
+
+void App::updateScreenCaptureArea(Thread::ThreadID tid, int val) {
+    traceScope();
+
+    std::lock_guard<std::mutex> lock(m_windowsMtx);
+
+    auto it = m_windows.find((uint64)tid);
+    if (it != m_windows.end() && it->second.window != nullptr && it->second.processor != nullptr) {
+        it->second.processor->updateScreenCaptureArea(val);
+        it->second.window->updateScreenCaptureArea();
+    }
+}
+
+Point<float> App::localPointToGlobal(Thread::ThreadID tid, Point<float> lp) {
+    traceScope();
+
+    std::lock_guard<std::mutex> lock(m_windowsMtx);
+
+    auto it = m_windows.find((uint64)tid);
+    if (it != m_windows.end() && it->second.window != nullptr) {
+        auto ret = it->second.window->localPointToGlobal(lp);
+        ret.y += it->second.window->getTitleBarHeight();
+        return ret;
+    } else {
+        logln("failed to resolve local to global point: no active window");
+    }
+
     return lp;
 }
 
-void App::ProcessorWindow::createEditor() {
+PopupMenu App::getMenuForIndex(int topLevelMenuIndex, const String& /* menuName */) {
+    PopupMenu menu;
+    if (topLevelMenuIndex == 0) {  // Settings
+        menu.addItem("Settings", [this] {
+            if (nullptr == m_srvSettingsWindow) {
+                m_srvSettingsWindow = std::make_unique<ServerSettingsWindow>(this);
+                updateDockIcon();
+            } else {
+                windowToFront(m_srvSettingsWindow.get());
+            }
+        });
+        menu.addItem("Plugins", [this] {
+            if (nullptr == m_pluginListWindow) {
+                m_pluginListWindow = std::make_unique<PluginListWindow>(
+                    this, m_server->getPluginList(), Defaults::getConfigFileName(Defaults::ConfigDeadMan));
+                updateDockIcon();
+            } else {
+                windowToFront(m_pluginListWindow.get());
+            }
+        });
+        menu.addSeparator();
+        menu.addItem("Statistics", [this] {
+            if (nullptr == m_statsWindow) {
+                m_statsWindow = std::make_unique<StatisticsWindow>(this);
+                updateDockIcon();
+            } else {
+                windowToFront(m_statsWindow.get());
+            }
+        });
+        menu.addSeparator();
+        menu.addItem("Rescan", [this] { restartServer(true); });
+        menu.addItem("Wipe Cache & Rescan", [this] {
+            m_server->getPluginList().clear();
+            m_server->saveKnownPluginList();
+            restartServer(true);
+        });
+    }
+    return menu;
+}
+
+void App::hidePluginList() {
     traceScope();
-    auto* disp = Desktop::getInstance().getDisplays().getPrimaryDisplay();
-    if (nullptr != disp) {
-        m_totalRect = disp->totalArea;
+    m_pluginListWindow.reset();
+    updateDockIcon();
+}
+
+void App::hideServerSettings() {
+    traceScope();
+    m_srvSettingsWindow.reset();
+    updateDockIcon();
+}
+
+void App::hideStatistics() {
+    traceScope();
+    m_statsWindow.reset();
+    updateDockIcon();
+}
+
+void App::showSplashWindow(std::function<void(bool)> onClick) {
+    traceScope();
+    if (nullptr == m_splashWindow) {
+        m_splashWindow = std::make_shared<SplashWindow>();
+        updateDockIcon();
     }
-    m_editor = m_processor->createEditorIfNeeded();
-    if (nullptr != m_editor) {
-        setContentNonOwned(m_editor, true);
-        if (getApp()->getServer()->getScreenCapturingOff()) {
-            setTopLeftPosition(m_processor->getLastPosition());
-        }
-        Component::setVisible(true);
-        if (getApp()->getServer()->getPluginWindowsOnTop()) {
-            setAlwaysOnTop(true);
-        } else {
-            windowToFront(this);
-        }
-        startCapturing();
-    } else {
-        logln("failed to create editor");
+    if (onClick) {
+        m_splashWindow->onClick = onClick;
     }
+}
+
+// called from the server thread
+void App::hideSplashWindow(int wait) {
+    traceScope();
+    auto ptrcpy = m_splashWindow;
+    m_splashWindow.reset();
+    std::thread([this, ptrcpy, wait] {
+        Thread::sleep(wait);
+        int step = 10;
+        while (step-- > 0) {
+            float alpha = 1.0f * (float)step / 10.0f;
+            runOnMsgThreadAsync([ptrcpy, alpha] { ptrcpy->setAlpha(alpha); });
+            Thread::sleep(40);
+        }
+        runOnMsgThreadAsync([this, ptrcpy] { updateDockIcon(); });
+    }).detach();
+}
+
+void App::setSplashInfo(const String& txt) {
+    traceScope();
+    runOnMsgThreadAsync([this, txt] {
+        if (nullptr != m_splashWindow) {
+            m_splashWindow->setInfo(txt);
+        }
+    });
 }
 
 }  // namespace e47
 
+#ifndef AG_UNIT_TESTS
 // This kicks the whole thing off..
 START_JUCE_APPLICATION(e47::App)
+#endif

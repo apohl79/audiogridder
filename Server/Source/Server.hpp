@@ -22,11 +22,9 @@
 
 namespace e47 {
 
-using json = nlohmann::json;
-
 class Server : public Thread, public LogTag {
   public:
-    Server(json opts = {});
+    Server(const json& opts = {});
     ~Server() override;
 
     void initialize();
@@ -36,8 +34,11 @@ class Server : public Thread, public LogTag {
     void loadConfig();
     void saveConfig();
 
+    enum SandboxMode : int { SANDBOX_NONE = 0, SANDBOX_CHAIN = 1, SANDBOX_PLUGIN = 2 };
+
     int getId(bool ignoreOpts = false) const;
     void setId(int i) { m_id = i; }
+    void setHost(const String& h) { m_host = h; }
     const String& getName() const { return m_name; }
     void setName(const String& name);
     bool getEnableAU() const { return m_enableAU; }
@@ -56,13 +57,13 @@ class Server : public Thread, public LogTag {
     void setScreenQuality(float q) { m_screenJpgQuality = q; }
     bool getScreenDiffDetection() const { return m_screenDiffDetection; }
     void setScreenDiffDetection(bool b) { m_screenDiffDetection = b; }
-    bool getScreenCapturingFFmpeg() const { return m_screenCapturingFFmpeg; }
+    bool getScreenCapturingFFmpeg() const { return m_sandboxModeRuntime != SANDBOX_PLUGIN || m_screenCapturingFFmpeg; }
     void setScreenCapturingFFmpeg(bool b) { m_screenCapturingFFmpeg = b; }
     ScreenRecorder::EncoderMode getScreenCapturingFFmpegEncoder() const { return m_screenCapturingFFmpegEncMode; }
     void setScreenCapturingFFmpegEncoder(ScreenRecorder::EncoderMode m) { m_screenCapturingFFmpegEncMode = m; }
     ScreenRecorder::EncoderQuality getScreenCapturingFFmpegQuality() const { return m_screenCapturingFFmpegQuality; }
     void setScreenCapturingFFmpegQuality(ScreenRecorder::EncoderQuality q) { m_screenCapturingFFmpegQuality = q; }
-    bool getScreenCapturingOff() const { return m_screenCapturingOff; }
+    bool getScreenCapturingOff() const { return m_sandboxModeRuntime == SANDBOX_PLUGIN || m_screenCapturingOff; }
     void setScreenCapturingOff(bool b) { m_screenCapturingOff = b; }
     bool getScreenLocalMode() const { return m_screenLocalMode; }
     void setScreenLocalMode(bool b) { m_screenLocalMode = b; }
@@ -70,10 +71,9 @@ class Server : public Thread, public LogTag {
     void setPluginWindowsOnTop(bool b) { m_pluginWindowsOnTop = b; }
     bool getScanForPlugins() const { return m_scanForPlugins; }
     void setScanForPlugins(bool b) { m_scanForPlugins = b; }
-    bool getParallelPluginLoad() const { return m_parallelPluginLoad; }
-    void setParallelPluginLoad(bool b) { m_parallelPluginLoad = b; }
-    bool getSandboxing() const { return m_sandboxing; }
-    void setSandboxing(bool b) { m_sandboxing = b; }
+    SandboxMode getSandboxMode() const { return m_sandboxMode; }
+    SandboxMode getSandboxModeRuntime() const { return m_sandboxModeRuntime; }
+    void setSandboxMode(SandboxMode m) { m_sandboxMode = m; }
     bool getCrashReporting() const { return m_crashReporting; }
     void setCrashReporting(bool b) { m_crashReporting = b; }
     const KnownPluginList& getPluginList() const { return m_pluginlist; }
@@ -82,9 +82,13 @@ class Server : public Thread, public LogTag {
     bool shouldExclude(const String& name, const std::vector<String>& include);
     auto& getExcludeList() { return m_pluginexclude; }
     void addPlugins(const std::vector<String>& names, std::function<void(bool)> fn);
+
+    static void loadKnownPluginList(KnownPluginList& plist, int srvId);
+    static void saveKnownPluginList(KnownPluginList& plist, int srvId);
+
     void saveKnownPluginList();
 
-    static bool scanPlugin(const String& id, const String& format);
+    static bool scanPlugin(const String& id, const String& format, int srvId);
 
     void sandboxShowEditor();
     void sandboxHideEditor();
@@ -105,6 +109,11 @@ class Server : public Thread, public LogTag {
             sum += c;
         }
         return sum;
+    }
+
+    template <typename T>
+    inline T getOpt(const String& name, T def) const {
+        return jsonGetValue(m_opts, name, def);
     }
 
   private:
@@ -134,9 +143,8 @@ class Server : public Thread, public LogTag {
     StringArray m_vst2Folders;
     bool m_vstNoStandardFolders;
     bool m_scanForPlugins = true;
-    bool m_parallelPluginLoad = false;
     bool m_crashReporting = true;
-    bool m_sandboxing = false;
+    SandboxMode m_sandboxMode = SANDBOX_NONE, m_sandboxModeRuntime = SANDBOX_NONE;
     bool m_sandboxLogAutoclean = true;
 
     HashMap<String, std::shared_ptr<SandboxMaster>, DefaultHashFunctions, CriticalSection> m_sandboxes;
@@ -157,18 +165,13 @@ class Server : public Thread, public LogTag {
     void scanForPlugins(const std::vector<String>& include);
 
     void loadKnownPluginList();
-    static void loadKnownPluginList(KnownPluginList& plist);
-    static void saveKnownPluginList(KnownPluginList& plist);
 
+    void checkPort();
     void runServer();
-    void runSandbox();
+    void runSandboxChain();
+    void runSandboxPlugin();
 
     bool sendHandshakeResponse(StreamingSocket* sock, bool sandboxEnabled = false, int sandboxPort = 0);
-
-    template <typename T>
-    inline T getOpt(const String& name, T def) const {
-        return jsonGetValue(m_opts, name, def);
-    }
 
     ENABLE_ASYNC_FUNCTORS();
 };

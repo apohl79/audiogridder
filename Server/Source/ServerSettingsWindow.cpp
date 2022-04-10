@@ -7,6 +7,7 @@
 
 #include "ServerSettingsWindow.hpp"
 #include "App.hpp"
+#include "Server.hpp"
 #include "WindowPositions.hpp"
 
 namespace e47 {
@@ -118,14 +119,17 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     }
 
     label = std::make_unique<Label>();
-    label->setText("Sandboxing (run AG chains in dedicated processes):", NotificationType::dontSendNotification);
+    label->setText("Sandbox Mode:", NotificationType::dontSendNotification);
     label->setBounds(getLabelBounds(row));
     addChildAndSetID(label.get(), "lbl");
     m_components.push_back(std::move(label));
 
-    m_sandbox.setBounds(getCheckBoxBounds(row));
-    m_sandbox.setToggleState(m_app->getServer()->getSandboxing(), NotificationType::dontSendNotification);
-    addChildAndSetID(&m_sandbox, "sandbox");
+    m_sandboxMode.setBounds(getWideFieldBounds(row));
+    m_sandboxMode.addItem("Disabled", 1);
+    m_sandboxMode.addItem("Chain Isolation", 2);
+    m_sandboxMode.addItem("Plugin Isolation", 3);
+    m_sandboxMode.setSelectedItemIndex(m_app->getServer()->getSandboxMode());
+    addChildAndSetID(&m_sandboxMode, "sandbox");
 
     row++;
 
@@ -256,7 +260,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_screenCapturingMode.addItem("FFmpeg (webp)", 1);
     m_screenCapturingMode.addItem("FFmpeg (mjpeg)", 2);
     m_screenCapturingMode.addItem("Legacy", 3);
-    m_screenCapturingMode.addItem("Disabled", 4);
+    m_screenCapturingMode.addItem("Disabled (Local Mode)", 4);
     int mode = 1;
     if (m_app->getServer()->getScreenCapturingOff()) {
         mode = 4;
@@ -302,16 +306,10 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
             }
         }
         if (m_screenCapturingMode.getSelectedId() == 4) {
-            m_localModeLbl.setAlpha(1);
-            m_localMode.setEnabled(true);
-            m_localMode.setAlpha(1);
             m_pluginWindowsOnTopLbl.setAlpha(1);
             m_pluginWindowsOnTop.setEnabled(true);
             m_pluginWindowsOnTop.setAlpha(1);
         } else {
-            m_localModeLbl.setAlpha(0.5);
-            m_localMode.setEnabled(false);
-            m_localMode.setAlpha(0.5);
             m_pluginWindowsOnTopLbl.setAlpha(0.5);
             m_pluginWindowsOnTop.setEnabled(false);
             m_pluginWindowsOnTop.setAlpha(0.5);
@@ -374,16 +372,6 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 
     row++;
 
-    m_localModeLbl.setText("Local Mode:", NotificationType::dontSendNotification);
-    m_localModeLbl.setBounds(getLabelBounds(row));
-    addChildAndSetID(&m_localModeLbl, "lbl");
-
-    m_localMode.setToggleState(m_app->getServer()->getScreenLocalMode(), NotificationType::dontSendNotification);
-    m_localMode.setBounds(getCheckBoxBounds(row));
-    addChildAndSetID(&m_localMode, "local");
-
-    row++;
-
     m_pluginWindowsOnTopLbl.setText("Keep Plugin Windows on Top:", NotificationType::dontSendNotification);
     m_pluginWindowsOnTopLbl.setBounds(getLabelBounds(row));
     addChildAndSetID(&m_pluginWindowsOnTopLbl, "lbl");
@@ -420,19 +408,6 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     row++;
 
     label = std::make_unique<Label>();
-    label->setText("Allow Plugins to be loaded in parallel:", NotificationType::dontSendNotification);
-    label->setBounds(getLabelBounds(row));
-    addChildAndSetID(label.get(), "lbl");
-    m_components.push_back(std::move(label));
-
-    m_parallelPluginLoad.setBounds(getCheckBoxBounds(row));
-    m_parallelPluginLoad.setToggleState(m_app->getServer()->getParallelPluginLoad(),
-                                        NotificationType::dontSendNotification);
-    addChildAndSetID(&m_parallelPluginLoad, "pload");
-
-    row++;
-
-    label = std::make_unique<Label>();
     label->setText("Diagnostics", NotificationType::dontSendNotification);
     label->setJustificationType(Justification::centredTop);
     label->setBounds(getHeaderBounds(row));
@@ -451,7 +426,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_components.push_back(std::move(label));
 
     m_logger.setBounds(getCheckBoxBounds(row));
-    m_logger.setToggleState(AGLogger::isEnabled(), NotificationType::dontSendNotification);
+    m_logger.setToggleState(Logger::isEnabled(), NotificationType::dontSendNotification);
     addChildAndSetID(&m_logger, "logger");
 
     row++;
@@ -488,7 +463,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_saveButton.onClick = [this, app] {
         traceScope();
         Tracer::setEnabled(m_tracer.getToggleState());
-        AGLogger::setEnabled(m_logger.getToggleState());
+        Logger::setEnabled(m_logger.getToggleState());
         auto appCpy = app;
         appCpy->getServer()->setId(m_idText.getText().getIntValue());
         appCpy->getServer()->setName(m_nameText.getText());
@@ -496,8 +471,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
         appCpy->getServer()->setEnableVST3(m_vst3Support.getToggleState());
         appCpy->getServer()->setEnableVST2(m_vst2Support.getToggleState());
         appCpy->getServer()->setScanForPlugins(m_scanForPlugins.getToggleState());
-        appCpy->getServer()->setParallelPluginLoad(m_parallelPluginLoad.getToggleState());
-        appCpy->getServer()->setSandboxing(m_sandbox.getToggleState());
+        appCpy->getServer()->setSandboxMode((Server::SandboxMode)m_sandboxMode.getSelectedItemIndex());
         appCpy->getServer()->setCrashReporting(m_crashReporting.getToggleState());
         switch (m_screenCapturingMode.getSelectedId()) {
             case 1:
@@ -523,7 +497,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
             case 4:
                 appCpy->getServer()->setScreenCapturingFFmpeg(false);
                 appCpy->getServer()->setScreenCapturingOff(true);
-                appCpy->getServer()->setScreenLocalMode(m_localMode.getToggleState());
+                appCpy->getServer()->setScreenLocalMode(true);
                 appCpy->getServer()->setPluginWindowsOnTop(m_pluginWindowsOnTop.getToggleState());
                 break;
         }

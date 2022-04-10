@@ -42,7 +42,7 @@ Scope::Scope(const LogTag* t, const String& f, int l, const String& ff) {
         line = l;
         func = ff;
         start = Time::getHighResolutionTicks();
-        traceMessage(tagId, tagName, tagExtra, file, line, func, "enter");
+        traceMessage(tagId, tagName, tagExtra, file, line, func, ">> enter");
     }
 }
 
@@ -58,7 +58,11 @@ void initialize(const String& appName, const String& filePrefix) {
         if (!d.exists()) {
             d.createDirectory();
         }
-        int filesToKeep = appName == "Sandbox" ? 50 : 5;
+        // create a latest link
+        auto latestLnk = File(Defaults::getLogFileName(appName, filePrefix, ".trace", true));
+        f.createSymbolicLink(latestLnk, true);
+        // cleanup
+        int filesToKeep = appName == "Sandbox-Chain" ? 50 : 5;
         cleanDirectory(d.getFullPathName(), filePrefix, ".trace", filesToKeep);
     });
 }

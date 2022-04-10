@@ -86,14 +86,14 @@ StreamingSocket* accept(StreamingSocket*, int timeoutMs = 1000, std::function<bo
 /*
  * Client/Server handshake
  */
-static constexpr int AG_PROTOCOL_VERSION = 6;
+static constexpr int AG_PROTOCOL_VERSION = 7;
 
 struct HandshakeRequest {
     int version;
     int channelsIn;
     int channelsOut;
     int channelsSC;
-    double rate;
+    double sampleRate;
     int samplesPerBlock;
     bool doublePrecission;
     uint64 clientId;
@@ -112,7 +112,7 @@ struct HandshakeRequest {
         j["channelsIn"] = channelsIn;
         j["channelsOut"] = channelsOut;
         j["channelsSC"] = channelsSC;
-        j["rate"] = rate;
+        j["rate"] = sampleRate;
         j["samplesPerBlock"] = samplesPerBlock;
         j["doublePrecission"] = doublePrecission;
         j["clientId"] = clientId;
@@ -126,7 +126,7 @@ struct HandshakeRequest {
         channelsIn = j["channelsIn"].get<int>();
         channelsOut = j["channelsOut"].get<int>();
         channelsSC = j["channelsSC"].get<int>();
-        rate = j["rate"].get<double>();
+        sampleRate = j["rate"].get<double>();
         samplesPerBlock = j["samplesPerBlock"].get<int>();
         doublePrecission = j["doublePrecission"].get<bool>();
         clientId = j["clientId"].get<uint64>();
@@ -476,7 +476,7 @@ class JsonPayload : public BinaryPayload {
   public:
     JsonPayload(int type) : BinaryPayload(type) {}
 
-    void setJson(json& j) {
+    void setJson(const json& j) {
         auto str = j.dump();
         setData(str.data(), (int)str.size());
     }
@@ -545,10 +545,10 @@ class PluginList : public StringPayload {
     PluginList() : StringPayload(Type) {}
 };
 
-class AddPlugin : public StringPayload {
+class AddPlugin : public JsonPayload {
   public:
     static constexpr int Type = __COUNTER__;
-    AddPlugin() : StringPayload(Type) {}
+    AddPlugin() : JsonPayload(Type) {}
 };
 
 class AddPluginResult : public JsonPayload {
@@ -579,6 +579,25 @@ class HidePlugin : public Payload {
   public:
     static constexpr int Type = __COUNTER__;
     HidePlugin() : Payload(Type) {}
+};
+
+class GetScreenBounds : public NumberPayload {
+  public:
+    static constexpr int Type = __COUNTER__;
+    GetScreenBounds() : NumberPayload(Type) {}
+};
+
+struct screenbounds_t {
+    int x;
+    int y;
+    int w;
+    int h;
+};
+
+class ScreenBounds : public DataPayload<screenbounds_t> {
+  public:
+    static constexpr int Type = __COUNTER__;
+    ScreenBounds() : DataPayload<screenbounds_t>(Type) {}
 };
 
 class ScreenCapture : public Payload {
@@ -993,7 +1012,7 @@ struct JsonMessage {
 };
 
 struct PluginTrayMessage : JsonMessage {
-    enum Type : JsonMessage::Type { STATUS, CHANGE_SERVER, GET_RECENTS, UPDATE_RECENTS, SHOW_MONITOR };
+    enum Type : JsonMessage::Type { STATUS, CHANGE_SERVER, GET_RECENTS, UPDATE_RECENTS, SHOW_MONITOR, STOP };
     PluginTrayMessage() {}
     PluginTrayMessage(Type t, const json& d) : JsonMessage(t, d) {}
     PluginTrayMessage(Type t, const json& d, const String& i) : JsonMessage(t, d, i) {}

@@ -10,9 +10,7 @@
 
 namespace e47 {
 
-GenericEditor::GenericEditor(AudioGridderAudioProcessor& processor) : LogTag("editor"), m_processor(processor) {
-    traceScope();
-}
+GenericEditor::GenericEditor(PluginProcessor& processor) : LogTag("editor"), m_processor(processor) { traceScope(); }
 
 GenericEditor::~GenericEditor() {}
 

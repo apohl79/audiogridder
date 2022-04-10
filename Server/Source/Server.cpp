@@ -14,6 +14,7 @@
 #include "WindowPositions.hpp"
 #include "ChannelSet.hpp"
 #include "Sentry.hpp"
+#include "Processor.hpp"
 
 #ifdef JUCE_MAC
 #include <sys/socket.h>
@@ -21,13 +22,15 @@
 
 namespace e47 {
 
-Server::Server(json opts) : Thread("Server"), LogTag("server"), m_opts(opts) { initAsyncFunctors(); }
+Server::Server(const json& opts) : Thread("Server"), LogTag("server"), m_opts(opts) { initAsyncFunctors(); }
 
 void Server::initialize() {
     traceScope();
     String mode;
-    if (getOpt("sandboxMode", false)) {
+    String optMode = getOpt("sandboxMode", String());
+    if (optMode.isNotEmpty()) {
         mode = "sandbox";
+        m_sandboxModeRuntime = optMode == "chain" ? SANDBOX_CHAIN : optMode == "plugin" ? SANDBOX_PLUGIN : SANDBOX_NONE;
     } else {
         mode = "server";
         File runFile(Defaults::getConfigFileName(Defaults::ConfigServerRun));
@@ -41,7 +44,7 @@ void Server::initialize() {
     CPUInfo::initialize();
     WindowPositions::initialize();
 
-    if (!getOpt("sandboxMode", false)) {
+    if (m_sandboxModeRuntime == SANDBOX_NONE) {
         Metrics::getStatistic<TimeStatistic>("audio")->enableExtData(true);
         Metrics::getStatistic<TimeStatistic>("audio")->getMeter().enableExtData(true);
         Metrics::getStatistic<Meter>("NetBytesOut")->enableExtData(true);
@@ -51,10 +54,18 @@ void Server::initialize() {
 
 void Server::loadConfig() {
     traceScope();
-    logln("loading config");
-    auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigServer));
+    auto file = Defaults::getConfigFileName(Defaults::ConfigServer, {{"id", String(getId())}});
+
+#ifndef AG_UNIT_TESTS
+    if (!File(file).exists()) {
+        file = Defaults::getConfigFileName(Defaults::ConfigServer, {{"id", "0"}});
+    }
+#endif
+
+    logln("loading config from " << file);
+    auto cfg = configParseFile(file);
     Tracer::setEnabled(jsonGetValue(cfg, "Tracer", Tracer::isEnabled()));
-    AGLogger::setEnabled(jsonGetValue(cfg, "Logger", AGLogger::isEnabled()));
+    Logger::setEnabled(jsonGetValue(cfg, "Logger", Logger::isEnabled()));
     m_id = jsonGetValue(cfg, "ID", m_id);
     m_name = jsonGetValue(cfg, "NAME", m_name);
 #ifdef JUCE_MAC
@@ -104,7 +115,7 @@ void Server::loadConfig() {
     m_screenCapturingOff = jsonGetValue(cfg, "ScreenCapturingOff", m_screenCapturingOff);
     m_screenCapturingFFmpegQuality = jsonGetValue(cfg, "ScreenCapturingFFmpegQual", m_screenCapturingFFmpegQuality);
     String scmode;
-    if (m_screenCapturingOff) {
+    if (m_screenCapturingOff || m_sandboxModeRuntime == SANDBOX_PLUGIN) {
         scmode = "off";
     } else if (m_screenCapturingFFmpeg) {
         scmode = "ffmpeg (" + encoder + ")";
@@ -130,20 +141,24 @@ void Server::loadConfig() {
         }
     }
     m_scanForPlugins = jsonGetValue(cfg, "ScanForPlugins", m_scanForPlugins);
-    m_parallelPluginLoad = jsonGetValue(cfg, "ParallelPluginLoad", m_parallelPluginLoad);
     m_crashReporting = jsonGetValue(cfg, "CrashReporting", m_crashReporting);
     logln("crash reporting is " << (m_crashReporting ? "enabled" : "disabled"));
-    m_sandboxing = jsonGetValue(cfg, "Sandboxing", m_sandboxing);
-    logln("sanboxing is " << (m_sandboxing ? "enabled" : "disabled"));
+    bool sandboxLegacy = jsonGetValue(cfg, "Sandboxing", false);
+    m_sandboxMode = (SandboxMode)jsonGetValue(cfg, "SandboxMode", (int)SANDBOX_NONE);
+    if (m_sandboxMode == SANDBOX_NONE && sandboxLegacy) {
+        m_sandboxMode = SANDBOX_CHAIN;
+    }
+    logln("sandbox mode is " << (m_sandboxMode == SANDBOX_CHAIN    ? "chain"
+                                 : m_sandboxMode == SANDBOX_PLUGIN ? "plugin"
+                                                                   : "disabled"));
     m_sandboxLogAutoclean = jsonGetValue(cfg, "SandboxLogAutoclean", m_sandboxLogAutoclean);
 }
 
 void Server::saveConfig() {
     traceScope();
-    logln("saving config");
     json j;
     j["Tracer"] = Tracer::isEnabled();
-    j["Logger"] = AGLogger::isEnabled();
+    j["Logger"] = Logger::isEnabled();
     j["ID"] = m_id;
     j["NAME"] = m_name.toStdString();
 #ifdef JUCE_MAC
@@ -181,17 +196,16 @@ void Server::saveConfig() {
         j["ExcludePlugins"].push_back(p.toStdString());
     }
     j["ScanForPlugins"] = m_scanForPlugins;
-    j["ParallelPluginLoad"] = m_parallelPluginLoad;
     j["CrashReporting"] = m_crashReporting;
-    j["Sandboxing"] = m_sandboxing;
+    j["SandboxMode"] = m_sandboxMode;
     j["SandboxLogAutoclean"] = m_sandboxLogAutoclean;
 
-    File cfg(Defaults::getConfigFileName(Defaults::ConfigServer));
+    File cfg(Defaults::getConfigFileName(Defaults::ConfigServer, {{"id", String(getId())}}));
+    logln("saving config to " << cfg.getFullPathName());
     if (cfg.exists()) {
         cfg.deleteFile();
-    } else {
-        cfg.create();
     }
+    cfg.create();
     FileOutputStream fos(cfg);
     fos.writeText(j.dump(4), false, false, "\n");
 }
@@ -205,7 +219,7 @@ int Server::getId(bool ignoreOpts) const {
 
 void Server::loadKnownPluginList() {
     traceScope();
-    loadKnownPluginList(m_pluginlist);
+    loadKnownPluginList(m_pluginlist, getId());
     std::map<String, PluginDescription> dedupMap;
     for (auto& desc : m_pluginlist.getTypes()) {
         std::unique_ptr<AudioPluginFormat> fmt;
@@ -222,11 +236,14 @@ void Server::loadKnownPluginList() {
         }
         if (nullptr != fmt) {
             auto name = fmt->getNameOfPluginFromIdentifier(desc.fileOrIdentifier);
+            if (File(name).exists()) {
+                name = File(name).getFileName();
+            }
             if (shouldExclude(name)) {
                 m_pluginlist.removeType(desc);
             }
         }
-        String id = AGProcessor::createPluginID(desc);
+        String id = Processor::createPluginID(desc);
         bool updateDedupMap = true;
         auto it = dedupMap.find(id);
         if (it != dedupMap.end()) {
@@ -248,7 +265,8 @@ void Server::loadKnownPluginList() {
         }
     }
     File deadmanfile(Defaults::getConfigFileName(Defaults::ConfigDeadMan));
-    if (deadmanfile.exists()) {
+    if (deadmanfile.exists() && m_sandboxModeRuntime == SANDBOX_NONE) {
+        logln("reading scan crash file " << deadmanfile.getFullPathName());
         StringArray lines;
         deadmanfile.readLines(lines);
         for (auto& line : lines) {
@@ -261,25 +279,38 @@ void Server::loadKnownPluginList() {
     }
 }
 
-void Server::loadKnownPluginList(KnownPluginList& plist) {
+void Server::loadKnownPluginList(KnownPluginList& plist, int srvId) {
     setLogTagStatic("server");
     traceScope();
-    File file(Defaults::getConfigFileName(Defaults::ConfigPluginCache));
+
+    File file(Defaults::getConfigFileName(Defaults::ConfigPluginCache, {{"id", String(srvId)}}));
+
+#ifndef AG_UNIT_TESTS
+    if (!file.exists()) {
+        file = File(Defaults::getConfigFileName(Defaults::ConfigPluginCache, {{"id", "0"}}));
+    }
+#endif
+
     if (file.exists()) {
+        logln("loading plugins cache from " << file.getFullPathName());
         auto xml = XmlDocument::parse(file);
         plist.recreateFromXml(*xml);
+    } else {
+        logln("no plugins cache found");
     }
 }
 
 void Server::saveKnownPluginList() {
     traceScope();
-    saveKnownPluginList(m_pluginlist);
+    saveKnownPluginList(m_pluginlist, getId());
 }
 
-void Server::saveKnownPluginList(KnownPluginList& plist) {
+void Server::saveKnownPluginList(KnownPluginList& plist, int srvId) {
     setLogTagStatic("server");
     traceScope();
-    File file(Defaults::getConfigFileName(Defaults::ConfigPluginCache));
+
+    File file(Defaults::getConfigFileName(Defaults::ConfigPluginCache, {{"id", String(srvId)}}));
+    logln("writing plugins cache to " << file.getFullPathName());
     auto xml = plist.createXml();
     if (!xml->writeTo(file)) {
         logln("failed to store plugin cache");
@@ -289,17 +320,18 @@ void Server::saveKnownPluginList(KnownPluginList& plist) {
 Server::~Server() {
     traceScope();
     stopAsyncFunctors();
-    if (!getOpt("sandboxMode", false)) {
+    if (m_sandboxModeRuntime == SANDBOX_NONE) {
         m_masterSocket.close();
     }
     waitForThreadAndLog(this, this);
     m_pluginlist.clear();
+    ScreenRecorder::cleanup();
     Metrics::cleanup();
     ServiceResponder::cleanup();
     CPUInfo::cleanup();
     WindowPositions::cleanup();
     logln("server terminated");
-    if (!getOpt("sandboxMode", false)) {
+    if (m_sandboxModeRuntime == SANDBOX_NONE) {
         logln("removing run file");
         File runFile(Defaults::getConfigFileName(Defaults::ConfigServerRun));
         runFile.deleteFile();
@@ -309,7 +341,7 @@ Server::~Server() {
 void Server::shutdown() {
     traceScope();
     logln("shutting down server");
-    if (!getOpt("sandboxMode", false)) {
+    if (m_sandboxModeRuntime == SANDBOX_NONE) {
         m_masterSocket.close();
     }
     logln("shutting down " << m_workers.size() << " workers");
@@ -334,8 +366,7 @@ void Server::setName(const String& name) {
 
 bool Server::shouldExclude(const String& name) {
     traceScope();
-    std::vector<String> emptylist;
-    return shouldExclude(name, emptylist);
+    return shouldExclude(name, {});
 }
 
 bool Server::shouldExclude(const String& name, const std::vector<String>& include) {
@@ -386,7 +417,7 @@ void Server::addPlugins(const std::vector<String>& names, std::function<void(boo
     }).detach();
 }
 
-bool Server::scanPlugin(const String& id, const String& format) {
+bool Server::scanPlugin(const String& id, const String& format, int srvId) {
     std::unique_ptr<AudioPluginFormat> fmt;
     if (!format.compare("VST")) {
 #if JUCE_PLUGINHOST_VST
@@ -407,7 +438,7 @@ bool Server::scanPlugin(const String& id, const String& format) {
     logln("scanning id=" << id << " fmt=" << format);
     bool success = true;
     KnownPluginList plist, newlist;
-    loadKnownPluginList(plist);
+    loadKnownPluginList(plist, srvId);
     PluginDirectoryScanner scanner(newlist, *fmt, {}, true, File(Defaults::getConfigFileName(Defaults::ConfigDeadMan)));
     scanner.setFilesOrIdentifiersToScan({id});
     String name;
@@ -421,7 +452,7 @@ bool Server::scanPlugin(const String& id, const String& format) {
         logln("  name            = " << t.name << " (" << t.descriptiveName << ")");
         logln("  uniqueId        = " << String::toHexString(t.uniqueId));
         logln("  deprecatedUid   = " << String::toHexString(t.deprecatedUid));
-        logln("  id string       = " << AGProcessor::createPluginID(t));
+        logln("  id string       = " << Processor::createPluginID(t));
         logln("  manufacturer    = " << t.manufacturerName);
         logln("  category        = " << t.category);
         logln("  shell           = " << (int)t.hasSharedContainer);
@@ -430,7 +461,7 @@ bool Server::scanPlugin(const String& id, const String& format) {
         logln("  output channels = " << t.numOutputChannels);
         plist.addType(t);
     }
-    saveKnownPluginList(plist);
+    saveKnownPluginList(plist, srvId);
     return success;
 }
 
@@ -517,6 +548,9 @@ void Server::scanForPlugins(const std::vector<String>& include) {
         for (auto& fileOrId : fileOrIds) {
             auto name = fmt->getNameOfPluginFromIdentifier(fileOrId);
             auto plugindesc = m_pluginlist.getTypeForFile(fileOrId);
+            if (File(name).exists()) {
+                name = File(name).getFileName();
+            }
             bool excluded = shouldExclude(name, include);
             if ((nullptr == plugindesc || fmt->pluginNeedsRescanning(*plugindesc)) &&
                 !m_pluginlist.getBlacklistedFiles().contains(fileOrId) && !excluded) {
@@ -547,11 +581,60 @@ void Server::scanForPlugins(const std::vector<String>& include) {
 }
 
 void Server::run() {
-    if (getOpt("sandboxMode", false)) {
-        runSandbox();
-    } else {
-        runServer();
+    switch (m_sandboxModeRuntime) {
+        case SANDBOX_CHAIN:
+            runSandboxChain();
+            break;
+        case SANDBOX_PLUGIN:
+            runSandboxPlugin();
+            break;
+        case SANDBOX_NONE:
+            runServer();
+            break;
     }
+}
+
+void Server::checkPort() {
+    int port = m_port + getId();
+    ChildProcess proc;
+    StringArray args;
+#ifdef JUCE_MAC
+    // Waves is spawning a WavesLocalServer on macOS, that inherits the AG master socket and thus blocks the AG
+    // server port. Trying to automatically kill any process, that binds to the AG server port before creating the
+    // master socket.
+    args.add("lsof");
+    args.add("-nP");
+    args.add("-iTCP:" + String(port));
+    if (proc.start(args, ChildProcess::wantStdOut)) {
+        auto out = proc.readAllProcessOutput();
+        for (auto& line : StringArray::fromLines(out)) {
+            if (line.endsWith("(LISTEN)")) {
+                auto parts = StringArray::fromTokens(line, " ", "");
+                if (parts.size() > 1) {
+                    auto pid = parts[1];
+                    logln("about to kill process " << pid << " that blocks server port " << port);
+                    ChildProcess kproc;
+                    kproc.start("kill " + pid);
+                }
+            }
+        }
+        sleep(3000);
+    }
+#elif JUCE_WINDOWS
+    args.add("powershell");
+    args.add("-Command");
+    args.add("& {(Get-NetTCPConnection -LocalPort " + String(port) + ").OwningProcess}");
+    if (proc.start(args, ChildProcess::wantStdOut)) {
+        auto out = proc.readAllProcessOutput().trim();
+        if (out.isNotEmpty() && out.containsOnly("0123456789")) {
+            int pid = out.getIntValue();
+            logln("about to kill process " << pid << " that blocks server port " << port);
+            ChildProcess kproc;
+            kproc.start("taskkill /T /F /PID " + String(pid));
+        }
+        sleep(3000);
+    }
+#endif
 }
 
 void Server::runServer() {
@@ -593,44 +676,19 @@ void Server::runServer() {
 
     logln("available plugins:");
     for (auto& desc : m_pluginlist.getTypes()) {
-        logln("  " << desc.name << " [" << AGProcessor::createPluginID(desc) << "]"
+        logln("  " << desc.name << " [" << Processor::createPluginID(desc) << "]"
                    << " version=" << desc.version << " format=" << desc.pluginFormatName
                    << " ins=" << desc.numInputChannels << " outs=" << desc.numOutputChannels
                    << " instrument=" << (int)desc.isInstrument);
     }
 
-#ifdef JUCE_MAC
-    // Waves is spawning a WavesLocalServer on macOS, that inherits the AG master socket and thus blocks the AG
-    // server port. Trying to automatically kill any process, that binds to the AG server port before creating the
-    // master socket.
-    int port = m_port + getId();
-    ChildProcess proc;
-    StringArray args;
-    args.add("lsof");
-    args.add("-nP");
-    args.add("-iTCP:" + String(port));
-    if (proc.start(args, ChildProcess::wantStdOut)) {
-        auto out = proc.readAllProcessOutput();
-        for (auto& line : StringArray::fromLines(out)) {
-            if (line.endsWith("(LISTEN)")) {
-                auto parts = StringArray::fromTokens(line, " ", "");
-                if (parts.size() > 1) {
-                    auto pid = parts[1];
-                    logln("about to kill process " << pid << " that blocks server port " << Defaults::SERVER_PORT);
-                    ChildProcess kproc;
-                    kproc.start("kill " + pid);
-                }
-            }
-        }
-        sleep(3000);
-    }
-#endif
+    checkPort();
 
     logln("creating listener " << (m_host.length() == 0 ? "*" : m_host) << ":" << (m_port + getId()));
     if (m_masterSocket.createListener(m_port + getId(), m_host)) {
         logln("server started: ID=" << getId() << ", PORT=" << m_port + getId() << ", NAME=" << m_name);
-        while (!currentThreadShouldExit()) {
-            auto* clnt = accept(&m_masterSocket, 1000, [] { return currentThreadShouldExit(); });
+        while (!threadShouldExit()) {
+            auto* clnt = accept(&m_masterSocket, 1000, [this] { return threadShouldExit(); });
             if (nullptr != clnt) {
                 HandshakeRequest cfg;
                 int len = clnt->read(&cfg, sizeof(cfg), true);
@@ -672,7 +730,7 @@ void Server::runServer() {
                         }
                         logln("  active channels           = " << active);
 
-                        logln("  rate                      = " << cfg.rate);
+                        logln("  rate                      = " << cfg.sampleRate);
                         logln("  samplesPerBlock           = " << cfg.samplesPerBlock);
                         logln("  doublePrecission          = " << static_cast<int>(cfg.doublePrecission));
                         logln("  flags.NoPluginListFilter  = "
@@ -692,7 +750,7 @@ void Server::runServer() {
                     continue;
                 }
 
-                if (m_sandboxing) {
+                if (m_sandboxMode == SANDBOX_CHAIN) {
                     // Spawn a sandbox child process for a new client and tell the client the port to connect to
                     int num = 0;
                     String id = String::toHexString(cfg.clientId) + "-" + String(num);
@@ -702,8 +760,8 @@ void Server::runServer() {
                     }
                     auto sandbox = std::make_shared<SandboxMaster>(*this, id);
                     logln("creating sandbox " << id);
-                    if (sandbox->launchSlaveProcess(File::getSpecialLocation(File::currentExecutableFile),
-                                                    Defaults::SANDBOX_CMD_PREFIX, 30000)) {
+                    if (sandbox->launchWorkerProcess(File::getSpecialLocation(File::currentExecutableFile),
+                                                     Defaults::SANDBOX_CMD_PREFIX, {"-id", String(getId())}, 30000)) {
                         sandbox->onPortReceived = [this, id, clnt](int sandboxPort) {
                             traceScope();
                             if (!sendHandshakeResponse(clnt, true, sandboxPort)) {
@@ -722,16 +780,17 @@ void Server::runServer() {
                         logln("failed to launch sandbox");
                     }
                 } else {
-                    auto masterSocket = std::make_shared<StreamingSocket>();
+                    auto workerMasterSocket = std::make_shared<StreamingSocket>();
 
 #ifndef JUCE_WINDOWS
-                    setsockopt(masterSocket->getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
+                    setsockopt(workerMasterSocket->getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
 #endif
 
-                    int workerPort = Defaults::CLIENT_PORT;
-                    while (!masterSocket->createListener(workerPort, m_host)) {
+                    int workerPort = getOpt("workerPort", Defaults::CLIENT_PORT);
+                    int workerPortMax = getOpt("workerPortMax", Defaults::CLIENT_PORT + 1000);
+                    while (!workerMasterSocket->createListener(workerPort, m_host)) {
                         workerPort++;
-                        if (workerPort > Defaults::CLIENT_PORT + 1000) {
+                        if (workerPort > workerPortMax) {
                             logln("failed to create client listener");
                             clnt->close();
                             delete clnt;
@@ -756,7 +815,7 @@ void Server::runServer() {
                     clnt->close();
                     delete clnt;
 
-                    auto w = std::make_shared<Worker>(masterSocket, cfg);
+                    auto w = std::make_shared<Worker>(workerMasterSocket, cfg);
                     w->startThread();
                     m_workers.add(w);
                     // lazy cleanup
@@ -812,7 +871,7 @@ void Server::runServer() {
     }
 }
 
-void Server::runSandbox() {
+void Server::runSandboxChain() {
     traceScope();
 
     if (m_crashReporting) {
@@ -828,17 +887,17 @@ void Server::runSandbox() {
         return;
     }
 
-    auto masterSocket = std::make_shared<StreamingSocket>();
+    auto workerMasterSocket = std::make_shared<StreamingSocket>();
 
 #ifndef JUCE_WINDOWS
-    setsockopt(masterSocket->getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
+    setsockopt(workerMasterSocket->getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
 #endif
 
     m_port = Defaults::CLIENT_PORT;
-    while (!masterSocket->createListener(m_port, m_host)) {
+    while (!workerMasterSocket->createListener(m_port, m_host)) {
         m_port++;
         if (m_port > Defaults::CLIENT_PORT + 1000) {
-            logln("failed to create client listener");
+            logln("failed to create worker listener");
             getApp()->prepareShutdown(App::EXIT_SANDBOX_BIND_ERROR);
             return;
         }
@@ -863,16 +922,16 @@ void Server::runSandbox() {
     loadKnownPluginList();
     m_pluginlist.sort(KnownPluginList::sortAlphabetically, true);
 
-    logln("sandbox started: PORT=" << m_port << ", NAME=" << m_name);
+    logln("sandbox (chain isolation) started: PORT=" << m_port << ", NAME=" << m_name);
 
-    while (!m_sandboxReady && !currentThreadShouldExit()) {
+    while (!m_sandboxReady && !threadShouldExit()) {
         // wait for the master to send the config
         sleep(10);
     }
 
-    if (!currentThreadShouldExit()) {
+    if (!threadShouldExit()) {
         logln("creating worker");
-        auto w = std::make_shared<Worker>(masterSocket, m_sandboxConfig);
+        auto w = std::make_shared<Worker>(workerMasterSocket, m_sandboxConfig);
         w->startThread();
         if (w->isThreadRunning()) {
             m_workers.add(w);
@@ -883,7 +942,7 @@ void Server::runSandbox() {
 
             while (!w->waitForThreadToExit(1000)) {
                 json jmetrics;
-                jmetrics["LoadedCount"] = AGProcessor::loadedCount.load();
+                jmetrics["LoadedCount"] = Processor::loadedCount.load();
                 jmetrics["NetBytesOut"] = bytesOutMeter->rate_1min();
                 jmetrics["NetBytesIn"] = bytesInMeter->rate_1min();
                 jmetrics["RPS"] = audioTime->getMeter().rate_1min();
@@ -907,7 +966,58 @@ void Server::runSandbox() {
 
     logln("run finished");
 
-    if (!currentThreadShouldExit()) {
+    if (!threadShouldExit()) {
+        getApp()->prepareShutdown();
+    }
+}
+
+void Server::runSandboxPlugin() {
+    auto workerMasterSocket = std::make_shared<StreamingSocket>();
+
+#ifndef JUCE_WINDOWS
+    setsockopt(workerMasterSocket->getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
+#endif
+
+    if (!jsonHasValue(m_opts, "config")) {
+        logln("missing parameter config");
+        getApp()->prepareShutdown(App::EXIT_SANDBOX_PARAM_ERROR);
+        return;
+    }
+
+    m_port = getOpt("workerPort", 0);
+
+    if (m_port == 0) {
+        logln("missing parameter workerPort");
+        getApp()->prepareShutdown(App::EXIT_SANDBOX_PARAM_ERROR);
+        return;
+    }
+
+    if (!workerMasterSocket->createListener(m_port, m_host)) {
+        logln("failed to create worker listener");
+        getApp()->prepareShutdown(App::EXIT_SANDBOX_BIND_ERROR);
+        return;
+    }
+
+    loadKnownPluginList();
+    m_pluginlist.sort(KnownPluginList::sortAlphabetically, true);
+
+    logln("sandbox (plugin isolation) started: PORT=" << m_port << ", NAME=" << m_name);
+
+    m_sandboxConfig.fromJson(m_opts["config"]);
+
+    logln("creating worker");
+    auto w = std::make_shared<Worker>(workerMasterSocket, m_sandboxConfig, m_sandboxModeRuntime);
+    w->startThread();
+    if (w->isThreadRunning()) {
+        m_workers.add(w);
+        w->waitForThreadToExit(-1);
+    } else {
+        logln("failed to start worker thread");
+    }
+
+    logln("run finished");
+
+    if (!threadShouldExit()) {
         getApp()->prepareShutdown();
     }
 }
@@ -1001,13 +1111,13 @@ void Server::handleMessageFromMaster(const SandboxMessage& msg) {
 }
 
 void Server::sandboxShowEditor() {
-    if (getOpt("sandboxMode", false) && nullptr != m_sandboxController) {
+    if (m_sandboxModeRuntime == SANDBOX_CHAIN && nullptr != m_sandboxController) {
         m_sandboxController->send(SandboxMessage(SandboxMessage::SHOW_EDITOR, {}), nullptr, true);
     }
 }
 
 void Server::sandboxHideEditor() {
-    if (getOpt("sandboxMode", false) && nullptr != m_sandboxController) {
+    if (m_sandboxModeRuntime == SANDBOX_CHAIN && nullptr != m_sandboxController) {
         m_sandboxController->send(SandboxMessage(SandboxMessage::HIDE_EDITOR, {}));
     }
 }

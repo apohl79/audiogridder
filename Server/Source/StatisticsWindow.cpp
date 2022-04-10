@@ -7,6 +7,8 @@
 
 #include "StatisticsWindow.hpp"
 #include "App.hpp"
+#include "Server.hpp"
+#include "Processor.hpp"
 #include "CPUInfo.hpp"
 #include "Metrics.hpp"
 #include "WindowPositions.hpp"
@@ -19,7 +21,7 @@ StatisticsWindow::StatisticsWindow(App* app)
                      DocumentWindow::closeButton),
       LogTag("statistics"),
       m_app(app),
-      m_sandboxing(m_app->getServer()->getSandboxing()),
+      m_sandboxing(m_app->getServer()->getSandboxMode() == Server::SANDBOX_CHAIN),
       m_updater(this) {
     traceScope();
     setUsingNativeTitleBar(true);
@@ -167,7 +169,7 @@ StatisticsWindow::StatisticsWindow(App* app)
         } else {
             m_totalWorkers.setText(String(Worker::count), NotificationType::dontSendNotification);
             m_activeWorkers.setText(String(Worker::runCount), NotificationType::dontSendNotification);
-            m_plugins.setText(String(AGProcessor::loadedCount), NotificationType::dontSendNotification);
+            m_plugins.setText(String(Processor::loadedCount), NotificationType::dontSendNotification);
         }
 
         auto hist = audioTime->get1minHistogram();

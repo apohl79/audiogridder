@@ -16,13 +16,13 @@
 
 namespace e47 {
 
-class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
-                                         public PluginButton::Listener,
-                                         public Button::Listener,
-                                         public LogTagDelegate {
+class PluginEditor : public AudioProcessorEditor,
+                     public PluginButton::Listener,
+                     public Button::Listener,
+                     public LogTagDelegate {
   public:
-    AudioGridderAudioProcessorEditor(AudioGridderAudioProcessor&);
-    ~AudioGridderAudioProcessorEditor() override;
+    PluginEditor(PluginProcessor&);
+    ~PluginEditor() override;
 
     void paint(Graphics&) override;
     void resized() override;
@@ -38,7 +38,7 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     void updateParamValue(int paramIdx);
 
   private:
-    AudioGridderAudioProcessor& m_processor;
+    PluginProcessor& m_processor;
 
     const int SCREENTOOLS_HEIGHT = 17;
     const int SCREENTOOLS_MARGIN = 3;
@@ -93,11 +93,10 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
     void unhighlightPluginButton(int idx);
 
     struct PositionTracker : Timer, LogTagDelegate {
-        AudioGridderAudioProcessorEditor* e;
+        PluginEditor* e;
         int x, y;
 
-        PositionTracker(AudioGridderAudioProcessorEditor* e_)
-            : LogTagDelegate(e_), e(e_), x(e->getScreenX()), y(e->getScreenY()) {
+        PositionTracker(PluginEditor* e_) : LogTagDelegate(e_), e(e_), x(e->getScreenX()), y(e->getScreenY()) {
             logln("starting position tracker");
             startTimer(100);
         }
@@ -119,7 +118,7 @@ class AudioGridderAudioProcessorEditor : public AudioProcessorEditor,
 
     ENABLE_ASYNC_FUNCTORS();
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioGridderAudioProcessorEditor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)
 };
 
 }  // namespace e47

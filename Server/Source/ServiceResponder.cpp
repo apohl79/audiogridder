@@ -73,7 +73,7 @@ void ServiceResponder::run() {
     logln("service: " << Defaults::MDNS_SERVICE_NAME);
     logln("hostname: " << m_hostname);
 
-    while (!currentThreadShouldExit()) {
+    while (!threadShouldExit()) {
         m_connector.readQueries(serviceCallback);
     }
 

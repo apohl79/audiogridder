@@ -8,15 +8,27 @@
 #include "WindowPositions.hpp"
 #include "Defaults.hpp"
 
+#if AG_SERVER
+#include "App.hpp"
+#include "Server.hpp"
+#endif
+
 namespace e47 {
 
 WindowPositions::WindowPositions()
     : LogTag("winpos"),
-      m_file(this, Defaults::getConfigFileName(Defaults::WindowPositions), sizeof(WindowPositions::Positions)) {
+#if AG_SERVER
+      m_file(this,
+             Defaults::getConfigFileName(Defaults::WindowPositionsServer,
+                                         {{"id", String(getApp()->getServer()->getId())}}),
+             sizeof(WindowPositions::Positions)) {
+#else
+      m_file(this, Defaults::getConfigFileName(Defaults::WindowPositionsPlugin), sizeof(WindowPositions::Positions)) {
+#endif
     m_file.open();
     if (m_file.isOpen()) {
         m_positions = reinterpret_cast<Positions*>(m_file.data());
-        logln("opened window positions file");
+        logln("opened window positions file " << m_file.getFile().getFullPathName());
     }
 }
 

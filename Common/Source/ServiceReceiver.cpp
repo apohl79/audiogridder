@@ -51,7 +51,7 @@ void ServiceReceiver::run() {
 
     logln("receiver ready");
 
-    while (!currentThreadShouldExit()) {
+    while (!threadShouldExit()) {
         m_currentResult.clear();
 
         connector.sendQuery(Defaults::MDNS_SERVICE_NAME);
@@ -59,7 +59,7 @@ void ServiceReceiver::run() {
         TimeStatistic::Timeout timeout(3000);
         do {
             connector.readResponses(queryCallback);
-        } while (timeout.getMillisecondsLeft() > 0 && !currentThreadShouldExit());
+        } while (timeout.getMillisecondsLeft() > 0 && !threadShouldExit());
 
         struct SortSrvByName {
             static int compareElements(const ServerInfo& lhs, const ServerInfo& rhs) {
@@ -72,14 +72,14 @@ void ServiceReceiver::run() {
 
         bool changed = updateServers();
         if (changed) {
-            auto newList = getServersReal();
+            auto newList = getServersInternal();
             logln("updated server list:");
             for (auto& s : newList) {
                 logln("  " << s.toString());
             }
 
             bool locked = false;
-            while (!currentThreadShouldExit() && (locked = m_instMtx.try_lock()) == false) {
+            while (!threadShouldExit() && (locked = m_instMtx.try_lock()) == false) {
                 sleep(5);
             }
             if (locked) {
@@ -222,12 +222,12 @@ void ServiceReceiver::cleanup(uint64 id) {
 Array<ServerInfo> ServiceReceiver::getServers() {
     auto inst = getInstance();
     if (nullptr != inst) {
-        return inst->getServersReal();
+        return inst->getServersInternal();
     }
     return {};
 }
 
-Array<ServerInfo> ServiceReceiver::getServersReal() {
+Array<ServerInfo> ServiceReceiver::getServersInternal() {
     traceScope();
     std::lock_guard<std::mutex> lock(m_serverMtx);
     return m_servers;

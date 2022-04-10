@@ -28,6 +28,8 @@
 #include <netinet/in.h>
 #endif
 
+JUCE_BEGIN_IGNORE_WARNINGS_MSVC(4267)
+
 int mdns_socket_open_ipv4(struct sockaddr_in* saddr) {
     int sock = (int)socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sock < 0) return -1;
@@ -930,3 +932,5 @@ size_t mdns_record_parse_txt(const void* buffer, size_t size, size_t offset, siz
 
     return parsed;
 }
+
+JUCE_END_IGNORE_WARNINGS_MSVC

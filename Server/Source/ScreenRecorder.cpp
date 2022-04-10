@@ -30,6 +30,8 @@ void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode, EncoderQual
     setLogTagStatic("screenrec");
     traceScope();
 
+    SharedInstance<ScreenRecorder>::initialize();
+
     av_log_set_level(AV_LOG_QUIET);
 
     m_encMode = encMode;
@@ -103,6 +105,7 @@ void ScreenRecorder::cleanupInput() {
     traceScope();
     if (nullptr != m_capturePacket) {
         av_free(m_capturePacket);
+        m_capturePacket = nullptr;
     }
 
     if (nullptr != m_captureFrame) {
@@ -125,6 +128,7 @@ void ScreenRecorder::cleanupInput() {
         if (nullptr != m_captureFmtCtx) {
             logln("avformat_close_input failed");
             avformat_free_context(m_captureFmtCtx);
+            m_captureFmtCtx = nullptr;
         }
     }
 }
@@ -133,10 +137,12 @@ void ScreenRecorder::cleanupOutput() {
     traceScope();
     if (nullptr != m_outputPacket) {
         av_free(m_outputPacket);
+        m_outputPacket = nullptr;
     }
 
     if (nullptr != m_outputFrameBuf) {
         av_free(m_outputFrameBuf);
+        m_outputFrameBuf = nullptr;
     }
 
     if (nullptr != m_outputFrame) {
@@ -151,25 +157,43 @@ void ScreenRecorder::cleanupOutput() {
 
     if (nullptr != m_swsCtx) {
         sws_freeContext(m_swsCtx);
+        m_swsCtx = nullptr;
     }
 }
 
-void ScreenRecorder::start(Rectangle<int> rect, CaptureCallback fn) {
+void ScreenRecorder::start(juce::Rectangle<int> rect, CaptureCallback fn) {
     traceScope();
+
     if (!m_initialized) {
         logln("screen recording not possible: initialization failed");
         return;
     }
-    m_captureRect = rect * m_scale;
-    if (nullptr != fn) {
-        m_callback = fn;
+
+    bool shouldResume = false;
+
+    {
+        std::lock_guard<std::mutex> lock(m_startStopMtx);
+
+        m_captureRect = rect * m_scale;
+
+        if (nullptr != fn) {
+            m_callback = fn;
+            shouldResume = true;
+        }
+    }
+
+    if (shouldResume) {
         resume();
     }
 }
 
 void ScreenRecorder::stop() {
     traceScope();
+
     m_capture = false;
+
+    std::lock_guard<std::mutex> lock(m_startStopMtx);
+
     if (nullptr != m_thread) {
         while (m_threadRunning) {
             Thread::sleep(5);
@@ -182,53 +206,42 @@ void ScreenRecorder::stop() {
         }
         m_thread.reset();
     }
+
     m_threadRunning = false;
 }
 
 void ScreenRecorder::resume(Rectangle<int> rect) {
     traceScope();
+
     if (!m_initialized) {
         logln("screen recording not possible: initialization failed");
         return;
     }
+
     m_capture = true;
+
+    std::lock_guard<std::mutex> lock(m_startStopMtx);
+
     if (nullptr != m_thread) {
         logln("error: detaching thread in resume()");
         m_thread->detach();
     }
+
     m_threadRunning = true;
+
     m_thread = std::make_unique<std::thread>([this, rect] {
         Thread::setCurrentThreadName("ScreenRecorder");
         traceScope();
-        bool ready = true;
-        if (rect.isEmpty()) {
-            // start
-            ready = prepareInput() && prepareOutput();
-        } else {
-            // resize
-            ready = updateArea(rect);
+        if (!rect.isEmpty()) {
+            m_captureRect = rect * m_scale;
         }
-        if (ready) {
+        if (prepareInput() && prepareOutput()) {
             record();
         }
+        cleanupInput();
+        cleanupOutput();
         m_threadRunning = false;
     });
-}
-
-bool ScreenRecorder::updateArea(Rectangle<int> rect) {
-    traceScope();
-    m_captureRect = rect * m_scale;
-#ifdef JUCE_WINDOWS
-    cleanupInput();
-    if (!prepareInput()) {
-        return false;
-    }
-#endif
-    cleanupOutput();
-    if (!prepareOutput()) {
-        return false;
-    }
-    return true;
 }
 
 bool ScreenRecorder::prepareInput() {

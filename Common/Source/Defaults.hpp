@@ -15,6 +15,7 @@ namespace Defaults {
 
 static constexpr int SERVER_PORT = 55056;
 static constexpr int CLIENT_PORT = 55088;
+static constexpr int SANDBOX_PLUGIN_PORT = 56056;
 static constexpr int PLUGIN_TRAY_PORT = 55055;
 
 static const String SANDBOX_CMD_PREFIX = "sandbox";
@@ -43,13 +44,14 @@ static const String SERVER_CONFIG_FILE_OLD = "~/.audiogridderserver";
 static const String PLUGIN_CONFIG_FILE_OLD = "~/.audiogridder";
 static const String KNOWN_PLUGINS_FILE_OLD = "~/.audiogridderserver.cache";
 
-static const String SERVER_CONFIG_FILE = "~/.audiogridder/audiogridderserver.cfg";
+static const String SERVER_CONFIG_FILE = "~/.audiogridder/audiogridderserver{id}.cfg";
 static const String PLUGIN_CONFIG_FILE = "~/.audiogridder/audiogridderplugin.cfg";
 static const String PLUGIN_TRAY_CONFIG_FILE = "~/.audiogridder/audiogridderplugintray.cfg";
-static const String KNOWN_PLUGINS_FILE = "~/.audiogridder/audiogridderserver.cache";
+static const String KNOWN_PLUGINS_FILE = "~/.audiogridder/audiogridderserver{id}.cache";
 static const String DEAD_MANS_FILE = "~/.audiogridder/audiogridderserver.crash";
 static const String SERVER_RUN_FILE = "~/.audiogridder/audiogridderserver.running";
-static const String WINDOW_POSITIONS_FILE = "~/.audiogridder/audiogridder.winpos";
+static const String SERVER_WINDOW_POSITIONS_FILE = "~/.audiogridder/audiogridderserver{id}.winpos";
+static const String PLUGIN_WINDOW_POSITIONS_FILE = "~/.audiogridder/audiogridderplugin.winpos";
 static const String PRESETS_DIR =
     File::getSpecialLocation(File::userDocumentsDirectory).getFullPathName() + "/AudioGridder Presets";
 #else
@@ -62,7 +64,7 @@ static const String KNOWN_PLUGINS_FILE_OLD =
 
 static const String SERVER_CONFIG_FILE =
     File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
-    "\\AudioGridder\\audiogridderserver.cfg";
+    "\\AudioGridder\\audiogridderserver{id}.cfg";
 static const String PLUGIN_CONFIG_FILE =
     File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
     "\\AudioGridder\\audiogridderplugin.cfg";
@@ -71,19 +73,20 @@ static const String PLUGIN_TRAY_CONFIG_FILE =
     "\\AudioGridder\\audiogridderplugintray.cfg";
 static const String KNOWN_PLUGINS_FILE =
     File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
-    "\\AudioGridder\\audiogridderserver.cache";
+    "\\AudioGridder\\audiogridderserver{id}.cache";
 static const String DEAD_MANS_FILE = File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
                                      "\\AudioGridder\\audiogridderserver.crash";
 static const String SERVER_RUN_FILE = File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
                                       "\\AudioGridder\\audiogridderserver.running";
-static const String WINDOW_POSITIONS_FILE =
+static const String SERVER_WINDOW_POSITIONS_FILE =
     File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
-    "\\AudioGridder\\audiogridder.winpos";
+    "\\AudioGridder\\audiogridderserver{id}.winpos";
+static const String PLUGIN_WINDOW_POSITIONS_FILE =
+    File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
+    "\\AudioGridder\\audiogridderplugin.winpos";
 static const String PRESETS_DIR =
     File::getSpecialLocation(File::userDocumentsDirectory).getFullPathName() + "\\AudioGridder Presets";
 #endif
-
-setLogTagStatic("defaults");
 
 inline String getLogDirName() {
 #ifdef JUCE_LINUX
@@ -96,11 +99,12 @@ inline String getLogDirName() {
     return path;
 }
 
-inline String getLogFileName(const String& appName, const String& filePrefix, const String& fileExtension) {
+inline String getLogFileName(const String& appName, const String& filePrefix, const String& fileExtension,
+                             bool latest = false) {
     auto sep = File::getSeparatorString();
     auto path = getLogDirName();
-    path << sep << appName << sep << filePrefix << Time::getCurrentTime().formatted("%Y-%m-%d_%H-%M-%S")
-         << fileExtension;
+    path << sep << appName << sep << filePrefix
+         << (latest ? "latest" : Time::getCurrentTime().formatted("%Y-%m-%d_%H-%M-%S")) << fileExtension;
     return path;
 }
 
@@ -166,10 +170,11 @@ enum ConfigFile {
     ConfigPluginCache,
     ConfigPluginTray,
     ConfigDeadMan,
-    WindowPositions
+    WindowPositionsServer,
+    WindowPositionsPlugin
 };
 
-inline String getConfigFileName(ConfigFile type) {
+inline String getConfigFileName(ConfigFile type, const std::unordered_map<String, String>& replace = {}) {
     String file;
     String fileOld;
     switch (type) {
@@ -194,20 +199,35 @@ inline String getConfigFileName(ConfigFile type) {
         case ConfigDeadMan:
             file = DEAD_MANS_FILE;
             break;
-        case WindowPositions:
-            file = WINDOW_POSITIONS_FILE;
+        case WindowPositionsServer:
+            file = SERVER_WINDOW_POSITIONS_FILE;
+            break;
+        case WindowPositionsPlugin:
+            file = PLUGIN_WINDOW_POSITIONS_FILE;
             break;
     }
     if (fileOld.isNotEmpty()) {
         File fOld(fileOld);
         File fNew(file);
         if (fOld.existsAsFile()) {
+            setLogTagStatic("defaults");
             logln("migrating config file '" << fileOld << "' to '" << file << "'");
             if (!fNew.exists()) {
                 fNew.create();
             }
             fOld.copyFileTo(fNew);
             fOld.deleteFile();
+        }
+    }
+    if (!replace.empty()) {
+        for (auto& pair : replace) {
+            String src = "{" + pair.first + "}";
+            String dst = pair.second;
+            // special case "id"
+            if (pair.first == "id" && pair.second == "0") {
+                dst = "";
+            }
+            file = file.replace(src, dst);
         }
     }
     return file;

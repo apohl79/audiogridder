@@ -25,7 +25,7 @@ class Worker : public Thread, public LogTag {
     static std::atomic_uint32_t count;
     static std::atomic_uint32_t runCount;
 
-    Worker(std::shared_ptr<StreamingSocket> masterSocket, const HandshakeRequest& cfg);
+    Worker(std::shared_ptr<StreamingSocket> masterSocket, const HandshakeRequest& cfg, int sandboxMode = 0);
 
     ~Worker() override;
     void run() override;
@@ -54,6 +54,7 @@ class Worker : public Thread, public LogTag {
     void handleMessage(std::shared_ptr<Message<Restart>> msg);
     void handleMessage(std::shared_ptr<Message<CPULoad>> msg);
     void handleMessage(std::shared_ptr<Message<PluginList>> msg);
+    void handleMessage(std::shared_ptr<Message<GetScreenBounds>> msg);
 
   private:
     std::shared_ptr<StreamingSocket> m_masterSocket;
@@ -65,8 +66,8 @@ class Worker : public Thread, public LogTag {
     std::atomic_int m_activeEditorIdx{-1};
     std::atomic_bool m_shutdown{false};
     MessageFactory m_msgFactory;
-
     bool m_noPluginListFilter = false;
+    int m_sandboxMode = 0;
 
     struct KeyWatcher : KeyListener {
         Worker* worker;

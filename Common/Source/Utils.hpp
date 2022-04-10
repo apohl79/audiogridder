@@ -18,12 +18,14 @@
 #include <sys/resource.h>
 #endif
 
+using namespace std::chrono_literals;
+
 #define logln(M)                                                                          \
     do {                                                                                  \
         String __msg, __str;                                                              \
         __msg << M;                                                                       \
         __str << "[" << getLogTagSource()->getLogTag() << "] " << __msg;                  \
-        AGLogger::log(__str);                                                             \
+        Logger::log(__str);                                                               \
         if (Tracer::isEnabled()) {                                                        \
             Tracer::traceMessage(getLogTagSource(), __FILE__, __LINE__, __func__, __msg); \
         }                                                                                 \
@@ -34,7 +36,7 @@
         String __msg, __str;                                             \
         __msg << M;                                                      \
         __str << "[" << getLogTagSource()->getLogTag() << "] " << __msg; \
-        AGLogger::log(__str);                                            \
+        Logger::log(__str);                                              \
     } while (0)
 
 #define setLogTagStatic(t)  \
@@ -290,8 +292,11 @@ inline void runOnMsgThreadSync(std::function<void()> fn) {
         done = true;
         cv.notify_one();
     });
-    std::unique_lock<std::mutex> lock(mtx);
-    cv.wait(lock, [&done, &mm] { return done || mm->hasStopMessageBeenSent(); });
+    bool finished = false;
+    do {
+        std::unique_lock<std::mutex> lock(mtx);
+        finished = cv.wait_for(lock, 5ms, [&done, &mm] { return done || mm->hasStopMessageBeenSent(); });
+    } while (!finished);
 }
 
 inline void waitForThreadAndLog(const LogTag* tag, Thread* t, int millisUntilWarning = 3000) {
@@ -404,6 +409,26 @@ inline void cleanDirectory(const String& path, const String& filePrefix, const S
         }
     }
 }
+
+struct FnThread : Thread {
+    std::function<void()> fn;
+
+    FnThread(std::function<void()> f = nullptr, const String& n = "FnThread", bool autoStart = false)
+        : Thread(n), fn(f) {
+        if (autoStart) {
+            startThread();
+        }
+    }
+
+    virtual ~FnThread() override { stopThread(-1); }
+
+    void run() override {
+        if (fn != nullptr) {
+            fn();
+            fn = nullptr;
+        }
+    }
+};
 
 }  // namespace e47
 #endif /* Utils_hpp */

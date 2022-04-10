@@ -33,3 +33,6 @@ done
 for f in $(find $DIR/Common/Source -name "*.[ch]pp"); do
     format $f
 done
+for f in $(find $DIR/Tests/Source -name "*.[ch]pp"); do
+    format $f
+done

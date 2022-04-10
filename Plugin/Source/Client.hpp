@@ -17,7 +17,7 @@
 #include "Metrics.hpp"
 #include "ImageReader.hpp"
 
-JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE("-Wzero-as-null-pointer-constant", "-Wsign-conversion")
+JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE("-Wzero-as-null-pointer-constant", "-Wsign-conversion", "-Wshadow")
 #include <boost/lockfree/spsc_queue.hpp>
 JUCE_END_IGNORE_WARNINGS_GCC_LIKE
 
@@ -25,7 +25,7 @@ JUCE_END_IGNORE_WARNINGS_GCC_LIKE
 
 namespace e47 {
 
-class AudioGridderAudioProcessor;
+class PluginProcessor;
 
 template <typename T>
 class AudioStreamer;
@@ -34,7 +34,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
   public:
     static std::atomic_uint32_t count;
 
-    Client(AudioGridderAudioProcessor* processor);
+    Client(PluginProcessor* processor);
     ~Client() override;
 
     struct Parameter {
@@ -239,7 +239,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     friend AudioStreamer<float>;
     friend AudioStreamer<double>;
 
-    AudioGridderAudioProcessor* m_processor;
+    PluginProcessor* m_processor;
     String m_loadedPluginsString;
     std::mutex m_srvMtx;
     String m_srvHost = "";
