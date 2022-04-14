@@ -32,8 +32,7 @@ int queryCallback(int sock, const struct sockaddr* from, size_t addrlen, mdns_en
                   size_t name_length, size_t record_offset, size_t record_length, void* user_data) {
     setLogTagStatic("mdns_querycallback");
     traceScope();
-    auto inst = ServiceReceiver::getInstance();
-    if (nullptr != inst) {
+    if (auto inst = ServiceReceiver::getInstance()) {
         return inst->handleRecord(sock, from, addrlen, entry, query_id, rtype, rclass, ttl, data, size, name_offset,
                                   name_length, record_offset, record_length, user_data);
     }
@@ -55,6 +54,7 @@ void ServiceReceiver::run() {
         m_currentResult.clear();
 
         connector.sendQuery(Defaults::MDNS_SERVICE_NAME);
+
         // read/store result
         TimeStatistic::Timeout timeout(3000);
         do {
@@ -99,31 +99,66 @@ void ServiceReceiver::run() {
 
 bool ServiceReceiver::updateServers() {
     traceScope();
-    std::lock_guard<std::mutex> lock(m_serverMtx);
+
     bool changed = false;
-    for (auto& s1 : m_currentResult) {
-        bool exists = false;
-        for (auto& s2 : m_servers) {
-            if (s1 == s2) {
-                s2.refresh(s1.getLoad());
-                exists = true;
-                break;
+    auto now = Time::currentTimeMillis();
+
+    {
+        std::lock_guard<std::mutex> lock(m_serversMtx);
+        for (auto& s1 : m_currentResult) {
+            bool exists = false;
+            for (auto& s2 : m_servers) {
+                if (s1 == s2) {
+                    s2.refresh(s1.getLoad());
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) {
+                m_servers.add(s1);
+                changed = true;
             }
         }
-        if (!exists) {
-            m_servers.add(s1);
-            changed = true;
+        for (int i = 0; i < m_servers.size();) {
+            if (m_servers.getReference(i).getUpdated().toMilliseconds() + 30000 < now) {
+                m_servers.remove(i);
+                changed = true;
+            } else {
+                i++;
+            }
         }
     }
-    auto now = Time::getCurrentTime().toMilliseconds();
-    for (int i = 0; i < m_servers.size();) {
-        if (m_servers.getReference(i).getUpdated().toMilliseconds() + 30000 < now) {
-            m_servers.remove(i);
-            changed = true;
+
+    // reachable check
+    int idx = 0;
+    for (auto& srv : getServersInternal()) {
+        String host = srv.getHost();
+        int port = Defaults::SERVER_PORT + srv.getID();
+        String key = host + String(port);
+        bool removed = false;
+        if (m_lastReachableChecks.count(key) == 0 || m_lastReachableChecks[key] + 30000 < now) {
+            StreamingSocket sock;
+            if (!sock.connect(host, port, 500) || (srv.getLocalMode() && !sock.isLocal())) {
+                std::lock_guard<std::mutex> lock(m_serversMtx);
+                m_servers.remove(idx);
+                removed = true;
+            }
+            sock.close();
+            m_lastReachableChecks[key] = now;
+        }
+        if (!removed) {
+            idx++;
+        }
+    }
+
+    for (auto it = m_lastReachableChecks.begin(); it != m_lastReachableChecks.end();) {
+        if (it->second + 30000 > now) {
+            it = m_lastReachableChecks.erase(it);
         } else {
-            i++;
+            it++;
         }
     }
+
     return changed;
 }
 
@@ -165,18 +200,10 @@ int ServiceReceiver::handleRecord(int /*sock*/, const struct sockaddr* from, siz
                         complete = true;
                     } else if (key == "INFO") {
                         json j = json::parse(MDNS_TO_JUCE_STRING(m_txtBuffer[itxt].value).toStdString());
-                        m_curId = 0;
-                        if (j.find("ID") != j.end()) {
-                            m_curId = j["ID"].get<int>();
-                        }
-                        m_curLoad = 0.0f;
-                        if (j.find("LOAD") != j.end()) {
-                            m_curLoad = j["LOAD"].get<float>();
-                        }
-                        m_curVersion = "unknown";
-                        if (j.find("V") != j.end()) {
-                            m_curVersion = j["V"].get<std::string>();
-                        }
+                        m_curId = jsonGetValue(j, "ID", 0);
+                        m_curLoad = jsonGetValue(j, "LOAD", 0.0f);
+                        m_curLocalMode = jsonGetValue(j, "LM", false);
+                        m_curVersion = jsonGetValue(j, "V", String("unknown"));
                         complete = true;
                     }
                 }
@@ -186,7 +213,8 @@ int ServiceReceiver::handleRecord(int /*sock*/, const struct sockaddr* from, siz
     }
     if (complete) {
         auto host = mDNSConnector::ipToString(from, addrlen, true);
-        m_currentResult.add(ServerInfo(host, m_curName, m_curId, m_curLoad, m_curVersion));
+        m_currentResult.add(
+            ServerInfo(host, m_curName, from->sa_family == AF_INET6, m_curId, m_curLoad, m_curLocalMode, m_curVersion));
     }
     return 0;
 }
@@ -229,7 +257,7 @@ Array<ServerInfo> ServiceReceiver::getServers() {
 
 Array<ServerInfo> ServiceReceiver::getServersInternal() {
     traceScope();
-    std::lock_guard<std::mutex> lock(m_serverMtx);
+    std::lock_guard<std::mutex> lock(m_serversMtx);
     return m_servers;
 }
 

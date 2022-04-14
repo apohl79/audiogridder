@@ -123,7 +123,7 @@ class Server : public Thread, public LogTag {
     int m_port = Defaults::SERVER_PORT;
     int m_id = 0;
     String m_name;
-    StreamingSocket m_masterSocket;
+    StreamingSocket m_masterSocket, m_masterSocketLocal;
     using WorkerList = Array<std::shared_ptr<Worker>>;
     WorkerList m_workers;
     KnownPluginList m_pluginlist;
@@ -172,6 +172,7 @@ class Server : public Thread, public LogTag {
     void runSandboxPlugin();
 
     bool sendHandshakeResponse(StreamingSocket* sock, bool sandboxEnabled = false, int sandboxPort = 0);
+    bool createWorkerListener(std::shared_ptr<StreamingSocket> sock, bool isLocal, int& workerPort);
 
     ENABLE_ASYNC_FUNCTORS();
 };

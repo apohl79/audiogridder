@@ -81,6 +81,12 @@ class ServerInfo {
             if (hostParts.size() > 3) {
                 m_version = hostParts[3];
             }
+            if (hostParts.size() > 4) {
+                m_isIpv6 = hostParts[4] == "1";
+            }
+            if (hostParts.size() > 5) {
+                m_localMode = hostParts[5] == "1";
+            }
         } else {
             m_host = s;
             m_id = 0;
@@ -89,16 +95,25 @@ class ServerInfo {
         refresh();
     }
 
-    ServerInfo(const String& host, const String& name, int id, float load, const String& version = "")
-        : m_host(host), m_name(name), m_id(id), m_load(load), m_version(version) {
+    ServerInfo(const String& host, const String& name, bool ipv6, int id, float load, bool localMode,
+               const String& version = "")
+        : m_host(host),
+          m_name(name),
+          m_isIpv6(ipv6),
+          m_id(id),
+          m_load(load),
+          m_localMode(localMode),
+          m_version(version) {
         refresh();
     }
 
     ServerInfo(const ServerInfo& other)
         : m_host(other.m_host),
           m_name(other.m_name),
+          m_isIpv6(other.m_isIpv6),
           m_id(other.m_id),
           m_load(other.m_load),
+          m_localMode(other.m_localMode),
           m_version(other.m_version) {
         refresh();
     }
@@ -106,23 +121,37 @@ class ServerInfo {
     ServerInfo& operator=(const ServerInfo& other) {
         m_host = other.m_host;
         m_name = other.m_name;
+        m_isIpv6 = other.m_isIpv6;
         m_id = other.m_id;
         m_load = other.m_load;
+        m_localMode = other.m_localMode;
         m_version = other.m_version;
         refresh();
         return *this;
     }
 
     bool operator==(const ServerInfo& other) const {
-        return m_host == other.m_host && m_name == other.m_name && m_id == other.m_id && m_version == other.m_version;
+        return m_host == other.m_host && m_name == other.m_name && m_isIpv6 == other.m_isIpv6 && m_id == other.m_id &&
+               m_localMode == other.m_localMode && m_version == other.m_version;
     }
+
+    bool operator!=(const ServerInfo& other) const { return !operator==(other); }
 
     bool isValid() const { return m_id > -1; }
     const String& getHost() const { return m_host; }
+    void setHost(const String& h) { m_host = h; }
     const String& getName() const { return m_name; }
+    void setName(const String& n) { m_name = n; }
+    bool isIpv6() const { return m_isIpv6; }
+    void setIsIpv6(bool b) { m_isIpv6 = b; }
     const String& getVersion() const { return m_version; }
+    void setVersion(const String& v) { m_version = v; }
     int getID() const { return m_id; }
+    void setID(int id) { m_id = id; }
     float getLoad() const { return m_load; }
+    void setLoad(float l) { m_load = l; }
+    bool getLocalMode() const { return m_localMode; }
+    void setLocalMode(bool b) { m_localMode = b; }
 
     String getHostAndID() const {
         String ret = m_host;
@@ -148,6 +177,7 @@ class ServerInfo {
         ret << "name=" << m_name << ", ";
         ret << "host=" << m_host << ", ";
         ret << "id=" << m_id << ", ";
+        ret << "localmode=" << (int)m_localMode << ", ";
         ret << "version=" << m_version;
         if (m_load > 0.0f) {
             ret << ", load=" << m_load;
@@ -158,7 +188,7 @@ class ServerInfo {
 
     String serialize() const {
         String ret = m_host;
-        ret << ":" << m_id << ":" << m_name << ":" << m_version;
+        ret << ":" << m_id << ":" << m_name << ":" << m_version << ":" << (int)m_isIpv6 << ":" << (int)m_localMode;
         return ret;
     }
 
@@ -173,8 +203,10 @@ class ServerInfo {
 
   private:
     String m_host, m_name;
+    bool m_isIpv6;
     int m_id;
     float m_load;
+    bool m_localMode;
     String m_version;
     Time m_updated;
 };

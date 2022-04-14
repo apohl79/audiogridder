@@ -21,7 +21,7 @@ class ServiceResponder : public Thread, public LogTag {
   public:
     static std::unique_ptr<ServiceResponder> m_inst;
 
-    ServiceResponder(int port, int id, const String& hostname);
+    ServiceResponder(int port, int id, const String& hostname, bool localMode);
     ~ServiceResponder() override;
 
     void run() override;
@@ -30,7 +30,7 @@ class ServiceResponder : public Thread, public LogTag {
                      uint16_t rtype, uint16_t rclass, uint32_t ttl, const void* data, size_t size, size_t name_offset,
                      size_t name_length, size_t record_offset, size_t record_length, void* user_data);
 
-    static void initialize(int port, int id, const String& hostname);
+    static void initialize(int port, int id, const String& hostname, bool localMode);
     static void cleanup();
     static void setHostName(const String& hostname);
     static const String& getHostName();
@@ -39,6 +39,7 @@ class ServiceResponder : public Thread, public LogTag {
     int m_port;
     int m_id;
     String m_hostname;
+    bool m_localMode;
     mDNSConnector m_connector;
 
     char m_sendBuffer[256];

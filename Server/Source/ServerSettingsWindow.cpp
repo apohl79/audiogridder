@@ -261,9 +261,14 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_screenCapturingMode.addItem("FFmpeg (mjpeg)", 2);
     m_screenCapturingMode.addItem("Legacy", 3);
     m_screenCapturingMode.addItem("Disabled (Local Mode)", 4);
+    m_screenCapturingMode.addItem("Disabled", 5);
     int mode = 1;
     if (m_app->getServer()->getScreenCapturingOff()) {
-        mode = 4;
+        if (m_app->getServer()->getScreenLocalMode()) {
+            mode = 4;
+        } else {
+            mode = 5;
+        }
     } else if (!m_app->getServer()->getScreenCapturingFFmpeg()) {
         mode = 3;
     } else {
@@ -278,41 +283,64 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     }
     m_screenCapturingMode.setSelectedId(mode, NotificationType::dontSendNotification);
     m_screenCapturingMode.onChange = [this] {
-        if (m_screenCapturingMode.getSelectedId() != 3) {
-            m_screenDiffDetectionLbl.setAlpha(0.5);
-            m_screenDiffDetection.setEnabled(false);
-            m_screenDiffDetection.setAlpha(0.5);
-            m_screenJpgQualityLbl.setAlpha(0.5);
-            m_screenJpgQuality.setEnabled(false);
-            m_screenJpgQuality.setAlpha(0.5);
+        switch (m_screenCapturingMode.getSelectedId()) {
+            case 1:
+            case 2:
+                m_screenCapturingQualityLbl.setAlpha(1);
+                m_screenCapturingQuality.setAlpha(1);
+                m_screenCapturingQuality.setEnabled(true);
 
-            m_screenCapturingQualityLbl.setAlpha(1);
-            m_screenCapturingQuality.setAlpha(1);
-            m_screenCapturingQuality.setEnabled(true);
-        } else {
-            m_screenDiffDetectionLbl.setAlpha(1);
-            m_screenDiffDetection.setEnabled(true);
-            m_screenDiffDetection.setAlpha(1);
-            m_screenJpgQualityLbl.setAlpha(1);
-            m_screenJpgQuality.setEnabled(true);
-            m_screenJpgQuality.setAlpha(1);
+                m_pluginWindowsOnTopLbl.setAlpha(0.5);
+                m_pluginWindowsOnTop.setEnabled(false);
+                m_pluginWindowsOnTop.setAlpha(0.5);
 
-            m_screenCapturingQualityLbl.setAlpha(0.5);
-            m_screenCapturingQuality.setAlpha(0.5);
-            m_screenCapturingQuality.setEnabled(false);
+                m_screenDiffDetectionLbl.setAlpha(0.5);
+                m_screenDiffDetection.setEnabled(false);
+                m_screenDiffDetection.setAlpha(0.5);
 
-            if (nullptr != m_screenDiffDetection.onClick) {
-                m_screenDiffDetection.onClick();
-            }
-        }
-        if (m_screenCapturingMode.getSelectedId() == 4) {
-            m_pluginWindowsOnTopLbl.setAlpha(1);
-            m_pluginWindowsOnTop.setEnabled(true);
-            m_pluginWindowsOnTop.setAlpha(1);
-        } else {
-            m_pluginWindowsOnTopLbl.setAlpha(0.5);
-            m_pluginWindowsOnTop.setEnabled(false);
-            m_pluginWindowsOnTop.setAlpha(0.5);
+                m_screenJpgQualityLbl.setAlpha(0.5);
+                m_screenJpgQuality.setEnabled(false);
+                m_screenJpgQuality.setAlpha(0.5);
+                break;
+            case 3:
+                m_screenDiffDetectionLbl.setAlpha(1);
+                m_screenDiffDetection.setEnabled(true);
+                m_screenDiffDetection.setAlpha(1);
+
+                m_screenJpgQualityLbl.setAlpha(1);
+                m_screenJpgQuality.setEnabled(true);
+                m_screenJpgQuality.setAlpha(1);
+
+                m_screenCapturingQualityLbl.setAlpha(0.5);
+                m_screenCapturingQuality.setAlpha(0.5);
+                m_screenCapturingQuality.setEnabled(false);
+
+                m_pluginWindowsOnTopLbl.setAlpha(0.5);
+                m_pluginWindowsOnTop.setEnabled(false);
+                m_pluginWindowsOnTop.setAlpha(0.5);
+
+                if (nullptr != m_screenDiffDetection.onClick) {
+                    m_screenDiffDetection.onClick();
+                }
+                break;
+            case 4:
+            case 5:
+                m_screenCapturingQualityLbl.setAlpha(0.5);
+                m_screenCapturingQuality.setAlpha(0.5);
+                m_screenCapturingQuality.setEnabled(false);
+
+                m_pluginWindowsOnTopLbl.setAlpha(1);
+                m_pluginWindowsOnTop.setEnabled(true);
+                m_pluginWindowsOnTop.setAlpha(1);
+
+                m_screenDiffDetectionLbl.setAlpha(0.5);
+                m_screenDiffDetection.setEnabled(false);
+                m_screenDiffDetection.setAlpha(0.5);
+
+                m_screenJpgQualityLbl.setAlpha(0.5);
+                m_screenJpgQuality.setEnabled(false);
+                m_screenJpgQuality.setAlpha(0.5);
+                break;
         }
     };
     m_screenCapturingMode.onChange();
@@ -498,6 +526,12 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
                 appCpy->getServer()->setScreenCapturingFFmpeg(false);
                 appCpy->getServer()->setScreenCapturingOff(true);
                 appCpy->getServer()->setScreenLocalMode(true);
+                appCpy->getServer()->setPluginWindowsOnTop(m_pluginWindowsOnTop.getToggleState());
+                break;
+            case 5:
+                appCpy->getServer()->setScreenCapturingFFmpeg(false);
+                appCpy->getServer()->setScreenCapturingOff(true);
+                appCpy->getServer()->setScreenLocalMode(false);
                 appCpy->getServer()->setPluginWindowsOnTop(m_pluginWindowsOnTop.getToggleState());
                 break;
         }

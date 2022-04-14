@@ -40,6 +40,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
 
     const String getApplicationName() override { return ProjectInfo::projectName; }
     const String getApplicationVersion() override { return ProjectInfo::versionString; }
+    bool moreThanOneInstanceAllowed() override { return true; }
     void initialise(const String& commandLineParameters) override;
     void shutdown() override;
     void systemRequestedQuit() override { quit(); }

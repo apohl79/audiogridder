@@ -270,7 +270,7 @@ void PluginProcessor::saveConfig(int numOfBuffers) {
     json jcfg;
     jcfg["_comment_"] = "PLEASE DO NOT CHANGE THIS FILE WHILE YOUR DAW IS RUNNING AND HAS AUDIOGRIDDER PLUGINS LOADED";
     jcfg["Servers"] = jservers;
-    jcfg["LastServer"] = m_client->getServerHostAndID().toStdString();
+    jcfg["LastServer"] = m_client->getServer().serialize().toStdString();
     jcfg["NumberOfBuffers"] = numOfBuffers;
     jcfg["NumberOfAutomationSlots"] = m_numberOfAutomationSlots;
     jcfg["LoadPluginTimeoutMS"] = m_client->LOAD_PLUGIN_TIMEOUT.load();
@@ -458,9 +458,9 @@ bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
 }
 
 Array<std::pair<short, short>> PluginProcessor::getAUChannelInfo() const {
-#if JucePlugin_IsSynth
+#if JucePlugin_IsSynth && JUCE_MAC
     Array<std::pair<short, short>> info;
-    info.add({(short)0, -(short)Defaults::PLUGIN_CHANNELS_OUT});
+    info.add(std::make_pair((short)0, -(short)Defaults::PLUGIN_CHANNELS_OUT));
     return info;
 #else
     return {};
@@ -661,7 +661,7 @@ json PluginProcessor::getState(bool withServers) {
             jservers.push_back(srv.toStdString());
         }
         j["servers"] = jservers;
-        j["activeServerStr"] = m_client->getServerHostAndID().toStdString();
+        j["activeServerStr"] = m_client->getServer().serialize().toStdString();
     }
 
     j["ActiveChannels"] = m_activeChannels.toInt();
@@ -714,13 +714,9 @@ bool PluginProcessor::setState(const json& j) {
             m_servers.add(srv.get<std::string>());
         }
     }
-    String activeServerStr;
-    int activeServer = -1;
-    if (j.find("activeServerStr") != j.end()) {
-        activeServerStr = j["activeServerStr"].get<std::string>();
-    } else if (j.find("activeServer") != j.end()) {
-        activeServer = j["activeServer"].get<int>();
-    }
+
+    String activeServerStr = jsonGetValue(j, "activeServerStr", String());
+    int activeServer = jsonGetValue(j, "activeServer", -1);
 
     if (jsonHasValue(j, "ActiveChannels")) {
         m_activeChannels = jsonGetValue(j, "ActiveChannels", (uint64)3);
@@ -1260,10 +1256,10 @@ void PluginProcessor::setActiveServer(const ServerInfo& s) {
 
 String PluginProcessor::getActiveServerName() const {
     traceScope();
-    String ret = ServiceReceiver::hostToName(m_client->getServerHost());
-    int id = m_client->getServerID();
-    if (id > 0) {
-        ret << ":" << id;
+    auto srvInfo = m_client->getServer();
+    String ret = ServiceReceiver::hostToName(srvInfo.getHost());
+    if (srvInfo.getID() > 0) {
+        ret << ":" << srvInfo.getID();
     }
     return ret;
 }
@@ -1364,7 +1360,7 @@ void PluginProcessor::TrayConnection::sendStatus() {
     j["perf95th"] = ts->get1minHistogram().nintyFifth;
     j["blocks"] = client.NUM_OF_BUFFERS.load();
     j["serverNameId"] = m_processor->getActiveServerName().toStdString();
-    j["serverHost"] = client.getServerHost().toStdString();
+    j["serverHost"] = client.getServer().getHost().toStdString();
 
     sendMessage(PluginTrayMessage(PluginTrayMessage::STATUS, j));
 }
@@ -1385,7 +1381,13 @@ void PluginProcessor::TrayConnection::sendMessage(const PluginTrayMessage& msg) 
 void PluginProcessor::TrayConnection::run() {
     while (!threadShouldExit()) {
         if (!connected) {
-            if (!connectToSocket("localhost", Defaults::PLUGIN_TRAY_PORT, 500)) {
+            bool success;
+            if (Defaults::unixDomainSocketsSupported()) {
+                success = connectToSocket(Defaults::getSocketPath(Defaults::PLUGIN_TRAY_SOCK), 500);
+            } else {
+                success = connectToSocket("localhost", Defaults::PLUGIN_TRAY_PORT, 500);
+            }
+            if (!success) {
                 String path = File::getSpecialLocation(File::globalApplicationsDirectory).getFullPathName();
 #ifdef JUCE_MAC
 #ifdef DEBUG
@@ -1413,6 +1415,7 @@ void PluginProcessor::TrayConnection::run() {
                             "AudioGridder plugin and reinstall it!",
                             "OK");
                     });
+                    return;
                 }
                 sleepExitAware(2500);
             }

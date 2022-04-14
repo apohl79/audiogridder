@@ -13,6 +13,7 @@
 #include "GenericEditor.hpp"
 #include "StatisticsWindow.hpp"
 #include "Utils.hpp"
+#include "WindowHelper.hpp"
 
 namespace e47 {
 
@@ -92,24 +93,28 @@ class PluginEditor : public AudioProcessorEditor,
     void highlightPluginButton(int idx);
     void unhighlightPluginButton(int idx);
 
+    Point<int> getLocalModePosition(juce::Rectangle<int> bounds = {});
+
     struct PositionTracker : Timer, LogTagDelegate {
         PluginEditor* e;
-        int x, y;
+        juce::Rectangle<int> r;
 
-        PositionTracker(PluginEditor* e_) : LogTagDelegate(e_), e(e_), x(e->getScreenX()), y(e->getScreenY()) {
+        PositionTracker(PluginEditor* e_) : LogTagDelegate(e_), e(e_), r(WindowHelper::getWindowScreenBounds(e)) {
             logln("starting position tracker");
             startTimer(100);
         }
 
         void timerCallback() override {
             auto active = e->m_processor.getActivePlugin();
-            if (active > -1 && (x != e->getScreenX() || y != e->getScreenY())) {
-                x = e->getScreenX();
-                y = e->getScreenY();
-                if (active > -1) {
-                    logln("updating editor position to " << x << "x" << y);
-                    e->m_processor.editPlugin(active, x + e->getWidth() + 10, y);
-                }
+            auto bounds = WindowHelper::getWindowScreenBounds(e);
+            if (bounds.isEmpty()) {
+                bounds = e->getScreenBounds();
+            }
+            if (active > -1 && r != bounds) {
+                r = bounds;
+                auto p = e->getLocalModePosition(r);
+                logln("updating editor position to " << p.x << "x" << p.y);
+                e->m_processor.editPlugin(active, p.x, p.y);
             }
         }
     };

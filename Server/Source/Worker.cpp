@@ -26,7 +26,7 @@ namespace e47 {
 std::atomic_uint32_t Worker::count{0};
 std::atomic_uint32_t Worker::runCount{0};
 
-Worker::Worker(std::shared_ptr<StreamingSocket> masterSocket, const HandshakeRequest& cfg, int sandboxMode)
+Worker::Worker(std::shared_ptr<StreamingSocket> masterSocket, const HandshakeRequest& cfg, int sandboxModeRuntime)
     : Thread("Worker"),
       LogTag("worker"),
       m_masterSocket(masterSocket),
@@ -34,7 +34,7 @@ Worker::Worker(std::shared_ptr<StreamingSocket> masterSocket, const HandshakeReq
       m_audio(std::make_shared<AudioWorker>(this)),
       m_screen(std::make_shared<ScreenWorker>(this)),
       m_msgFactory(this),
-      m_sandboxMode(sandboxMode),
+      m_sandboxModeRuntime(sandboxModeRuntime),
       m_keyWatcher(std::make_unique<KeyWatcher>(this)) {
     traceScope();
     initAsyncFunctors();
@@ -90,7 +90,7 @@ void Worker::run() {
     }
 
     // start screen capturing
-    if (m_sandboxMode != Server::SANDBOX_PLUGIN) {
+    if (m_sandboxModeRuntime != Server::SANDBOX_PLUGIN) {
         sock.reset(accept(m_masterSocket.get(), 2000));
         if (nullptr != sock && sock->isConnected()) {
             m_screen->init(std::move(sock));
@@ -104,7 +104,7 @@ void Worker::run() {
     m_masterSocket.reset();
 
     // send list of plugins
-    if (m_sandboxMode != Server::SANDBOX_PLUGIN) {
+    if (m_sandboxModeRuntime != Server::SANDBOX_PLUGIN) {
         auto msgPL = std::make_shared<Message<PluginList>>(this);
         handleMessage(msgPL);
     }

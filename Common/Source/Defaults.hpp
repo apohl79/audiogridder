@@ -20,6 +20,11 @@ static constexpr int PLUGIN_TRAY_PORT = 55055;
 
 static const String SANDBOX_CMD_PREFIX = "sandbox";
 
+static const String SANDBOX_PLUGIN_SOCK = "sandbox-plugin-{n}.sock";
+static const String PLUGIN_TRAY_SOCK = "plugin-tray.sock";
+static const String SERVER_SOCK = "server-{id}.sock";
+static const String WORKER_SOCK = "worker-{id}-{n}.sock";
+
 static constexpr int SCAREA_STEPS = 30;
 static constexpr int SCAREA_FULLSCREEN = 0xFFFF;
 
@@ -40,6 +45,7 @@ static constexpr int PLUGIN_CHANNELS_SC = 2;
 #endif
 
 #ifndef JUCE_WINDOWS
+
 static const String SERVER_CONFIG_FILE_OLD = "~/.audiogridderserver";
 static const String PLUGIN_CONFIG_FILE_OLD = "~/.audiogridder";
 static const String KNOWN_PLUGINS_FILE_OLD = "~/.audiogridderserver.cache";
@@ -54,7 +60,10 @@ static const String SERVER_WINDOW_POSITIONS_FILE = "~/.audiogridder/audiogridder
 static const String PLUGIN_WINDOW_POSITIONS_FILE = "~/.audiogridder/audiogridderplugin.winpos";
 static const String PRESETS_DIR =
     File::getSpecialLocation(File::userDocumentsDirectory).getFullPathName() + "/AudioGridder Presets";
+static const String DOMAIN_SOCKETS_DIR = "~/.audiogridder/sockets";
+
 #else
+
 static const String SERVER_CONFIG_FILE_OLD =
     File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + "\\.audiogridderserver";
 static const String PLUGIN_CONFIG_FILE_OLD =
@@ -86,6 +95,9 @@ static const String PLUGIN_WINDOW_POSITIONS_FILE =
     "\\AudioGridder\\audiogridderplugin.winpos";
 static const String PRESETS_DIR =
     File::getSpecialLocation(File::userDocumentsDirectory).getFullPathName() + "\\AudioGridder Presets";
+static const String DOMAIN_SOCKETS_DIR =
+    File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + "\\AudioGridder\\sockets";
+
 #endif
 
 inline String getLogDirName() {
@@ -232,6 +244,33 @@ inline String getConfigFileName(ConfigFile type, const std::unordered_map<String
     }
     return file;
 }
+
+inline File getSocketPath(const String& socketName, const std::unordered_map<String, String>& replace = {},
+                          bool deleteIfExists = false) {
+    File root(DOMAIN_SOCKETS_DIR);
+
+    if (!root.exists()) {
+        root.createDirectory();
+    }
+
+    String name = socketName;
+
+    if (!replace.empty()) {
+        for (auto& pair : replace) {
+            name = name.replace("{" + pair.first + "}", pair.second);
+        }
+    }
+
+    auto file = root.getChildFile(name);
+
+    if (deleteIfExists && file.exists()) {
+        file.deleteFile();
+    }
+
+    return file;
+}
+
+bool unixDomainSocketsSupported() noexcept;
 
 static constexpr int DEFAULT_NUM_OF_BUFFERS = 8;
 static constexpr int DEFAULT_NUM_RECENTS = 10;

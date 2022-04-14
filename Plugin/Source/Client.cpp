@@ -64,17 +64,19 @@ void Client::run() {
         // Start/stop tray connection, if the setting changed
         m_processor->setDisableTray(m_processor->getDisableTray());
 
+        auto srvInfo = getServer();
+
         // Try to auto connect to the first available host discovered via mDNS
-        if (m_srvHost.isEmpty()) {
+        if (!srvInfo.isValid()) {
             auto servers = m_processor->getServersMDNS();
             if (servers.size() > 0) {
                 setServer(servers[0]);
+                srvInfo = servers[0];
             }
         }
 
         // Health check & reconnect
-        if ((!isReady(LOAD_PLUGIN_TIMEOUT + 5000) || m_needsReconnect) && m_srvHost.isNotEmpty() &&
-            !threadShouldExit()) {
+        if ((!isReady(LOAD_PLUGIN_TIMEOUT + 5000) || m_needsReconnect) && srvInfo.isValid() && !threadShouldExit()) {
             logln("(re)connecting...");
             close();
             init();
@@ -182,41 +184,16 @@ void Client::handleMessage(std::shared_ptr<Message<ParameterGesture>> msg) {
 void Client::setServer(const ServerInfo& srv) {
     traceScope();
     logln("setting server to " << srv.toString());
-    String currHost = getServerHostAndID();
     std::lock_guard<std::mutex> lock(m_srvMtx);
-    if (currHost.compare(srv.getHostAndID())) {
-        m_srvHost = srv.getHost();
-        m_srvId = srv.getID();
+    if (m_srvInfo != srv) {
+        m_srvInfo = srv;
         m_needsReconnect = true;
     }
 }
 
-String Client::getServerHost() {
-    traceScope();
+ServerInfo Client::getServer() {
     std::lock_guard<std::mutex> lock(m_srvMtx);
-    return m_srvHost;
-}
-
-int Client::getServerID() {
-    traceScope();
-    std::lock_guard<std::mutex> lock(m_srvMtx);
-    return m_srvId;
-}
-
-String Client::getServerHostAndID() {
-    traceScope();
-    std::lock_guard<std::mutex> lock(m_srvMtx);
-    String h = m_srvHost;
-    if (m_srvId > 0) {
-        h << ":" << m_srvId;
-    }
-    return h;
-}
-
-int Client::getServerPort() {
-    traceScope();
-    std::lock_guard<std::mutex> lock(m_srvMtx);
-    return m_srvPort;
+    return m_srvInfo;
 }
 
 void Client::setPluginScreenUpdateCallback(ScreenUpdateCallback fn) {
@@ -260,25 +237,36 @@ void Client::init(int channelsIn, int channelsOut, int channelsSC, double rate, 
 
 void Client::init() {
     traceScope();
-    String host;
-    int id;
-    int port;
-    {
-        std::lock_guard<std::mutex> lock(m_srvMtx);
-        host = m_srvHost;
-        id = m_srvId;
-        port = m_srvPort + m_srvId;
-    }
+    auto srvInfo = getServer();
+    bool useUnixDomain = srvInfo.getLocalMode() && Defaults::unixDomainSocketsSupported();
+    int port = Defaults::SERVER_PORT + srvInfo.getID();
+
     LockByID lock(*this, INIT2);
-    m_error = true;
+
 #if !JucePlugin_IsMidiEffect
     if (m_channelsOut == 0 || m_rate == 0.0 || m_samplesPerBlock == 0) {
         return;
     }
 #endif
-    logln("connecting server " << host << ":" << id);
+
+    m_error = true;
     m_cmdOut = std::make_unique<StreamingSocket>();
-    if (m_cmdOut->connect(host, port, 1000)) {
+
+    if (useUnixDomain) {
+        auto socketPath = Defaults::getSocketPath(Defaults::SERVER_SOCK, {{"id", String(srvInfo.getID())}});
+        logln("connecting server: " << socketPath.getFullPathName());
+        if (!m_cmdOut->connect(socketPath, 1000)) {
+            logln("local connection to server failed");
+            useUnixDomain = false;
+        }
+    }
+
+    if (!m_cmdOut->isConnected()) {
+        logln("connecting server: " << srvInfo.getHostAndID());
+        m_cmdOut->connect(srvInfo.getHost(), port, 1000);
+    }
+
+    if (m_cmdOut->isConnected()) {
         HandshakeRequest cfg = {AG_PROTOCOL_VERSION,
                                 m_channelsIn,
                                 m_channelsOut,
@@ -312,14 +300,26 @@ void Client::init() {
         m_srvLocalMode = resp.isFlag(HandshakeResponse::LOCAL_MODE);
         logln("server local mode is " << (int)m_srvLocalMode);
 
-        logln("connecting server " << host << ":" << resp.port);
-        if (!m_cmdOut->connect(host, resp.port, 3000)) {
+        File workerSocketPath;
+
+        if (useUnixDomain) {
+            workerSocketPath = Defaults::getSocketPath(Defaults::WORKER_SOCK,
+                                                       {{"id", String(srvInfo.getID())}, {"n", String(resp.port)}});
+            logln("connecting worker: " << workerSocketPath.getFullPathName());
+            m_cmdOut->connect(workerSocketPath);
+        } else {
+            logln("connecting worker: " << srvInfo.getHost() << ":" << resp.port);
+            m_cmdOut->connect(srvInfo.getHost(), resp.port);
+        }
+
+        if (!m_cmdOut->isConnected()) {
             logln("connection to server failed");
-            m_cmdOut->close();
+            m_cmdOut.reset();
             return;
         }
+
         m_cmdIn = std::make_unique<StreamingSocket>();
-        if (!m_cmdIn->connect(host, resp.port, 3000)) {
+        if (useUnixDomain ? !m_cmdIn->connect(workerSocketPath) : !m_cmdIn->connect(srvInfo.getHost(), resp.port)) {
             logln("failed to setup command receive connection");
             m_cmdIn.reset();
         }
@@ -327,16 +327,17 @@ void Client::init() {
 
         StreamingSocket* audioSock = nullptr;
         audioSock = new StreamingSocket;
-        if (!audioSock->connect(host, resp.port, 3000)) {
+        if (useUnixDomain ? !audioSock->connect(workerSocketPath) : !audioSock->connect(srvInfo.getHost(), resp.port)) {
             logln("failed to setup audio connection");
             delete audioSock;
             audioSock = nullptr;
         }
 
-        m_screen_socket = std::make_unique<StreamingSocket>();
-        if (!m_screen_socket->connect(host, resp.port, 3000)) {
+        m_screenSocket = std::make_unique<StreamingSocket>();
+        if (useUnixDomain ? !m_screenSocket->connect(workerSocketPath)
+                          : !m_screenSocket->connect(srvInfo.getHost(), resp.port)) {
             logln("failed to setup screen connection");
-            m_screen_socket.reset();
+            m_screenSocket.reset();
         }
 
         if (nullptr != audioSock) {
@@ -353,9 +354,9 @@ void Client::init() {
             return;
         }
 
-        if (nullptr != m_screen_socket) {
+        if (nullptr != m_screenSocket) {
             logln("screen connection established");
-            m_screenWorker = std::make_unique<ScreenReceiver>(this, m_screen_socket.get());
+            m_screenWorker = std::make_unique<ScreenReceiver>(this, m_screenSocket.get());
             m_screenWorker->startThread();
         } else {
             return;
@@ -385,7 +386,7 @@ bool Client::isReady(int timeout) {
     }
     if (locked) {
         m_ready = !m_error && !m_needsReconnect && nullptr != m_cmdOut && m_cmdOut->isConnected() &&
-                  m_screenWorker->isThreadRunning() && nullptr != m_screen_socket && m_screen_socket->isConnected() &&
+                  m_screenWorker->isThreadRunning() && nullptr != m_screenSocket && m_screenSocket->isConnected() &&
                   audioConnectionOk();
         m_clientMtx.unlock();
     } else {
@@ -405,14 +406,14 @@ void Client::close() {
     m_ready = false;
     LockByID lock(*this, CLOSE);
     m_plugins.clear();
-    if (nullptr != m_screen_socket && m_screen_socket->isConnected()) {
-        m_screen_socket->close();
+    if (nullptr != m_screenSocket && m_screenSocket->isConnected()) {
+        m_screenSocket->close();
     }
     if (nullptr != m_screenWorker && m_screenWorker->isThreadRunning()) {
         m_screenWorker->signalThreadShouldExit();
         m_screenWorker->waitForThreadToExit(100);
         m_screenWorker.reset();
-        m_screen_socket.reset();
+        m_screenSocket.reset();
     }
     if (nullptr != m_cmdOut) {
         if (m_cmdOut->isConnected()) {
@@ -515,17 +516,6 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
             }
             params.add(std::move(newParam));
         }
-        // Message<PluginSettings> msgSettings(this);
-        // if (settings.isNotEmpty()) {
-        //    MemoryBlock block;
-        //    block.fromBase64Encoding(settings);
-        //    msgSettings.payload.setData(block.begin(), static_cast<int>(block.getSize()));
-        //}
-        // if (!msgSettings.send(m_cmdOut.get())) {
-        //    err = "failed to send settings";
-        //    logln(err);
-        //    return false;
-        //}
         m_latency = jresult["latency"].get<int>();
         hasEditor = jresult["hasEditor"].get<bool>();
         scDisabled = jresult["disabledSideChain"].get<bool>();
@@ -1021,7 +1011,7 @@ void Client::updatePluginList(bool sendRequest) {
 
 void Client::updateCPULoad() {
     traceScope();
-    auto srvInfo = ServiceReceiver::hostToServerInfo(getServerHost());
+    auto srvInfo = ServiceReceiver::hostToServerInfo(getServer().getHost());
     bool updated = false;
     int now = Time::getCurrentTime().getUTCOffsetSeconds();
     if (srvInfo.isValid()) {

@@ -667,7 +667,7 @@ void Server::runServer() {
 
     setNonBlocking(m_masterSocket.getRawSocketHandle());
 
-    ServiceResponder::initialize(m_port + getId(), getId(), m_name);
+    ServiceResponder::initialize(m_port + getId(), getId(), m_name, getScreenLocalMode());
 
     if (m_name.isEmpty()) {
         m_name = ServiceResponder::getHostName();
@@ -684,11 +684,28 @@ void Server::runServer() {
 
     checkPort();
 
+    if (getScreenLocalMode() && Defaults::unixDomainSocketsSupported()) {
+        auto socketPath = Defaults::getSocketPath(Defaults::SERVER_SOCK, {{"id", String(getId())}}, true);
+        logln("creating listener " << socketPath.getFullPathName());
+        if (!m_masterSocketLocal.createListener(socketPath)) {
+            logln("failed to create local master listener");
+        }
+    }
+
     logln("creating listener " << (m_host.length() == 0 ? "*" : m_host) << ":" << (m_port + getId()));
-    if (m_masterSocket.createListener(m_port + getId(), m_host)) {
+    if (m_masterSocket.createListener6(m_port + getId(), m_host)) {
         logln("server started: ID=" << getId() << ", PORT=" << m_port + getId() << ", NAME=" << m_name);
         while (!threadShouldExit()) {
-            auto* clnt = accept(&m_masterSocket, 1000, [this] { return threadShouldExit(); });
+            StreamingSocket* clnt = nullptr;
+            bool isLocal = false;
+            if (m_masterSocketLocal.isConnected()) {
+                if ((clnt = accept(&m_masterSocketLocal, 100, [this] { return threadShouldExit(); }))) {
+                    isLocal = true;
+                }
+            }
+            if (nullptr == clnt && !threadShouldExit()) {
+                clnt = accept(&m_masterSocket, 100, [this] { return threadShouldExit(); });
+            }
             if (nullptr != clnt) {
                 HandshakeRequest cfg;
                 int len = clnt->read(&cfg, sizeof(cfg), true);
@@ -740,7 +757,6 @@ void Server::runServer() {
                         handshakeOk = false;
                     }
                 } else {
-                    logln("client " << clnt->getHostName() << " with protocol error");
                     handshakeOk = false;
                 }
 
@@ -760,8 +776,9 @@ void Server::runServer() {
                     }
                     auto sandbox = std::make_shared<SandboxMaster>(*this, id);
                     logln("creating sandbox " << id);
-                    if (sandbox->launchWorkerProcess(File::getSpecialLocation(File::currentExecutableFile),
-                                                     Defaults::SANDBOX_CMD_PREFIX, {"-id", String(getId())}, 30000)) {
+                    if (sandbox->launchWorkerProcess(
+                            File::getSpecialLocation(File::currentExecutableFile), Defaults::SANDBOX_CMD_PREFIX,
+                            {"-id", String(getId()), "-islocal", String((int)isLocal)}, 30000)) {
                         sandbox->onPortReceived = [this, id, clnt](int sandboxPort) {
                             traceScope();
                             if (!sendHandshakeResponse(clnt, true, sandboxPort)) {
@@ -786,20 +803,13 @@ void Server::runServer() {
                     setsockopt(workerMasterSocket->getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
 #endif
 
-                    int workerPort = getOpt("workerPort", Defaults::CLIENT_PORT);
-                    int workerPortMax = getOpt("workerPortMax", Defaults::CLIENT_PORT + 1000);
-                    while (!workerMasterSocket->createListener(workerPort, m_host)) {
-                        workerPort++;
-                        if (workerPort > workerPortMax) {
-                            logln("failed to create client listener");
-                            clnt->close();
-                            delete clnt;
-                            clnt = nullptr;
-                            break;
-                        }
-                    }
+                    int workerPort = 0;
 
-                    if (nullptr == clnt) {
+                    if (!createWorkerListener(workerMasterSocket, isLocal, workerPort)) {
+                        logln("failed to create client listener");
+                        clnt->close();
+                        delete clnt;
+                        clnt = nullptr;
                         continue;
                     }
 
@@ -893,14 +903,10 @@ void Server::runSandboxChain() {
     setsockopt(workerMasterSocket->getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE, nullptr, 0);
 #endif
 
-    m_port = Defaults::CLIENT_PORT;
-    while (!workerMasterSocket->createListener(m_port, m_host)) {
-        m_port++;
-        if (m_port > Defaults::CLIENT_PORT + 1000) {
-            logln("failed to create worker listener");
-            getApp()->prepareShutdown(App::EXIT_SANDBOX_BIND_ERROR);
-            return;
-        }
+    if (!createWorkerListener(workerMasterSocket, getOpt("isLocal", false), m_port)) {
+        logln("failed to create worker listener");
+        getApp()->prepareShutdown(App::EXIT_SANDBOX_BIND_ERROR);
+        return;
     }
 
     int waitForMasterSteps = 6000;
@@ -992,16 +998,30 @@ void Server::runSandboxPlugin() {
         return;
     }
 
-    if (!workerMasterSocket->createListener(m_port, m_host)) {
-        logln("failed to create worker listener");
-        getApp()->prepareShutdown(App::EXIT_SANDBOX_BIND_ERROR);
-        return;
+    bool hasUnixDomainSockets = Defaults::unixDomainSocketsSupported();
+    File socketPath;
+
+    if (hasUnixDomainSockets) {
+        socketPath = Defaults::getSocketPath(Defaults::SANDBOX_PLUGIN_SOCK, {{"n", String(m_port)}}, true);
+        if (!workerMasterSocket->createListener(socketPath)) {
+            logln("failed to create worker listener");
+            getApp()->prepareShutdown(App::EXIT_SANDBOX_BIND_ERROR);
+            return;
+        }
+    } else {
+        if (!workerMasterSocket->createListener6(m_port, m_host)) {
+            logln("failed to create worker listener");
+            getApp()->prepareShutdown(App::EXIT_SANDBOX_BIND_ERROR);
+            return;
+        }
     }
 
     loadKnownPluginList();
     m_pluginlist.sort(KnownPluginList::sortAlphabetically, true);
 
-    logln("sandbox (plugin isolation) started: PORT=" << m_port << ", NAME=" << m_name);
+    logln("sandbox (plugin isolation) started: "
+          << (hasUnixDomainSockets ? "PATH=" + socketPath.getFullPathName() : "PORT=" + String(m_port))
+          << ", NAME=" << m_name);
 
     m_sandboxConfig.fromJson(m_opts["config"]);
 
@@ -1032,6 +1052,28 @@ bool Server::sendHandshakeResponse(StreamingSocket* sock, bool sandboxEnabled, i
     }
     resp.port = port;
     return send(sock, reinterpret_cast<const char*>(&resp), sizeof(resp));
+}
+
+bool Server::createWorkerListener(std::shared_ptr<StreamingSocket> sock, bool isLocal, int& workerPort) {
+    int workerPortMax = getOpt("workerPortMax", Defaults::CLIENT_PORT + 1000);
+    workerPort = getOpt("workerPort", Defaults::CLIENT_PORT);
+    if (isLocal) {
+        File socketPath;
+        do {
+            socketPath =
+                Defaults::getSocketPath(Defaults::WORKER_SOCK, {{"id", String(getId())}, {"n", String(workerPort)}});
+        } while (socketPath.exists() && ++workerPort <= workerPortMax);
+        if (!socketPath.exists()) {
+            sock->createListener(socketPath);
+        }
+    } else {
+        while (!sock->createListener6(workerPort, m_host)) {
+            if (++workerPort > workerPortMax) {
+                break;
+            }
+        }
+    }
+    return sock->isConnected();
 }
 
 void Server::handleMessageFromSandbox(SandboxMaster& sandbox, const SandboxMessage& msg) {

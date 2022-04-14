@@ -25,7 +25,7 @@ class Worker : public Thread, public LogTag {
     static std::atomic_uint32_t count;
     static std::atomic_uint32_t runCount;
 
-    Worker(std::shared_ptr<StreamingSocket> masterSocket, const HandshakeRequest& cfg, int sandboxMode = 0);
+    Worker(std::shared_ptr<StreamingSocket> masterSocket, const HandshakeRequest& cfg, int sandboxModeRuntime = 0);
 
     ~Worker() override;
     void run() override;
@@ -67,7 +67,7 @@ class Worker : public Thread, public LogTag {
     std::atomic_bool m_shutdown{false};
     MessageFactory m_msgFactory;
     bool m_noPluginListFilter = false;
-    int m_sandboxMode = 0;
+    int m_sandboxModeRuntime = 0;
 
     struct KeyWatcher : KeyListener {
         Worker* worker;

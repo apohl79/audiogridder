@@ -143,10 +143,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     void run() override;
 
     void setServer(const ServerInfo& srv);
-    String getServerHost();
-    String getServerHostAndID();
-    int getServerPort();
-    int getServerID();
+    ServerInfo getServer();
     bool isServerLocalMode() const { return m_srvLocalMode; }
     int getChannelsIn() const { return m_channelsIn; }
     int getChannelsOut() const { return m_channelsOut; }
@@ -242,12 +239,10 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     PluginProcessor* m_processor;
     String m_loadedPluginsString;
     std::mutex m_srvMtx;
-    String m_srvHost = "";
-    int m_srvPort = Defaults::SERVER_PORT;
-    int m_srvId = 0;
-    float m_srvLoad = 0.0f;
-    int m_srvLoadLastUpdated = 0;
+    ServerInfo m_srvInfo;
+    float m_srvLoad;
     bool m_srvLocalMode = false;
+    int m_srvLoadLastUpdated = 0;
     bool m_needsReconnect = false;
     double m_rate = 0;
     bool m_doublePrecission = false;
@@ -349,7 +344,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
 
     std::unique_ptr<StreamingSocket> m_cmdOut;
     std::unique_ptr<StreamingSocket> m_cmdIn;
-    std::unique_ptr<StreamingSocket> m_screen_socket;
+    std::unique_ptr<StreamingSocket> m_screenSocket;
     std::vector<ServerPlugin> m_plugins;
 
     MessageFactory m_msgFactory;

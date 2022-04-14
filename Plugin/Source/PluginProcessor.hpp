@@ -200,7 +200,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     auto& getServers() const { return m_servers; }
     void addServer(const String& s) { m_servers.add(s); }
     void delServer(const String& s);
-    String getActiveServerHost() const { return m_client->getServerHostAndID(); }
+    String getActiveServerHost() const { return m_client->getServer().getHostAndID(); }
     String getActiveServerName() const;
     void setActiveServer(const ServerInfo& s);
     Array<ServerInfo> getServersMDNS();

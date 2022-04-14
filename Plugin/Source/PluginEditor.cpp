@@ -555,7 +555,8 @@ void PluginEditor::focusOfChildComponentChanged(FocusChangeType /*cause*/) {
         // reactivate the plugin screen
         int active = m_processor.getActivePlugin();
         if (active > -1) {
-            m_processor.editPlugin(active, getScreenX() + getWidth() + 10, getScreenY());
+            auto p = getLocalModePosition();
+            m_processor.editPlugin(active, p.x, p.y);
         }
     }
 }
@@ -1082,7 +1083,8 @@ void PluginEditor::editPlugin(int idx) {
     highlightPluginButton(idx);
     m_stA.setVisible(true);
     m_stB.setVisible(true);
-    m_processor.editPlugin(idx, getScreenX() + getWidth() + 10, getScreenY());
+    auto pos = getLocalModePosition();
+    m_processor.editPlugin(idx, pos.x, pos.y);
     if (genericEditorEnabled()) {
         m_wantsScreenUpdates = false;
         m_processor.getClient().setPluginScreenUpdateCallback(nullptr);
@@ -1135,6 +1137,18 @@ void PluginEditor::highlightPluginButton(int idx) {
 void PluginEditor::unhighlightPluginButton(int idx) {
     m_pluginButtons[(size_t)idx]->setActive(false);
     m_pluginButtons[(size_t)idx]->setColour(PluginButton::textColourOffId, Colours::white);
+}
+
+Point<int> PluginEditor::getLocalModePosition(juce::Rectangle<int> bounds) {
+    if (m_processor.getClient().isServerLocalMode()) {
+        if (bounds.isEmpty()) {
+            bounds = WindowHelper::getWindowScreenBounds(this);
+        }
+        if (!bounds.isEmpty()) {
+            return {bounds.getRight() + 10, bounds.getY()};
+        }
+    }
+    return {};
 }
 
 void PluginEditor::getPresetsMenu(PopupMenu& menu, const File& dir) {

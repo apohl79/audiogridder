@@ -128,7 +128,9 @@ inline std::pair<CGMouseButton, CGEventType> toMouseButtonType(MouseEvType t) {
     }
     return std::make_pair(button, type);
 }
+
 #elif defined(JUCE_WINDOWS)
+
 void sendInput(INPUT* in) {
     traceScope();
     if (SendInput(1, in, sizeof(INPUT)) != 1) {
@@ -196,51 +198,6 @@ void mouseEventInternal(POINT pos, DWORD evFlags, uint64_t flags) {
     }
 }
 
-/*
-void mouseDoubleClickEventInternal(POINT pos, uint64_t flags) {
-    traceScope();
-
-    INPUT event = {0};
-    event.type = INPUT_MOUSE;
-    event.mi.dx = pos.x;
-    event.mi.dy = pos.y;
-    event.mi.mouseData = 0;
-    event.mi.time = 0;
-    event.mi.dwExtraInfo = NULL;
-
-    // modifiers down
-    if ((flags & VK_SHIFT) == VK_SHIFT) {
-        sendKey(VK_SHIFT, true);
-    }
-    if ((flags & VK_CONTROL) == VK_CONTROL) {
-        sendKey(VK_CONTROL, true);
-    }
-    if ((flags & VK_MENU) == VK_MENU) {
-        sendKey(VK_MENU, true);
-    }
-
-    event.mi.dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTDOWN;
-    sendInput(&event);
-    event.mi.dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTUP;
-    sendInput(&event);
-    event.mi.dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTDOWN;
-    sendInput(&event);
-    event.mi.dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTUP;
-    sendInput(&event);
-
-    // modifiers up
-    if ((flags & VK_SHIFT) == VK_SHIFT) {
-        sendKey(VK_SHIFT, false);
-    }
-    if ((flags & VK_CONTROL) == VK_CONTROL) {
-        sendKey(VK_CONTROL, false);
-    }
-    if ((flags & VK_MENU) == VK_MENU) {
-        sendKey(VK_MENU, false);
-    }
-}
-*/
-
 void mouseScrollEventInternal(POINT pos, DWORD deltaX, DWORD deltaY) {
     traceScope();
 
@@ -306,13 +263,16 @@ inline POINT getScaledPoint(float x, float y) {
     HDC hDC = GetDC(0);
     float dpi = (GetDeviceCaps(hDC, LOGPIXELSX) + GetDeviceCaps(hDC, LOGPIXELSY)) / 2.0f;
     ReleaseDC(0, hDC);
-    auto* disp = Desktop::getInstance().getDisplays().getPrimaryDisplay();
-    float sf = dpi / 96;
-    float xf = (float)0xffff / disp->totalArea.getWidth();
-    float yf = (float)0xffff / disp->totalArea.getHeight();
-    long lx = lroundf(x * sf * xf);
-    long ly = lroundf(y * sf * yf);
-    return {lx, ly};
+    if (auto* disp = Desktop::getInstance().getDisplays().getPrimaryDisplay()) {
+        float sf = dpi / 96;
+        float xf = (float)0xffff / disp->totalArea.getWidth();
+        float yf = (float)0xffff / disp->totalArea.getHeight();
+        long lx = lroundf(x * sf * xf);
+        long ly = lroundf(y * sf * yf);
+        return {lx, ly};
+    } else {
+        return {lroundf(x), lroundf(y)};
+    }
 }
 
 inline DWORD getMouseFlags(MouseEvType t) {

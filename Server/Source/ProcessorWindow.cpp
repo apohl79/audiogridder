@@ -65,7 +65,7 @@ juce::Rectangle<int> ProcessorWindow::getScreenCaptureRect() {
     if (nullptr != m_processor) {
         bool fs = m_processor->isFullscreen();
         auto rect = fs ? m_totalRect : m_processor->getScreenBounds();
-        if (!fs) {
+        if (!fs && m_processor->getAdditionalScreenCapturingSpace() > 0) {
             rect.setSize(rect.getWidth() + m_processor->getAdditionalScreenCapturingSpace(),
                          rect.getHeight() + m_processor->getAdditionalScreenCapturingSpace());
             if (rect.getRight() > m_totalRect.getRight()) {

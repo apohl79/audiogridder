@@ -36,7 +36,7 @@ void App::initialise(const String& commandLineParameters) {
     String fileToScan, pluginId, error;
     int workerPort = 0, srvId = -1;
     json jconfig;
-    bool log = false;
+    bool log = false, isLocal = false;
     for (int i = 0; i < args.size(); i++) {
         if (!args[i].compare("-scan") && args.size() >= i + 2) {
             fileToScan = args[i + 1];
@@ -49,6 +49,8 @@ void App::initialise(const String& commandLineParameters) {
             mode = SANDBOX_PLUGIN;
         } else if (!args[i].compare("-log")) {
             log = true;
+        } else if (!args[i].compare("-islocal")) {
+            isLocal = args[i + 1] == "1";
         } else if (!args[i].compare("-pluginid")) {
             pluginId = args[i + 1];
         } else if (!args[i].compare("-workerport")) {
@@ -165,7 +167,8 @@ void App::initialise(const String& commandLineParameters) {
                 Logger::deleteFileAtFinish();
                 Tracer::deleteFileAtFinish();
             }
-            json opts = {{"sandboxMode", "chain"}, {"commandLine", commandLineParameters.toStdString()}};
+            json opts = {
+                {"sandboxMode", "chain"}, {"commandLine", commandLineParameters.toStdString()}, {"isLocal", isLocal}};
             if (srvId > -1) {
                 opts["ID"] = srvId;
             }

@@ -23,9 +23,16 @@ void App::initialise(const String& /*commandLineParameters*/) {
             m_keepRunning = true;
         }
     }
-    if (!m_srv.beginWaitingForSocket(Defaults::PLUGIN_TRAY_PORT, "127.0.0.1")) {
-        quit();
-        return;
+    if (Defaults::unixDomainSocketsSupported()) {
+        if (!m_srv.beginWaitingForSocket(Defaults::getSocketPath(Defaults::PLUGIN_TRAY_SOCK, {}, true))) {
+            quit();
+            return;
+        }
+    } else {
+        if (!m_srv.beginWaitingForSocket(Defaults::PLUGIN_TRAY_PORT, "127.0.0.1")) {
+            quit();
+            return;
+        }
     }
     Logger::initialize("Tray", "AudioGridderTray_", "");
     ServiceReceiver::initialize(0);

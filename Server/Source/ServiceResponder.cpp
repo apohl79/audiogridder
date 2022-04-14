@@ -31,8 +31,14 @@ int serviceCallback(int sock, const struct sockaddr* from, size_t addrlen, mdns_
     return 0;
 }
 
-ServiceResponder::ServiceResponder(int port, int id, const String& hostname)
-    : Thread("ServiceResponder"), LogTag("mdns"), m_port(port), m_id(id), m_hostname(hostname), m_connector(this) {
+ServiceResponder::ServiceResponder(int port, int id, const String& hostname, bool localMode)
+    : Thread("ServiceResponder"),
+      LogTag("mdns"),
+      m_port(port),
+      m_id(id),
+      m_hostname(hostname),
+      m_localMode(localMode),
+      m_connector(this) {
     traceScope();
 
     if (m_hostname.isEmpty()) {
@@ -49,8 +55,8 @@ void ServiceResponder::setHostName(const String& hostname) { m_inst->m_hostname 
 
 const String& ServiceResponder::getHostName() { return m_inst->m_hostname; }
 
-void ServiceResponder::initialize(int port, int id, const String& hostname) {
-    m_inst = std::make_unique<ServiceResponder>(port, id, hostname);
+void ServiceResponder::initialize(int port, int id, const String& hostname, bool localMode) {
+    m_inst = std::make_unique<ServiceResponder>(port, id, hostname, localMode);
     m_inst->startThread();
 }
 
@@ -103,6 +109,7 @@ int ServiceResponder::handleRecord(int sock, const struct sockaddr* from, size_t
             }
             json j;
             j["ID"] = m_id;
+            j["LM"] = m_localMode;
             j["LOAD"] = CPUInfo::getUsage();
             j["V"] = AUDIOGRIDDER_VERSION;
             String txtRecord;

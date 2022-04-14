@@ -139,13 +139,22 @@ bool ProcessorClient::connectSandbox() {
 
     logln("connecting to sandbox at port " << m_port);
 
+    bool hasUnixDomainSockets = Defaults::unixDomainSocketsSupported();
+    auto socketPath = Defaults::getSocketPath(Defaults::SANDBOX_PLUGIN_SOCK, {{"n", String(m_port)}});
+
     m_sockCmdOut = std::make_unique<StreamingSocket>();
 
     // let the process come up and bind to the port
     int maxTries = 50;
     while (!m_sockCmdOut->isConnected() && maxTries-- > 0 && m_process.isRunning()) {
-        if (!m_sockCmdOut->connect("127.0.0.1", m_port, 100)) {
-            sleep(100);
+        if (hasUnixDomainSockets) {
+            if (!m_sockCmdOut->connect(socketPath, 100)) {
+                sleep(100);
+            }
+        } else {
+            if (!m_sockCmdOut->connect("127.0.0.1", m_port, 100)) {
+                sleep(100);
+            }
         }
     }
 
@@ -155,15 +164,29 @@ bool ProcessorClient::connectSandbox() {
     }
 
     m_sockCmdIn = std::make_unique<StreamingSocket>();
-    if (!m_sockCmdIn->connect("127.0.0.1", m_port)) {
-        logln("failed to setup sandbox command-in connection");
-        return false;
+    if (hasUnixDomainSockets) {
+        if (!m_sockCmdIn->connect(socketPath)) {
+            logln("failed to setup sandbox command-in connection");
+            return false;
+        }
+    } else {
+        if (!m_sockCmdIn->connect("127.0.0.1", m_port)) {
+            logln("failed to setup sandbox command-in connection");
+            return false;
+        }
     }
 
     m_sockAudio = std::make_unique<StreamingSocket>();
-    if (!m_sockAudio->connect("127.0.0.1", m_port)) {
-        logln("failed to setup sandbox audio connection");
-        return false;
+    if (hasUnixDomainSockets) {
+        if (!m_sockAudio->connect(socketPath)) {
+            logln("failed to setup sandbox audio connection");
+            return false;
+        }
+    } else {
+        if (!m_sockAudio->connect("127.0.0.1", m_port)) {
+            logln("failed to setup sandbox audio connection");
+            return false;
+        }
     }
 
     m_bytesOutMeter = Metrics::getStatistic<Meter>("NetBytesOut");

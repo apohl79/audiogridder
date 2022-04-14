@@ -139,7 +139,7 @@ bool setNonBlocking(int handle) noexcept {
 StreamingSocket* accept(StreamingSocket* master, int timeoutMs, std::function<bool()> abortFn) {
     TimeStatistic::Timeout timeout(timeoutMs);
     do {
-        if (master->waitUntilReady(true, 100) > 0) {
+        if (master->waitUntilReady(true, 20) > 0) {
             auto sock = master->waitForNextConnection();
             if (nullptr != sock) {
                 return sock;

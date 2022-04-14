@@ -49,11 +49,13 @@ class ServiceReceiver : public Thread, public LogTag {
     int m_curPort;
     String m_curName;
     float m_curLoad;
+    bool m_curLocalMode;
     String m_curVersion;
     Array<ServerInfo> m_currentResult;
 
     Array<ServerInfo> m_servers;
-    std::mutex m_serverMtx;
+    std::mutex m_serversMtx;
+    std::unordered_map<String, int64> m_lastReachableChecks;
 
     HashMap<uint64, std::function<void()>> m_updateFn;
 
