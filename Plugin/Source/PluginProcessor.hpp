@@ -227,6 +227,8 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     void setDisableTray(bool b);
     bool getDisableRecents() const { return m_disableRecents; }
     void setDisableRecents(bool b) { m_disableRecents = b; }
+    bool getKeepEditorOpen() const { return m_keepEditorOpen; }
+    void setKeepEditorOpen(bool b) { m_keepEditorOpen = b; }
 
     // AudioProcessorParameter::Listener
     void parameterValueChanged(int parameterIndex, float newValue) override;
@@ -344,6 +346,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     bool m_transferWhenPlayingOnly = false;
     bool m_disableTray = false;
     bool m_disableRecents = false;
+    bool m_keepEditorOpen = false;
 
     TrackProperties m_trackProperties;
     std::mutex m_trackPropertiesMtx;

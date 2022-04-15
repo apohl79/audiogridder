@@ -147,7 +147,9 @@ PluginEditor::~PluginEditor() {
     logln("destroying editor");
     m_positionTracker.reset();
     m_wantsScreenUpdates = false;
-    m_processor.hidePlugin();
+    if (!m_processor.getKeepEditorOpen()) {
+        m_processor.hidePlugin();
+    }
     m_processor.getClient().setPluginScreenUpdateCallback(nullptr);
     logln("editor destroyed");
 }
@@ -965,6 +967,11 @@ void PluginEditor::mouseUp(const MouseEvent& event) {
         m.addItem("Keep Plugin UI Open", true, m_processor.isEditAlways(), [this] {
             traceScope();
             m_processor.setEditAlways(!m_processor.isEditAlways());
+            m_processor.saveConfig();
+        });
+        m.addItem("Keep Server Plugin Window Open", true, m_processor.getKeepEditorOpen(), [this] {
+            traceScope();
+            m_processor.setKeepEditorOpen(!m_processor.getKeepEditorOpen());
             m_processor.saveConfig();
         });
         m.addItem("Show Sidechain-Disabled Info", true, m_processor.getShowSidechainDisabledInfo(), [this] {

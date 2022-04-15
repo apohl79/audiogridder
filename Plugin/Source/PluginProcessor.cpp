@@ -253,6 +253,7 @@ void PluginProcessor::loadConfig(const json& j, bool isUpdate) {
     m_showSidechainDisabledInfo = jsonGetValue(j, "ShowSidechainDisabledInfo", m_showSidechainDisabledInfo);
     m_disableTray = jsonGetValue(j, "DisableTray", m_disableTray);
     m_disableRecents = jsonGetValue(j, "DisableRecents", m_disableRecents);
+    m_keepEditorOpen = jsonGetValue(j, "KeepEditorOpen", m_keepEditorOpen);
 }
 
 void PluginProcessor::saveConfig(int numOfBuffers) {
@@ -291,6 +292,7 @@ void PluginProcessor::saveConfig(int numOfBuffers) {
     jcfg["ShowSidechainDisabledInfo"] = m_showSidechainDisabledInfo;
     jcfg["DisableTray"] = m_disableTray;
     jcfg["DisableRecents"] = m_disableRecents;
+    jcfg["KeepEditorOpen"] = m_keepEditorOpen;
 
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), jcfg);
 }
