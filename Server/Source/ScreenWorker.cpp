@@ -170,6 +170,7 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
     logln("showing editor for " << proc->getName() << " at " << x << "x" << y);
 
     m_currentTid = tid;
+    m_imgCounter = 0;
 
     if (m_visible && proc.get() == m_currentProc && proc == getApp()->getCurrentWindowProc(m_currentTid)) {
         logln("already showing editor");
@@ -198,6 +199,10 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
                 traceScope();
                 if (threadShouldExit()) {
                     return;
+                }
+                // check for undetected plugin UI bounds changes
+                if (++m_imgCounter % 30 == 0) {
+                    getApp()->updateScreenCaptureArea(m_currentTid);
                 }
                 std::lock_guard<std::mutex> lock(m_currentImageLock);
                 if (m_imageBuf.size() < (size_t)size) {

@@ -53,6 +53,7 @@ class ScreenWorker : public Thread, public LogTagDelegate {
     int m_height;
     double m_scale;
     bool m_updated = false;
+    uint16 m_imgCounter = 0;
     std::mutex m_currentImageLock;
     std::condition_variable m_currentImageCv;
 

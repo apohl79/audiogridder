@@ -529,7 +529,9 @@ void App::updateScreenCaptureArea(Thread::ThreadID tid, int val) {
 
     auto it = m_windows.find((uint64)tid);
     if (it != m_windows.end() && it->second.window != nullptr && it->second.processor != nullptr) {
-        it->second.processor->updateScreenCaptureArea(val);
+        if (val > -1) {
+            it->second.processor->updateScreenCaptureArea(val);
+        }
         it->second.window->updateScreenCaptureArea();
     }
 }
