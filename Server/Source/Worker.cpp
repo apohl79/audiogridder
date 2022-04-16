@@ -553,6 +553,7 @@ void Worker::handleMessage(std::shared_ptr<Message<GetScreenBounds>> /*msg*/) {
         DATA(res)->w = rect.getWidth();
         DATA(res)->h = rect.getHeight();
     } else {
+        logln("failed to get processor screen bounds: no active editor");
         DATA(res)->x = 0;
         DATA(res)->y = 0;
         DATA(res)->w = 0;

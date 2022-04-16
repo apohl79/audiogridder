@@ -49,11 +49,14 @@ class ProcessorWindow : public DocumentWindow, private Timer, public LogTag {
     CaptureCallbackNative m_callbackNative;
     CaptureCallbackFFmpeg m_callbackFFmpeg;
     juce::Rectangle<int> m_screenCaptureRect, m_totalRect;
+    int m_startCapturingRetry;
 
     void createEditor();
     void captureWindow();
 
     void timerCallback() override { captureWindow(); }
+
+    ENABLE_ASYNC_FUNCTORS();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ProcessorWindow)
 };

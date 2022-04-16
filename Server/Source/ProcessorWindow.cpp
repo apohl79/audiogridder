@@ -20,6 +20,7 @@ ProcessorWindow::ProcessorWindow(std::shared_ptr<Processor> proc, CaptureCallbac
       m_callbackNative(func),
       m_callbackFFmpeg(nullptr) {
     traceScope();
+    initAsyncFunctors();
     if (m_processor->hasEditor()) {
         createEditor();
     }
@@ -32,6 +33,7 @@ ProcessorWindow::ProcessorWindow(std::shared_ptr<Processor> proc, CaptureCallbac
       m_callbackNative(nullptr),
       m_callbackFFmpeg(func) {
     traceScope();
+    initAsyncFunctors();
     logln("creating processor window: " << m_processor->getName());
     if (m_processor->hasEditor()) {
         createEditor();
@@ -41,6 +43,7 @@ ProcessorWindow::ProcessorWindow(std::shared_ptr<Processor> proc, CaptureCallbac
 ProcessorWindow::~ProcessorWindow() {
     traceScope();
     logln("destroying processor window: " << m_processor->getName());
+    stopAsyncFunctors();
     stopCapturing();
     if (m_editor != nullptr) {
         delete m_editor;
@@ -76,6 +79,8 @@ juce::Rectangle<int> ProcessorWindow::getScreenCaptureRect() {
             }
         }
         return rect;
+    } else {
+        logln("getScreenCaptureRect failed: no processor");
     }
     traceln("m_editor=" << (uint64)m_editor << " m_processor=" << String::toHexString((uint64)m_processor.get()));
     return m_screenCaptureRect;
@@ -116,7 +121,13 @@ void ProcessorWindow::startCapturing() {
                     logln("error: no screen recorder");
                 }
             } else {
-                logln("error: can't start screen capturing with empty rect");
+                // when launching a plugin sandbox, it might take a little bit to ramp up the plugin editor, so we retry
+                bool retry = ++m_startCapturingRetry < 30;
+                logln("error: can't start screen capturing with empty rect ("
+                      << (retry ? "retrying in 100ms" : "giving up") << ")");
+                if (retry) {
+                    Timer::callAfterDelay(100, safeLambda([this] { startCapturing(); }));
+                }
             }
         }
     }
@@ -211,6 +222,7 @@ void ProcessorWindow::createEditor() {
     }
 
     if (success) {
+        m_startCapturingRetry = 0;
         startCapturing();
     }
 }
