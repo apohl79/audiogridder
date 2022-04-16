@@ -254,6 +254,7 @@ void PluginProcessor::loadConfig(const json& j, bool isUpdate) {
     m_disableTray = jsonGetValue(j, "DisableTray", m_disableTray);
     m_disableRecents = jsonGetValue(j, "DisableRecents", m_disableRecents);
     m_keepEditorOpen = jsonGetValue(j, "KeepEditorOpen", m_keepEditorOpen);
+    m_bypassWhenNotConnected = jsonGetValue(j, "BypassWhenNotConnected", m_bypassWhenNotConnected.load());
 }
 
 void PluginProcessor::saveConfig(int numOfBuffers) {
@@ -293,6 +294,7 @@ void PluginProcessor::saveConfig(int numOfBuffers) {
     jcfg["DisableTray"] = m_disableTray;
     jcfg["DisableRecents"] = m_disableRecents;
     jcfg["KeepEditorOpen"] = m_keepEditorOpen;
+    jcfg["BypassWhenNotConnected"] = m_bypassWhenNotConnected.load();
 
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), jcfg);
 }
@@ -477,6 +479,12 @@ void PluginProcessor::numChannelsChanged() {
 template <typename T>
 void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
     traceScope();
+
+    if (m_bypassWhenNotConnected && !m_client->isReadyLockFree()) {
+        processBlockBypassed(buffer, midiMessages);
+        return;
+    }
+
     ScopedNoDenormals noDenormals;
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();

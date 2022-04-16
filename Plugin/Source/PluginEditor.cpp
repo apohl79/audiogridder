@@ -984,6 +984,11 @@ void PluginEditor::mouseUp(const MouseEvent& event) {
             m_processor.setDisableTray(!m_processor.getDisableTray());
             m_processor.saveConfig();
         });
+        m.addItem("Bypass when not connected", true, m_processor.getBypassWhenNotConnected(), [this] {
+            traceScope();
+            m_processor.setBypassWhenNotConnected(!m_processor.getBypassWhenNotConnected());
+            m_processor.saveConfig();
+        });
 
         subm.addItem("Always", true, m_processor.getTransferWhenPlayingOnly() == false, [this] {
             traceScope();
