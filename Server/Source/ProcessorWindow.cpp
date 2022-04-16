@@ -192,9 +192,13 @@ void ProcessorWindow::captureWindow() {
 
 void ProcessorWindow::createEditor() {
     traceScope();
+
+    juce::Rectangle<int> userRect;
+
     auto* disp = Desktop::getInstance().getDisplays().getPrimaryDisplay();
     if (nullptr != disp) {
         m_totalRect = disp->totalArea;
+        userRect = disp->userArea;
     }
 
     bool success = true;
@@ -206,8 +210,10 @@ void ProcessorWindow::createEditor() {
         m_editor = m_processor->createEditorIfNeeded();
         if (nullptr != m_editor) {
             setContentNonOwned(m_editor, true);
-            if (getApp()->getServer()->getScreenCapturingOff()) {
+            if (getApp()->getServer()->getScreenLocalMode()) {
                 setTopLeftPosition(m_processor->getLastPosition());
+            } else {
+                setTopLeftPosition(userRect.getTopLeft());
             }
             Component::setVisible(true);
             if (getApp()->getServer()->getPluginWindowsOnTop()) {
