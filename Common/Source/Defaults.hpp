@@ -297,11 +297,12 @@ struct ThemeInitailizer : Component {
         lf.setColour(AlertWindow::backgroundColourId, Colour(Defaults::BG_COLOR));
         lf.setColour(ResizableWindow::backgroundColourId, Colour(Defaults::BG_COLOR));
         lf.setColour(PopupMenu::backgroundColourId, Colour(Defaults::BG_COLOR));
+        lf.setColour(PopupMenu::highlightedBackgroundColourId, Colour(Defaults::ACTIVE_COLOR).withAlpha(0.8f));
+        lf.setColour(PopupMenu::highlightedTextColourId, Colour(Defaults::BG_COLOR));
         lf.setColour(TextEditor::backgroundColourId, Colour(Defaults::BUTTON_COLOR));
         lf.setColour(TextButton::buttonColourId, Colour(Defaults::BUTTON_COLOR));
         lf.setColour(ComboBox::backgroundColourId, Colour(Defaults::BUTTON_COLOR));
         lf.setColour(ListBox::backgroundColourId, Colour(Defaults::BUTTON_COLOR));
-        lf.setColour(PopupMenu::highlightedBackgroundColourId, Colour(Defaults::ACTIVE_COLOR).withAlpha(0.05f));
         lf.setColour(Slider::thumbColourId, Colour(Defaults::SLIDERTHUMB_COLOR));
         lf.setColour(Slider::trackColourId, Colour(Defaults::SLIDERTRACK_COLOR));
         lf.setColour(Slider::backgroundColourId, Colour(Defaults::SLIDERBG_COLOR));
