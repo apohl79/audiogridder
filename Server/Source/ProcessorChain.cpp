@@ -117,6 +117,31 @@ bool ProcessorChain::setProcessorBusesLayout(Processor* proc) {
                 }
             }
         }
+        if (!supported && layout.getMainOutputChannels() > 2 && layout.getMainInputChannels() == 0) {
+            logln("trying multi-mono-bus layout for instrument");
+            AudioProcessor::BusesLayout layout2;
+            for (int ch = 0; ch < layout.getMainOutputChannels(); ch++) {
+                layout2.outputBuses.add(AudioChannelSet::mono());
+            }
+            supported = proc->checkBusesLayoutSupported(layout2) && proc->setBusesLayout(layout2);
+            if (!supported) {
+                logln("trying multi-stereo-bus layout for instrument");
+                layout2.outputBuses.clear();
+                for (int ch = 0; ch + 1 < layout.getMainOutputChannels(); ch += 2) {
+                    layout2.outputBuses.add(AudioChannelSet::stereo());
+                }
+                supported = proc->checkBusesLayoutSupported(layout2) && proc->setBusesLayout(layout2);
+            }
+            if (!supported) {
+                logln("trying multi-mono-bus layout with stereo main for instrument");
+                layout2.outputBuses.clear();
+                layout2.outputBuses.add(AudioChannelSet::stereo());
+                for (int ch = 2; ch < layout.getMainOutputChannels(); ch++) {
+                    layout2.outputBuses.add(AudioChannelSet::mono());
+                }
+                supported = proc->checkBusesLayoutSupported(layout2) && proc->setBusesLayout(layout2);
+            }
+        }
         if (!supported) {
             if (hasSidechain) {
                 logln("disabling sidechain input to use the plugins I/O layout");
