@@ -69,7 +69,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     void moveEditor(Thread::ThreadID tid, int x, int y);
     std::shared_ptr<Processor> getCurrentWindowProc(Thread::ThreadID tid);
     void restartEditor(Thread::ThreadID tid);
-    void updateScreenCaptureArea(Thread::ThreadID tid, int val = -1);
+    void updateScreenCaptureArea(Thread::ThreadID tid, int val = 0);
     Point<float> localPointToGlobal(Thread::ThreadID tid, Point<float> lp);
     void addKeyListener(Thread::ThreadID tid, KeyListener* l);
 

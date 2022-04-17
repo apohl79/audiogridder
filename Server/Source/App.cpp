@@ -529,7 +529,7 @@ void App::updateScreenCaptureArea(Thread::ThreadID tid, int val) {
 
     auto it = m_windows.find((uint64)tid);
     if (it != m_windows.end() && it->second.window != nullptr && it->second.processor != nullptr) {
-        if (val > -1) {
+        if (val != 0) {
             it->second.processor->updateScreenCaptureArea(val);
         }
         it->second.window->updateScreenCaptureArea();
@@ -544,7 +544,14 @@ Point<float> App::localPointToGlobal(Thread::ThreadID tid, Point<float> lp) {
     auto it = m_windows.find((uint64)tid);
     if (it != m_windows.end() && it->second.window != nullptr) {
         auto ret = it->second.window->localPointToGlobal(lp);
-        ret.y += it->second.window->getTitleBarHeight();
+        if (!it->second.processor->isFullscreen()) {
+            ret.y += it->second.window->getTitleBarHeight();
+        } else {
+            if (auto* disp = Desktop::getInstance().getDisplays().getPrimaryDisplay()) {
+                ret.x -= disp->userArea.getX();
+                ret.y -= disp->userArea.getY();
+            }
+        }
         return ret;
     } else {
         logln("failed to resolve local to global point: no active window");

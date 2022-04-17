@@ -195,8 +195,7 @@ void ProcessorWindow::createEditor() {
 
     juce::Rectangle<int> userRect;
 
-    auto* disp = Desktop::getInstance().getDisplays().getPrimaryDisplay();
-    if (nullptr != disp) {
+    if (auto* disp = Desktop::getInstance().getDisplays().getPrimaryDisplay()) {
         m_totalRect = disp->totalArea;
         userRect = disp->userArea;
     }
