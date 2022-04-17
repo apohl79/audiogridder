@@ -272,7 +272,7 @@ inline File getSocketPath(const String& socketName, const std::unordered_map<Str
 
 bool unixDomainSocketsSupported() noexcept;
 
-static constexpr int DEFAULT_NUM_OF_BUFFERS = 8;
+static constexpr int DEFAULT_NUM_OF_BUFFERS = 2;
 static constexpr int DEFAULT_NUM_RECENTS = 10;
 static constexpr int DEFAULT_LOAD_PLUGIN_TIMEOUT = 15000;
 
