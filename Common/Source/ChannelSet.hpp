@@ -55,9 +55,9 @@ class ChannelSet {
     bool isInputActive(int ch) const { return isActive((size_t)ch, true); }
     bool isOutputActive(int ch) const { return isActive((size_t)ch, false); }
 
-    void setRangeActive(size_t start = 0, size_t end = Defaults::PLUGIN_CHANNELS_MAX) {
+    void setRangeActive(size_t start = 0, size_t end = Defaults::PLUGIN_CHANNELS_MAX, bool active = true) {
         for (size_t ch = start; ch < jmin(end, (size_t)Defaults::PLUGIN_CHANNELS_MAX); ch++) {
-            setBit(ch);
+            setBit(ch, active);
         }
     }
 
@@ -70,8 +70,8 @@ class ChannelSet {
         return true;
     }
 
-    void setInputRangeActive() { setRangeActive(getStart(true), getEnd(true)); }
-    void setOutputRangeActive() { setRangeActive(getStart(false), getEnd(false)); }
+    void setInputRangeActive(bool active = true) { setRangeActive(getStart(true), getEnd(true), active); }
+    void setOutputRangeActive(bool active = true) { setRangeActive(getStart(false), getEnd(false), active); }
     bool isInputRangeActive() const { return isRangeActive(getStart(true), getEnd(true)); }
     bool isOutputRangeActive() const { return isRangeActive(getStart(false), getEnd(false)); }
 

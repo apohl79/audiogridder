@@ -51,7 +51,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     void releaseResources() override;
 
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
-    Array<std::pair<short, short>> getAUChannelInfo() const override;
+    //Array<std::pair<short, short>> getAUChannelInfo() const override;
 
     bool canAddBus(bool /*isInput*/) const override { return true; }
     bool canRemoveBus(bool /*isInput*/) const override { return true; }
@@ -363,14 +363,15 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
         int chIn = Defaults::PLUGIN_CHANNELS_IN;
         int chOut = Defaults::PLUGIN_CHANNELS_OUT;
         int chSC = Defaults::PLUGIN_CHANNELS_SC;
-        bool useMultipleOutputBuses = false;
+        bool useMonoMainBus = false;
         bool useMonoOutputBuses = true;
+        bool useMultipleOutputBusses = false;
 
 #if JucePlugin_IsSynth
-        useMultipleOutputBuses = true;
+        chIn = 0;
+        useMultipleOutputBusses = true;
         if (wt == WrapperType::wrapperType_AudioUnit) {
-            chOut = 2;
-            useMultipleOutputBuses = false;
+            useMonoMainBus = true;
         } else if (wt == WrapperType::wrapperType_AAX) {
             useMonoOutputBuses = false;
         }
@@ -393,19 +394,23 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
         } else if (chOut == 2) {
             bp = bp.withOutput("Output", AudioChannelSet::stereo(), true);
         } else if (chOut > 0) {
-            if (useMultipleOutputBuses) {
-                bp = bp.withOutput("Main", AudioChannelSet::stereo(), true);
+            if (useMultipleOutputBusses) {
+                if (useMonoMainBus) {
+                    bp = bp.withOutput("Main", AudioChannelSet::mono(), true);
+                } else {
+                    bp = bp.withOutput("Main", AudioChannelSet::stereo(), true);
+                }
                 if (useMonoOutputBuses) {
-                    for (int i = 2; i < chOut; i++) {
-                        bp = bp.withOutput("Mono " + String(i + 1), AudioChannelSet::mono(), true);
+                    for (int i = useMonoMainBus ? 1 : 2; i < chOut; i++) {
+                        bp = bp.withOutput("Ch " + String(i + 1), AudioChannelSet::mono(), true);
                     }
                 } else {
-                    for (int i = 2; i < chOut; i += 2) {
-                        bp = bp.withOutput("Stereo " + String(i / 2 + 1), AudioChannelSet::mono(), true);
+                    for (int i = useMonoMainBus ? 1 : 2; i < chOut; i += 2) {
+                        bp = bp.withOutput("Ch " + String(i / 2 + 1), AudioChannelSet::mono(), true);
                     }
                 }
             } else {
-                bp = bp.withOutput("Output", AudioChannelSet::discreteChannels(chOut), true);
+                bp = bp.withOutput("Output", AudioChannelSet::discreteChannels(chOut));
             }
         }
 

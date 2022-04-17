@@ -884,7 +884,25 @@ void PluginEditor::mouseUp(const MouseEvent& event) {
         };
 
         size_t ch;
+
 #if JucePlugin_IsSynth
+        if (m_processor.getBusCount(false) > 1) {
+            subm.addItem("Enable all channels...", [this] {
+                m_processor.getActiveChannels().setOutputRangeActive(true);
+                m_processor.updateChannelMapping();
+                m_processor.getClient().reconnect();
+            });
+            subm.addItem("Enable Main channels only...", [this] {
+                m_processor.getActiveChannels().setOutputRangeActive(false);
+                for (int c = 0; c < m_processor.getMainBusNumOutputChannels(); c++) {
+                    m_processor.getActiveChannels().setOutputActive(c);
+                }
+                m_processor.updateChannelMapping();
+                m_processor.getClient().reconnect();
+            });
+            subm.addSeparator();
+        }
+
         ch = 0;
         for (int busIdx = 0; busIdx < m_processor.getBusCount(false); busIdx++) {
             addBusChannelItems(m_processor.getBus(false, busIdx), ch);

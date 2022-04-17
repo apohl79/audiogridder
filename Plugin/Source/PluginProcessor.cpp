@@ -86,8 +86,9 @@ PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
 
 #if JucePlugin_IsSynth
     // activate main outs per default
-    m_activeChannels.setInputActive(0);
-    m_activeChannels.setInputActive(1);
+    for (int c = 0; c < getMainBusNumOutputChannels(); c++) {
+        m_activeChannels.setOutputActive(c);
+    }
 #elif !JucePlugin_IsMidiEffect
     // activate all input/output channels per default
     m_activeChannels.setRangeActive();
@@ -461,19 +462,28 @@ bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
     return numOfInputs <= Defaults::PLUGIN_CHANNELS_MAX && numOfOutputs <= Defaults::PLUGIN_CHANNELS_MAX;
 }
 
-Array<std::pair<short, short>> PluginProcessor::getAUChannelInfo() const {
-#if JucePlugin_IsSynth && JUCE_MAC
-    Array<std::pair<short, short>> info;
-    info.add(std::make_pair((short)0, -(short)Defaults::PLUGIN_CHANNELS_OUT));
-    return info;
-#else
-    return {};
-#endif
-}
+//Array<std::pair<short, short>> PluginProcessor::getAUChannelInfo() const {
+//#if JucePlugin_IsSynth && JUCE_MAC
+//    Array<std::pair<short, short>> info;
+//    info.add(std::make_pair((short)0, -(short)Defaults::PLUGIN_CHANNELS_OUT));
+//    return info;
+//#else
+//    return {};
+//#endif
+//}
 
 void PluginProcessor::numChannelsChanged() {
     traceScope();
-    logln("numChannelsChanged");
+#if JucePlugin_IsSynth
+    // activate main outs per default
+    m_activeChannels.setOutputRangeActive(false);
+    for (int c = 0; c < getMainBusNumOutputChannels(); c++) {
+        m_activeChannels.setOutputActive(c);
+    }
+#elif !JucePlugin_IsMidiEffect
+    // activate all input/output channels per default
+    m_activeChannels.setRangeActive();
+#endif
 }
 
 template <typename T>
