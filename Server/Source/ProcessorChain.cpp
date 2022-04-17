@@ -353,8 +353,6 @@ template <typename T>
 void ProcessorChain::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
     traceScope();
 
-    auto start_proc = Time::getHighResolutionTicks();
-
     int latency = 0;
     if (getBusCount(true) > 1 && m_sidechainDisabled) {
         auto sidechainBuffer = getBusBuffer(buffer, true, 1);
@@ -373,12 +371,6 @@ void ProcessorChain::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& mi
     if (latency != getLatencySamples()) {
         logln("updating latency samples to " << latency);
         setLatencySamples(latency);
-    }
-
-    auto end_proc = Time::getHighResolutionTicks();
-    double time_proc = Time::highResolutionTicksToSeconds(end_proc - start_proc);
-    if (time_proc > 0.02) {
-        logln("warning: chain (" << toString() << "): high audio processing time: " << time_proc);
     }
 }
 
