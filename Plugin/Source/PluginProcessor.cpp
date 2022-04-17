@@ -514,9 +514,15 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
 
     // buffer to be send
     int sendBufChannels = m_activeChannels.getNumActiveChannelsCombined();
-    AudioBuffer<T>* sendBuffer = sendBufChannels != buffer.getNumChannels()
-                                     ? new AudioBuffer<T>(sendBufChannels, buffer.getNumSamples())
-                                     : &buffer;
+    AudioBuffer<T>* sendBuffer;
+    std::unique_ptr<AudioBuffer<T>> tmpBuffer;
+
+    if (sendBufChannels != buffer.getNumChannels()) {
+        tmpBuffer = std::make_unique<AudioBuffer<T>>(sendBufChannels, buffer.getNumSamples());
+        sendBuffer = tmpBuffer.get();
+    } else {
+        sendBuffer = &buffer;
+    }
 
 #if JucePlugin_IsSynth || JucePlugin_IsMidiEffect
     buffer.clear();
@@ -740,7 +746,7 @@ bool PluginProcessor::setState(const json& j) {
 
     if (jsonHasValue(j, "ActiveChannels")) {
         m_activeChannels = jsonGetValue(j, "ActiveChannels", (uint64)3);
-        m_channelMapper.createMapping(m_activeChannels);
+        m_channelMapper.createPluginMapping(m_activeChannels);
     }
 
     {

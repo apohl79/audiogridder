@@ -19,46 +19,13 @@ namespace e47 {
 class ChannelMapper : public LogTagDelegate {
   public:
     ChannelMapper(LogTag* tag) : LogTagDelegate(tag) {}
-    ChannelMapper(LogTag* tag, const ChannelSet& activeChannels) : ChannelMapper(tag) { createMapping(activeChannels); }
-
-    // Creates a mapping to copy channels one buffer to a reduced buffer containing only the active channels provided
-    void createMapping(const ChannelSet& activeChannels) {
-        reset();
-        int chSrc = 0, chDst = 0;
-        if (activeChannels.getNumChannels(true)) {  // fx
-#if AG_PLUGIN
-            auto& fwdMap = m_fwdMap;
-            auto& revMap = m_revMap;
-#else
-            // invert directions for the server side
-            auto& fwdMap = m_revMap;
-            auto& revMap = m_fwdMap;
-#endif
-            // input channels exists, so we map from a larger buffer to a smaller buffer and back
-            for (; chSrc < activeChannels.getNumChannelsCombined(); chSrc++) {
-                if (activeChannels.isInputActive(chSrc)) {
-                    fwdMap[chSrc] = chDst;
-                    if (activeChannels.isOutputActive(chSrc)) {
-                        // reverse mapping only for active outputs
-                        revMap[chDst] = chSrc;
-                    }
-                    chDst++;
-                }
-            }
-        } else {  // inst
-            for (; chSrc < activeChannels.getNumChannelsCombined(); chSrc++) {
-                if (activeChannels.isOutputActive(chSrc)) {
-#if AG_PLUGIN
-                    // no input channels, we just create a reverse map for the plugin side
-                    m_revMap[chDst++] = chSrc;
-#else
-                    // and also invert the direction for the server
-                    m_revMap[chSrc] = chDst++;
-#endif
-                }
-            }
-        }
+    ChannelMapper(LogTag* tag, const ChannelSet& activeChannels, bool pluginMode) : ChannelMapper(tag) {
+        createMappingInternal(activeChannels, pluginMode);
     }
+
+    // Creates a mapping to copy channels of one buffer to a reduced buffer containing only the active channels provided
+    void createPluginMapping(const ChannelSet& activeChannels) { createMappingInternal(activeChannels, true); }
+    void createServerMapping(const ChannelSet& activeChannels) { createMappingInternal(activeChannels, false); }
 
     void reset() {
         m_fwdMap.clear();
@@ -105,7 +72,47 @@ class ChannelMapper : public LogTagDelegate {
     }
 
   private:
-    std::unordered_map<int, int> m_fwdMap, m_revMap;
+    using MapType = std::unordered_map<int, int>;
+    MapType m_fwdMap, m_revMap;
+
+    void createMappingInternal(const ChannelSet& activeChannels, bool pluginMode) {
+        reset();
+        int chSrc = 0, chDst = 0;
+        if (activeChannels.getNumChannels(true)) {  // fx
+            MapType *fwdMap, *revMap;
+            if (pluginMode) {
+                fwdMap = &m_fwdMap;
+                revMap = &m_revMap;
+            } else {
+                // invert directions for the server side
+                fwdMap = &m_revMap;
+                revMap = &m_fwdMap;
+            }
+            // input channels exists, so we map from a larger buffer to a smaller buffer and back
+            for (; chSrc < activeChannels.getNumChannelsCombined(); chSrc++) {
+                if (activeChannels.isInputActive(chSrc)) {
+                    (*fwdMap)[chSrc] = chDst;
+                    if (activeChannels.isOutputActive(chSrc)) {
+                        // reverse mapping only for active outputs
+                        (*revMap)[chDst] = chSrc;
+                    }
+                    chDst++;
+                }
+            }
+        } else {  // inst
+            for (; chSrc < activeChannels.getNumChannelsCombined(); chSrc++) {
+                if (activeChannels.isOutputActive(chSrc)) {
+                    if (pluginMode) {
+                        // no input channels, we just create a reverse map for the plugin side
+                        m_revMap[chDst++] = chSrc;
+                    } else {
+                        // and also invert the direction for the server
+                        m_revMap[chSrc] = chDst++;
+                    }
+                }
+            }
+        }
+    }
 
     template <typename T>
     void mapInternal(const AudioBuffer<T>* src, AudioBuffer<T>* dst, bool reverse) const {

@@ -495,23 +495,40 @@ void ProcessorClient::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
         m_playhead->getCurrentPosition(posInfo);
     }
 
-    std::lock_guard<std::mutex> lock(m_mtx);
+    int sendBufChannels = m_activeChannels.getNumActiveChannelsCombined();
+    AudioBuffer<T>* sendBuffer;
+    std::unique_ptr<AudioBuffer<T>> tmpBuffer;
+
+    if (sendBufChannels != buffer.getNumChannels()) {
+        tmpBuffer = std::make_unique<AudioBuffer<T>>(sendBufChannels, buffer.getNumSamples());
+        sendBuffer = tmpBuffer.get();
+    } else {
+        sendBuffer = &buffer;
+    }
 
     MessageHelper::Error e;
     AudioMessage msg(this);
 
-    if (!msg.sendToServer(m_sockAudio.get(), buffer, midiMessages, posInfo, buffer.getNumChannels(),
-                          buffer.getNumSamples(), &e, *m_bytesOutMeter)) {
-        logln("error while sending audio message to sandbox: " << e.toString());
-        m_sockAudio->close();
-        return;
+    m_channelMapper.map(&buffer, sendBuffer);
+
+    {
+        std::lock_guard<std::mutex> lock(m_mtx);
+
+        if (!msg.sendToServer(m_sockAudio.get(), *sendBuffer, midiMessages, posInfo, sendBuffer->getNumChannels(),
+                              sendBuffer->getNumSamples(), &e, *m_bytesOutMeter)) {
+            logln("error while sending audio message to sandbox: " << e.toString());
+            m_sockAudio->close();
+            return;
+        }
+
+        if (!msg.readFromServer(m_sockAudio.get(), *sendBuffer, midiMessages, &e, *m_bytesInMeter)) {
+            logln("error while reading audio message from sandbox: " << e.toString());
+            m_sockAudio->close();
+            return;
+        }
     }
 
-    if (!msg.readFromServer(m_sockAudio.get(), buffer, midiMessages, &e, *m_bytesInMeter)) {
-        logln("error while reading audio message from sandbox: " << e.toString());
-        m_sockAudio->close();
-        return;
-    }
+    m_channelMapper.mapReverse(sendBuffer, &buffer);
 }
 
 void ProcessorClient::processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMessages) {

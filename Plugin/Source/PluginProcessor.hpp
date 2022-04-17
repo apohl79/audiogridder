@@ -136,7 +136,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     ChannelSet& getActiveChannels() { return m_activeChannels; }
 
     void updateChannelMapping() {
-        m_channelMapper.createMapping(m_activeChannels);
+        m_channelMapper.createPluginMapping(m_activeChannels);
         m_channelMapper.print();
     }
 

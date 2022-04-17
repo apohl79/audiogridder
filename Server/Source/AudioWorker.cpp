@@ -43,7 +43,7 @@ void AudioWorker::init(std::unique_ptr<StreamingSocket> s, HandshakeRequest cfg)
     m_activeChannels = cfg.activeChannels;
     m_activeChannels.setWithInput(m_channelsIn > 0);
     m_activeChannels.setNumChannels(m_channelsIn + m_channelsSC, m_channelsOut);
-    m_channelMapper.createMapping(m_activeChannels);
+    m_channelMapper.createServerMapping(m_activeChannels);
     m_channelMapper.print();
     m_chain = std::make_shared<ProcessorChain>(
         ProcessorChain::createBussesProperties(m_channelsIn, m_channelsOut, m_channelsSC), cfg);

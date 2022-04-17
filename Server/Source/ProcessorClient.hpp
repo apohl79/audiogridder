@@ -13,13 +13,24 @@
 #include "Utils.hpp"
 #include "Message.hpp"
 #include "ParameterValue.hpp"
+#include "ChannelMapper.hpp"
+#include "ChannelSet.hpp"
 
 namespace e47 {
 
 class ProcessorClient : public Thread, public LogTag {
   public:
     ProcessorClient(const String& id, HandshakeRequest cfg)
-        : Thread("ProcessorClient"), LogTag("processorclient"), m_port(getWorkerPort()), m_id(id), m_cfg(cfg) {}
+        : Thread("ProcessorClient"),
+          LogTag("processorclient"),
+          m_port(getWorkerPort()),
+          m_id(id),
+          m_cfg(cfg),
+          m_activeChannels(cfg.activeChannels, cfg.channelsIn > 0),
+          m_channelMapper(this) {
+        m_activeChannels.setNumChannels(cfg.channelsIn + cfg.channelsSC, cfg.channelsOut);
+        m_channelMapper.createPluginMapping(m_activeChannels);
+    }
     ~ProcessorClient() override { removeWorkerPort(m_port); }
 
     bool init();
@@ -92,6 +103,9 @@ class ProcessorClient : public Thread, public LogTag {
     AudioPlayHead* m_playhead = nullptr;
     std::atomic_bool m_suspended{false};
     String m_lastSettings;
+
+    ChannelSet m_activeChannels;
+    ChannelMapper m_channelMapper;
 
     static std::unordered_set<int> m_workerPorts;
     static std::mutex m_workerPortsMtx;
