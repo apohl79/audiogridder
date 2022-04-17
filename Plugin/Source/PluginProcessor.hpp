@@ -116,12 +116,14 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     std::set<String> getPluginTypes() const;
 
     struct LoadedPlugin {
-        String id;
+        String idDeprecated;
         String name;
         String settings;
         StringArray presets;
         Array<Client::Parameter> params;
         bool bypassed = false;
+        String id;
+
         bool hasEditor = true;
         bool ok = false;
     };

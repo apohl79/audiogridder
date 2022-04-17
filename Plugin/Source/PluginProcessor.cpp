@@ -693,7 +693,7 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes) {
 json PluginProcessor::getState(bool withServers) {
     traceScope();
     json j;
-    j["version"] = 2;
+    j["version"] = 3;
     j["Mode"] = m_mode.toStdString();
 
     if (withServers) {
@@ -727,8 +727,8 @@ json PluginProcessor::getState(bool withServers) {
             for (auto& p : plug.params) {
                 jparams.push_back(p.toJson());
             }
-            jplugs.push_back({plug.id.toStdString(), plug.name.toStdString(), plug.settings.toStdString(), jpresets,
-                              jparams, plug.bypassed});
+            jplugs.push_back({plug.idDeprecated.toStdString(), plug.name.toStdString(), plug.settings.toStdString(),
+                              jpresets, jparams, plug.bypassed, plug.id.toStdString()});
         }
     }
     j["loadedPlugins"] = jplugs;
@@ -779,12 +779,26 @@ bool PluginProcessor::setState(const json& j) {
                     StringArray dummy;
                     Array<Client::Parameter> dummy2;
                     m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
-                                               plug[2].get<std::string>(), dummy, dummy2, false, false});
+                                               plug[2].get<std::string>(), dummy, dummy2, false,
+                                               plug[0].get<std::string>()});
                 } else if (version == 1) {
                     StringArray dummy;
                     Array<Client::Parameter> dummy2;
                     m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
-                                               plug[2].get<std::string>(), dummy, dummy2, plug[3].get<bool>(), false});
+                                               plug[2].get<std::string>(), dummy, dummy2, plug[3].get<bool>(),
+                                               plug[0].get<std::string>()});
+                } else if (version == 2) {
+                    StringArray presets;
+                    for (auto& p : plug[3]) {
+                        presets.add(p.get<std::string>());
+                    }
+                    Array<e47::Client::Parameter> params;
+                    for (auto& p : plug[4]) {
+                        params.add(e47::Client::Parameter::fromJson(p));
+                    }
+                    m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
+                                               plug[2].get<std::string>(), presets, params, plug[5].get<bool>(),
+                                               plug[0].get<std::string>()});
                 } else {
                     StringArray presets;
                     for (auto& p : plug[3]) {
@@ -796,7 +810,7 @@ bool PluginProcessor::setState(const json& j) {
                     }
                     m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
                                                plug[2].get<std::string>(), presets, params, plug[5].get<bool>(),
-                                               false});
+                                               plug[6].get<std::string>()});
                 }
             }
         }
@@ -867,7 +881,8 @@ bool PluginProcessor::loadPlugin(const ServerPlugin& plugin, String& err) {
     if (success) {
         updateLatency(m_client->getLatencySamples());
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
-        m_loadedPlugins.push_back({plugin.getId(), plugin.getName(), "", presets, params, false, hasEditor, true});
+        m_loadedPlugins.push_back(
+            {plugin.getIdDeprecated(), plugin.getName(), "", presets, params, false, plugin.getId(), hasEditor, true});
         updateRecents(plugin);
         if (scDisabled && m_showSidechainDisabledInfo) {
             struct cb : ModalComponentManager::Callback {

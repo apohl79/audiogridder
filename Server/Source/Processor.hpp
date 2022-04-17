@@ -31,10 +31,14 @@ class Processor : public LogTagDelegate, public AudioProcessorParameter::Listene
     static String convertJUCEtoAGPluginID(const String& id);
 
     inline static String createString(const PluginDescription& d) {
-        json j = {{"name", d.name.toStdString()},          {"company", d.manufacturerName.toStdString()},
-                  {"id", createPluginID(d).toStdString()}, {"type", d.pluginFormatName.toStdString()},
-                  {"category", d.category.toStdString()},  {"isInstrument", d.isInstrument}};
-        return String(j.dump()) + "\n";
+        json j = {{"name", d.name.toStdString()},
+                  {"company", d.manufacturerName.toStdString()},
+                  {"id", createPluginIDDepricated(d).toStdString()},
+                  {"id2", createPluginID(d).toStdString()},
+                  {"type", d.pluginFormatName.toStdString()},
+                  {"category", d.category.toStdString()},
+                  {"isInstrument", d.isInstrument}};
+        return String(j.dump());
     }
 
     static std::unique_ptr<PluginDescription> findPluginDescritpion(const String& id);
