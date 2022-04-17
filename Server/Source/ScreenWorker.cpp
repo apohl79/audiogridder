@@ -202,7 +202,7 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
                 }
                 // check for undetected plugin UI bounds changes
                 if (++m_imgCounter % 30 == 0) {
-                    getApp()->updateScreenCaptureArea(m_currentTid);
+                    runOnMsgThreadAsync([this] { getApp()->updateScreenCaptureArea(m_currentTid); });
                 }
                 std::lock_guard<std::mutex> lock(m_currentImageLock);
                 if (m_imageBuf.size() < (size_t)size) {
