@@ -256,6 +256,7 @@ void PluginProcessor::loadConfig(const json& j, bool isUpdate) {
     m_disableRecents = jsonGetValue(j, "DisableRecents", m_disableRecents);
     m_keepEditorOpen = jsonGetValue(j, "KeepEditorOpen", m_keepEditorOpen);
     m_bypassWhenNotConnected = jsonGetValue(j, "BypassWhenNotConnected", m_bypassWhenNotConnected.load());
+    m_bufferSizeByPlugin = jsonGetValue(j, "BufferSettingByPlugin", m_bufferSizeByPlugin);
 }
 
 void PluginProcessor::saveConfig(int numOfBuffers) {
@@ -267,7 +268,11 @@ void PluginProcessor::saveConfig(int numOfBuffers) {
     }
 
     if (numOfBuffers < 0) {
-        numOfBuffers = m_client->NUM_OF_BUFFERS;
+        if (m_bufferSizeByPlugin) {
+            numOfBuffers = Defaults::DEFAULT_NUM_OF_BUFFERS;
+        } else {
+            numOfBuffers = m_client->NUM_OF_BUFFERS;
+        }
     }
 
     json jcfg;
@@ -296,8 +301,18 @@ void PluginProcessor::saveConfig(int numOfBuffers) {
     jcfg["DisableRecents"] = m_disableRecents;
     jcfg["KeepEditorOpen"] = m_keepEditorOpen;
     jcfg["BypassWhenNotConnected"] = m_bypassWhenNotConnected.load();
+    jcfg["BufferSettingByPlugin"] = m_bufferSizeByPlugin;
 
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), jcfg);
+}
+
+void PluginProcessor::setNumBuffers(int n) {
+    if (m_bufferSizeByPlugin) {
+        m_client->NUM_OF_BUFFERS = n;
+        m_client->reconnect();
+    } else {
+        saveConfig(n);
+    }
 }
 
 void PluginProcessor::storePreset(const File& file) {
@@ -462,7 +477,7 @@ bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
     return numOfInputs <= Defaults::PLUGIN_CHANNELS_MAX && numOfOutputs <= Defaults::PLUGIN_CHANNELS_MAX;
 }
 
-//Array<std::pair<short, short>> PluginProcessor::getAUChannelInfo() const {
+// Array<std::pair<short, short>> PluginProcessor::getAUChannelInfo() const {
 //#if JucePlugin_IsSynth && JUCE_MAC
 //    Array<std::pair<short, short>> info;
 //    info.add(std::make_pair((short)0, -(short)Defaults::PLUGIN_CHANNELS_OUT));
@@ -691,6 +706,7 @@ json PluginProcessor::getState(bool withServers) {
     }
 
     j["ActiveChannels"] = m_activeChannels.toInt();
+    j["NumberOfBuffers"] = getNumBuffers();
 
     auto jplugs = json::array();
     {
@@ -747,6 +763,10 @@ bool PluginProcessor::setState(const json& j) {
     if (jsonHasValue(j, "ActiveChannels")) {
         m_activeChannels = jsonGetValue(j, "ActiveChannels", (uint64)3);
         m_channelMapper.createPluginMapping(m_activeChannels);
+    }
+
+    if (jsonHasValue(j, "NumberOfBuffers") && m_bufferSizeByPlugin) {
+        setNumBuffers(jsonGetValue(j, "NumberOfBuffers", Defaults::DEFAULT_NUM_OF_BUFFERS));
     }
 
     {

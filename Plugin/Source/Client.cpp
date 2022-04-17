@@ -48,11 +48,13 @@ void Client::run() {
         // Check for config updates from other clients
         auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigPlugin));
         int newNum;
-        newNum = jsonGetValue(cfg, "NumberOfBuffers", NUM_OF_BUFFERS.load());
-        if (NUM_OF_BUFFERS != newNum) {
-            logln("number of buffers changed from " << NUM_OF_BUFFERS << " to " << newNum);
-            NUM_OF_BUFFERS = newNum;
-            reconnect();
+        if (!jsonGetValue(cfg, "BufferSettingByPlugin", false)) {
+            newNum = jsonGetValue(cfg, "NumberOfBuffers", NUM_OF_BUFFERS.load());
+            if (NUM_OF_BUFFERS != newNum) {
+                logln("number of buffers changed from " << NUM_OF_BUFFERS << " to " << newNum);
+                NUM_OF_BUFFERS = newNum;
+                reconnect();
+            }
         }
         newNum = jsonGetValue(cfg, "LoadPluginTimeoutMS", LOAD_PLUGIN_TIMEOUT.load());
         if (LOAD_PLUGIN_TIMEOUT != newNum) {

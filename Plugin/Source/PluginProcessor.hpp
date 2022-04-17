@@ -51,7 +51,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     void releaseResources() override;
 
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
-    //Array<std::pair<short, short>> getAUChannelInfo() const override;
+    // Array<std::pair<short, short>> getAUChannelInfo() const override;
 
     bool canAddBus(bool /*isInput*/) const override { return true; }
     bool canRemoveBus(bool /*isInput*/) const override { return true; }
@@ -231,6 +231,11 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     void setKeepEditorOpen(bool b) { m_keepEditorOpen = b; }
     bool getBypassWhenNotConnected() const { return m_bypassWhenNotConnected; }
     void setBypassWhenNotConnected(bool b) { m_bypassWhenNotConnected = b; }
+    bool getBufferSizeByPlugin() const { return m_bufferSizeByPlugin; }
+    void setBufferSizeByPlugin(bool b) { m_bufferSizeByPlugin = b; }
+
+    int getNumBuffers() const { return m_client->NUM_OF_BUFFERS; }
+    void setNumBuffers(int n);
 
     // AudioProcessorParameter::Listener
     void parameterValueChanged(int parameterIndex, float newValue) override;
@@ -350,6 +355,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     bool m_disableRecents = false;
     bool m_keepEditorOpen = false;
     std::atomic_bool m_bypassWhenNotConnected{false};
+    bool m_bufferSizeByPlugin = false;
 
     TrackProperties m_trackProperties;
     std::mutex m_trackPropertiesMtx;

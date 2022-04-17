@@ -320,7 +320,6 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         }
         return success;
     }
-
 };
 
 }  // namespace e47

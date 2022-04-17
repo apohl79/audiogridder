@@ -626,49 +626,49 @@ void PluginEditor::mouseUp(const MouseEvent& event) {
             n << blocks << " Blocks (+" << blocks * iobuf * 1000 / rate << "ms)";
             return n;
         };
-        bufMenu.addItem("Disabled (+0ms)", true, m_processor.getClient().NUM_OF_BUFFERS == 0, [this] {
+        bufMenu.addItem("Disabled (+0ms)", true, m_processor.getNumBuffers() == 0, [this] {
             traceScope();
-            m_processor.saveConfig(0);
+            m_processor.setNumBuffers(0);
         });
-        bufMenu.addItem(getName(1), true, m_processor.getClient().NUM_OF_BUFFERS == 1, [this] {
+        bufMenu.addItem(getName(1), true, m_processor.getNumBuffers() == 1, [this] {
             traceScope();
-            m_processor.saveConfig(1);
+            m_processor.setNumBuffers(1);
         });
-        bufMenu.addItem(getName(2), true, m_processor.getClient().NUM_OF_BUFFERS == 2, [this] {
+        bufMenu.addItem(getName(2), true, m_processor.getNumBuffers() == 2, [this] {
             traceScope();
-            m_processor.saveConfig(2);
+            m_processor.setNumBuffers(2);
         });
-        bufMenu.addItem(getName(4), true, m_processor.getClient().NUM_OF_BUFFERS == 4, [this] {
+        bufMenu.addItem(getName(4), true, m_processor.getNumBuffers() == 4, [this] {
             traceScope();
-            m_processor.saveConfig(4);
+            m_processor.setNumBuffers(4);
         });
-        bufMenu.addItem(getName(8), true, m_processor.getClient().NUM_OF_BUFFERS == 8, [this] {
+        bufMenu.addItem(getName(8), true, m_processor.getNumBuffers() == 8, [this] {
             traceScope();
-            m_processor.saveConfig(8);
+            m_processor.setNumBuffers(8);
         });
-        bufMenu.addItem(getName(12), true, m_processor.getClient().NUM_OF_BUFFERS == 12, [this] {
+        bufMenu.addItem(getName(12), true, m_processor.getNumBuffers() == 12, [this] {
             traceScope();
-            m_processor.saveConfig(12);
+            m_processor.setNumBuffers(12);
         });
-        bufMenu.addItem(getName(16), true, m_processor.getClient().NUM_OF_BUFFERS == 16, [this] {
+        bufMenu.addItem(getName(16), true, m_processor.getNumBuffers() == 16, [this] {
             traceScope();
-            m_processor.saveConfig(16);
+            m_processor.setNumBuffers(16);
         });
-        bufMenu.addItem(getName(20), true, m_processor.getClient().NUM_OF_BUFFERS == 20, [this] {
+        bufMenu.addItem(getName(20), true, m_processor.getNumBuffers() == 20, [this] {
             traceScope();
-            m_processor.saveConfig(20);
+            m_processor.setNumBuffers(20);
         });
-        bufMenu.addItem(getName(24), true, m_processor.getClient().NUM_OF_BUFFERS == 24, [this] {
+        bufMenu.addItem(getName(24), true, m_processor.getNumBuffers() == 24, [this] {
             traceScope();
-            m_processor.saveConfig(24);
+            m_processor.setNumBuffers(24);
         });
-        bufMenu.addItem(getName(28), true, m_processor.getClient().NUM_OF_BUFFERS == 28, [this] {
+        bufMenu.addItem(getName(28), true, m_processor.getNumBuffers() == 28, [this] {
             traceScope();
-            m_processor.saveConfig(28);
+            m_processor.setNumBuffers(28);
         });
-        bufMenu.addItem(getName(30), true, m_processor.getClient().NUM_OF_BUFFERS == 30, [this] {
+        bufMenu.addItem(getName(30), true, m_processor.getNumBuffers() == 30, [this] {
             traceScope();
-            m_processor.saveConfig(30);
+            m_processor.setNumBuffers(30);
         });
         m.addSubMenu("Buffer Size", bufMenu);
         m.addSectionHeader("Servers");
@@ -975,38 +975,33 @@ void PluginEditor::mouseUp(const MouseEvent& event) {
         m.addSubMenu("Zoom", subm);
         subm.clear();
 
-        m.addSeparator();
-
-        m.addItem("Confirm Delete", true, m_processor.getConfirmDelete(), [this] {
+        subm.addItem("Confirm Delete", true, m_processor.getConfirmDelete(), [this] {
             traceScope();
             m_processor.setConfirmDelete(!m_processor.getConfirmDelete());
             m_processor.saveConfig();
         });
-        m.addItem("Keep Plugin UI Open", true, m_processor.isEditAlways(), [this] {
+        subm.addItem("Keep Plugin UI Open", true, m_processor.isEditAlways(), [this] {
             traceScope();
             m_processor.setEditAlways(!m_processor.isEditAlways());
             m_processor.saveConfig();
         });
-        m.addItem("Keep Server Plugin Window Open", true, m_processor.getKeepEditorOpen(), [this] {
+        subm.addItem("Don't close the Plugin Window on the Server", true, m_processor.getKeepEditorOpen(), [this] {
             traceScope();
             m_processor.setKeepEditorOpen(!m_processor.getKeepEditorOpen());
             m_processor.saveConfig();
         });
-        m.addItem("Show Sidechain-Disabled Info", true, m_processor.getShowSidechainDisabledInfo(), [this] {
+        subm.addItem("Show Sidechain-Disabled Info", true, m_processor.getShowSidechainDisabledInfo(), [this] {
             traceScope();
             m_processor.setShowSidechainDisabledInfo(!m_processor.getShowSidechainDisabledInfo());
             m_processor.saveConfig();
         });
-        m.addItem("Disable Tray App", true, m_processor.getDisableTray(), [this] {
+        subm.addItem("Disable Tray App", true, m_processor.getDisableTray(), [this] {
             traceScope();
             m_processor.setDisableTray(!m_processor.getDisableTray());
             m_processor.saveConfig();
         });
-        m.addItem("Bypass when not connected", true, m_processor.getBypassWhenNotConnected(), [this] {
-            traceScope();
-            m_processor.setBypassWhenNotConnected(!m_processor.getBypassWhenNotConnected());
-            m_processor.saveConfig();
-        });
+        m.addSubMenu("User Interface", subm);
+        subm.clear();
 
         subm.addItem("Always", true, m_processor.getTransferWhenPlayingOnly() == false, [this] {
             traceScope();
@@ -1038,6 +1033,19 @@ void PluginEditor::mouseUp(const MouseEvent& event) {
                      });
         m.addSubMenu("Remote Sync Frequency", subm);
         subm.clear();
+
+        m.addSeparator();
+
+        m.addItem("Bypass when not connected", true, m_processor.getBypassWhenNotConnected(), [this] {
+            traceScope();
+            m_processor.setBypassWhenNotConnected(!m_processor.getBypassWhenNotConnected());
+            m_processor.saveConfig();
+        });
+        m.addItem("Allow buffer size by plugin", true, m_processor.getBufferSizeByPlugin(), [this] {
+            traceScope();
+            m_processor.setBufferSizeByPlugin(!m_processor.getBufferSizeByPlugin());
+            m_processor.saveConfig();
+        });
 
         m.addSeparator();
 
