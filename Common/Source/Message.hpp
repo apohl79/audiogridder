@@ -338,18 +338,20 @@ class AudioMessage : public LogTagDelegate {
             }
             midi.clear();
             for (int i = 0; i < m_reqHeader.numMidiEvents; i++) {
-                std::vector<char> midiData;
                 MidiHeader midiHdr;
                 if (!read(socket, &midiHdr, sizeof(midiHdr), 0, e, &metric)) {
                     MessageHelper::seterrstr(e, "midi header");
                     return false;
                 }
-                midiData.resize(static_cast<size_t>(midiHdr.size));
-                if (!read(socket, midiData.data(), midiHdr.size, 0, e, &metric)) {
-                    MessageHelper::seterrstr(e, "midi data");
-                    return false;
+                if (midiHdr.size > 0) {
+                    std::vector<char> midiData;
+                    midiData.resize(static_cast<size_t>(midiHdr.size));
+                    if (!read(socket, midiData.data(), midiHdr.size, 0, e, &metric)) {
+                        MessageHelper::seterrstr(e, "midi data");
+                        return false;
+                    }
+                    midi.addEvent(midiData.data(), midiHdr.size, midiHdr.sampleNumber);
                 }
-                midi.addEvent(midiData.data(), midiHdr.size, midiHdr.sampleNumber);
             }
             if (!read(socket, &posInfo, sizeof(posInfo), 0, e, &metric)) {
                 MessageHelper::seterrstr(e, "pos info");
