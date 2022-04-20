@@ -23,11 +23,18 @@ class ChannelMapper : public LogTagDelegate {
         createMappingInternal(activeChannels, pluginMode);
     }
 
-    // Creates a mapping to copy channels of one buffer to a reduced buffer containing only the active channels provided
-    void createPluginMapping(const ChannelSet& activeChannels) { createMappingInternal(activeChannels, true); }
-    void createServerMapping(const ChannelSet& activeChannels) { createMappingInternal(activeChannels, false); }
+    void createPluginMapping(const ChannelSet& activeChannels) {
+        traceScope();
+        createMappingInternal(activeChannels, true);
+    }
+
+    void createServerMapping(const ChannelSet& activeChannels) {
+        traceScope();
+        createMappingInternal(activeChannels, false);
+    }
 
     void reset() {
+        traceScope();
         m_fwdMap.clear();
         m_revMap.clear();
     }
@@ -45,6 +52,7 @@ class ChannelMapper : public LogTagDelegate {
     }
 
     void print() const {
+        traceScope();
         logln("channel mapping:");
         for (int ch = 0; ch < Defaults::PLUGIN_CHANNELS_MAX; ch++) {
             int chMapped = getMappedChannel(ch);
@@ -75,6 +83,7 @@ class ChannelMapper : public LogTagDelegate {
     using MapType = std::unordered_map<int, int>;
     MapType m_fwdMap, m_revMap;
 
+    // Creates a mapping to copy channels of one buffer to a reduced buffer containing only the active channels provided
     void createMappingInternal(const ChannelSet& activeChannels, bool pluginMode) {
         reset();
         int chSrc = 0, chDst = 0;
