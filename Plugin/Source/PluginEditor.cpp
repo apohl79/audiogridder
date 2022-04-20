@@ -293,7 +293,7 @@ void PluginEditor::buttonClicked(Button* button, const ModifierKeys& modifiers, 
         };
 
         auto bounds = button->getScreenBounds().toFloat();
-        auto searchWin = new PluginSearchWindow(bounds.getX(), bounds.getBottom(), m_processor);
+        auto searchWin = std::make_unique<PluginSearchWindow>(bounds.getX(), bounds.getBottom(), m_processor);
         searchWin->onClick([this, addFn](ServerPlugin plugin) {
             traceScope();
             addFn(plugin);

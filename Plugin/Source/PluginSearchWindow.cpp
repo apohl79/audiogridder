@@ -59,8 +59,11 @@ PluginSearchWindow::~PluginSearchWindow() {
 }
 
 void PluginSearchWindow::hide() {
-    logln("hiding serach window 0x" << String::toHexString((uint64)this) << " (delete)");
-    delete this;
+    if (isVisible()) {
+        logln("hiding serach window 0x" << String::toHexString((uint64)this));
+        exitModalState(0);
+        setVisible(false);
+    }
 }
 
 void PluginSearchWindow::paint(Graphics& g) {
