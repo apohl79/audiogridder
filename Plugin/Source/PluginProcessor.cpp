@@ -192,6 +192,10 @@ PluginProcessor::~PluginProcessor() {
     m_client->signalThreadShouldExit();
     m_client->close();
     waitForThreadAndLog(m_client.get(), m_client.get());
+    m_client.reset();
+    if (Client::count == 0) {
+        StatisticsWindow::hide();
+    }
     m_tray.reset();
     logln("plugin shutdown: cleaning up");
     WindowPositions::cleanup();
