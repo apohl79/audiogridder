@@ -630,46 +630,48 @@ void PluginEditor::mouseUp(const MouseEvent& event) {
             traceScope();
             m_processor.setNumBuffers(0);
         });
-        bufMenu.addItem(getName(1), true, m_processor.getNumBuffers() == 1, [this] {
-            traceScope();
-            m_processor.setNumBuffers(1);
-        });
-        bufMenu.addItem(getName(2), true, m_processor.getNumBuffers() == 2, [this] {
-            traceScope();
-            m_processor.setNumBuffers(2);
-        });
-        bufMenu.addItem(getName(4), true, m_processor.getNumBuffers() == 4, [this] {
-            traceScope();
-            m_processor.setNumBuffers(4);
-        });
-        bufMenu.addItem(getName(8), true, m_processor.getNumBuffers() == 8, [this] {
-            traceScope();
-            m_processor.setNumBuffers(8);
-        });
-        bufMenu.addItem(getName(12), true, m_processor.getNumBuffers() == 12, [this] {
-            traceScope();
-            m_processor.setNumBuffers(12);
-        });
-        bufMenu.addItem(getName(16), true, m_processor.getNumBuffers() == 16, [this] {
-            traceScope();
-            m_processor.setNumBuffers(16);
-        });
-        bufMenu.addItem(getName(20), true, m_processor.getNumBuffers() == 20, [this] {
-            traceScope();
-            m_processor.setNumBuffers(20);
-        });
-        bufMenu.addItem(getName(24), true, m_processor.getNumBuffers() == 24, [this] {
-            traceScope();
-            m_processor.setNumBuffers(24);
-        });
-        bufMenu.addItem(getName(28), true, m_processor.getNumBuffers() == 28, [this] {
-            traceScope();
-            m_processor.setNumBuffers(28);
-        });
-        bufMenu.addItem(getName(30), true, m_processor.getNumBuffers() == 30, [this] {
-            traceScope();
-            m_processor.setNumBuffers(30);
-        });
+        if (rate > 0.0) {
+            bufMenu.addItem(getName(1), true, m_processor.getNumBuffers() == 1, [this] {
+                traceScope();
+                m_processor.setNumBuffers(1);
+            });
+            bufMenu.addItem(getName(2), true, m_processor.getNumBuffers() == 2, [this] {
+                traceScope();
+                m_processor.setNumBuffers(2);
+            });
+            bufMenu.addItem(getName(4), true, m_processor.getNumBuffers() == 4, [this] {
+                traceScope();
+                m_processor.setNumBuffers(4);
+            });
+            bufMenu.addItem(getName(8), true, m_processor.getNumBuffers() == 8, [this] {
+                traceScope();
+                m_processor.setNumBuffers(8);
+            });
+            bufMenu.addItem(getName(12), true, m_processor.getNumBuffers() == 12, [this] {
+                traceScope();
+                m_processor.setNumBuffers(12);
+            });
+            bufMenu.addItem(getName(16), true, m_processor.getNumBuffers() == 16, [this] {
+                traceScope();
+                m_processor.setNumBuffers(16);
+            });
+            bufMenu.addItem(getName(20), true, m_processor.getNumBuffers() == 20, [this] {
+                traceScope();
+                m_processor.setNumBuffers(20);
+            });
+            bufMenu.addItem(getName(24), true, m_processor.getNumBuffers() == 24, [this] {
+                traceScope();
+                m_processor.setNumBuffers(24);
+            });
+            bufMenu.addItem(getName(28), true, m_processor.getNumBuffers() == 28, [this] {
+                traceScope();
+                m_processor.setNumBuffers(28);
+            });
+            bufMenu.addItem(getName(30), true, m_processor.getNumBuffers() == 30, [this] {
+                traceScope();
+                m_processor.setNumBuffers(30);
+            });
+        }
         m.addSubMenu("Buffer Size", bufMenu);
         m.addSectionHeader("Servers");
         auto& servers = m_processor.getServers();
