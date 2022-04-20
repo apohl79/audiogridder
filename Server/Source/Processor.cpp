@@ -559,7 +559,7 @@ json Processor::getParameters() {
             json jparams = json::array();
             runOnMsgThreadSync([this, &jparams] {
                 auto plugin = getPlugin();
-                for (auto& param : plugin->getParameters()) {
+                for (auto* param : plugin->getParameters()) {
                     json jparam = {{"idx", param->getParameterIndex()},
                                    {"name", param->getName(32).toStdString()},
                                    {"defaultValue", param->getDefaultValue()},
