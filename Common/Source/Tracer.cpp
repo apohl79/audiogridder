@@ -91,7 +91,7 @@ bool isEnabled() { return l_tracerEnabled; }
 
 TraceRecord* getRecord() {
     if (l_file.isOpen()) {
-        auto offset = (l_index.fetch_add(1, std::memory_order_relaxed) % NUM_OF_TRACE_RECORDS) * sizeof(TraceRecord);
+        auto offset = (l_index.fetch_add(1) % NUM_OF_TRACE_RECORDS) * sizeof(TraceRecord);
         return reinterpret_cast<TraceRecord*>(l_file.data() + offset);
     }
     return nullptr;
