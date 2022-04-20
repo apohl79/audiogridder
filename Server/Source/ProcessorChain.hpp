@@ -53,6 +53,7 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
 
     void prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock) override;
     void releaseResources() override;
+    void setPlayHead(AudioPlayHead* ph) override;
     void processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMessages) override;
     void processBlock(AudioBuffer<double>& buffer, MidiBuffer& midiMessages) override;
     const String getName() const override { return "ProcessorChain"; }

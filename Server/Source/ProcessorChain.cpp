@@ -28,6 +28,14 @@ void ProcessorChain::releaseResources() {
     }
 }
 
+void ProcessorChain::setPlayHead(AudioPlayHead *ph) {
+    AudioProcessor::setPlayHead(ph);
+    std::lock_guard<std::mutex> lock(m_processors_mtx);
+    for (auto& proc : m_processors) {
+        proc->setPlayHead(ph);
+    }
+}
+
 void ProcessorChain::processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMessages) {
     processBlockInternal(buffer, midiMessages);
 }
@@ -212,8 +220,8 @@ bool ProcessorChain::initPluginInstance(Processor* proc, String& err) {
         }
     }
     proc->setProcessingPrecision(prec);
-    proc->prepareToPlay(getSampleRate(), getBlockSize());
     proc->setPlayHead(getPlayHead());
+    proc->prepareToPlay(getSampleRate(), getBlockSize());
     proc->enableAllBuses();
     if (prec == AudioProcessor::doublePrecision) {
         preProcessBlocks<double>(proc);
