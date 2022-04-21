@@ -189,11 +189,10 @@ bool Processor::load(const String& settings, String& err, const PluginDescriptio
         }
 
         if (client->init()) {
-            client->startThread();
-        }
-
-        if (client->isOk()) {
             loaded = client->load(settings, err);
+            if (loaded) {
+                client->startThread();
+            }
         } else {
             err = "failed to initialize sandbox";
         }

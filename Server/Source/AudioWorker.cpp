@@ -29,6 +29,8 @@ AudioWorker::~AudioWorker() {
         m_socket->close();
     }
     waitForThreadAndLog(getLogTagSource(), this);
+    m_socket.reset();
+    m_chain.reset();
 }
 
 void AudioWorker::init(std::unique_ptr<StreamingSocket> s, HandshakeRequest cfg) {

@@ -18,21 +18,19 @@ std::mutex ProcessorClient::m_workerPortsMtx;
 
 bool ProcessorClient::init() {
     traceScope();
-    if (startSandbox()) {
-        if (!connectSandbox()) {
-            if (m_process.isRunning()) {
-                logln("error: failed to connect to sandbox process (retrying in a bit)");
-                m_process.kill();
-                return true;
-            } else {
-                logln("fatal error: failed to connect to sandbox process (process died, giving up)");
-                return false;
-            }
-        }
-    } else {
+    if (!startSandbox()) {
         logln("fatal error: failed to start sandbox process");
         return false;
     }
+
+    if (!connectSandbox()) {
+        logln("fatal error: failed to connect to sandbox process");
+        if (m_process.isRunning()) {
+            m_process.kill();
+        }
+        return false;
+    }
+
     return true;
 }
 
@@ -92,46 +90,54 @@ void ProcessorClient::removeWorkerPort(int port) {
 }
 
 bool ProcessorClient::startSandbox() {
-    std::lock_guard<std::mutex> lock(m_mtx);
+    try {
+        std::lock_guard<std::mutex> lock(m_mtx);
 
-    if (m_process.isRunning()) {
-        logln("killing already running sandbox");
-        m_process.kill();
-        m_process.waitForProcessToFinish(-1);
-    }
+        if (m_process.isRunning()) {
+            logln("killing already running sandbox");
+            m_process.kill();
+            m_process.waitForProcessToFinish(-1);
+        }
 
-    auto cfgDump = m_cfg.toJson().dump();
-    MemoryBlock config(cfgDump.c_str(), cfgDump.size());
+        auto cfgDump = m_cfg.toJson().dump();
+        MemoryBlock config(cfgDump.c_str(), cfgDump.size());
 
-    StringArray args;
+        StringArray args;
 
 #ifndef AG_UNIT_TESTS
-    args.add(File::getSpecialLocation(File::currentExecutableFile).getFullPathName());
-    args.addArray({"-id", String(getApp()->getServer()->getId())});
+        args.add(File::getSpecialLocation(File::currentExecutableFile).getFullPathName());
+        args.addArray({"-id", String(getApp()->getServer()->getId())});
 #else
-    auto exe = File::getSpecialLocation(File::currentExecutableFile).getParentDirectory();
+        auto exe = File::getSpecialLocation(File::currentExecutableFile).getParentDirectory();
 #if JUCE_WINDOWS
-    exe = exe.getChildFile("AudioGridderServer.exe");
+        exe = exe.getChildFile("AudioGridderServer.exe");
 #else
-    exe = exe.getChildFile("AudioGridderServer.app")
-              .getChildFile("Contents")
-              .getChildFile("MacOS")
-              .getChildFile("AudioGridderServer");
+        exe = exe.getChildFile("AudioGridderServer.app")
+                  .getChildFile("Contents")
+                  .getChildFile("MacOS")
+                  .getChildFile("AudioGridderServer");
 #endif
-    // args.add("lldb");
-    args.add(exe.getFullPathName());
-    // args.addArray({"-o", "process launch --tty", "--"});
-    args.addArray({"-id", "999"});
+        // args.add("lldb");
+        args.add(exe.getFullPathName());
+        // args.addArray({"-o", "process launch --tty", "--"});
+        args.addArray({"-id", "999"});
 #endif
 
-    args.add("-load");
-    args.addArray({"-pluginid", m_id});
-    args.addArray({"-workerport", String(m_port)});
-    args.addArray({"-config", config.toBase64Encoding()});
+        args.add("-load");
+        args.addArray({"-pluginid", m_id});
+        args.addArray({"-workerport", String(m_port)});
+        args.addArray({"-config", config.toBase64Encoding()});
 
-    logln("starting sandbox process: " << args.joinIntoString(" "));
+        logln("starting sandbox process: " << args.joinIntoString(" "));
 
-    return m_process.start(args, 0);
+        return m_process.start(args, 0);
+    } catch (const std::exception& e) {
+        logln("failed to start sandbox: " << e.what());
+    } catch (...) {
+        logln("failed to start sandbox: unknown error");
+    }
+
+    return false;
 }
 
 bool ProcessorClient::connectSandbox() {
@@ -142,10 +148,17 @@ bool ProcessorClient::connectSandbox() {
     bool hasUnixDomainSockets = Defaults::unixDomainSocketsSupported();
     auto socketPath = Defaults::getSocketPath(Defaults::SANDBOX_PLUGIN_SOCK, {{"n", String(m_port)}});
 
+    auto resetSocketsAndFalse = [this] {
+        m_sockCmdIn.reset();
+        m_sockCmdOut.reset();
+        m_sockAudio.reset();
+        return false;
+    };
+
     m_sockCmdOut = std::make_unique<StreamingSocket>();
 
     // let the process come up and bind to the port
-    int maxTries = 50;
+    int maxTries = 100;
     while (!m_sockCmdOut->isConnected() && maxTries-- > 0 && m_process.isRunning()) {
         if (hasUnixDomainSockets) {
             if (!m_sockCmdOut->connect(socketPath, 100)) {
@@ -160,19 +173,19 @@ bool ProcessorClient::connectSandbox() {
 
     if (!m_sockCmdOut->isConnected()) {
         logln("failed to setup sandbox command-out connection");
-        return false;
+        return resetSocketsAndFalse();
     }
 
     m_sockCmdIn = std::make_unique<StreamingSocket>();
     if (hasUnixDomainSockets) {
         if (!m_sockCmdIn->connect(socketPath)) {
             logln("failed to setup sandbox command-in connection");
-            return false;
+            return resetSocketsAndFalse();
         }
     } else {
         if (!m_sockCmdIn->connect("127.0.0.1", m_port)) {
             logln("failed to setup sandbox command-in connection");
-            return false;
+            return resetSocketsAndFalse();
         }
     }
 
@@ -180,12 +193,12 @@ bool ProcessorClient::connectSandbox() {
     if (hasUnixDomainSockets) {
         if (!m_sockAudio->connect(socketPath)) {
             logln("failed to setup sandbox audio connection");
-            return false;
+            return resetSocketsAndFalse();
         }
     } else {
         if (!m_sockAudio->connect("127.0.0.1", m_port)) {
             logln("failed to setup sandbox audio connection");
-            return false;
+            return resetSocketsAndFalse();
         }
     }
 
@@ -288,11 +301,11 @@ bool ProcessorClient::load(const String& settings, String& err) {
         auto jresult = msgResult.payload.getJson();
         if (!jresult["success"].get<bool>()) {
             err = jresult["err"].get<std::string>();
-            logln(err);
+            logln("load failed: " << err);
             return false;
         }
         if (timeout.getMillisecondsLeft() == 0) {
-            err = "timeout";
+            err = "load failed: timeout";
             logln(err);
             return false;
         }
@@ -304,7 +317,7 @@ bool ProcessorClient::load(const String& settings, String& err) {
         }
         m_presets = StringArray::fromTokens(msgPresets.payload.getString(), "|", "");
         if (timeout.getMillisecondsLeft() == 0) {
-            err = "timeout";
+            err = "load failed: timeout";
             logln(err);
             return false;
         }
