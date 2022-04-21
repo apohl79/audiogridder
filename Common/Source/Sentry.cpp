@@ -33,7 +33,9 @@ void initialize() {
 #if AG_SENTRY_ENABLED
     auto crashpadPath = Defaults::getSentryCrashpadPath();
     setLogTagStatic("sentry");
-    if (l_sentryEnabled && crashpadPath.isNotEmpty() && !l_sentryInitialized.exchange(true)) {
+    if (juce_isRunningUnderDebugger()) {
+        logln("not initializing sentry: debugger detected");
+    } else if (l_sentryEnabled && crashpadPath.isNotEmpty() && !l_sentryInitialized.exchange(true)) {
         logln("initializing crash reporting...");
         sentry_options_t* options = sentry_options_new();
         sentry_options_set_dsn(options, AG_SENTRY_DSN);
