@@ -344,15 +344,6 @@ void Server::shutdown() {
     if (m_sandboxModeRuntime == SANDBOX_NONE) {
         m_masterSocket.close();
     }
-    logln("shutting down " << m_workers.size() << " workers");
-    for (auto& w : m_workers) {
-        logln("shutting down worker, isRunning=" << (int)w->isThreadRunning());
-        w->shutdown();
-    }
-    logln("waiting for " << m_workers.size() << " workers");
-    for (auto& w : m_workers) {
-        w->waitForThreadToExit(-1);
-    }
     signalThreadShouldExit();
     logln("thread signaled");
 }
@@ -362,6 +353,21 @@ void Server::setName(const String& name) {
     m_name = name;
     ServiceResponder::setHostName(name);
     logln("setting server name to " << name);
+}
+
+void Server::shutdownWorkers() {
+    logln("shutting down " << m_workers.size() << " workers");
+    for (auto& w : m_workers) {
+        logln("shutting down worker, isRunning=" << (int)w->isThreadRunning());
+        w->shutdown();
+    }
+
+    logln("waiting for " << m_workers.size() << " workers");
+    for (auto& w : m_workers) {
+        w->waitForThreadToExit(-1);
+    }
+
+    m_workers.clear();
 }
 
 bool Server::shouldExclude(const String& name) {
@@ -849,6 +855,9 @@ void Server::runServer() {
                 }
             }
         }
+
+        shutdownWorkers();
+
         if (m_sandboxes.size() > 0) {
             for (auto sandbox : m_sandboxes) {
                 m_sandboxesForDeletion.add(sandbox);
@@ -946,7 +955,7 @@ void Server::runSandboxChain() {
             auto bytesOutMeter = Metrics::getStatistic<Meter>("NetBytesOut");
             auto bytesInMeter = Metrics::getStatistic<Meter>("NetBytesIn");
 
-            while (!w->waitForThreadToExit(1000)) {
+            while (!w->waitForThreadToExit(1000) && !threadShouldExit()) {
                 json jmetrics;
                 jmetrics["LoadedCount"] = Processor::loadedCount.load();
                 jmetrics["NetBytesOut"] = bytesOutMeter->rate_1min();
@@ -959,6 +968,8 @@ void Server::runSandboxChain() {
                 jmetrics["audio"] = jtimes;
                 m_sandboxController->send(SandboxMessage(SandboxMessage::METRICS, jmetrics), nullptr, true);
             }
+
+            shutdownWorkers();
         } else {
             logln("failed to start worker thread");
         }
@@ -1030,7 +1041,12 @@ void Server::runSandboxPlugin() {
     w->startThread();
     if (w->isThreadRunning()) {
         m_workers.add(w);
-        w->waitForThreadToExit(-1);
+
+        while (w->isThreadRunning() && !threadShouldExit()) {
+            sleepExitAware(100);
+        }
+
+        shutdownWorkers();
     } else {
         logln("failed to start worker thread");
     }

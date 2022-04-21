@@ -173,6 +173,7 @@ class Server : public Thread, public LogTag {
 
     bool sendHandshakeResponse(StreamingSocket* sock, bool sandboxEnabled = false, int sandboxPort = 0);
     bool createWorkerListener(std::shared_ptr<StreamingSocket> sock, bool isLocal, int& workerPort);
+    void shutdownWorkers();
 
     ENABLE_ASYNC_FUNCTORS();
 };
