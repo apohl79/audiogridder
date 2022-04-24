@@ -796,7 +796,8 @@ void Server::runServer() {
 
     logln("available plugins:");
     for (auto& desc : m_pluginlist.getTypes()) {
-        logln("  " << desc.name << " [" << Processor::createPluginID(desc) << "]"
+        logln("  " << desc.name << " [" << Processor::createPluginID(desc) << ", "
+                   << Processor::createPluginIDDepricated(desc) << "]"
                    << " version=" << desc.version << " format=" << desc.pluginFormatName
                    << " ins=" << desc.numInputChannels << " outs=" << desc.numOutputChannels
                    << " instrument=" << (int)desc.isInstrument);

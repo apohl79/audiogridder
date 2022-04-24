@@ -26,7 +26,12 @@ class Processor : public LogTagDelegate, public AudioProcessorParameter::Listene
     Processor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize, bool isClient);
     ~Processor() override;
 
+    //
+    // ID calculation methods
+    //
     static String createPluginID(const PluginDescription& d);
+    // These are for some backwards compatibility
+    static String createPluginIDWithName(const PluginDescription& d);
     static String createPluginIDDepricated(const PluginDescription& d);
     static String convertJUCEtoAGPluginID(const String& id);
 

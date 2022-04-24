@@ -37,6 +37,10 @@ String Processor::createPluginID(const PluginDescription& d) {
     return d.pluginFormatName + "-" + String::toHexString(d.uniqueId);
 }
 
+String Processor::createPluginIDWithName(const PluginDescription& d) {
+    return d.pluginFormatName + (d.name.isNotEmpty() ? "-" + d.name : "") + "-" + String::toHexString(d.uniqueId);
+}
+
 String Processor::createPluginIDDepricated(const PluginDescription& d) {
     return d.pluginFormatName + (d.name.isNotEmpty() ? "-" + d.name : "") + "-" + String::toHexString(d.deprecatedUid);
 }
@@ -104,8 +108,10 @@ std::unique_ptr<PluginDescription> Processor::findPluginDescritpion(const String
     auto convertedId = convertJUCEtoAGPluginID(id);
     for (auto& desc : pluglist.getTypes()) {
         auto descId = createPluginID(desc);
+        auto descIdWithName = createPluginIDWithName(desc);
         auto descIdDepricated = createPluginIDDepricated(desc);
-        if (descId == id || descId == convertedId || descIdDepricated == id || descIdDepricated == convertedId) {
+        if (descId == id || descIdWithName == id || descIdWithName == convertedId || descIdDepricated == id ||
+            descIdDepricated == convertedId) {
             plugdesc = std::make_unique<PluginDescription>(desc);
         }
     }
