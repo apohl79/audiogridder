@@ -560,7 +560,13 @@ void Worker::handleMessage(std::shared_ptr<Message<GetScreenBounds>> /*msg*/) {
         DATA(res)->w = 0;
         DATA(res)->h = 0;
     }
-    res.send(m_cmdIn.get());
+    if (getApp()->getServer()->getSandboxModeRuntime() == Server::SANDBOX_PLUGIN) {
+        // We don't want to block for updating the bounds of a plugin UI in a plugin isolation sandbox, so the response
+        // goes back on the "command out" channel.
+        res.send(m_cmdOut.get());
+    } else {
+        res.send(m_cmdIn.get());
+    }
 }
 
 void Worker::sendKeys(const std::vector<uint16_t>& keysToPress) {

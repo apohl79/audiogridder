@@ -200,6 +200,7 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
         runOnMsgThreadAsync([this, proc] {
             traceScope();
             getApp()->showEditor(proc, m_currentTid, [this](const uint8_t* data, int size, int w, int h, double scale) {
+                // executed in the context of the screen recorder worker thread
                 traceScope();
                 if (threadShouldExit()) {
                     return;
