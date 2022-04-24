@@ -122,7 +122,7 @@ void ProcessorWindow::startCapturing() {
                 }
             } else {
                 // when launching a plugin sandbox, it might take a little bit to ramp up the plugin editor, so we retry
-                bool retry = ++m_startCapturingRetry < 30;
+                bool retry = ++m_startCapturingRetry < 100;
                 logln("error: can't start screen capturing with empty rect ("
                       << (retry ? "retrying in 100ms" : "giving up") << ")");
                 if (retry) {
