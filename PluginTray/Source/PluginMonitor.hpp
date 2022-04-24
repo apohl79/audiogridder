@@ -42,9 +42,10 @@ class PluginMonitorWindow : public TopLevelWindow, public LogTagDelegate {
     int m_channelColWidth = 20;
     int m_channelNameWidth = 100;
     std::vector<std::unique_ptr<Component>> m_components;
+    TooltipWindow m_tooltipWindow;
 
-    void addLabel(const String& txt, juce::Rectangle<int> bounds, Justification just = Justification::topLeft,
-                  float alpha = 0.6f);
+    void addLabel(const String& txt, const String& tooltip, juce::Rectangle<int> bounds,
+                  Justification just = Justification::topLeft, float alpha = 0.6f);
     void updatePosition();
 
     class Channel : public Component {
@@ -63,9 +64,11 @@ class PluginMonitorWindow : public TopLevelWindow, public LogTagDelegate {
 
     class Status : public Component {
       public:
-        Status(juce::Rectangle<int> bounds, bool ok) {
+        Status(juce::Rectangle<int> bounds, bool connected, bool loadedPluginsOk) {
             setBounds(bounds);
-            m_col = ok ? Colour(Defaults::PLUGIN_OK_COLOR) : Colour(Defaults::PLUGIN_NOTOK_COLOR);
+            m_col = connected
+                        ? loadedPluginsOk ? Colour(Defaults::PLUGIN_OK_COLOR) : Colour(Defaults::PLUGIN_NOTLOADED_COLOR)
+                        : Colour(Defaults::PLUGIN_NOTCONNECTED_COLOR);
         }
 
         void paint(Graphics& g) override;

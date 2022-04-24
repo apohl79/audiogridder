@@ -111,6 +111,9 @@ class Server : public Thread, public LogTag {
         return sum;
     }
 
+    void updateSandboxNetworkStats(const String& key, uint32 loaded, double bytesIn, double bytesOut, double rps,
+                                   const std::vector<TimeStatistic::Histogram>& audioHists);
+
     template <typename T>
     inline T getOpt(const String& name, T def) const {
         return jsonGetValue(m_opts, name, def);
@@ -160,7 +163,7 @@ class Server : public Thread, public LogTag {
     HandshakeRequest m_sandboxConfig;
     String m_sandboxHasScreen;
 
-    void scanNextPlugin(const String& id, const String& fmt);
+    void scanNextPlugin(const String& id, const String& fmt, int srvId);
     void scanForPlugins();
     void scanForPlugins(const std::vector<String>& include);
 

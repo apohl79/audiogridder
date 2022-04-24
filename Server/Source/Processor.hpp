@@ -61,6 +61,8 @@ class Processor : public LogTagDelegate, public AudioProcessorParameter::Listene
 
     void setChainIndex(int idx) { m_chainIdx = idx; }
 
+    const String& getPluginId() const { return m_id; }
+
     bool processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMessages);
     bool processBlock(AudioBuffer<double>& buffer, MidiBuffer& midiMessages);
 
@@ -98,13 +100,15 @@ class Processor : public LogTagDelegate, public AudioProcessorParameter::Listene
     using ParamValueChangeCallback = std::function<void(int idx, int paramIdx, float val)>;
     using ParamGestureChangeCallback = std::function<void(int idx, int paramIdx, float val)>;
     using KeysFromSandboxCallback = std::function<void(Message<Key>&)>;
+    using StatusChangeFromSandbox = std::function<void(int idx, bool ok, const String& err)>;
 
     ParamValueChangeCallback onParamValueChange;
     ParamGestureChangeCallback onParamGestureChange;
     KeysFromSandboxCallback onKeysFromSandbox;
+    StatusChangeFromSandbox onStatusChangeFromSandbox;
 
     void setCallbacks(ParamValueChangeCallback valueChangeFn, ParamGestureChangeCallback gestureChangeFn,
-                      KeysFromSandboxCallback keysFn);
+                      KeysFromSandboxCallback keysFn, StatusChangeFromSandbox statusChangeFn);
 
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;

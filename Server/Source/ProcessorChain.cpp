@@ -28,7 +28,7 @@ void ProcessorChain::releaseResources() {
     }
 }
 
-void ProcessorChain::setPlayHead(AudioPlayHead *ph) {
+void ProcessorChain::setPlayHead(AudioPlayHead* ph) {
     AudioProcessor::setPlayHead(ph);
     std::lock_guard<std::mutex> lock(m_processors_mtx);
     for (auto& proc : m_processors) {
@@ -234,11 +234,9 @@ bool ProcessorChain::initPluginInstance(Processor* proc, String& err) {
 bool ProcessorChain::addPluginProcessor(const String& id, const String& settings, String& err) {
     traceScope();
     auto proc = std::make_shared<Processor>(*this, id, getSampleRate(), getBlockSize());
-    if (proc->load(settings, err)) {
-        addProcessor(std::move(proc));
-        return true;
-    }
-    return false;
+    auto success = proc->load(settings, err);
+    addProcessor(std::move(proc));
+    return success;
 }
 
 void ProcessorChain::addProcessor(std::shared_ptr<Processor> processor) {

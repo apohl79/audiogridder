@@ -148,7 +148,7 @@ def getMacToolchain(args):
     if args.macostarget in ('10.7', '10.8'):
         toolchain = '/Library/Developer/10/CommandLineTools'
     elif args.macostarget == '11.1':
-        toolchain = '/Library/Developer/CommandLineTools'
+        toolchain = '/Library/Developer/13/CommandLineTools'
     return toolchain
 
 def setMacToolchain(args, toolchain=None):
@@ -162,7 +162,10 @@ def setMacToolchain(args, toolchain=None):
     else:
         newToolchain = lastToolchain
     log('Using toolchain: ' + newToolchain)
-    return (newToolchain, lastToolchain, newToolchain + '/SDKs/MacOS.sdk')
+    sdk = '/SDKs/MacOS.sdk'
+    if args.macostarget == '11.1':
+        sdk = '/SDKs/MacOS11.sdk'
+    return (newToolchain, lastToolchain, newToolchain + sdk)
 
 def conf(args):
     cmake_params = []
@@ -195,6 +198,8 @@ def conf(args):
         cmake_params.append('-DAG_MACOS_TARGET=' + args.macostarget)
         if not args.nosigning:
             execute('codesign --force --sign AudioGridder --timestamp=none ' + buildDir + '/bin/crashpad_handler')
+        if args.withasan:
+            cmake_params.append('-DAG_ENABLE_ASAN=ON')
 
     if platform == 'windows':
         cmake_params.append('-A x64')
@@ -539,6 +544,8 @@ def main():
                              help='Disable copying plugins into plugin folders in Debug mode on MacOS (default: %(default)s)')
     parser_conf.add_argument('--enable-tests', dest='withtests', action='store_true', default=False,
                              help='Enable unit tests (default: %(default)s)')
+    parser_conf.add_argument('--enable-asan', dest='withasan', action='store_true', default=False,
+                             help='Enable Clangs AddressSanitizer for the server on macOS (only with -t Debug, default: %(default)s)')
     parser_conf.add_argument('--deps-root', dest='depsroot', type=str, default='audiogridder-deps',
                              help='Dependencies root directory (git clone https://github.com/apohl79/audiogridder-deps.git)')
     parser_conf.add_argument('--sdks-root', dest='sdksroot', type=str, default='audiogridder-sdks',

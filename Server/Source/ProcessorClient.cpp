@@ -16,20 +16,29 @@ namespace e47 {
 std::unordered_set<int> ProcessorClient::m_workerPorts;
 std::mutex ProcessorClient::m_workerPortsMtx;
 
+ProcessorClient::~ProcessorClient() {
+    m_sockCmdOut.reset();
+    m_sockCmdIn.reset();
+    m_sockAudio.reset();
+    removeWorkerPort(m_port);
+}
+
 bool ProcessorClient::init() {
     traceScope();
     if (!startSandbox()) {
-        logln("fatal error: failed to start sandbox process");
+        setAndLogError("fatal error: failed to start sandbox process");
         return false;
     }
 
     if (!connectSandbox()) {
-        logln("fatal error: failed to connect to sandbox process");
+        setAndLogError("fatal error: failed to connect to sandbox process");
         if (m_process.isRunning()) {
             m_process.kill();
         }
         return false;
     }
+
+    m_error.clear();
 
     return true;
 }
@@ -45,21 +54,18 @@ void ProcessorClient::shutdown() {
         if (m_sockCmdOut->isConnected()) {
             m_sockCmdOut->close();
         }
-        m_sockCmdOut.reset();
     }
 
     if (nullptr != m_sockCmdIn) {
         if (m_sockCmdIn->isConnected()) {
             m_sockCmdIn->close();
         }
-        m_sockCmdIn.reset();
     }
 
     if (nullptr != m_sockAudio) {
         if (m_sockAudio->isConnected()) {
             m_sockAudio->close();
         }
-        m_sockAudio.reset();
     }
 
     if (m_process.isRunning()) {
@@ -132,9 +138,9 @@ bool ProcessorClient::startSandbox() {
 
         return m_process.start(args, 0);
     } catch (const std::exception& e) {
-        logln("failed to start sandbox: " << e.what());
+        setAndLogError("failed to start sandbox: " + String(e.what()));
     } catch (...) {
-        logln("failed to start sandbox: unknown error");
+        setAndLogError("failed to start sandbox: unknown error");
     }
 
     return false;
@@ -172,19 +178,19 @@ bool ProcessorClient::connectSandbox() {
     }
 
     if (!m_sockCmdOut->isConnected()) {
-        logln("failed to setup sandbox command-out connection");
+        setAndLogError("failed to setup sandbox command-out connection");
         return resetSocketsAndFalse();
     }
 
     m_sockCmdIn = std::make_unique<StreamingSocket>();
     if (hasUnixDomainSockets) {
         if (!m_sockCmdIn->connect(socketPath)) {
-            logln("failed to setup sandbox command-in connection");
+            setAndLogError("failed to setup sandbox command-in connection");
             return resetSocketsAndFalse();
         }
     } else {
         if (!m_sockCmdIn->connect("127.0.0.1", m_port)) {
-            logln("failed to setup sandbox command-in connection");
+            setAndLogError("failed to setup sandbox command-in connection");
             return resetSocketsAndFalse();
         }
     }
@@ -192,12 +198,12 @@ bool ProcessorClient::connectSandbox() {
     m_sockAudio = std::make_unique<StreamingSocket>();
     if (hasUnixDomainSockets) {
         if (!m_sockAudio->connect(socketPath)) {
-            logln("failed to setup sandbox audio connection");
+            setAndLogError("failed to setup sandbox audio connection");
             return resetSocketsAndFalse();
         }
     } else {
         if (!m_sockAudio->connect("127.0.0.1", m_port)) {
-            logln("failed to setup sandbox audio connection");
+            setAndLogError("failed to setup sandbox audio connection");
             return resetSocketsAndFalse();
         }
     }
@@ -214,8 +220,16 @@ void ProcessorClient::run() {
     traceScope();
     MessageFactory msgFactory(this);
 
+    bool lastOk = true;
+
     while (!threadShouldExit()) {
         if (!isOk()) {
+            if (lastOk) {
+                lastOk = false;
+                if (onStatusChange) {
+                    onStatusChange(false, m_error);
+                }
+            }
             if (!init()) {
                 return;
             }
@@ -226,8 +240,15 @@ void ProcessorClient::run() {
             if (m_loaded) {
                 String err;
                 if (!load(m_lastSettings, err)) {
-                    logln("reload failed: " << err);
+                    setAndLogError("reload failed: " + err);
                 }
+            }
+        }
+
+        if (!lastOk) {
+            lastOk = true;
+            if (onStatusChange) {
+                onStatusChange(m_error.isEmpty(), m_error);
             }
         }
 
@@ -294,31 +315,31 @@ bool ProcessorClient::load(const String& settings, String& err) {
     if (msgAddPlugin.send(m_sockCmdOut.get())) {
         Message<AddPluginResult> msgResult(this);
         if (!msgResult.read(m_sockCmdOut.get(), &e, timeout.getMillisecondsLeft())) {
-            err = "failed to get result: " + e.toString();
-            logln(err);
+            err = "seems like the plugin did not load or crash: " + e.toString();
+            setAndLogError(err);
             return false;
         }
         auto jresult = msgResult.payload.getJson();
         if (!jresult["success"].get<bool>()) {
             err = jresult["err"].get<std::string>();
-            logln("load failed: " << err);
+            setAndLogError("load failed: " + err);
             return false;
         }
         if (timeout.getMillisecondsLeft() == 0) {
             err = "load failed: timeout";
-            logln(err);
+            setAndLogError(err);
             return false;
         }
         Message<Presets> msgPresets(this);
         if (!msgPresets.read(m_sockCmdOut.get(), &e, timeout.getMillisecondsLeft())) {
             err = "failed to read presets: " + e.toString();
-            logln(err);
+            setAndLogError(err);
             return false;
         }
         m_presets = StringArray::fromTokens(msgPresets.payload.getString(), "|", "");
         if (timeout.getMillisecondsLeft() == 0) {
             err = "load failed: timeout";
-            logln(err);
+            setAndLogError(err);
             return false;
         }
         Message<Parameters> msgParams(this);
@@ -337,6 +358,7 @@ bool ProcessorClient::load(const String& settings, String& err) {
         m_numOutputChannels = jresult["numOutputChannels"].get<int>();
         m_lastSettings = settings;
         m_loaded = true;
+        m_error.clear();
         return true;
     } else {
         err = "load failed: send failed";

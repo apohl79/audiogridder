@@ -79,7 +79,7 @@ void AudioWorker::run() {
     bool hasToSetPlayHead = true;
 
     MessageHelper::Error e;
-    while (isOk()) {
+    while (!threadShouldExit() && isOk()) {
         // Read audio chunk
         if (waitForData()) {
             if (msg.readFromClient(m_socket.get(), bufferF, bufferD, midi, posInfo, &e, *bytesIn)) {
@@ -130,7 +130,11 @@ void AudioWorker::run() {
 
     duration.clear();
     clear();
-    signalThreadShouldExit();
+
+    if (m_error.isNotEmpty()) {
+        logln("audio processor error: " << m_error);
+    }
+
     logln("audio processor terminated");
 }
 

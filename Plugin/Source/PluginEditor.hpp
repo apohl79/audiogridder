@@ -37,6 +37,7 @@ class PluginEditor : public AudioProcessorEditor,
     void setCPULoad(float load);
 
     void updateParamValue(int paramIdx);
+    void updatePluginStatus(int idx, bool ok, const String& err);
 
   private:
     PluginProcessor& m_processor;
@@ -58,6 +59,7 @@ class PluginEditor : public AudioProcessorEditor,
     ImageComponent m_srvIcon, m_settingsIcon, m_cpuIcon;
     Label m_srvLabel, m_versionLabel, m_cpuLabel;
     ImageComponent m_logo;
+    TooltipWindow m_tooltipWindow;
     bool m_connected = false;
 
     struct ToolsButton : TextButton {
@@ -92,6 +94,9 @@ class PluginEditor : public AudioProcessorEditor,
 
     void highlightPluginButton(int idx);
     void unhighlightPluginButton(int idx);
+
+    void showServerMenu();
+    void showSettingsMenu();
 
     Point<int> getLocalModePosition(juce::Rectangle<int> bounds = {});
 

@@ -94,14 +94,14 @@ void PluginMonitorWindow::update() {
     int row = 1;
 
     if (m_mon->showChannelName) {
-        addLabel("Channel", getLabelBounds(row, 0, 2), Justification::topLeft, 1.0f);
+        addLabel("Channel", "", getLabelBounds(row, 0, 2), Justification::topLeft, 1.0f);
     } else if (m_mon->showChannelColor) {
-        addLabel("Ch", getLabelBounds(row, 0, 2), Justification::topLeft, 1.0f);
+        addLabel("Ch", "", getLabelBounds(row, 0, 2), Justification::topLeft, 1.0f);
     }
-    addLabel("Inserts", getLabelBounds(row, 2), Justification::topLeft, 1.0f);
-    addLabel("I/O", getLabelBounds(row, 3), Justification::topRight, 1.0f);
-    addLabel("Buf", getLabelBounds(row, 4), Justification::topRight, 1.0f);
-    addLabel("Perf", getLabelBounds(row, 5), Justification::topRight, 1.0f);
+    addLabel("Inserts", "", getLabelBounds(row, 2), Justification::topLeft, 1.0f);
+    addLabel("I/O", "", getLabelBounds(row, 3), Justification::topRight, 1.0f);
+    addLabel("Buf", "", getLabelBounds(row, 4), Justification::topRight, 1.0f);
+    addLabel("Perf", "", getLabelBounds(row, 5), Justification::topRight, 1.0f);
 
     row++;
 
@@ -117,18 +117,18 @@ void PluginMonitorWindow::update() {
             m_components.push_back(std::move(chan));
         }
         if (m_mon->showChannelName) {
-            addLabel(s.name, getLabelBounds(row, 1));
+            addLabel(s.name, s.loadedPluginsErr, getLabelBounds(row, 1));
         }
         String io;
         io << s.channelsIn << ":" << s.channelsOut;
         if (s.channelsSC > 0) {
             io << "+" << s.channelsSC;
         }
-        addLabel(s.loadedPlugins, getLabelBounds(row, 2));
-        addLabel(io, getLabelBounds(row, 3), Justification::topRight);
-        addLabel(String(s.blocks), getLabelBounds(row, 4), Justification::topRight);
-        addLabel(String(s.perf95th, 2) + " ms", getLabelBounds(row, 5), Justification::topRight);
-        auto led = std::make_unique<Status>(getLabelBounds(row, 6), s.ok);
+        addLabel(s.loadedPlugins, s.loadedPluginsErr, getLabelBounds(row, 2));
+        addLabel(io, s.loadedPluginsErr, getLabelBounds(row, 3), Justification::topRight);
+        addLabel(String(s.blocks), s.loadedPluginsErr, getLabelBounds(row, 4), Justification::topRight);
+        addLabel(String(s.perf95th, 2) + " ms", s.loadedPluginsErr, getLabelBounds(row, 5), Justification::topRight);
+        auto led = std::make_unique<Status>(getLabelBounds(row, 6), s.connected, s.loadedPluginsOk);
         addChildAndSetID(led.get(), "led");
         m_components.push_back(std::move(led));
 
@@ -143,9 +143,11 @@ void PluginMonitorWindow::update() {
     updatePosition();
 }
 
-void PluginMonitorWindow::addLabel(const String& txt, juce::Rectangle<int> bounds, Justification just, float alpha) {
+void PluginMonitorWindow::addLabel(const String& txt, const String& tooltip, juce::Rectangle<int> bounds,
+                                   Justification just, float alpha) {
     auto label = std::make_unique<Label>();
     label->setText(txt, NotificationType::dontSendNotification);
+    label->setTooltip(tooltip);
     auto f = label->getFont();
     f.setHeight(f.getHeight() - 2);
     label->setFont(f);
@@ -226,7 +228,7 @@ void PluginMonitorWindow::HirozontalLine::paint(Graphics& g) {
 void PluginMonitor::update() {
     bool allOk = true;
     for (auto& c : m_app->getServer().getConnections()) {
-        allOk = allOk && c->status.ok;
+        allOk = allOk && c->status.connected && c->status.loadedPluginsOk;
         if (!allOk) {
             break;
         }

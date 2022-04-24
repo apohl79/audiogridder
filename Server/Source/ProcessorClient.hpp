@@ -31,17 +31,19 @@ class ProcessorClient : public Thread, public LogTag {
         m_activeChannels.setNumChannels(cfg.channelsIn + cfg.channelsSC, cfg.channelsOut);
         m_channelMapper.createPluginMapping(m_activeChannels);
     }
-    ~ProcessorClient() override { removeWorkerPort(m_port); }
+    ~ProcessorClient() override;
 
     bool init();
     void shutdown();
     bool isOk();
+    const String& getError() const { return m_error; }
 
     void run() override;
 
     std::function<void(int paramIdx, float val)> onParamValueChange;
     std::function<void(int paramIdx, bool gestureIsStarting)> onParamGestureChange;
     std::function<void(Message<Key>&)> onKeysFromSandbox;
+    std::function<void(bool ok, const String& err)> onStatusChange;
 
     void handleMessage(std::shared_ptr<Message<Key>> msg);
     void handleMessage(std::shared_ptr<Message<ParameterValue>> msg);
@@ -89,6 +91,7 @@ class ProcessorClient : public Thread, public LogTag {
     std::unique_ptr<StreamingSocket> m_sockCmdIn, m_sockCmdOut, m_sockAudio;
     std::mutex m_mtx;
     std::shared_ptr<Meter> m_bytesOutMeter, m_bytesInMeter;
+    String m_error;
 
     bool m_loaded = false;
     String m_name;
@@ -115,6 +118,11 @@ class ProcessorClient : public Thread, public LogTag {
 
     bool startSandbox();
     bool connectSandbox();
+
+    void setAndLogError(const String& e) {
+        m_error = e;
+        logln(e);
+    }
 
     template <typename T>
     void processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages);

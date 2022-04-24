@@ -96,7 +96,9 @@ class App : public JUCEApplication, public LogTag {
             int blocks;
             String serverNameId;
             String serverHost;
-            bool ok;
+            bool connected;
+            bool loadedPluginsOk;
+            String loadedPluginsErr;
             int64 lastUpdated;
         };
 

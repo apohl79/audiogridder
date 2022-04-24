@@ -64,7 +64,6 @@ class Worker : public Thread, public LogTag {
     std::shared_ptr<AudioWorker> m_audio;
     std::shared_ptr<ScreenWorker> m_screen;
     std::atomic_int m_activeEditorIdx{-1};
-    std::atomic_bool m_shutdown{false};
     MessageFactory m_msgFactory;
     bool m_noPluginListFilter = false;
     int m_sandboxModeRuntime = 0;
@@ -80,6 +79,7 @@ class Worker : public Thread, public LogTag {
     void sendKeys(const std::vector<uint16_t>& keysToPress);
     void sendParamValueChange(int idx, int paramIdx, float val);
     void sendParamGestureChange(int idx, int paramIdx, bool guestureIsStarting);
+    void sendStatusChange(int idx, bool ok, const String& err);
 
     ENABLE_ASYNC_FUNCTORS();
 };

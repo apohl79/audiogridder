@@ -44,13 +44,17 @@ void ScreenWorker::run() {
         }
     }
 
+    if (m_error.isNotEmpty()) {
+        logln("screen processor error: " << m_error);
+    }
+
     logln("screen processor terminated");
 }
 
 void ScreenWorker::runFFmpeg() {
     traceScope();
     Message<ScreenCapture> msg;
-    while (isOk()) {
+    while (!threadShouldExit() && isOk()) {
         std::unique_lock<std::mutex> lock(m_currentImageLock);
         if (m_currentImageCv.wait_for(lock, 50ms, [this] { return m_updated; })) {
             m_updated = false;
@@ -78,7 +82,7 @@ void ScreenWorker::runNative() {
     JPEGImageFormat jpg;
     bool diffDetect = getApp()->getServer()->getScreenDiffDetection();
     uint32_t captureCount = 0;
-    while (isOk()) {
+    while (!threadShouldExit() && isOk()) {
         std::unique_lock<std::mutex> lock(m_currentImageLock);
         m_currentImageCv.wait(lock, [this] { return m_updated; });
         m_updated = false;

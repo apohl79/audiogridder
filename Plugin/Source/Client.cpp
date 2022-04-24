@@ -67,13 +67,25 @@ void Client::run() {
         m_processor->setDisableTray(m_processor->getDisableTray());
 
         auto srvInfo = getServer();
+        auto servers = m_processor->getServersMDNS();
 
         // Try to auto connect to the first available host discovered via mDNS
         if (!srvInfo.isValid()) {
-            auto servers = m_processor->getServersMDNS();
             if (servers.size() > 0) {
                 setServer(servers[0]);
                 srvInfo = servers[0];
+            }
+        } else {
+            for (auto& si : servers) {
+                if (si.getNameAndID() == srvInfo.getNameAndID() && si != srvInfo) {
+                    bool reconnect = si.getHostAndID() != srvInfo.getHostAndID();
+                    srvInfo = si;
+                    std::lock_guard<std::mutex> lock(m_srvMtx);
+                    m_srvInfo = si;
+                    if (reconnect) {
+                        m_needsReconnect = true;
+                    }
+                }
             }
         }
 
@@ -105,6 +117,9 @@ void Client::run() {
             m_processor->sync();
         }
 
+        // Check for auto reconnect
+        m_processor->autoRetry();
+
         if (isReadyLockFree()) {
             TimeStatistic::Timeout timeout(1000);
             while (timeout.getMillisecondsLeft() > 0 && !threadShouldExit()) {
@@ -120,6 +135,9 @@ void Client::run() {
                             break;
                         case ParameterGesture::Type:
                             handleMessage(Message<Any>::convert<ParameterGesture>(msg));
+                            break;
+                        case PluginStatus::Type:
+                            handleMessage(Message<Any>::convert<PluginStatus>(msg));
                             break;
                         default:
                             logln("unknown message type " << msg->getType());
@@ -181,6 +199,17 @@ void Client::handleMessage(std::shared_ptr<Message<ParameterValue>> msg) {
 
 void Client::handleMessage(std::shared_ptr<Message<ParameterGesture>> msg) {
     m_processor->updateParameterGestureTracking(pDATA(msg)->idx, pDATA(msg)->paramIdx, pDATA(msg)->gestureIsStarting);
+}
+
+void Client::handleMessage(std::shared_ptr<Message<PluginStatus>> msg) {
+    auto jstatus = pPLD(msg).getJson();
+    try {
+        logln("updating plugin status: " << jstatus.dump());
+        m_processor->updatePluginStatus(jstatus["idx"].get<int>(), jstatus["ok"].get<bool>(),
+                                        jstatus["err"].get<std::string>());
+    } catch (const json::exception& e) {
+        logln("failed to update plugin status: " << e.what());
+    }
 }
 
 void Client::setServer(const ServerInfo& srv) {
@@ -276,7 +305,7 @@ void Client::init() {
                                 m_rate,
                                 m_samplesPerBlock,
                                 m_doublePrecission,
-                                getId(),
+                                getTagId(),
                                 0,
                                 0,
                                 m_processor->getActiveChannels().toInt(),
@@ -462,25 +491,32 @@ void Client::quit() {
 bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params, bool& hasEditor, bool& scDisabled,
                        String settings, String& err) {
     traceScope();
+
     if (!isReadyLockFree()) {
+        err = "client not ready";
         return false;
     };
+
+    err.clear();
     MessageHelper::Error e;
     Message<AddPlugin> msg(this);
     PLD(msg).setJson({{"id", id.toStdString()}, {"settings", settings.toStdString()}});
+
     LockByID lock(*this, ADDPLUGIN);
+
     TimeStatistic::Timeout timeout(LOAD_PLUGIN_TIMEOUT);
+
     if (msg.send(m_cmdOut.get())) {
         Message<AddPluginResult> msgResult(this);
         if (!msgResult.read(m_cmdOut.get(), &e, timeout.getMillisecondsLeft())) {
             err = "failed to get result: " + e.toString();
-            logln(err);
+            logln("error: " << err);
             return false;
         }
         auto jresult = PLD(msgResult).getJson();
         if (!jresult["success"].get<bool>()) {
             err = jresult["err"].get<std::string>();
-            logln(err);
+            logln("load error: " << err);
             return false;
         }
         if (timeout.getMillisecondsLeft() == 0) {
@@ -488,6 +524,7 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
             logln(err);
             return false;
         }
+
         Message<Presets> msgPresets(this);
         if (!msgPresets.read(m_cmdOut.get(), &e, timeout.getMillisecondsLeft())) {
             err = "failed to read presets: " + e.toString();
@@ -500,6 +537,7 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
             logln(err);
             return false;
         }
+
         Message<Parameters> msgParams(this);
         if (!msgParams.read(m_cmdOut.get(), &e, timeout.getMillisecondsLeft())) {
             err = "failed to read parameters: " + e.toString();
@@ -518,11 +556,14 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
             }
             params.add(std::move(newParam));
         }
+
         m_latency = jresult["latency"].get<int>();
         hasEditor = jresult["hasEditor"].get<bool>();
         scDisabled = jresult["disabledSideChain"].get<bool>();
+
         return true;
     }
+
     return false;
 }
 
@@ -578,12 +619,13 @@ MemoryBlock Client::getPluginSettings(int idx) {
     } else {
         Message<PluginSettings> res(this);
         MessageHelper::Error err;
-        if (res.read(m_cmdOut.get(), &err, 5000)) {
+        if (res.read(m_cmdOut.get(), &err, 10000)) {
             if (*res.payload.size > 0) {
                 block.append(res.payload.data, (size_t)*res.payload.size);
             }
         } else {
-            logln(getLoadedPluginsString() << ": failed to read PluginSettings message: " << err.toString());
+            logln(getLoadedPluginsString()
+                  << ": failed to read PluginSettings message for idx " << idx << ": " << err.toString());
             m_error = true;
         }
     }
@@ -763,7 +805,6 @@ void Client::ScreenReceiver::run() {
     } while (!threadShouldExit() && (err.code == MessageHelper::E_NONE || err.code == MessageHelper::E_TIMEOUT));
     if (!threadShouldExit()) {
         logln("screen receiver failed to read message: " << err.toString());
-        signalThreadShouldExit();
     }
     m_client->m_error = true;
     logln("screen receiver terminated");

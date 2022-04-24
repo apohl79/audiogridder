@@ -223,7 +223,8 @@ void App::initialise(const String& commandLineParameters) {
                                 logln("killing child process");
                                 proc.kill();
                                 proc.waitForProcessToFinish(-1);
-                                File serverRunFile(Defaults::getConfigFileName(Defaults::ConfigServerRun));
+                                File serverRunFile(Defaults::getConfigFileName(
+                                    Defaults::ConfigServerRun, {{"id", String(srvId > -1 ? srvId : 0)}}));
                                 if (serverRunFile.exists()) {
                                     serverRunFile.deleteFile();
                                 }
@@ -238,7 +239,8 @@ void App::initialise(const String& commandLineParameters) {
                         } else if (ec != 0) {
                             logln("error: server failed with exit code " << (int)ec);
                         }
-                        File serverRunFile(Defaults::getConfigFileName(Defaults::ConfigServerRun));
+                        File serverRunFile(Defaults::getConfigFileName(Defaults::ConfigServerRun,
+                                                                       {{"id", String(srvId > -1 ? srvId : 0)}}));
                         if (serverRunFile.exists()) {
                             logln("error: server did non shutdown properly");
                             serverRunFile.deleteFile();

@@ -33,7 +33,7 @@ void Server::initialize() {
         m_sandboxModeRuntime = optMode == "chain" ? SANDBOX_CHAIN : optMode == "plugin" ? SANDBOX_PLUGIN : SANDBOX_NONE;
     } else {
         mode = "server";
-        File runFile(Defaults::getConfigFileName(Defaults::ConfigServerRun));
+        File runFile(Defaults::getConfigFileName(Defaults::ConfigServerRun, {{"id", String(getId())}}));
         runFile.create();
     }
     setLogTagName(mode);
@@ -219,10 +219,14 @@ int Server::getId(bool ignoreOpts) const {
 
 void Server::loadKnownPluginList() {
     traceScope();
+
     loadKnownPluginList(m_pluginlist, getId());
+
     std::map<String, PluginDescription> dedupMap;
+
     for (auto& desc : m_pluginlist.getTypes()) {
         std::unique_ptr<AudioPluginFormat> fmt;
+
         if (desc.pluginFormatName == "AudioUnit") {
 #if JUCE_MAC
             fmt = std::make_unique<AudioUnitPluginFormat>();
@@ -234,6 +238,7 @@ void Server::loadKnownPluginList() {
         } else if (desc.pluginFormatName == "VST3") {
             fmt = std::make_unique<VST3PluginFormat>();
         }
+
         if (nullptr != fmt) {
             auto name = fmt->getNameOfPluginFromIdentifier(desc.fileOrIdentifier);
             if (File(name).exists()) {
@@ -243,8 +248,10 @@ void Server::loadKnownPluginList() {
                 m_pluginlist.removeType(desc);
             }
         }
+
         String id = Processor::createPluginID(desc);
         bool updateDedupMap = true;
+
         auto it = dedupMap.find(id);
         if (it != dedupMap.end()) {
             auto& descExists = it->second;
@@ -260,22 +267,42 @@ void Server::loadKnownPluginList() {
                                           << ") due to newer version");
             }
         }
+
         if (updateDedupMap) {
             dedupMap[id] = desc;
         }
     }
-    File deadmanfile(Defaults::getConfigFileName(Defaults::ConfigDeadMan));
-    if (deadmanfile.exists() && m_sandboxModeRuntime == SANDBOX_NONE) {
-        logln("reading scan crash file " << deadmanfile.getFullPathName());
-        StringArray lines;
-        deadmanfile.readLines(lines);
-        for (auto& line : lines) {
-            logln("  adding " << line << " to blacklist");
-            m_pluginlist.addToBlacklist(line);
+
+    if (m_sandboxModeRuntime == SANDBOX_NONE) {
+        std::set<String> blackList;
+
+        for (int scanId = Defaults::SCAN_ID_START; scanId < Defaults::SCAN_ID_START + Defaults::SCAN_WORKERS;
+             scanId++) {
+            File deadmanfile(Defaults::getConfigFileName(Defaults::ConfigDeadMan, {{"id", String(scanId)}}));
+
+            if (deadmanfile.existsAsFile()) {
+                logln("reading scan crash file " << deadmanfile.getFullPathName());
+
+                StringArray lines;
+                deadmanfile.readLines(lines);
+
+                for (auto& line : lines) {
+                    blackList.insert(line);
+                }
+
+                deadmanfile.deleteFile();
+            }
         }
-        deadmanfile.deleteFile();
-        saveConfig();
-        saveKnownPluginList();
+
+        if (!blackList.empty()) {
+            for (auto& p : blackList) {
+                logln("  adding " << p << " to blacklist");
+                m_pluginlist.addToBlacklist(p);
+            }
+
+            saveConfig();
+            saveKnownPluginList();
+        }
     }
 }
 
@@ -309,6 +336,16 @@ void Server::saveKnownPluginList(KnownPluginList& plist, int srvId) {
     setLogTagStatic("server");
     traceScope();
 
+    // dedup blacklist
+    std::set<String> blackList;
+    for (auto& entry : plist.getBlacklistedFiles()) {
+        blackList.insert(entry);
+    }
+    plist.clearBlacklistedFiles();
+    for (auto& entry: blackList) {
+        plist.addToBlacklist(entry);
+    }
+
     File file(Defaults::getConfigFileName(Defaults::ConfigPluginCache, {{"id", String(srvId)}}));
     logln("writing plugins cache to " << file.getFullPathName());
     auto xml = plist.createXml();
@@ -319,32 +356,42 @@ void Server::saveKnownPluginList(KnownPluginList& plist, int srvId) {
 
 Server::~Server() {
     traceScope();
+
     stopAsyncFunctors();
+
     if (m_sandboxModeRuntime == SANDBOX_NONE) {
         m_masterSocket.close();
     }
+
     waitForThreadAndLog(this, this);
+
     m_pluginlist.clear();
     ScreenRecorder::cleanup();
     Metrics::cleanup();
     ServiceResponder::cleanup();
     CPUInfo::cleanup();
     WindowPositions::cleanup();
+
     logln("server terminated");
+
     if (m_sandboxModeRuntime == SANDBOX_NONE) {
         logln("removing run file");
-        File runFile(Defaults::getConfigFileName(Defaults::ConfigServerRun));
+        File runFile(Defaults::getConfigFileName(Defaults::ConfigServerRun, {{"id", String(getId())}}));
         runFile.deleteFile();
     }
 }
 
 void Server::shutdown() {
     traceScope();
+
     logln("shutting down server");
+
     if (m_sandboxModeRuntime == SANDBOX_NONE) {
         m_masterSocket.close();
     }
+
     signalThreadShouldExit();
+
     logln("thread signaled");
 }
 
@@ -358,7 +405,8 @@ void Server::setName(const String& name) {
 void Server::shutdownWorkers() {
     logln("shutting down " << m_workers.size() << " workers");
     for (auto& w : m_workers) {
-        logln("shutting down worker, isRunning=" << (int)w->isThreadRunning());
+        logln("shutting down worker " << String::toHexString(w->getTagId())
+                                      << ", isRunning=" << (int)w->isThreadRunning());
         w->shutdown();
     }
 
@@ -440,19 +488,36 @@ bool Server::scanPlugin(const String& id, const String& format, int srvId) {
     } else {
         return false;
     }
+
     setLogTagStatic("server");
     logln("scanning id=" << id << " fmt=" << format);
-    bool success = true;
+
     KnownPluginList plist, newlist;
     loadKnownPluginList(plist, srvId);
-    PluginDirectoryScanner scanner(newlist, *fmt, {}, true, File(Defaults::getConfigFileName(Defaults::ConfigDeadMan)));
-    scanner.setFilesOrIdentifiersToScan({id});
+
+    File crashFile(Defaults::getConfigFileName(Defaults::ConfigDeadMan, {{"id", String(srvId)}}));
+
+    int retries = 4;
+    bool success = false;
     String name;
-    scanner.scanNextFile(true, name);
-    for (auto& f : scanner.getFailedFiles()) {
-        plist.addToBlacklist(f);
-        success = false;
-    }
+
+    do {
+        PluginDirectoryScanner scanner(newlist, *fmt, {}, true, crashFile);
+        scanner.setFilesOrIdentifiersToScan({id});
+        scanner.scanNextFile(true, name);
+
+        if (scanner.getFailedFiles().isEmpty()) {
+            success = true;
+        } else {
+            if (retries == 0) {
+                for (auto& f : scanner.getFailedFiles()) {
+                    plist.addToBlacklist(f);
+                }
+            }
+            Thread::sleep(500);
+        }
+    } while (!success && retries-- > 0);
+
     for (auto& t : newlist.getTypes()) {
         logln("adding plugin description:");
         logln("  name            = " << t.name << " (" << t.descriptiveName << ")");
@@ -467,19 +532,21 @@ bool Server::scanPlugin(const String& id, const String& format, int srvId) {
         logln("  output channels = " << t.numOutputChannels);
         plist.addType(t);
     }
+
     saveKnownPluginList(plist, srvId);
+
     return success;
 }
 
-void Server::scanNextPlugin(const String& id, const String& fmt) {
+void Server::scanNextPlugin(const String& id, const String& fmt, int srvId) {
     traceScope();
     String fileFmt = id;
     fileFmt << "|" << fmt;
     ChildProcess proc;
     StringArray args;
     args.add(File::getSpecialLocation(File::currentExecutableFile).getFullPathName());
-    args.add("-scan");
-    args.add(fileFmt);
+    args.addArray({"-scan", fileFmt});
+    args.addArray({"-id", String(srvId)});
     if (proc.start(args)) {
         bool finished;
         do {
@@ -534,6 +601,16 @@ void Server::scanForPlugins(const std::vector<String>& include) {
 
     loadKnownPluginList();
 
+    struct ScanThread : FnThread {
+        int id;
+    };
+
+    int scanId = Defaults::SCAN_ID_START;
+    std::vector<ScanThread> scanThreads(Defaults::SCAN_WORKERS);
+    for (auto& t : scanThreads) {
+        t.id = scanId++;
+    }
+
     for (auto& fmt : fmts) {
         FileSearchPath searchPaths;
         if (fmt->getName().compare("AudioUnit") && !m_vstNoStandardFolders) {
@@ -560,6 +637,18 @@ void Server::scanForPlugins(const std::vector<String>& include) {
             bool excluded = shouldExclude(name, include);
             if ((nullptr == plugindesc || fmt->pluginNeedsRescanning(*plugindesc)) &&
                 !m_pluginlist.getBlacklistedFiles().contains(fileOrId) && !excluded) {
+
+                ScanThread* scanThread = nullptr;
+                do {
+                    for (auto& t : scanThreads) {
+                        if (!t.isThreadRunning()) {
+                            scanThread = &t;
+                            break;
+                        }
+                        sleep(5);
+                    }
+                } while(scanThread == nullptr);
+
                 logln("  scanning: " << name);
                 String splashName = name;
                 if (fmt->getName().compare("AudioUnit")) {
@@ -568,8 +657,13 @@ void Server::scanForPlugins(const std::vector<String>& include) {
                         splashName = f.getFileName();
                     }
                 }
+
                 getApp()->setSplashInfo(String("Scanning ") + fmt->getName() + ": " + splashName + " ...");
-                scanNextPlugin(fileOrId, fmt->getName());
+
+                scanThread->fn = [this, fileOrId, name = fmt->getName(), srvId = scanThread->id] {
+                    scanNextPlugin(fileOrId, name, srvId);
+                };
+                scanThread->startThread();
             } else {
                 logln("  (skipping: " << name << (excluded ? " excluded" : "") << ")");
             }
@@ -577,7 +671,28 @@ void Server::scanForPlugins(const std::vector<String>& include) {
         }
     }
 
-    loadKnownPluginList();
+    for (auto& t : scanThreads) {
+        while (t.isThreadRunning()) {
+            sleep(50);
+        }
+
+        File file(Defaults::getConfigFileName(Defaults::ConfigPluginCache, {{"id", String(t.id)}}));
+
+        if (file.existsAsFile()) {
+            KnownPluginList plist;
+            loadKnownPluginList(plist, t.id);
+
+            for (auto& p : plist.getBlacklistedFiles()) {
+                m_pluginlist.addToBlacklist(p);
+            }
+            for (auto p : plist.getTypes()) {
+                m_pluginlist.addType(p);
+            }
+
+            file.deleteFile();
+        }
+    }
+
     m_pluginlist.sort(KnownPluginList::sortAlphabetically, true);
 
     for (auto& name : neverSeenList) {
@@ -1102,25 +1217,17 @@ void Server::handleMessageFromSandbox(SandboxMaster& sandbox, const SandboxMessa
     } else if (msg.type == SandboxMessage::HIDE_EDITOR && m_sandboxHasScreen == sandbox.id) {
         m_sandboxHasScreen.clear();
     } else if (msg.type == SandboxMessage::METRICS) {
-        m_sandboxLoadedCount.set(sandbox.id, jsonGetValue(msg.data, "LoadedCount", (uint32)0));
-
-        auto bytesOutMeter = Metrics::getStatistic<Meter>("NetBytesOut");
-        bytesOutMeter->updateExtRate1min(sandbox.id, jsonGetValue(msg.data, "NetBytesOut", 0.0));
-
-        auto bytesInMeter = Metrics::getStatistic<Meter>("NetBytesIn");
-        bytesInMeter->updateExtRate1min(sandbox.id, jsonGetValue(msg.data, "NetBytesIn", 0.0));
-
-        auto audioTime = Metrics::getStatistic<TimeStatistic>("audio");
-        audioTime->getMeter().updateExtRate1min(sandbox.id, jsonGetValue(msg.data, "RPS", 0.0));
+        std::vector<TimeStatistic::Histogram> hists;
 
         if (msg.data.find("audio") != msg.data.end()) {
-            std::vector<TimeStatistic::Histogram> hists;
             for (auto& hist : msg.data["audio"]) {
                 hists.emplace_back(hist);
             }
-            audioTime->updateExt1minValues(sandbox.id, hists);
         }
 
+        updateSandboxNetworkStats(sandbox.id, jsonGetValue(msg.data, "LoadedCount", (uint32)0),
+                                  jsonGetValue(msg.data, "NetBytesIn", 0.0), jsonGetValue(msg.data, "NetBytesOut", 0.0),
+                                  jsonGetValue(msg.data, "RPS", 0.0), hists);
     } else {
         logln("received unhandled message from sandbox " << sandbox.id);
     }
@@ -1178,6 +1285,15 @@ void Server::sandboxHideEditor() {
     if (m_sandboxModeRuntime == SANDBOX_CHAIN && nullptr != m_sandboxController) {
         m_sandboxController->send(SandboxMessage(SandboxMessage::HIDE_EDITOR, {}));
     }
+}
+
+void Server::updateSandboxNetworkStats(const String& key, uint32 loaded, double bytesIn, double bytesOut, double rps,
+                                       const std::vector<TimeStatistic::Histogram>& audioHists) {
+    m_sandboxLoadedCount.set(key, loaded);
+    Metrics::getStatistic<Meter>("NetBytesIn")->updateExtRate1min(key, bytesIn);
+    Metrics::getStatistic<Meter>("NetBytesOut")->updateExtRate1min(key, bytesOut);
+    Metrics::getStatistic<TimeStatistic>("audio")->getMeter().updateExtRate1min(key, rps);
+    Metrics::getStatistic<TimeStatistic>("audio")->updateExt1minValues(key, audioHists);
 }
 
 }  // namespace e47

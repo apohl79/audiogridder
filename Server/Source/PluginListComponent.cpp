@@ -14,9 +14,9 @@
 
 namespace e47 {
 
-class AudioGridderPluginListComponent::TableModel : public TableListBoxModel {
+class PluginListComponent::TableModel : public TableListBoxModel {
   public:
-    TableModel(AudioGridderPluginListComponent& c, KnownPluginList& l, std::set<String>& e)
+    TableModel(PluginListComponent& c, KnownPluginList& l, std::set<String>& e)
         : owner(c), list(l), exlist(e) {}
 
     int getNumRows() override {
@@ -101,14 +101,27 @@ class AudioGridderPluginListComponent::TableModel : public TableListBoxModel {
         }
     }
 
+    void selectedRowsChanged(int) override {
+        selectedRows.clear();
+
+        auto rowsSet = owner.m_table.getSelectedRows();
+
+        for (auto& range : rowsSet.getRanges()) {
+            for (int row = range.getStart(); row < range.getEnd(); row++) {
+                selectedRows.push_back(row);
+            }
+        }
+    }
+
     void cellClicked(int rowNumber, int columnId, const juce::MouseEvent& e) override {
         TableListBoxModel::cellClicked(rowNumber, columnId, e);
 
-        if (rowNumber >= 0 && rowNumber < getNumRows() && e.mods.isPopupMenu())
+        if (rowNumber >= 0 && rowNumber < getNumRows() && e.mods.isPopupMenu()) {
             owner.createMenuForRow(rowNumber).showMenuAsync(PopupMenu::Options().withDeletionCheck(owner));
+        }
     }
 
-    void deleteKeyPressed(int) override { owner.removeSelectedPlugins(); }
+    void deleteKeyPressed(int) override { owner.removePluginItems(selectedRows); }
 
     void sortOrderChanged(int newSortColumnId, bool isForwards) override {
         switch (newSortColumnId) {
@@ -144,20 +157,20 @@ class AudioGridderPluginListComponent::TableModel : public TableListBoxModel {
         return items.joinIntoString(" - ");
     }
 
-    AudioGridderPluginListComponent& owner;
+    PluginListComponent& owner;
     KnownPluginList& list;
     std::set<String>& exlist;
+    std::vector<int> selectedRows;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TableModel)
 };
 
-AudioGridderPluginListComponent::AudioGridderPluginListComponent(AudioPluginFormatManager& manager,
-                                                                 KnownPluginList& listToEdit, std::set<String>& exList,
-                                                                 const File& deadMansPedal)
-    : formatManager(manager), list(listToEdit), excludeList(exList), deadMansPedalFile(deadMansPedal) {
-    tableModel.reset(new TableModel(*this, listToEdit, exList));
+PluginListComponent::PluginListComponent(AudioPluginFormatManager& manager, KnownPluginList& listToEdit,
+                                         std::set<String>& exList, const File& deadMansPedal)
+    : m_formatManager(manager), m_list(listToEdit), m_excludeList(exList), m_deadMansPedalFile(deadMansPedal) {
+    m_tableModel.reset(new TableModel(*this, listToEdit, exList));
 
-    TableHeaderComponent& header = table.getHeader();
+    TableHeaderComponent& header = m_table.getHeader();
 
     header.addColumn(TRANS("Name"), TableModel::nameCol, 200, 100, 700,
                      TableHeaderComponent::defaultFlags | TableHeaderComponent::sortedForwards);
@@ -166,135 +179,143 @@ AudioGridderPluginListComponent::AudioGridderPluginListComponent(AudioPluginForm
     header.addColumn(TRANS("Manufacturer"), TableModel::manufacturerCol, 200, 100, 300);
     header.addColumn(TRANS("Description"), TableModel::descCol, 100, 100, 500, TableHeaderComponent::notSortable);
 
-    table.setHeaderHeight(22);
-    table.setRowHeight(20);
-    table.setModel(tableModel.get());
-    table.setMultipleSelectionEnabled(true);
-    addAndMakeVisible(table);
+    m_table.setHeaderHeight(22);
+    m_table.setRowHeight(20);
+    m_table.setModel(m_tableModel.get());
+    m_table.setMultipleSelectionEnabled(true);
+    addAndMakeVisible(m_table);
 
     setSize(400, 600);
-    list.addChangeListener(this);
+    m_list.addChangeListener(this);
     updateList();
-    table.getHeader().reSortTable();
+    m_table.getHeader().reSortTable();
 
-    PluginDirectoryScanner::applyBlacklistingsFromDeadMansPedal(list, deadMansPedalFile);
-    deadMansPedalFile.deleteFile();
+    PluginDirectoryScanner::applyBlacklistingsFromDeadMansPedal(m_list, m_deadMansPedalFile);
+    m_deadMansPedalFile.deleteFile();
 }
 
-AudioGridderPluginListComponent::~AudioGridderPluginListComponent() { list.removeChangeListener(this); }
+PluginListComponent::~PluginListComponent() { m_list.removeChangeListener(this); }
 
-void AudioGridderPluginListComponent::resized() {
+void PluginListComponent::resized() {
     auto r = getLocalBounds().reduced(2);
-    table.setBounds(r);
+    m_table.setBounds(r);
 }
 
-void AudioGridderPluginListComponent::changeListenerCallback(ChangeBroadcaster*) {
-    table.getHeader().reSortTable();
+void PluginListComponent::changeListenerCallback(ChangeBroadcaster*) {
+    m_table.getHeader().reSortTable();
     updateList();
 }
 
-void AudioGridderPluginListComponent::updateList() {
-    table.updateContent();
-    table.repaint();
+void PluginListComponent::updateList() {
+    m_table.updateContent();
+    m_table.repaint();
 }
 
-void AudioGridderPluginListComponent::removeSelectedPlugins() {
-    auto selected = table.getSelectedRows();
-
-    for (int i = table.getNumRows(); --i >= 0;) {
-        if (selected.contains(i)) {
-            removePluginItem(i);
-        }
-    }
-}
-
-void AudioGridderPluginListComponent::setTableModel(TableListBoxModel* model) {
-    table.setModel(nullptr);
-    tableModel.reset(model);
-    table.setModel(tableModel.get());
-    table.getHeader().reSortTable();
-    table.updateContent();
-    table.repaint();
-}
-
-void AudioGridderPluginListComponent::removeMissingPlugins() {
-    auto types = list.getTypes();
+void PluginListComponent::removeMissingPlugins() {
+    auto types = m_list.getTypes();
 
     for (int i = types.size(); --i >= 0;) {
         auto type = types.getUnchecked(i);
 
-        if (!formatManager.doesPluginStillExist(type)) list.removeType(type);
-    }
-}
-
-void AudioGridderPluginListComponent::removePluginItem(int index) {
-    if (index < list.getNumTypes()) {
-        auto p = list.getTypes()[index];
-        if (!p.pluginFormatName.compare("AudioUnit")) {
-            excludeList.insert(p.descriptiveName);
-        } else {
-            excludeList.insert(p.fileOrIdentifier);
-        }
-        list.removeType(p);
-        getApp()->getServer()->saveConfig();
-    }
-}
-
-void AudioGridderPluginListComponent::addPluginItem(int index) {
-    if (index >= (list.getNumTypes() + list.getBlacklistedFiles().size())) {
-        index -= list.getNumTypes();
-        index -= list.getBlacklistedFiles().size();
-        auto it = excludeList.begin();
-        while (index-- > 0 && it != excludeList.end()) it++;
-        if (it != excludeList.end()) {
-            auto name = *it;
-            excludeList.erase(it);
-            // try to add plugin
-            std::vector<String> v = {name};
-            getApp()->getServer()->addPlugins(v, [this, name](bool success) {
-                if (!success) {
-                    excludeList.insert(name);
-                }
-            });
+        if (!m_formatManager.doesPluginStillExist(type)) {
+            m_list.removeType(type);
         }
     }
 }
 
-void AudioGridderPluginListComponent::rescanPluginItem(int index) {
-    if (index >= list.getNumTypes() && index < (list.getNumTypes() + list.getBlacklistedFiles().size())) {
-        index -= list.getNumTypes();
-        auto id = list.getBlacklistedFiles()[index];
-        list.removeFromBlacklist(id);
+void PluginListComponent::removePluginItems(const std::vector<int> indexes) {
+    auto types = m_list.getTypes();
+
+    for (int index : indexes) {
+        if (index < types.size()) {
+            auto p = types[index];
+            if (!p.pluginFormatName.compare("AudioUnit")) {
+                m_excludeList.insert(p.descriptiveName);
+            } else {
+                m_excludeList.insert(p.fileOrIdentifier);
+            }
+            m_list.removeType(p);
+        }
+    }
+
+    getApp()->getServer()->saveConfig();
+}
+
+void PluginListComponent::addPluginItems(const std::vector<int> indexes) {
+    auto types = m_list.getTypes();
+    int numTypes = types.size();
+    int numBlacklistedFiles = m_list.getBlacklistedFiles().size();
+    std::vector<String> names;
+
+    for (int index : indexes) {
+        if (index >= (numTypes + numBlacklistedFiles)) {
+            index -= numTypes;
+            index -= numBlacklistedFiles;
+            auto it = m_excludeList.begin();
+            while (index-- > 0 && it != m_excludeList.end()) it++;
+            if (it != m_excludeList.end()) {
+                auto name = *it;
+                names.push_back(name);
+            }
+        }
+    }
+
+    for (auto& name : names) {
+        m_excludeList.erase(name);
+    }
+
+    getApp()->getServer()->addPlugins(names, [this, names](bool success) {
+        if (!success) {
+            for (auto& name : names) {
+                m_excludeList.insert(name);
+            }
+        }
+    });
+}
+
+void PluginListComponent::rescanPluginItems(const std::vector<int> indexes) {
+    auto types = m_list.getTypes();
+    int numTypes = types.size();
+    int numBlacklistedFiles = m_list.getBlacklistedFiles().size();
+    std::vector<String> ids;
+
+    for (int index : indexes) {
+        if (index >= numTypes && index < (numTypes + numBlacklistedFiles)) {
+            index -= numTypes;
+            auto id = m_list.getBlacklistedFiles()[index];
+            ids.push_back(id);
+        }
+    }
+
+    for (auto& id : ids) {
+        m_list.removeFromBlacklist(id);
         getApp()->getServer()->saveKnownPluginList();
     }
 }
 
-PopupMenu AudioGridderPluginListComponent::createMenuForRow(int rowNumber) {
+PopupMenu PluginListComponent::createMenuForRow(int rowNumber) {
     PopupMenu menu;
 
-    if (rowNumber >= 0 && rowNumber < tableModel->getNumRows()) {
-        bool blacklisted = dynamic_cast<TableModel*>(tableModel.get())->isBlacklisted(rowNumber);
-        bool excluded = dynamic_cast<TableModel*>(tableModel.get())->isExcluded(rowNumber);
-        if (!blacklisted) {
-            menu.addItem(PopupMenu::Item("Deactivate").setAction([this, rowNumber] { removePluginItem(rowNumber); }));
-        } else if (excluded) {
-            menu.addItem(PopupMenu::Item("Activate").setAction([this, rowNumber] { addPluginItem(rowNumber); }));
+    if (rowNumber >= 0 && rowNumber < m_tableModel->getNumRows()) {
+        if (!m_tableModel->isBlacklisted(rowNumber)) {
+            menu.addItem("Deactivate", [this] {
+                removePluginItems(m_tableModel->selectedRows);
+                m_table.deselectAllRows();
+            });
+        } else if (m_tableModel->isExcluded(rowNumber)) {
+            menu.addItem("Activate", [this] {
+                addPluginItems(m_tableModel->selectedRows);
+                m_table.deselectAllRows();
+            });
         } else {
-            menu.addItem(
-                PopupMenu::Item("Remove from blacklist (Force rescan at next start)").setAction([this, rowNumber] {
-                    rescanPluginItem(rowNumber);
-                }));
+            menu.addItem("Remove from blacklist (Force rescan at next start)", [this] {
+                rescanPluginItems(m_tableModel->selectedRows);
+                m_table.deselectAllRows();
+            });
         }
     }
 
     return menu;
-}
-
-bool AudioGridderPluginListComponent::isInterestedInFileDrag(const StringArray& /*files*/) { return true; }
-
-void AudioGridderPluginListComponent::filesDropped(const StringArray& files, int, int) {
-    OwnedArray<PluginDescription> typesFound;
-    list.scanAndAddDragAndDroppedFiles(formatManager, files, typesFound);
 }
 
 }  // namespace e47

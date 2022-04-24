@@ -48,6 +48,11 @@ Worker::~Worker() {
         m_cmdIn->close();
     }
     waitForThreadAndLog(this, this);
+    m_cmdIn.reset();
+    m_cmdOut.reset();
+    m_audio.reset();
+    m_screen.reset();
+    m_keyWatcher.reset();
     count--;
 }
 
@@ -196,34 +201,25 @@ void Worker::run() {
         }
     }
 
-    shutdown();
-    if (nullptr != m_audio) {
-        m_audio->waitForThreadToExit(-1);
-        m_audio.reset();
-    }
     if (nullptr != m_screen) {
+        if (m_activeEditorIdx > -1) {
+            m_screen->hideEditor();
+        }
+        m_screen->shutdown();
         m_screen->waitForThreadToExit(-1);
-        m_screen.reset();
     }
+
+    if (nullptr != m_audio) {
+        m_audio->shutdown();
+        m_audio->waitForThreadToExit(-1);
+    }
+
     logln("command processor terminated");
     runCount--;
 }
 
 void Worker::shutdown() {
     traceScope();
-    if (m_shutdown) {
-        return;
-    }
-    m_shutdown = true;
-    if (m_activeEditorIdx > -1) {
-        m_screen->hideEditor();
-    }
-    if (nullptr != m_audio) {
-        m_audio->shutdown();
-    }
-    if (nullptr != m_screen) {
-        m_screen->shutdown();
-    }
     signalThreadShouldExit();
 }
 
@@ -241,6 +237,9 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     String err;
     bool wasSidechainDisabled = m_audio->isSidechainDisabled();
     bool success = m_audio->addPlugin(id, settings, err);
+    if (!success) {
+        logln("error: " << err);
+    }
     std::shared_ptr<Processor> proc;
     json jresult;
     jresult["success"] = success;
@@ -258,7 +257,8 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
                            [this](int idx, int paramIdx, bool gestureIsStarting) {
                                sendParamGestureChange(idx, paramIdx, gestureIsStarting);
                            },
-                           [this](Message<Key>& m) { m.send(m_cmdOut.get()); });
+                           [this](Message<Key>& m) { m.send(m_cmdOut.get()); },
+                           [this](int idx, bool ok, const String& procErr) { sendStatusChange(idx, ok, procErr); });
     }
     Message<AddPluginResult> msgResult(this);
     PLD(msgResult).setJson(jresult);
@@ -269,7 +269,6 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     }
     logln("..." << (success ? "ok" : "failed"));
     if (!success) {
-        m_cmdIn->close();
         return;
     }
     logln("sending presets...");
@@ -395,14 +394,18 @@ void Worker::handleMessage(std::shared_ptr<Message<Key>> msg) {
 
 void Worker::handleMessage(std::shared_ptr<Message<GetPluginSettings>> msg) {
     traceScope();
+    MemoryBlock block;
     if (auto proc = m_audio->getProcessor(pPLD(msg).getNumber())) {
-        MemoryBlock block;
         // Load plugin state on the message thread
         proc->getStateInformation(block);
-        Message<PluginSettings> ret(this);
-        ret.payload.setData(block.begin(), static_cast<int>(block.getSize()));
-        ret.send(m_cmdIn.get());
+    } else {
+        logln("error: failed to read plugin settings: invalid index " << pPLD(msg).getNumber());
     }
+    Message<PluginSettings> ret(this);
+    if (!block.isEmpty()) {
+        ret.payload.setData(block.begin(), static_cast<int>(block.getSize()));
+    }
+    ret.send(m_cmdIn.get());
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<SetPluginSettings>> msg) {
@@ -673,6 +676,13 @@ void Worker::sendParamGestureChange(int idx, int paramIdx, bool guestureIsStarti
     DATA(msg)->idx = idx;
     DATA(msg)->paramIdx = paramIdx;
     DATA(msg)->gestureIsStarting = guestureIsStarting;
+    msg.send(m_cmdOut.get());
+}
+
+void Worker::sendStatusChange(int idx, bool ok, const String& err) {
+    logln("sending plugin status (index=" << idx << ", ok=" << (int)ok << ", err=" << err << ")");
+    Message<PluginStatus> msg(this);
+    PLD(msg).setJson({{"idx", idx}, {"ok", ok}, {"err", err.toStdString()}});
     msg.send(m_cmdOut.get());
 }
 

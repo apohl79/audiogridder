@@ -153,10 +153,11 @@ std::shared_ptr<AudioPluginInstance> Processor::loadPlugin(const String& id, dou
 }
 
 void Processor::setCallbacks(ParamValueChangeCallback valueChangeFn, ParamGestureChangeCallback gestureChangeFn,
-                             KeysFromSandboxCallback keysFn) {
+                             KeysFromSandboxCallback keysFn, StatusChangeFromSandbox statusChangeFn) {
     onParamValueChange = valueChangeFn;
     onParamGestureChange = gestureChangeFn;
     onKeysFromSandbox = keysFn;
+    onStatusChangeFromSandbox = statusChangeFn;
 
     if (auto client = getClient()) {
         client->onParamValueChange = [this](int paramIdx, float value) {
@@ -166,6 +167,7 @@ void Processor::setCallbacks(ParamValueChangeCallback valueChangeFn, ParamGestur
             onParamGestureChange(m_chainIdx, paramIdx, value);
         };
         client->onKeysFromSandbox = [this](Message<Key>& msg) { onKeysFromSandbox(msg); };
+        client->onStatusChange = [this](bool ok, const String& err) { onStatusChangeFromSandbox(m_chainIdx, ok, err); };
     }
 }
 
@@ -195,6 +197,9 @@ bool Processor::load(const String& settings, String& err, const PluginDescriptio
             }
         } else {
             err = "failed to initialize sandbox";
+            if (client->getError().isNotEmpty()) {
+                err << ": " << client->getError();
+            }
         }
     } else {
         std::shared_ptr<AudioPluginInstance> p;
@@ -213,7 +218,6 @@ bool Processor::load(const String& settings, String& err, const PluginDescriptio
                 for (auto* param : m_plugin->getParameters()) {
                     param->addListener(this);
                 }
-                loadedCount++;
                 if (settings.isNotEmpty()) {
                     MemoryBlock block;
                     block.fromBase64Encoding(settings);
@@ -225,6 +229,11 @@ bool Processor::load(const String& settings, String& err, const PluginDescriptio
             }
         }
     }
+
+    if (loaded) {
+        loadedCount++;
+    }
+
     return loaded;
 }
 
@@ -243,6 +252,7 @@ void Processor::unload() {
         }
         client->unload();
         client->shutdown();
+        client->waitForThreadToExit(-1);
         client.reset();
     } else {
         std::shared_ptr<AudioPluginInstance> p;
@@ -256,10 +266,11 @@ void Processor::unload() {
             }
             p = m_plugin;
             m_plugin.reset();
-            loadedCount--;
         }
         p.reset();
     }
+
+    loadedCount--;
 }
 
 bool Processor::isLoaded() {

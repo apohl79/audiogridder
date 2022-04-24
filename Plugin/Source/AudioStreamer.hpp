@@ -26,7 +26,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
           m_writeQ((size_t)clnt->NUM_OF_BUFFERS * 2),
           m_readQ((size_t)clnt->NUM_OF_BUFFERS * 2),
           m_durationGlobal(TimeStatistic::getDuration("audio")),
-          m_durationLocal(TimeStatistic::getDuration(String("audio.") + String(getId()), false)) {
+          m_durationLocal(TimeStatistic::getDuration(String("audio.") + String(getTagId()), false)) {
         traceScope();
 
         for (int i = 0; i < clnt->NUM_OF_BUFFERS; i++) {

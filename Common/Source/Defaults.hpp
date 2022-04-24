@@ -25,6 +25,9 @@ static const String PLUGIN_TRAY_SOCK = "plugin-tray.sock";
 static const String SERVER_SOCK = "server-{id}.sock";
 static const String WORKER_SOCK = "worker-{id}-{n}.sock";
 
+static constexpr int SCAN_WORKERS = 8;
+static constexpr int SCAN_ID_START = 1000;
+
 static constexpr int SCAREA_STEPS = 30;
 static constexpr int SCAREA_FULLSCREEN = 0xFFFF;
 
@@ -54,8 +57,8 @@ static const String SERVER_CONFIG_FILE = "~/.audiogridder/audiogridderserver{id}
 static const String PLUGIN_CONFIG_FILE = "~/.audiogridder/audiogridderplugin.cfg";
 static const String PLUGIN_TRAY_CONFIG_FILE = "~/.audiogridder/audiogridderplugintray.cfg";
 static const String KNOWN_PLUGINS_FILE = "~/.audiogridder/audiogridderserver{id}.cache";
-static const String DEAD_MANS_FILE = "~/.audiogridder/audiogridderserver.crash";
-static const String SERVER_RUN_FILE = "~/.audiogridder/audiogridderserver.running";
+static const String DEAD_MANS_FILE = "~/.audiogridder/audiogridderserver{id}.crash";
+static const String SERVER_RUN_FILE = "~/.audiogridder/audiogridderserver{id}.running";
 static const String SERVER_WINDOW_POSITIONS_FILE = "~/.audiogridder/audiogridderserver{id}.winpos";
 static const String PLUGIN_WINDOW_POSITIONS_FILE = "~/.audiogridder/audiogridderplugin.winpos";
 static const String PRESETS_DIR =
@@ -84,9 +87,9 @@ static const String KNOWN_PLUGINS_FILE =
     File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
     "\\AudioGridder\\audiogridderserver{id}.cache";
 static const String DEAD_MANS_FILE = File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
-                                     "\\AudioGridder\\audiogridderserver.crash";
+                                     "\\AudioGridder\\audiogridderserver{id}.crash";
 static const String SERVER_RUN_FILE = File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
-                                      "\\AudioGridder\\audiogridderserver.running";
+                                      "\\AudioGridder\\audiogridderserver{id}.running";
 static const String SERVER_WINDOW_POSITIONS_FILE =
     File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
     "\\AudioGridder\\audiogridderserver{id}.winpos";
@@ -286,7 +289,8 @@ static constexpr uint32 CPU_LOW_COLOR = 0xff00ff00;
 static constexpr uint32 CPU_MEDIUM_COLOR = 0xffffff00;
 static constexpr uint32 CPU_HIGH_COLOR = 0xffff0000;
 static constexpr uint32 PLUGIN_OK_COLOR = 0xff008000;
-static constexpr uint32 PLUGIN_NOTOK_COLOR = 0xff8b0000;
+static constexpr uint32 PLUGIN_NOTCONNECTED_COLOR = 0xff8b0000;
+static constexpr uint32 PLUGIN_NOTLOADED_COLOR = 0xff8b4f00;
 
 static const String MDNS_SERVICE_NAME = "_audiogridder._tcp.local.";
 

@@ -21,7 +21,7 @@ PluginListWindow::PluginListWindow(App* app, KnownPluginList& list, const String
       m_deadMansPedalFile(deadMansPedalFile) {
     setUsingNativeTitleBar(true);
     m_plugmgr.addDefaultFormats();
-    setContentOwned(new AudioGridderPluginListComponent(m_plugmgr, m_pluginlist, m_app->getServer()->getExcludeList(),
+    setContentOwned(new PluginListComponent(m_plugmgr, m_pluginlist, m_app->getServer()->getExcludeList(),
                                                         m_deadMansPedalFile),
                     true);
 

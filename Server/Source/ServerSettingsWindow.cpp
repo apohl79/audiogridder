@@ -81,7 +81,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     row++;
 
     label = std::make_unique<Label>();
-    label->setText("Server ID:", NotificationType::dontSendNotification);
+    label->setText("Server ID (0-31):", NotificationType::dontSendNotification);
     label->setBounds(getLabelBounds(row));
     addChildAndSetID(label.get(), "lbl");
     m_components.push_back(std::move(label));
@@ -90,6 +90,12 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     String id;
     id << idConfig;
     m_idText.setText(id);
+    m_idText.setInputFilter(new TextEditor::LengthAndCharacterRestriction(2, "0123456789"), true);
+    m_idText.onTextChange = [this] {
+        if (m_idText.getText().getIntValue() > 31) {
+            m_idText.setText("31", false);
+        }
+    };
     m_idText.setBounds(getFieldBounds(row));
     addChildAndSetID(&m_idText, "id");
 

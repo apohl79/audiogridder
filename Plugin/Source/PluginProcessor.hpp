@@ -126,10 +126,14 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
 
         bool hasEditor = true;
         bool ok = false;
+        String error;
     };
 
-    // Called by the client object to trigger resyncing the remote plugin settings
+    // Called by the client to trigger resyncing the remote plugin settings
     void sync();
+
+    // Called by the client to check for failed plugins that we want to auto retry
+    void autoRetry();
 
     enum SyncRemoteMode { SYNC_ALWAYS, SYNC_WITH_EDITOR, SYNC_DISABLED };
     SyncRemoteMode getSyncRemoteMode() const { return m_syncRemote; }
@@ -169,6 +173,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     void getAllParameterValues(int idx);
     void updateParameterValue(int idx, int paramIdx, float val, bool updateServer = true);
     void updateParameterGestureTracking(int idx, int paramIdx, bool starting);
+    void updatePluginStatus(int idx, bool ok, const String& err);
     void increaseSCArea();
     void decreaseSCArea();
     void toggleFullscreenSCArea();
@@ -324,6 +329,8 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     std::atomic_bool m_prepared{false};
     std::vector<LoadedPlugin> m_loadedPlugins;
     mutable std::mutex m_loadedPluginsSyncMtx;
+    std::atomic_bool m_loadedPluginsOk{false};
+    int m_autoReconnects = 0;
     int m_activePlugin = -1;
     int m_lastActivePlugin = -1;
     bool m_editAlways = true;

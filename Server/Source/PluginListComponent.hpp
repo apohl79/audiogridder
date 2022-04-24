@@ -15,44 +15,37 @@
 
 namespace e47 {
 
-class AudioGridderPluginListComponent : public Component, public FileDragAndDropTarget, private ChangeListener {
+class PluginListComponent : public Component, public FileDragAndDropTarget, private ChangeListener {
   public:
-    AudioGridderPluginListComponent(AudioPluginFormatManager& formatManager, KnownPluginList& listToRepresent,
-                                    std::set<String>& exList, const File& deadMansPedalFile);
-
-    ~AudioGridderPluginListComponent() override;
+    PluginListComponent(AudioPluginFormatManager& formatManager, KnownPluginList& listToRepresent,
+                        std::set<String>& exList, const File& deadMansPedalFile);
+    ~PluginListComponent() override;
 
     PopupMenu createMenuForRow(int rowNumber);
 
-    void removeSelectedPlugins();
-
-    void setTableModel(TableListBoxModel*);
-
-    TableListBox& getTableListBox() noexcept { return table; }
-
   private:
-    AudioPluginFormatManager& formatManager;
-    KnownPluginList& list;
-    std::set<String>& excludeList;
-    File deadMansPedalFile;
-    TableListBox table;
-    String dialogTitle, dialogText;
+    AudioPluginFormatManager& m_formatManager;
+    KnownPluginList& m_list;
+    std::set<String>& m_excludeList;
+    File m_deadMansPedalFile;
+    TableListBox m_table;
+    String m_dialogTitle, m_dialogText;
 
     class TableModel;
-    std::unique_ptr<TableListBoxModel> tableModel;
+    std::unique_ptr<TableModel> m_tableModel;
 
     void updateList();
     void removeMissingPlugins();
-    void removePluginItem(int index);
-    void addPluginItem(int index);
-    void rescanPluginItem(int index);
+    void removePluginItems(const std::vector<int> indexes);
+    void addPluginItems(const std::vector<int> indexes);
+    void rescanPluginItems(const std::vector<int> indexes);
 
     void resized() override;
-    bool isInterestedInFileDrag(const StringArray&) override;
-    void filesDropped(const StringArray&, int, int) override;
+    bool isInterestedInFileDrag(const StringArray&) override { return false; }
+    void filesDropped(const StringArray&, int, int) override {}
     void changeListenerCallback(ChangeBroadcaster*) override;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioGridderPluginListComponent)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginListComponent)
 };
 
 }  // namespace e47

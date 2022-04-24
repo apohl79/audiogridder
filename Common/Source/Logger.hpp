@@ -116,7 +116,7 @@ class LogTag {
     void setLogTagName(const String& s) { m_tagName = s; }
     const String& getLogTagName() const { return m_tagName; }
     const String& getLogTagExtra() const { return m_tagExtra; }
-    uint64 getId() const { return m_tagId; }
+    uint64 getTagId() const { return m_tagId; }
 
     const LogTag* getLogTagSource() const { return this; }
     String getLogTag() const {
@@ -137,7 +137,7 @@ class LogTagDelegate : public LogTag {
     LogTagDelegate(const LogTag* src = nullptr) : LogTag("unset") { setLogTagSource(src); }
     void setLogTagSource(const LogTag* src) {
         if (nullptr != src) {
-            m_tagId = src->getId();
+            m_tagId = src->getTagId();
             m_tagName = src->getLogTagName();
             m_tagExtra = src->getLogTagExtra();
         }

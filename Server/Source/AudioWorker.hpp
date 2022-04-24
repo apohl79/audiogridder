@@ -40,7 +40,15 @@ class AudioWorker : public Thread, public LogTagDelegate {
 
     bool isOk() {
         std::lock_guard<std::mutex> lock(m_mtx);
-        m_wasOk = !threadShouldExit() && nullptr != m_socket && m_socket->isConnected();
+        if (nullptr == m_socket) {
+            m_error = "socket is nullptr";
+            m_wasOk = false;
+        } else if (!m_socket->isConnected()) {
+            m_error = "socket is not connected";
+            m_wasOk = false;
+        } else {
+            m_wasOk = true;
+        }
         return m_wasOk;
     }
 
@@ -74,6 +82,7 @@ class AudioWorker : public Thread, public LogTagDelegate {
     std::mutex m_mtx;
     std::atomic_bool m_wasOk{true};
     std::unique_ptr<StreamingSocket> m_socket;
+    String m_error;
     int m_channelsIn;
     int m_channelsOut;
     int m_channelsSC;

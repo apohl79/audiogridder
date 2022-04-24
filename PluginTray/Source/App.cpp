@@ -80,7 +80,7 @@ void App::getPopupMenu(PopupMenu& menu, bool withShowMonitorOption) {
         if (name.isEmpty()) {
             name = "Unnamed";
         }
-        if (!c->status.ok) {
+        if (!c->status.connected) {
             name = "[X] " + name;
         }
         PopupMenu subRecon;
@@ -197,7 +197,9 @@ void App::Connection::messageReceived(const MemoryBlock& message) {
         updateValue(status.blocks, jsonGetValue(msg.data, "blocks", 0));
         updateValue(status.serverNameId, jsonGetValue(msg.data, "serverNameId", status.serverNameId));
         updateValue(status.serverHost, jsonGetValue(msg.data, "serverHost", status.serverHost));
-        updateValue(status.ok, jsonGetValue(msg.data, "ok", false));
+        updateValue(status.connected, jsonGetValue(msg.data, "connected", false));
+        updateValue(status.loadedPluginsOk, jsonGetValue(msg.data, "loadedPluginsOk", false));
+        updateValue(status.loadedPluginsErr, jsonGetValue(msg.data, "loadedPluginsErr", String()));
 
         status.lastUpdated = Time::currentTimeMillis();
 

@@ -54,9 +54,12 @@ struct MessageHelper {
         ErrorCode code = E_NONE;
         String str = "";
         String toString() const {
-            String ret = "EC=";
-            ret << errorCodeToString(code);
-            ret << " STR=" << str;
+            String ret;
+            if (str.isNotEmpty()) {
+                ret << str << " (" << errorCodeToString(code) << ")";
+            } else {
+                ret << errorCodeToString(code);
+            }
             return ret;
         }
     };
@@ -565,6 +568,12 @@ class DelPlugin : public NumberPayload {
     DelPlugin() : NumberPayload(Type) {}
 };
 
+class PluginStatus : public JsonPayload {
+  public:
+    static constexpr int Type = __COUNTER__;
+    PluginStatus() : JsonPayload(Type) {}
+};
+
 struct editplugin_t {
     int index;
     int x;
@@ -827,7 +836,7 @@ class Message : public LogTagDelegate {
             success = true;
             int ret = socket->waitUntilReady(true, timeoutMilliseconds);
             if (ret > 0) {
-                if (e47::read(socket, &hdr, sizeof(hdr), timeoutMilliseconds, e, m_bytesIn.get())) {
+                if (e47::read(socket, &hdr, sizeof(hdr), 2000, e, m_bytesIn.get())) {
                     auto t = T::Type;
                     if (t > 0 && hdr.type != t) {
                         success = false;
@@ -849,8 +858,7 @@ class Message : public LogTagDelegate {
                                 if (payload.getSize() != hdr.size) {
                                     payload.setSize(hdr.size);
                                 }
-                                if (!e47::read(socket, payload.getData(), hdr.size, timeoutMilliseconds, e,
-                                               m_bytesIn.get())) {
+                                if (!e47::read(socket, payload.getData(), hdr.size, 2000, e, m_bytesIn.get())) {
                                     success = false;
                                     MessageHelper::seterr(e, MessageHelper::E_DATA, "failed to read message body");
                                     traceln("read of message body failed");
@@ -873,7 +881,7 @@ class Message : public LogTagDelegate {
                 traceln("failed: E_TIMEOUT");
             }
         } else {
-            MessageHelper::seterr(e, MessageHelper::E_STATE);
+            MessageHelper::seterr(e, MessageHelper::E_STATE, "no socket or not connected");
             traceln("failed: E_STATE");
         }
         return success;

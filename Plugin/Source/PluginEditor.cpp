@@ -279,17 +279,22 @@ void PluginEditor::buttonClicked(Button* button, const ModifierKeys& modifiers, 
         auto addFn = [this](const ServerPlugin& plug) {
             traceScope();
             String err;
-            if (m_processor.loadPlugin(plug, err)) {
-                addPluginButton(plug.getId(), plug.getName());
-                editPlugin((int)m_pluginButtons.size() - 1);
-#if JucePlugin_IsSynth
-                m_newPluginButton.setEnabled(false);
-#endif
-                resized();
-            } else {
+            bool success = m_processor.loadPlugin(plug, err);
+            if (!success) {
                 AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Error",
                                                  "Failed to add " + plug.getName() + " plugin!\n\nError: " + err, "OK");
             }
+            auto* b = addPluginButton(plug.getId(), plug.getName());
+            if (success) {
+                editPlugin((int)m_pluginButtons.size() - 1);
+            } else {
+                b->setEnabled(false);
+                b->setTooltip(err);
+            }
+#if JucePlugin_IsSynth
+            m_newPluginButton.setEnabled(false);
+#endif
+            resized();
         };
 
         auto bounds = button->getScreenBounds().toFloat();
@@ -494,6 +499,7 @@ void PluginEditor::createPluginButtons() {
             auto* b = addPluginButton(plug.id, plug.name);
             if (!plug.ok) {
                 b->setEnabled(false);
+                b->setTooltip(plug.error);
             }
             if (plug.bypassed) {
                 b->setButtonText("( " + m_processor.getLoadedPlugin(idx).name + " )");
@@ -571,7 +577,10 @@ void PluginEditor::setConnected(bool connected) {
         srvTxt << " (+" << m_processor.getLatencyMillis() << "ms)";
         m_srvLabel.setText(srvTxt, NotificationType::dontSendNotification);
         for (size_t i = 0; i < m_pluginButtons.size(); i++) {
-            m_pluginButtons[i]->setEnabled(m_processor.getLoadedPlugin((int)i).ok);
+            auto& plug = m_processor.getLoadedPlugin((int)i);
+            auto* b = m_pluginButtons[i].get();
+            b->setEnabled(plug.ok);
+            b->setTooltip(plug.error);
         }
         auto active = m_processor.getActivePlugin();
         if (active > -1) {
@@ -589,8 +598,9 @@ void PluginEditor::setConnected(bool connected) {
     } else {
         m_srvLabel.setText("not connected", NotificationType::dontSendNotification);
         setCPULoad(0.0f);
-        for (auto& but : m_pluginButtons) {
-            but->setEnabled(false);
+        for (auto& b : m_pluginButtons) {
+            b->setEnabled(false);
+            b->setTooltip("");
         }
         resetPluginScreen();
         resized();
@@ -616,68 +626,135 @@ void PluginEditor::setCPULoad(float load) {
 void PluginEditor::mouseUp(const MouseEvent& event) {
     traceScope();
     if (event.eventComponent == &m_srvIcon) {
-        PopupMenu m;
-        m.addSectionHeader("Buffering");
-        PopupMenu bufMenu;
-        int rate = (int)lround(m_processor.getSampleRate());
-        int iobuf = m_processor.getBlockSize();
-        auto getName = [rate, iobuf](int blocks) -> String {
-            String n;
-            n << blocks << " Blocks (+" << blocks * iobuf * 1000 / rate << "ms)";
-            return n;
-        };
-        bufMenu.addItem("Disabled (+0ms)", true, m_processor.getNumBuffers() == 0, [this] {
+        showServerMenu();
+    } else if (event.eventComponent == &m_settingsIcon) {
+        showSettingsMenu();
+    }
+}
+
+void PluginEditor::showServerMenu() {
+    PopupMenu m;
+
+    if (m_processor.getClient().isReadyLockFree()) {
+        m.addItem("Reload", [this] {
             traceScope();
-            m_processor.setNumBuffers(0);
+            m_processor.getClient().reconnect();
         });
-        if (rate > 0.0) {
-            bufMenu.addItem(getName(1), true, m_processor.getNumBuffers() == 1, [this] {
+        m.addSeparator();
+    }
+
+    PopupMenu subm;
+    int rate = (int)lround(m_processor.getSampleRate());
+    int iobuf = m_processor.getBlockSize();
+    auto getName = [rate, iobuf](int blocks) -> String {
+        String n;
+        n << blocks << " Blocks (+" << blocks * iobuf * 1000 / rate << "ms)";
+        return n;
+    };
+    subm.addItem("Disabled (+0ms)", true, m_processor.getNumBuffers() == 0, [this] {
+        traceScope();
+        m_processor.setNumBuffers(0);
+    });
+    if (rate > 0.0) {
+        subm.addItem(getName(1), true, m_processor.getNumBuffers() == 1, [this] {
+            traceScope();
+            m_processor.setNumBuffers(1);
+        });
+        subm.addItem(getName(2), true, m_processor.getNumBuffers() == 2, [this] {
+            traceScope();
+            m_processor.setNumBuffers(2);
+        });
+        subm.addItem(getName(4), true, m_processor.getNumBuffers() == 4, [this] {
+            traceScope();
+            m_processor.setNumBuffers(4);
+        });
+        subm.addItem(getName(8), true, m_processor.getNumBuffers() == 8, [this] {
+            traceScope();
+            m_processor.setNumBuffers(8);
+        });
+        subm.addItem(getName(12), true, m_processor.getNumBuffers() == 12, [this] {
+            traceScope();
+            m_processor.setNumBuffers(12);
+        });
+        subm.addItem(getName(16), true, m_processor.getNumBuffers() == 16, [this] {
+            traceScope();
+            m_processor.setNumBuffers(16);
+        });
+        subm.addItem(getName(20), true, m_processor.getNumBuffers() == 20, [this] {
+            traceScope();
+            m_processor.setNumBuffers(20);
+        });
+        subm.addItem(getName(24), true, m_processor.getNumBuffers() == 24, [this] {
+            traceScope();
+            m_processor.setNumBuffers(24);
+        });
+        subm.addItem(getName(28), true, m_processor.getNumBuffers() == 28, [this] {
+            traceScope();
+            m_processor.setNumBuffers(28);
+        });
+        subm.addItem(getName(30), true, m_processor.getNumBuffers() == 30, [this] {
+            traceScope();
+            m_processor.setNumBuffers(30);
+        });
+    }
+    m.addSubMenu("Buffer Size", subm);
+    subm.clear();
+
+    auto& servers = m_processor.getServers();
+    auto active = m_processor.getActiveServerHost();
+    for (auto s : servers) {
+        if (s == active) {
+            PopupMenu srvMenu;
+            srvMenu.addItem("Rescan", [this] {
                 traceScope();
-                m_processor.setNumBuffers(1);
+                m_processor.getClient().rescan();
             });
-            bufMenu.addItem(getName(2), true, m_processor.getNumBuffers() == 2, [this] {
+            srvMenu.addItem("Wipe Cache & Rescan", [this] {
                 traceScope();
-                m_processor.setNumBuffers(2);
+                m_processor.getClient().rescan(true);
             });
-            bufMenu.addItem(getName(4), true, m_processor.getNumBuffers() == 4, [this] {
+            srvMenu.addItem("Reconnect", [this] {
                 traceScope();
-                m_processor.setNumBuffers(4);
+                m_processor.getClient().reconnect();
             });
-            bufMenu.addItem(getName(8), true, m_processor.getNumBuffers() == 8, [this] {
+            subm.addSubMenu(s, srvMenu, true, nullptr, true, 0);
+        } else {
+            PopupMenu srvMenu;
+            srvMenu.addItem("Connect", [this, s] {
                 traceScope();
-                m_processor.setNumBuffers(8);
+                m_processor.setActiveServer(s);
+                m_processor.saveConfig();
             });
-            bufMenu.addItem(getName(12), true, m_processor.getNumBuffers() == 12, [this] {
+            srvMenu.addItem("Remove", [this, s] {
                 traceScope();
-                m_processor.setNumBuffers(12);
+                m_processor.delServer(s);
+                m_processor.saveConfig();
             });
-            bufMenu.addItem(getName(16), true, m_processor.getNumBuffers() == 16, [this] {
-                traceScope();
-                m_processor.setNumBuffers(16);
-            });
-            bufMenu.addItem(getName(20), true, m_processor.getNumBuffers() == 20, [this] {
-                traceScope();
-                m_processor.setNumBuffers(20);
-            });
-            bufMenu.addItem(getName(24), true, m_processor.getNumBuffers() == 24, [this] {
-                traceScope();
-                m_processor.setNumBuffers(24);
-            });
-            bufMenu.addItem(getName(28), true, m_processor.getNumBuffers() == 28, [this] {
-                traceScope();
-                m_processor.setNumBuffers(28);
-            });
-            bufMenu.addItem(getName(30), true, m_processor.getNumBuffers() == 30, [this] {
-                traceScope();
-                m_processor.setNumBuffers(30);
-            });
+            subm.addSubMenu(s, srvMenu);
         }
-        m.addSubMenu("Buffer Size", bufMenu);
-        m.addSectionHeader("Servers");
-        auto& servers = m_processor.getServers();
-        auto active = m_processor.getActiveServerHost();
-        for (auto s : servers) {
-            if (s == active) {
+    }
+    auto serversMDNS = m_processor.getServersMDNS();
+    if (serversMDNS.size() > 0) {
+        bool showIp = false;
+        std::set<String> names;
+        for (auto s : serversMDNS) {
+            if (names.find(s.getNameAndID()) != names.end()) {
+                showIp = true;
+                break;
+            } else {
+                names.insert(s.getNameAndID());
+            }
+        }
+        for (auto s : serversMDNS) {
+            if (servers.contains(s.getHostAndID())) {
+                continue;
+            }
+            String name = s.getNameAndID();
+            if (showIp) {
+                name << " (" << s.getHost() << ")";
+            }
+            name << " [load: " << lround(s.getLoad()) << "%]";
+            if (s.getHostAndID() == active) {
                 PopupMenu srvMenu;
                 srvMenu.addItem("Rescan", [this] {
                     traceScope();
@@ -691,7 +768,7 @@ void PluginEditor::mouseUp(const MouseEvent& event) {
                     traceScope();
                     m_processor.getClient().reconnect();
                 });
-                m.addSubMenu(s, srvMenu, true, nullptr, true, 0);
+                subm.addSubMenu(name, srvMenu, true, nullptr, true, 0);
             } else {
                 PopupMenu srvMenu;
                 srvMenu.addItem("Connect", [this, s] {
@@ -699,384 +776,339 @@ void PluginEditor::mouseUp(const MouseEvent& event) {
                     m_processor.setActiveServer(s);
                     m_processor.saveConfig();
                 });
-                srvMenu.addItem("Remove", [this, s] {
-                    traceScope();
-                    m_processor.delServer(s);
-                    m_processor.saveConfig();
-                });
-                m.addSubMenu(s, srvMenu);
+                subm.addSubMenu(name, srvMenu);
             }
         }
-        auto serversMDNS = m_processor.getServersMDNS();
-        if (serversMDNS.size() > 0) {
-            bool showIp = false;
-            std::set<String> names;
-            for (auto s : serversMDNS) {
-                if (names.find(s.getNameAndID()) != names.end()) {
-                    showIp = true;
-                    break;
-                } else {
-                    names.insert(s.getNameAndID());
-                }
-            }
-            for (auto s : serversMDNS) {
-                if (servers.contains(s.getHostAndID())) {
-                    continue;
-                }
-                String name = s.getNameAndID();
-                if (showIp) {
-                    name << " (" << s.getHost() << ")";
-                }
-                name << " [load: " << lround(s.getLoad()) << "%]";
-                if (s.getHostAndID() == active) {
-                    PopupMenu srvMenu;
-                    srvMenu.addItem("Rescan", [this] {
-                        traceScope();
-                        m_processor.getClient().rescan();
-                    });
-                    srvMenu.addItem("Wipe Cache & Rescan", [this] {
-                        traceScope();
-                        m_processor.getClient().rescan(true);
-                    });
-                    srvMenu.addItem("Reconnect", [this] {
-                        traceScope();
-                        m_processor.getClient().reconnect();
-                    });
-                    m.addSubMenu(name, srvMenu, true, nullptr, true, 0);
-                } else {
-                    PopupMenu srvMenu;
-                    srvMenu.addItem("Connect", [this, s] {
-                        traceScope();
-                        m_processor.setActiveServer(s);
-                        m_processor.saveConfig();
-                    });
-                    m.addSubMenu(name, srvMenu);
-                }
-            }
-        }
-        m.addSeparator();
-        m.addItem("Add", [this] {
-            traceScope();
-            auto w = new NewServerWindow((float)(getScreenX() + 2), (float)(getScreenY() + 30));
-            w->onOk([this](String server) {
-                traceScope();
-                m_processor.addServer(server);
-                m_processor.setActiveServer(server);
-                m_processor.saveConfig();
-            });
-            w->setAlwaysOnTop(true);
-            w->runModalLoop();
-        });
-        m.showAt(&m_srvIcon);
-    } else if (event.eventComponent == &m_settingsIcon) {
-        PopupMenu m, subm;
-#if !JucePlugin_IsSynth && !JucePlugin_IsMidiEffect
-        subm.addItem("Make Default", [this] {
-            traceScope();
-            if (m_processor.hasDefaultPreset() &&
-                AlertWindow::showOkCancelBox(AlertWindow::QuestionIcon, "Replace",
-                                             "Are you sure you want to replace your existing default preset?", "Yes",
-                                             "No")) {
-                m_processor.resetPresetDefault();
-            }
-            m_processor.storePresetDefault();
-        });
-        subm.addItem("Reset Default", m_processor.hasDefaultPreset(), false, [this] {
-            traceScope();
-            if (AlertWindow::showOkCancelBox(AlertWindow::QuestionIcon, "Reset",
-                                             "Are you sure you want to delete your default settings?", "Yes", "No")) {
-                m_processor.resetPresetDefault();
-            }
-        });
-        subm.addSeparator();
-#endif
-        subm.addItem("Create New...", [this] {
-            traceScope();
-            File d(m_processor.getPresetDir());
-            if (!d.exists()) {
-                d.createDirectory();
-            }
-            WildcardFileFilter filter("*.preset", String(), "Presets");
-            FileBrowserComponent fb(FileBrowserComponent::saveMode | FileBrowserComponent::canSelectFiles, d, &filter,
-                                    nullptr);
-            FileChooserDialogBox fcdialog("Create New Preset", "Enter the name for the new preset.", fb, true,
-                                          Colour(Defaults::BG_COLOR));
-            fcdialog.setAlwaysOnTop(true);
-            if (fcdialog.show(300, 400)) {
-                auto file = fb.getSelectedFile(0);
-                if (file.getFileExtension() != ".preset") {
-                    file = file.withFileExtension(".preset");
-                }
-                if (file.existsAsFile()) {
-                    file.deleteFile();
-                }
-                m_processor.storePreset(file);
-            }
-        });
-        subm.addItem("Choose Preset Directory...", [this] {
-            traceScope();
-            File d(m_processor.getPresetDir());
-            if (!d.exists()) {
-                d.createDirectory();
-            }
-            FileChooser fc("Presets Directory", d);
-            if (fc.browseForDirectory()) {
-                d = fc.getResult();
-                logln("setting presets dir to " << d.getFullPathName());
-                m_processor.setPresetDir(d.getFullPathName());
-                m_processor.saveConfig();
-            }
-        });
-        subm.addItem("Manage...", [this] {
-            traceScope();
-            StringArray cmd;
-#if defined(JUCE_MAC)
-            cmd.add("open");
-#elif defined(JUCE_WINDOWS)
-            cmd.add("explorer.exe");
-#elif defined(JUCE_LINUX)
-            cmd.add("xdg-open");
-#endif
-            if (!cmd.isEmpty()) {
-                File d(m_processor.getPresetDir());
-                if (!d.exists()) {
-                    d.createDirectory();
-                }
-                cmd.add(d.getFullPathName());
-                logln("spawning child proc: " << cmd[0] << " " << cmd[1]);
-                ChildProcess proc;
-                if (!proc.start(cmd, 0)) {
-                    logln("failed to open presets dir");
-                }
-            }
-        });
-        subm.addSeparator();
-        getPresetsMenu(subm, m_processor.getPresetDir());
-        m.addSubMenu("Presets", subm);
-        subm.clear();
+    }
 
-        m.addSeparator();
-        m.addItem("Generic Editor", true, m_processor.getGenericEditor(), [this] {
+    subm.addSeparator();
+
+    subm.addItem("Add", [this] {
+        traceScope();
+        auto w = new NewServerWindow((float)(getScreenX() + 2), (float)(getScreenY() + 30));
+        w->onOk([this](String server) {
             traceScope();
-            m_processor.setGenericEditor(!m_processor.getGenericEditor());
+            m_processor.addServer(server);
+            m_processor.setActiveServer(server);
             m_processor.saveConfig();
-            resized();
-            editPlugin();
         });
+        w->setAlwaysOnTop(true);
+        w->runModalLoop();
+    });
+
+    m.addSubMenu("Servers", subm);
+    subm.clear();
+
+    m.showAt(&m_srvIcon);
+}
+
+void PluginEditor::showSettingsMenu() {
+    PopupMenu m, subm;
+#if !JucePlugin_IsSynth && !JucePlugin_IsMidiEffect
+    subm.addItem("Make Default", [this] {
+        traceScope();
+        if (m_processor.hasDefaultPreset() &&
+            AlertWindow::showOkCancelBox(AlertWindow::QuestionIcon, "Replace",
+                                         "Are you sure you want to replace your existing default preset?", "Yes",
+                                         "No")) {
+            m_processor.resetPresetDefault();
+        }
+        m_processor.storePresetDefault();
+    });
+    subm.addItem("Reset Default", m_processor.hasDefaultPreset(), false, [this] {
+        traceScope();
+        if (AlertWindow::showOkCancelBox(AlertWindow::QuestionIcon, "Reset",
+                                         "Are you sure you want to delete your default settings?", "Yes", "No")) {
+            m_processor.resetPresetDefault();
+        }
+    });
+    subm.addSeparator();
+#endif
+    subm.addItem("Create New...", [this] {
+        traceScope();
+        File d(m_processor.getPresetDir());
+        if (!d.exists()) {
+            d.createDirectory();
+        }
+        WildcardFileFilter filter("*.preset", String(), "Presets");
+        FileBrowserComponent fb(FileBrowserComponent::saveMode | FileBrowserComponent::canSelectFiles, d, &filter,
+                                nullptr);
+        FileChooserDialogBox fcdialog("Create New Preset", "Enter the name for the new preset.", fb, true,
+                                      Colour(Defaults::BG_COLOR));
+        fcdialog.setAlwaysOnTop(true);
+        if (fcdialog.show(300, 400)) {
+            auto file = fb.getSelectedFile(0);
+            if (file.getFileExtension() != ".preset") {
+                file = file.withFileExtension(".preset");
+            }
+            if (file.existsAsFile()) {
+                file.deleteFile();
+            }
+            m_processor.storePreset(file);
+        }
+    });
+    subm.addItem("Choose Preset Directory...", [this] {
+        traceScope();
+        File d(m_processor.getPresetDir());
+        if (!d.exists()) {
+            d.createDirectory();
+        }
+        FileChooser fc("Presets Directory", d);
+        if (fc.browseForDirectory()) {
+            d = fc.getResult();
+            logln("setting presets dir to " << d.getFullPathName());
+            m_processor.setPresetDir(d.getFullPathName());
+            m_processor.saveConfig();
+        }
+    });
+    subm.addItem("Manage...", [this] {
+        traceScope();
+        StringArray cmd;
+#if defined(JUCE_MAC)
+        cmd.add("open");
+#elif defined(JUCE_WINDOWS)
+        cmd.add("explorer.exe");
+#elif defined(JUCE_LINUX)
+        cmd.add("xdg-open");
+#endif
+        if (!cmd.isEmpty()) {
+            File d(m_processor.getPresetDir());
+            if (!d.exists()) {
+                d.createDirectory();
+            }
+            cmd.add(d.getFullPathName());
+            logln("spawning child proc: " << cmd[0] << " " << cmd[1]);
+            ChildProcess proc;
+            if (!proc.start(cmd, 0)) {
+                logln("failed to open presets dir");
+            }
+        }
+    });
+    subm.addSeparator();
+    getPresetsMenu(subm, m_processor.getPresetDir());
+    m.addSubMenu("Presets", subm);
+    subm.clear();
+
+    m.addSeparator();
+    m.addItem("Generic Editor", true, m_processor.getGenericEditor(), [this] {
+        traceScope();
+        m_processor.setGenericEditor(!m_processor.getGenericEditor());
+        m_processor.saveConfig();
+        resized();
+        editPlugin();
+    });
 
 #if !JucePlugin_IsMidiEffect
-        m.addSeparator();
+    m.addSeparator();
 
-        auto addBusChannelItems = [&](AudioProcessor::Bus* bus, size_t& ch) {
-            if (bus->isEnabled()) {
-                auto& layout = bus->getCurrentLayout();
-                bool isInput = bus->isInput();
-                for (int i = 0; i < bus->getNumberOfChannels(); i++) {
-                    auto name = bus->getName() + ": " + layout.getChannelTypeName(layout.getTypeOfChannel(i));
-                    subm.addItem(name, true, m_processor.getActiveChannels().isActive(ch, isInput),
-                                 [this, ch, isInput] {
-                                     m_processor.getActiveChannels().setActive(
-                                         ch, isInput, !m_processor.getActiveChannels().isActive(ch, isInput));
-                                     m_processor.updateChannelMapping();
-                                     m_processor.getClient().reconnect();
-                                 });
-                    ch++;
-                }
+    auto addBusChannelItems = [&](AudioProcessor::Bus* bus, size_t& ch) {
+        if (bus->isEnabled()) {
+            auto& layout = bus->getCurrentLayout();
+            bool isInput = bus->isInput();
+            for (int i = 0; i < bus->getNumberOfChannels(); i++) {
+                auto name = bus->getName() + ": " + layout.getChannelTypeName(layout.getTypeOfChannel(i));
+                subm.addItem(name, true, m_processor.getActiveChannels().isActive(ch, isInput), [this, ch, isInput] {
+                    m_processor.getActiveChannels().setActive(ch, isInput,
+                                                              !m_processor.getActiveChannels().isActive(ch, isInput));
+                    m_processor.updateChannelMapping();
+                    m_processor.getClient().reconnect();
+                });
+                ch++;
             }
-        };
+        }
+    };
 
-        size_t ch;
+    size_t ch;
 
 #if JucePlugin_IsSynth
-        if (m_processor.getBusCount(false) > 1) {
-            subm.addItem("Enable all channels...", [this] {
-                m_processor.getActiveChannels().setOutputRangeActive(true);
-                m_processor.updateChannelMapping();
-                m_processor.getClient().reconnect();
-            });
-            subm.addItem("Enable Main channels only...", [this] {
-                m_processor.getActiveChannels().setOutputRangeActive(false);
-                for (int c = 0; c < m_processor.getMainBusNumOutputChannels(); c++) {
-                    m_processor.getActiveChannels().setOutputActive(c);
-                }
-                m_processor.updateChannelMapping();
-                m_processor.getClient().reconnect();
-            });
-            subm.addSeparator();
-        }
-
-        ch = 0;
-        for (int busIdx = 0; busIdx < m_processor.getBusCount(false); busIdx++) {
-            addBusChannelItems(m_processor.getBus(false, busIdx), ch);
-        }
-        m.addSubMenu("Instrument Outputs...", subm);
-#else
-        subm.addSectionHeader("Inputs");
-        ch = 0;
-        for (int busIdx = 0; busIdx < m_processor.getBusCount(true); busIdx++) {
-            addBusChannelItems(m_processor.getBus(true, busIdx), ch);
-        }
-        subm.addSectionHeader("Outputs");
-        ch = 0;
-        for (int busIdx = 0; busIdx < m_processor.getBusCount(false); busIdx++) {
-            addBusChannelItems(m_processor.getBus(false, busIdx), ch);
-        }
-        m.addSubMenu("Active Channels...", subm);
-#endif
-        subm.clear();
-#endif
-
-        m.addSeparator();
-        m.addItem("Show Monitor...", [this] { m_processor.showMonitor(); });
-
-        m.addSeparator();
-        subm.addItem("Show Category", true, m_processor.getMenuShowCategory(), [this] {
-            traceScope();
-            m_processor.setMenuShowCategory(!m_processor.getMenuShowCategory());
-            m_processor.saveConfig();
-        });
-        subm.addItem("Show Company", true, m_processor.getMenuShowCompany(), [this] {
-            traceScope();
-            m_processor.setMenuShowCompany(!m_processor.getMenuShowCompany());
-            m_processor.saveConfig();
-        });
-        subm.addItem("Disable Recents", true, m_processor.getDisableRecents(), [this] {
-            traceScope();
-            m_processor.setDisableRecents(!m_processor.getDisableRecents());
-            m_processor.saveConfig();
-        });
-        subm.addItem("Disable Server Filter", true, m_processor.getNoSrvPluginListFilter(), [this] {
-            traceScope();
-            m_processor.setNoSrvPluginListFilter(!m_processor.getNoSrvPluginListFilter());
-            m_processor.saveConfig();
+    if (m_processor.getBusCount(false) > 1) {
+        subm.addItem("Enable all channels...", [this] {
+            m_processor.getActiveChannels().setOutputRangeActive(true);
+            m_processor.updateChannelMapping();
             m_processor.getClient().reconnect();
         });
-
-        m.addSubMenu("Plugin Menu", subm);
-        subm.clear();
-
-        float sf = Desktop::getInstance().getGlobalScaleFactor();
-        auto updateZoom = [this, sf](float f) -> std::function<void()> {
-            traceScope();
-            return [this, sf, f] {
-                if (f != sf) {
-                    logln("updating scale factor to " << f);
-                    Desktop::getInstance().setGlobalScaleFactor(f);
-                    m_processor.setScaleFactor(f);
-                    m_processor.saveConfig();
-                }
-            };
-        };
-        subm.addItem("50%", true, sf == 0.5f, updateZoom(0.5f));
-        subm.addItem("75%", true, sf == 0.75f, updateZoom(0.75f));
-        subm.addItem("100%", true, sf == 1.0f, updateZoom(1.0f));
-        subm.addItem("125%", true, sf == 1.25f, updateZoom(1.25f));
-        subm.addItem("150%", true, sf == 1.5f, updateZoom(1.5f));
-        subm.addItem("175%", true, sf == 1.75f, updateZoom(1.75f));
-        subm.addItem("200%", true, sf == 2.0f, updateZoom(2.0f));
-        m.addSubMenu("Zoom", subm);
-        subm.clear();
-
-        subm.addItem("Confirm Delete", true, m_processor.getConfirmDelete(), [this] {
-            traceScope();
-            m_processor.setConfirmDelete(!m_processor.getConfirmDelete());
-            m_processor.saveConfig();
+        subm.addItem("Enable Main channels only...", [this] {
+            m_processor.getActiveChannels().setOutputRangeActive(false);
+            for (int c = 0; c < m_processor.getMainBusNumOutputChannels(); c++) {
+                m_processor.getActiveChannels().setOutputActive(c);
+            }
+            m_processor.updateChannelMapping();
+            m_processor.getClient().reconnect();
         });
-        subm.addItem("Keep Plugin UI Open", true, m_processor.isEditAlways(), [this] {
-            traceScope();
-            m_processor.setEditAlways(!m_processor.isEditAlways());
-            m_processor.saveConfig();
-        });
-        subm.addItem("Don't close the Plugin Window on the Server", true, m_processor.getKeepEditorOpen(), [this] {
-            traceScope();
-            m_processor.setKeepEditorOpen(!m_processor.getKeepEditorOpen());
-            m_processor.saveConfig();
-        });
-        subm.addItem("Show Sidechain-Disabled Info", true, m_processor.getShowSidechainDisabledInfo(), [this] {
-            traceScope();
-            m_processor.setShowSidechainDisabledInfo(!m_processor.getShowSidechainDisabledInfo());
-            m_processor.saveConfig();
-        });
-        subm.addItem("Disable Tray App", true, m_processor.getDisableTray(), [this] {
-            traceScope();
-            m_processor.setDisableTray(!m_processor.getDisableTray());
-            m_processor.saveConfig();
-        });
-        m.addSubMenu("User Interface", subm);
-        subm.clear();
-
-        subm.addItem("Always", true, m_processor.getTransferWhenPlayingOnly() == false, [this] {
-            traceScope();
-            m_processor.setTransferWhenPlayingOnly(false);
-            m_processor.saveConfig();
-        });
-        subm.addItem("Only when Playing/Recording", true, m_processor.getTransferWhenPlayingOnly() == true, [this] {
-            traceScope();
-            m_processor.setTransferWhenPlayingOnly(true);
-            m_processor.saveConfig();
-        });
-        m.addSubMenu("Transfer Audio/MIDI", subm);
-        subm.clear();
-
-        subm.addItem("Always (every 10s)", true, m_processor.getSyncRemoteMode() == PluginProcessor::SYNC_ALWAYS,
-                     [this] {
-                         m_processor.setSyncRemoteMode(PluginProcessor::SYNC_ALWAYS);
-                         m_processor.saveConfig();
-                     });
-        subm.addItem("When an editor is active (every 10s)", true,
-                     m_processor.getSyncRemoteMode() == PluginProcessor::SYNC_WITH_EDITOR, [this] {
-                         m_processor.setSyncRemoteMode(PluginProcessor::SYNC_WITH_EDITOR);
-                         m_processor.saveConfig();
-                     });
-        subm.addItem("When saving the project", true, m_processor.getSyncRemoteMode() == PluginProcessor::SYNC_DISABLED,
-                     [this] {
-                         m_processor.setSyncRemoteMode(PluginProcessor::SYNC_DISABLED);
-                         m_processor.saveConfig();
-                     });
-        m.addSubMenu("Remote Sync Frequency", subm);
-        subm.clear();
-
-        m.addSeparator();
-
-        m.addItem("Bypass when not connected", true, m_processor.getBypassWhenNotConnected(), [this] {
-            traceScope();
-            m_processor.setBypassWhenNotConnected(!m_processor.getBypassWhenNotConnected());
-            m_processor.saveConfig();
-        });
-        m.addItem("Allow buffer size by plugin", true, m_processor.getBufferSizeByPlugin(), [this] {
-            traceScope();
-            m_processor.setBufferSizeByPlugin(!m_processor.getBufferSizeByPlugin());
-            m_processor.saveConfig();
-        });
-
-        m.addSeparator();
-
-        subm.addItem("Logging", true, Logger::isEnabled(), [this] {
-            traceScope();
-            Logger::setEnabled(!Logger::isEnabled());
-            m_processor.saveConfig();
-        });
-        subm.addItem("Tracing", true, Tracer::isEnabled(), [this] {
-            traceScope();
-            Tracer::setEnabled(!Tracer::isEnabled());
-            m_processor.saveConfig();
-        });
-        if (m_processor.supportsCrashReporting()) {
-            subm.addItem("Send Crash Reports", true, m_processor.getCrashReporting(), [this] {
-                traceScope();
-                m_processor.setCrashReporting(!m_processor.getCrashReporting());
-                m_processor.saveConfig();
-            });
-        }
-        m.addSubMenu("Diagnostics", subm);
-        subm.clear();
-
-        m.addItem("Show Statistics...", [this] {
-            traceScope();
-            StatisticsWindow::show();
-        });
-        m.showAt(&m_settingsIcon);
+        subm.addSeparator();
     }
+
+    ch = 0;
+    for (int busIdx = 0; busIdx < m_processor.getBusCount(false); busIdx++) {
+        addBusChannelItems(m_processor.getBus(false, busIdx), ch);
+    }
+    m.addSubMenu("Instrument Outputs...", subm);
+#else
+    subm.addSectionHeader("Inputs");
+    ch = 0;
+    for (int busIdx = 0; busIdx < m_processor.getBusCount(true); busIdx++) {
+        addBusChannelItems(m_processor.getBus(true, busIdx), ch);
+    }
+    subm.addSectionHeader("Outputs");
+    ch = 0;
+    for (int busIdx = 0; busIdx < m_processor.getBusCount(false); busIdx++) {
+        addBusChannelItems(m_processor.getBus(false, busIdx), ch);
+    }
+    m.addSubMenu("Active Channels...", subm);
+#endif
+    subm.clear();
+#endif
+
+    m.addSeparator();
+    m.addItem("Show Monitor...", [this] { m_processor.showMonitor(); });
+
+    m.addSeparator();
+    subm.addItem("Show Category", true, m_processor.getMenuShowCategory(), [this] {
+        traceScope();
+        m_processor.setMenuShowCategory(!m_processor.getMenuShowCategory());
+        m_processor.saveConfig();
+    });
+    subm.addItem("Show Company", true, m_processor.getMenuShowCompany(), [this] {
+        traceScope();
+        m_processor.setMenuShowCompany(!m_processor.getMenuShowCompany());
+        m_processor.saveConfig();
+    });
+    subm.addItem("Disable Recents", true, m_processor.getDisableRecents(), [this] {
+        traceScope();
+        m_processor.setDisableRecents(!m_processor.getDisableRecents());
+        m_processor.saveConfig();
+    });
+    subm.addItem("Disable Server Filter", true, m_processor.getNoSrvPluginListFilter(), [this] {
+        traceScope();
+        m_processor.setNoSrvPluginListFilter(!m_processor.getNoSrvPluginListFilter());
+        m_processor.saveConfig();
+        m_processor.getClient().reconnect();
+    });
+
+    m.addSubMenu("Plugin Menu", subm);
+    subm.clear();
+
+    float sf = Desktop::getInstance().getGlobalScaleFactor();
+    auto updateZoom = [this, sf](float f) -> std::function<void()> {
+        traceScope();
+        return [this, sf, f] {
+            if (f != sf) {
+                logln("updating scale factor to " << f);
+                Desktop::getInstance().setGlobalScaleFactor(f);
+                m_processor.setScaleFactor(f);
+                m_processor.saveConfig();
+            }
+        };
+    };
+    subm.addItem("50%", true, sf == 0.5f, updateZoom(0.5f));
+    subm.addItem("75%", true, sf == 0.75f, updateZoom(0.75f));
+    subm.addItem("100%", true, sf == 1.0f, updateZoom(1.0f));
+    subm.addItem("125%", true, sf == 1.25f, updateZoom(1.25f));
+    subm.addItem("150%", true, sf == 1.5f, updateZoom(1.5f));
+    subm.addItem("175%", true, sf == 1.75f, updateZoom(1.75f));
+    subm.addItem("200%", true, sf == 2.0f, updateZoom(2.0f));
+    m.addSubMenu("Zoom", subm);
+    subm.clear();
+
+    subm.addItem("Confirm Delete", true, m_processor.getConfirmDelete(), [this] {
+        traceScope();
+        m_processor.setConfirmDelete(!m_processor.getConfirmDelete());
+        m_processor.saveConfig();
+    });
+    subm.addItem("Keep Plugin UI Open", true, m_processor.isEditAlways(), [this] {
+        traceScope();
+        m_processor.setEditAlways(!m_processor.isEditAlways());
+        m_processor.saveConfig();
+    });
+    subm.addItem("Don't close the Plugin Window on the Server", true, m_processor.getKeepEditorOpen(), [this] {
+        traceScope();
+        m_processor.setKeepEditorOpen(!m_processor.getKeepEditorOpen());
+        m_processor.saveConfig();
+    });
+    subm.addItem("Show Sidechain-Disabled Info", true, m_processor.getShowSidechainDisabledInfo(), [this] {
+        traceScope();
+        m_processor.setShowSidechainDisabledInfo(!m_processor.getShowSidechainDisabledInfo());
+        m_processor.saveConfig();
+    });
+    subm.addItem("Disable Tray App", true, m_processor.getDisableTray(), [this] {
+        traceScope();
+        m_processor.setDisableTray(!m_processor.getDisableTray());
+        m_processor.saveConfig();
+    });
+    m.addSubMenu("User Interface", subm);
+    subm.clear();
+
+    subm.addItem("Always", true, m_processor.getTransferWhenPlayingOnly() == false, [this] {
+        traceScope();
+        m_processor.setTransferWhenPlayingOnly(false);
+        m_processor.saveConfig();
+    });
+    subm.addItem("Only when Playing/Recording", true, m_processor.getTransferWhenPlayingOnly() == true, [this] {
+        traceScope();
+        m_processor.setTransferWhenPlayingOnly(true);
+        m_processor.saveConfig();
+    });
+    m.addSubMenu("Transfer Audio/MIDI", subm);
+    subm.clear();
+
+    subm.addItem("Always (every 10s)", true, m_processor.getSyncRemoteMode() == PluginProcessor::SYNC_ALWAYS, [this] {
+        m_processor.setSyncRemoteMode(PluginProcessor::SYNC_ALWAYS);
+        m_processor.saveConfig();
+    });
+    subm.addItem("When an editor is active (every 10s)", true,
+                 m_processor.getSyncRemoteMode() == PluginProcessor::SYNC_WITH_EDITOR, [this] {
+                     m_processor.setSyncRemoteMode(PluginProcessor::SYNC_WITH_EDITOR);
+                     m_processor.saveConfig();
+                 });
+    subm.addItem("When saving the project", true, m_processor.getSyncRemoteMode() == PluginProcessor::SYNC_DISABLED,
+                 [this] {
+                     m_processor.setSyncRemoteMode(PluginProcessor::SYNC_DISABLED);
+                     m_processor.saveConfig();
+                 });
+    m.addSubMenu("Remote Sync Frequency", subm);
+    subm.clear();
+
+    m.addSeparator();
+
+    m.addItem("Bypass when not ready", true, m_processor.getBypassWhenNotConnected(), [this] {
+        traceScope();
+        m_processor.setBypassWhenNotConnected(!m_processor.getBypassWhenNotConnected());
+        m_processor.saveConfig();
+    });
+    m.addItem("Allow buffer size by plugin", true, m_processor.getBufferSizeByPlugin(), [this] {
+        traceScope();
+        m_processor.setBufferSizeByPlugin(!m_processor.getBufferSizeByPlugin());
+        m_processor.saveConfig();
+    });
+
+    m.addSeparator();
+
+    subm.addItem("Logging", true, Logger::isEnabled(), [this] {
+        traceScope();
+        Logger::setEnabled(!Logger::isEnabled());
+        m_processor.saveConfig();
+    });
+    subm.addItem("Tracing", true, Tracer::isEnabled(), [this] {
+        traceScope();
+        Tracer::setEnabled(!Tracer::isEnabled());
+        m_processor.saveConfig();
+    });
+    if (m_processor.supportsCrashReporting()) {
+        subm.addItem("Send Crash Reports", true, m_processor.getCrashReporting(), [this] {
+            traceScope();
+            m_processor.setCrashReporting(!m_processor.getCrashReporting());
+            m_processor.saveConfig();
+        });
+    }
+    m.addSubMenu("Diagnostics", subm);
+    subm.clear();
+
+    m.addItem("Show Statistics...", [this] {
+        traceScope();
+        StatisticsWindow::show();
+    });
+
+    m.showAt(&m_settingsIcon);
 }
 
 void PluginEditor::initStButtons() {
@@ -1257,6 +1289,17 @@ bool PluginEditor::genericEditorEnabled() const {
 void PluginEditor::updateParamValue(int paramIdx) {
     if (genericEditorEnabled()) {
         m_genericEditor.updateParamValue(paramIdx);
+    }
+}
+
+void PluginEditor::updatePluginStatus(int idx, bool ok, const String& err) {
+    if (idx > -1 && (size_t)idx < m_pluginButtons.size()) {
+        auto* b = m_pluginButtons[(size_t)idx].get();
+        b->setEnabled(ok);
+        b->setTooltip(err);
+        if (idx == m_processor.getActivePlugin()) {
+            resetPluginScreen();
+        }
     }
 }
 

@@ -203,10 +203,10 @@ class ServerInfo {
 
   private:
     String m_host, m_name;
-    bool m_isIpv6;
-    int m_id;
-    float m_load;
-    bool m_localMode;
+    bool m_isIpv6 = false;
+    int m_id = -1;
+    float m_load = 0.0f;
+    bool m_localMode = false;
     String m_version;
     Time m_updated;
 };

@@ -105,17 +105,13 @@ PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
         int idx = 0;
         {
             std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+            bool allOk = true;
             for (auto& p : m_loadedPlugins) {
                 logln("loading " << p.name << " (" << p.id << ") [on connect]... ");
-                String err;
                 bool scDisabled;
-                p.ok = m_client->addPlugin(p.id, p.presets, p.params, p.hasEditor, scDisabled, p.settings, err);
+                p.ok = m_client->addPlugin(p.id, p.presets, p.params, p.hasEditor, scDisabled, p.settings, p.error);
                 if (p.ok) {
                     logln("...ok");
-                } else {
-                    logln("...failed: " << err);
-                }
-                if (p.ok) {
                     updLatency = true;
                     if (p.bypassed) {
                         m_client->bypassPlugin(idx);
@@ -129,9 +125,13 @@ PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
                             }
                         }
                     }
+                } else {
+                    logln("...failed: " << p.error);
+                    allOk = false;
                 }
                 idx++;
             }
+            m_loadedPluginsOk = allOk;
         }
         m_client->setLoadedPluginsString(getLoadedPluginsString());
 
@@ -156,6 +156,7 @@ PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
     m_client->setOnCloseCallback(safeLambda([this] {
         traceScope();
         logln("disconnected");
+        m_loadedPluginsOk = false;
         runOnMsgThreadAsync([this] {
             traceScope();
             auto* editor = getActiveEditor();
@@ -509,7 +510,7 @@ template <typename T>
 void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
     traceScope();
 
-    if (m_bypassWhenNotConnected && !m_client->isReadyLockFree()) {
+    if (m_bypassWhenNotConnected && (!m_client->isReadyLockFree() || !m_loadedPluginsOk)) {
         processBlockBypassed(buffer, midiMessages);
         return;
     }
@@ -559,7 +560,7 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
     if (!m_transferWhenPlayingOnly || posInfo.isPlaying || posInfo.isRecording) {
         if ((buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) || midiMessages.getNumEvents() > 0) {
             auto streamer = m_client->getStreamer<T>();
-            if (nullptr != streamer) {
+            if (nullptr != streamer && m_loadedPluginsOk) {
                 m_channelMapper.map(&buffer, sendBuffer);
                 streamer->send(*sendBuffer, midiMessages, posInfo);
                 streamer->read(*sendBuffer, midiMessages);
@@ -717,8 +718,11 @@ json PluginProcessor::getState(bool withServers) {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
         for (int i = 0; i < (int)m_loadedPlugins.size(); i++) {
             auto& plug = m_loadedPlugins[(size_t)i];
-            if (plug.ok && m_client->isReadyLockFree()) {
+            if (m_loadedPluginsOk && m_client->isReadyLockFree()) {
                 auto settings = m_client->getPluginSettings(i);
+                if (!m_client->isReadyLockFree()) {
+                    logln("error in getState: getPluginSettings for " << plug.name << " (" << plug.id << ") failed");
+                }
                 if (settings.getSize() > 0) {
                     plug.settings = settings.toBase64Encoding();
                 }
@@ -776,6 +780,7 @@ bool PluginProcessor::setState(const json& j) {
     {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
         m_loadedPlugins.clear();
+        m_loadedPluginsOk = false;
         m_activePlugin = -1;
         if (j.find("loadedPlugins") != j.end()) {
             for (auto& plug : j["loadedPlugins"]) {
@@ -834,15 +839,53 @@ bool PluginProcessor::setState(const json& j) {
 void PluginProcessor::sync() {
     traceScope();
     traceln("sync mode is " << m_syncRemote);
-    if ((m_syncRemote == SYNC_ALWAYS) || (m_syncRemote == SYNC_WITH_EDITOR && nullptr != getActiveEditor())) {
-        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
-        for (int i = 0; i < (int)m_loadedPlugins.size(); i++) {
-            auto& plug = m_loadedPlugins[(size_t)i];
-            if (plug.ok && m_client->isReadyLockFree()) {
-                auto settings = m_client->getPluginSettings(static_cast<int>(i));
-                if (settings.getSize() > 0) {
-                    plug.settings = settings.toBase64Encoding();
+    if (m_loadedPluginsOk) {
+        if ((m_syncRemote == SYNC_ALWAYS || (m_syncRemote == SYNC_WITH_EDITOR && nullptr != getActiveEditor()))) {
+            std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+
+            for (int i = 0; i < (int)m_loadedPlugins.size(); i++) {
+                auto& plug = m_loadedPlugins[(size_t)i];
+                if (plug.ok && m_client->isReadyLockFree()) {
+                    auto settings = m_client->getPluginSettings(i);
+                    if (!m_client->isReadyLockFree()) {
+                        logln("error in sync: getPluginSettings for " << plug.name << " (" << plug.id << ") failed");
+                    }
+                    if (settings.getSize() > 0) {
+                        plug.settings = settings.toBase64Encoding();
+                    }
                 }
+            }
+        }
+    }
+}
+
+void PluginProcessor::autoRetry() {
+    traceScope();
+    if (!m_loadedPluginsOk) {
+        // retry if the sandbox failed to initialize, as when a session loads many plugins, we might see timeouts
+        // occasionally
+        if (m_autoReconnects < 3) {
+            bool reconnect = false;
+
+            {
+                std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+
+                for (int i = 0; i < (int)m_loadedPlugins.size(); i++) {
+                    auto& plug = m_loadedPlugins[(size_t)i];
+                    if (!plug.ok) {
+                        if (plug.error.startsWith("failed to initialize sandbox") ||
+                            plug.error.startsWith("failed loading plugin")) {
+                            reconnect = true;
+                        } else {
+                            reconnect = false;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (reconnect) {
+                m_client->reconnect();
             }
         }
     }
@@ -870,23 +913,32 @@ std::set<String> PluginProcessor::getPluginTypes() const {
 
 bool PluginProcessor::loadPlugin(const ServerPlugin& plugin, String& err) {
     traceScope();
+
     StringArray presets;
     Array<e47::Client::Parameter> params;
     bool hasEditor, scDisabled;
+
     logln("loading " << plugin.getName() << " (" << plugin.getId() << ")...");
+
     suspendProcessing(true);
     bool success = m_client->addPlugin(plugin.getId(), presets, params, hasEditor, scDisabled, "", err);
     suspendProcessing(false);
+
     if (success) {
         logln("...ok");
     } else {
         logln("...error: " << err);
+        m_loadedPluginsOk = false;
     }
+
+    {
+        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+        m_loadedPlugins.push_back({plugin.getIdDeprecated(), plugin.getName(), "", presets, params, false,
+                                   plugin.getId(), hasEditor, success, err});
+    }
+
     if (success) {
         updateLatency(m_client->getLatencySamples());
-        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
-        m_loadedPlugins.push_back(
-            {plugin.getIdDeprecated(), plugin.getName(), "", presets, params, false, plugin.getId(), hasEditor, true});
         updateRecents(plugin);
         if (scDisabled && m_showSidechainDisabledInfo) {
             struct cb : ModalComponentManager::Callback {
@@ -919,12 +971,10 @@ void PluginProcessor::unloadPlugin(int idx) {
         }
     }
 
-    if (getLoadedPlugin(idx).ok) {
-        suspendProcessing(true);
-        m_client->delPlugin(idx);
-        suspendProcessing(false);
-        updateLatency(m_client->getLatencySamples());
-    }
+    suspendProcessing(true);
+    m_client->delPlugin(idx);
+    suspendProcessing(false);
+    updateLatency(m_client->getLatencySamples());
 
     if (idx == m_activePlugin) {
         m_activePlugin = -1;
@@ -935,12 +985,18 @@ void PluginProcessor::unloadPlugin(int idx) {
     {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
         int i = 0;
-        for (auto it = m_loadedPlugins.begin(); it < m_loadedPlugins.end(); it++) {
+        bool allOk = true;
+        for (auto it = m_loadedPlugins.begin(); it < m_loadedPlugins.end();) {
             if (i++ == idx) {
-                m_loadedPlugins.erase(it);
-                break;
+                it = m_loadedPlugins.erase(it);
+            } else {
+                if (!it->ok) {
+                    allOk = false;
+                }
+                it++;
             }
         }
+        m_loadedPluginsOk = allOk;
     }
 
     m_client->setLoadedPluginsString(getLoadedPluginsString());
@@ -1139,11 +1195,11 @@ void PluginProcessor::updateParameterValue(int idx, int paramIdx, float val, boo
         {
             std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
             if (idx < 0 || idx >= (int)m_loadedPlugins.size()) {
-                logln("idx out of range");
+                logln("updateParameterValue failed: idx out of range");
                 return;
             }
             if (paramIdx < 0 || paramIdx >= m_loadedPlugins[(size_t)idx].params.size()) {
-                logln("paramIdx out of range");
+                logln("updateParameterValue failed: paramIdx out of range");
                 return;
             }
             auto& param = m_loadedPlugins[(size_t)idx].params.getReference(paramIdx);
@@ -1184,11 +1240,11 @@ void PluginProcessor::updateParameterGestureTracking(int idx, int paramIdx, bool
         {
             std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
             if (idx < 0 || idx >= (int)m_loadedPlugins.size()) {
-                logln("idx out of range");
+                logln("updateParameterGestureTracking failed: idx out of range");
                 return;
             }
             if (paramIdx < 0 || paramIdx >= m_loadedPlugins[(size_t)idx].params.size()) {
-                logln("paramIdx out of range");
+                logln("updateParameterGestureTracking failed: paramIdx out of range");
                 return;
             }
             auto& param = m_loadedPlugins[(size_t)idx].params.getReference(paramIdx);
@@ -1207,6 +1263,27 @@ void PluginProcessor::updateParameterGestureTracking(int idx, int paramIdx, bool
                     pparam->endChangeGesture();
                 }
             }
+        }
+    });
+}
+
+void PluginProcessor::updatePluginStatus(int idx, bool ok, const String& err) {
+    {
+        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+
+        if (idx < 0 || idx >= (int)m_loadedPlugins.size()) {
+            logln("updatePluginStatus failed: idx out of range");
+            return;
+        }
+
+        auto& plug = m_loadedPlugins[(size_t)idx];
+        plug.ok = ok;
+        plug.error = err;
+    }
+
+    runOnMsgThreadAsync([this, idx, ok, err] {
+        if (auto* e = dynamic_cast<PluginEditor*>(getActiveEditor())) {
+            e->updatePluginStatus(idx, ok, err);
         }
     });
 }
@@ -1254,10 +1331,13 @@ void PluginProcessor::toggleFullscreenSCArea() {
 
 void PluginProcessor::storeSettingsA() {
     traceScope();
-    if (m_activePlugin < 0) {
+    if (m_activePlugin < 0 || !m_client->isReadyLockFree()) {
         return;
     }
     auto settings = m_client->getPluginSettings(m_activePlugin);
+    if (!m_client->isReadyLockFree()) {
+        logln("error in storeSettingsA: getPluginSettings for idx " << m_activePlugin << " failed");
+    }
     if (settings.getSize() > 0) {
         m_settingsA = settings.toBase64Encoding();
     }
@@ -1265,10 +1345,13 @@ void PluginProcessor::storeSettingsA() {
 
 void PluginProcessor::storeSettingsB() {
     traceScope();
-    if (m_activePlugin < 0) {
+    if (m_activePlugin < 0 || !m_client->isReadyLockFree()) {
         return;
     }
     auto settings = m_client->getPluginSettings(m_activePlugin);
+    if (!m_client->isReadyLockFree()) {
+        logln("error in storeSettingsB: getPluginSettings for idx " << m_activePlugin << " failed");
+    }
     if (settings.getSize() > 0) {
         m_settingsB = settings.toBase64Encoding();
     }
@@ -1317,6 +1400,7 @@ void PluginProcessor::updateRecents(const ServerPlugin& plugin) {
 void PluginProcessor::setActiveServer(const ServerInfo& s) {
     traceScope();
     m_client->setServer(s);
+    m_autoReconnects = 0;
 }
 
 String PluginProcessor::getActiveServerName() const {
@@ -1406,11 +1490,11 @@ void PluginProcessor::TrayConnection::sendStatus() {
     auto& client = m_processor->getClient();
     auto track = m_processor->getTrackProperties();
     String statId = "audio.";
-    statId << m_processor->getId();
+    statId << m_processor->getTagId();
     auto ts = Metrics::getStatistic<TimeStatistic>(statId);
 
     json j;
-    j["ok"] = client.isReadyLockFree();
+    j["connected"] = client.isReadyLockFree();
     j["name"] = track.name.toStdString();
     j["channelsIn"] = m_processor->getMainBusNumInputChannels();
     j["channelsOut"] = m_processor->getTotalNumOutputChannels();
@@ -1422,10 +1506,24 @@ void PluginProcessor::TrayConnection::sendStatus() {
 #endif
     j["colour"] = track.colour.getARGB();
     j["loadedPlugins"] = client.getLoadedPluginsString().toStdString();
+    j["loadedPluginsOk"] = m_processor->m_loadedPluginsOk.load();
     j["perf95th"] = ts->get1minHistogram().nintyFifth;
     j["blocks"] = client.NUM_OF_BUFFERS.load();
     j["serverNameId"] = m_processor->getActiveServerName().toStdString();
     j["serverHost"] = client.getServer().getHost().toStdString();
+
+    if (!m_processor->m_loadedPluginsOk) {
+        std::stringstream str;
+        for (int idx = 0; idx < m_processor->getNumOfLoadedPlugins(); idx++) {
+            auto& plug = m_processor->getLoadedPlugin(idx);
+            bool first = true;
+            if (!plug.ok) {
+                str << (first ? String() : newLine) << plug.name << ": " << plug.error;
+                first = false;
+            }
+        }
+        j["loadedPluginsErr"] = str.str();
+    }
 
     sendMessage(PluginTrayMessage(PluginTrayMessage::STATUS, j));
 }

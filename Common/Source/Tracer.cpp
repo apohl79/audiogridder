@@ -35,7 +35,7 @@ setLogTagStatic("tracer");
 Scope::Scope(const LogTag* t, const String& f, int l, const String& ff) {
     if (l_tracerEnabled) {
         enabled = true;
-        tagId = t->getId();
+        tagId = t->getTagId();
         tagName = t->getLogTagName();
         tagExtra = t->getLogTagExtra();
         file = f;
@@ -99,7 +99,7 @@ TraceRecord* getRecord() {
 
 void traceMessage(const LogTag* tag, const String& file, int line, const String& func, const String& msg) {
     if (l_tracerEnabled) {
-        traceMessage(tag->getId(), tag->getLogTagName(), tag->getLogTagExtra(), file, line, func, msg);
+        traceMessage(tag->getTagId(), tag->getLogTagName(), tag->getLogTagExtra(), file, line, func, msg);
     }
 }
 
