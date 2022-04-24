@@ -48,36 +48,52 @@ void ProcessorClient::shutdown() {
 
     signalThreadShouldExit();
 
-    std::lock_guard<std::mutex> lock(m_mtx);
+    {
+        std::lock_guard<std::mutex> lock(m_cmdMtx);
 
-    if (nullptr != m_sockCmdOut) {
-        if (m_sockCmdOut->isConnected()) {
-            m_sockCmdOut->close();
+        if (nullptr != m_sockCmdOut) {
+            if (m_sockCmdOut->isConnected()) {
+                m_sockCmdOut->close();
+            }
+        }
+
+        if (nullptr != m_sockCmdIn) {
+            if (m_sockCmdIn->isConnected()) {
+                m_sockCmdIn->close();
+            }
+        }
+
+        if (m_process.isRunning()) {
+            m_process.kill();
         }
     }
 
-    if (nullptr != m_sockCmdIn) {
-        if (m_sockCmdIn->isConnected()) {
-            m_sockCmdIn->close();
-        }
-    }
+    {
+        std::lock_guard<std::mutex> lock(m_audioMtx);
 
-    if (nullptr != m_sockAudio) {
-        if (m_sockAudio->isConnected()) {
-            m_sockAudio->close();
+        if (nullptr != m_sockAudio) {
+            if (m_sockAudio->isConnected()) {
+                m_sockAudio->close();
+            }
         }
-    }
-
-    if (m_process.isRunning()) {
-        m_process.kill();
     }
 }
 
 bool ProcessorClient::isOk() {
-    std::lock_guard<std::mutex> lock(m_mtx);
-    return m_process.isRunning() && nullptr != m_sockCmdIn && m_sockCmdIn->isConnected() &&
-           nullptr != m_sockCmdOut & m_sockCmdOut->isConnected() && nullptr != m_sockAudio &&
-           m_sockAudio->isConnected();
+    bool ok;
+
+    {
+        std::lock_guard<std::mutex> lock(m_cmdMtx);
+        ok = m_process.isRunning() && nullptr != m_sockCmdIn && m_sockCmdIn->isConnected() &&
+             nullptr != m_sockCmdOut & m_sockCmdOut->isConnected();
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(m_audioMtx);
+        ok = ok && nullptr != m_sockAudio && m_sockAudio->isConnected();
+    }
+
+    return ok;
 }
 
 int ProcessorClient::getWorkerPort() {
@@ -97,7 +113,7 @@ void ProcessorClient::removeWorkerPort(int port) {
 
 bool ProcessorClient::startSandbox() {
     try {
-        std::lock_guard<std::mutex> lock(m_mtx);
+        std::lock_guard<std::mutex> lock(m_cmdMtx);
 
         if (m_process.isRunning()) {
             logln("killing already running sandbox");
@@ -147,8 +163,6 @@ bool ProcessorClient::startSandbox() {
 }
 
 bool ProcessorClient::connectSandbox() {
-    std::lock_guard<std::mutex> lock(m_mtx);
-
     logln("connecting to sandbox at port " << m_port);
 
     bool hasUnixDomainSockets = Defaults::unixDomainSocketsSupported();
@@ -161,55 +175,63 @@ bool ProcessorClient::connectSandbox() {
         return false;
     };
 
-    m_sockCmdOut = std::make_unique<StreamingSocket>();
+    {
+        std::lock_guard<std::mutex> lock(m_cmdMtx);
 
-    // let the process come up and bind to the port
-    int maxTries = 100;
-    while (!m_sockCmdOut->isConnected() && maxTries-- > 0 && m_process.isRunning()) {
+        m_sockCmdOut = std::make_unique<StreamingSocket>();
+
+        // let the process come up and bind to the port
+        int maxTries = 100;
+        while (!m_sockCmdOut->isConnected() && maxTries-- > 0 && m_process.isRunning()) {
+            if (hasUnixDomainSockets) {
+                if (!m_sockCmdOut->connect(socketPath, 100)) {
+                    sleep(100);
+                }
+            } else {
+                if (!m_sockCmdOut->connect("127.0.0.1", m_port, 100)) {
+                    sleep(100);
+                }
+            }
+        }
+
+        if (!m_sockCmdOut->isConnected()) {
+            setAndLogError("failed to setup sandbox command-out connection");
+            return resetSocketsAndFalse();
+        }
+
+        m_sockCmdIn = std::make_unique<StreamingSocket>();
         if (hasUnixDomainSockets) {
-            if (!m_sockCmdOut->connect(socketPath, 100)) {
-                sleep(100);
+            if (!m_sockCmdIn->connect(socketPath)) {
+                setAndLogError("failed to setup sandbox command-in connection");
+                return resetSocketsAndFalse();
             }
         } else {
-            if (!m_sockCmdOut->connect("127.0.0.1", m_port, 100)) {
-                sleep(100);
+            if (!m_sockCmdIn->connect("127.0.0.1", m_port)) {
+                setAndLogError("failed to setup sandbox command-in connection");
+                return resetSocketsAndFalse();
             }
         }
     }
 
-    if (!m_sockCmdOut->isConnected()) {
-        setAndLogError("failed to setup sandbox command-out connection");
-        return resetSocketsAndFalse();
-    }
+    {
+        std::lock_guard<std::mutex> lock(m_audioMtx);
 
-    m_sockCmdIn = std::make_unique<StreamingSocket>();
-    if (hasUnixDomainSockets) {
-        if (!m_sockCmdIn->connect(socketPath)) {
-            setAndLogError("failed to setup sandbox command-in connection");
-            return resetSocketsAndFalse();
+        m_sockAudio = std::make_unique<StreamingSocket>();
+        if (hasUnixDomainSockets) {
+            if (!m_sockAudio->connect(socketPath)) {
+                setAndLogError("failed to setup sandbox audio connection");
+                return resetSocketsAndFalse();
+            }
+        } else {
+            if (!m_sockAudio->connect("127.0.0.1", m_port)) {
+                setAndLogError("failed to setup sandbox audio connection");
+                return resetSocketsAndFalse();
+            }
         }
-    } else {
-        if (!m_sockCmdIn->connect("127.0.0.1", m_port)) {
-            setAndLogError("failed to setup sandbox command-in connection");
-            return resetSocketsAndFalse();
-        }
-    }
 
-    m_sockAudio = std::make_unique<StreamingSocket>();
-    if (hasUnixDomainSockets) {
-        if (!m_sockAudio->connect(socketPath)) {
-            setAndLogError("failed to setup sandbox audio connection");
-            return resetSocketsAndFalse();
-        }
-    } else {
-        if (!m_sockAudio->connect("127.0.0.1", m_port)) {
-            setAndLogError("failed to setup sandbox audio connection");
-            return resetSocketsAndFalse();
-        }
+        m_bytesOutMeter = Metrics::getStatistic<Meter>("SandboxBytesOut");
+        m_bytesInMeter = Metrics::getStatistic<Meter>("SandboxBytesIn");
     }
-
-    m_bytesOutMeter = Metrics::getStatistic<Meter>("NetBytesOut");
-    m_bytesInMeter = Metrics::getStatistic<Meter>("NetBytesIn");
 
     logln("connected to sandbox successfully");
 
@@ -267,6 +289,9 @@ void ProcessorClient::run() {
                     case ParameterGesture::Type:
                         handleMessage(Message<Any>::convert<ParameterGesture>(msg));
                         break;
+                    case ScreenBounds::Type:
+                        handleMessage(Message<Any>::convert<ScreenBounds>(msg));
+                        break;
                     default:
                         logln("unknown message type " << msg->getType());
                 }
@@ -296,6 +321,11 @@ void ProcessorClient::handleMessage(std::shared_ptr<Message<ParameterGesture>> m
     }
 }
 
+void ProcessorClient::handleMessage(std::shared_ptr<Message<ScreenBounds>> msg) {
+    std::lock_guard<std::mutex> lock(m_cmdMtx);
+    m_lastScreenBounds = {pDATA(msg)->x, pDATA(msg)->y, pDATA(msg)->w, pDATA(msg)->h};
+}
+
 bool ProcessorClient::load(const String& settings, String& err) {
     traceScope();
 
@@ -304,7 +334,7 @@ bool ProcessorClient::load(const String& settings, String& err) {
         return false;
     }
 
-    std::lock_guard<std::mutex> lock(m_mtx);
+    std::lock_guard<std::mutex> lock(m_cmdMtx);
 
     TimeStatistic::Timeout timeout(15000);
     MessageHelper::Error e;
@@ -317,37 +347,49 @@ bool ProcessorClient::load(const String& settings, String& err) {
         if (!msgResult.read(m_sockCmdOut.get(), &e, timeout.getMillisecondsLeft())) {
             err = "seems like the plugin did not load or crash: " + e.toString();
             setAndLogError(err);
+            m_sockCmdOut->close();
             return false;
         }
+
         auto jresult = msgResult.payload.getJson();
         if (!jresult["success"].get<bool>()) {
             err = jresult["err"].get<std::string>();
             setAndLogError("load failed: " + err);
+            m_sockCmdOut->close();
             return false;
         }
+
         if (timeout.getMillisecondsLeft() == 0) {
             err = "load failed: timeout";
             setAndLogError(err);
+            m_sockCmdOut->close();
             return false;
         }
+
         Message<Presets> msgPresets(this);
         if (!msgPresets.read(m_sockCmdOut.get(), &e, timeout.getMillisecondsLeft())) {
             err = "failed to read presets: " + e.toString();
             setAndLogError(err);
+            m_sockCmdOut->close();
             return false;
         }
         m_presets = StringArray::fromTokens(msgPresets.payload.getString(), "|", "");
+
         if (timeout.getMillisecondsLeft() == 0) {
             err = "load failed: timeout";
             setAndLogError(err);
+            m_sockCmdOut->close();
             return false;
         }
+
         Message<Parameters> msgParams(this);
         if (!msgParams.read(m_sockCmdOut.get(), &e, timeout.getMillisecondsLeft())) {
             err = "failed to read parameters: " + e.toString();
             logln(err);
+            m_sockCmdOut->close();
             return false;
         }
+
         m_parameters = msgParams.payload.getJson();
         m_name = jresult["name"].get<std::string>();
         m_latency = jresult["latency"].get<int>();
@@ -357,11 +399,14 @@ bool ProcessorClient::load(const String& settings, String& err) {
         m_tailSeconds = jresult["tailSeconds"].get<double>();
         m_numOutputChannels = jresult["numOutputChannels"].get<int>();
         m_lastSettings = settings;
+        m_lastScreenBounds = {};
         m_loaded = true;
         m_error.clear();
+
         return true;
     } else {
         err = "load failed: send failed";
+        m_sockCmdOut->close();
     }
 
     return false;
@@ -370,16 +415,20 @@ bool ProcessorClient::load(const String& settings, String& err) {
 void ProcessorClient::unload() {
     m_loaded = false;
 
-    std::lock_guard<std::mutex> lock(m_mtx);
+    std::lock_guard<std::mutex> lock(m_cmdMtx);
 
     Message<DelPlugin> msg(this);
     PLD(msg).setNumber(0);
     msg.send(m_sockCmdOut.get());
 
+    MessageHelper::Error e;
     MessageFactory msgFactory(this);
-    auto result = msgFactory.getResult(m_sockCmdOut.get());
+    auto result = msgFactory.getResult(m_sockCmdOut.get(), 5, &e);
     if (nullptr != result && result->getReturnCode() > -1) {
         m_latency = result->getReturnCode();
+    } else {
+        logln("unload failed: can read result message: " << e.toString());
+        m_sockCmdOut->close();
     }
 }
 
@@ -390,7 +439,7 @@ bool ProcessorClient::hasEditor() { return m_hasEditor; }
 void ProcessorClient::showEditor(int x, int y) {
     traceScope();
 
-    std::lock_guard<std::mutex> lock(m_mtx);
+    std::lock_guard<std::mutex> lock(m_cmdMtx);
 
     Message<EditPlugin> msg(this);
     DATA(msg)->index = 0;
@@ -402,10 +451,12 @@ void ProcessorClient::showEditor(int x, int y) {
 void ProcessorClient::hideEditor() {
     traceScope();
 
-    std::lock_guard<std::mutex> lock(m_mtx);
+    std::lock_guard<std::mutex> lock(m_cmdMtx);
 
     Message<HidePlugin> msg(this);
     msg.send(m_sockCmdOut.get());
+
+    m_lastScreenBounds = {};
 }
 
 bool ProcessorClient::supportsDoublePrecisionProcessing() { return m_supportsDoublePrecision; }
@@ -417,7 +468,7 @@ double ProcessorClient::getTailLengthSeconds() { return m_tailSeconds; }
 void ProcessorClient::getStateInformation(juce::MemoryBlock& block) {
     traceScope();
 
-    std::lock_guard<std::mutex> lock(m_mtx);
+    std::lock_guard<std::mutex> lock(m_cmdMtx);
 
     Message<GetPluginSettings> msg(this);
     PLD(msg).setNumber(0);
@@ -435,6 +486,7 @@ void ProcessorClient::getStateInformation(juce::MemoryBlock& block) {
         }
     } else {
         logln("getStateInformation failed: failed to read PluginSettings message: " << err.toString());
+        m_sockCmdOut->close();
         return;
     }
 }
@@ -442,7 +494,7 @@ void ProcessorClient::getStateInformation(juce::MemoryBlock& block) {
 void ProcessorClient::setStateInformation(const void* data, int size) {
     traceScope();
 
-    std::lock_guard<std::mutex> lock(m_mtx);
+    std::lock_guard<std::mutex> lock(m_cmdMtx);
 
     Message<SetPluginSettings> msg(this);
     PLD(msg).setNumber(0);
@@ -475,7 +527,7 @@ const String ProcessorClient::getProgramName(int i) {
 void ProcessorClient::setCurrentProgram(int i) {
     traceScope();
 
-    std::lock_guard<std::mutex> lock(m_mtx);
+    std::lock_guard<std::mutex> lock(m_cmdMtx);
 
     Message<Preset> msg(this);
     DATA(msg)->idx = 0;
@@ -486,7 +538,7 @@ void ProcessorClient::setCurrentProgram(int i) {
 void ProcessorClient::suspendProcessing(bool b) {
     m_suspended = b;
 
-    std::lock_guard<std::mutex> lock(m_mtx);
+    std::lock_guard<std::mutex> lock(m_cmdMtx);
 
     if (b) {
         Message<BypassPlugin> msg(this);
@@ -500,7 +552,7 @@ void ProcessorClient::suspendProcessing(bool b) {
 }
 
 void ProcessorClient::suspendProcessingRemoteOnly(bool b) {
-    std::lock_guard<std::mutex> lock(m_mtx);
+    std::lock_guard<std::mutex> lock(m_cmdMtx);
 
     if (b) {
         Message<BypassPlugin> msg(this);
@@ -547,7 +599,7 @@ void ProcessorClient::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
     m_channelMapper.map(&buffer, sendBuffer);
 
     {
-        std::lock_guard<std::mutex> lock(m_mtx);
+        std::lock_guard<std::mutex> lock(m_audioMtx);
 
         if (!msg.sendToServer(m_sockAudio.get(), *sendBuffer, midiMessages, posInfo, sendBuffer->getNumChannels(),
                               sendBuffer->getNumSamples(), &e, *m_bytesOutMeter)) {
@@ -577,29 +629,21 @@ void ProcessorClient::processBlock(AudioBuffer<double>& buffer, MidiBuffer& midi
 juce::Rectangle<int> ProcessorClient::getScreenBounds() {
     traceScope();
 
-    std::lock_guard<std::mutex> lock(m_mtx);
+    std::lock_guard<std::mutex> lock(m_cmdMtx);
 
     Message<GetScreenBounds> msg(this);
     PLD(msg).setNumber(0);
     if (!msg.send(m_sockCmdOut.get())) {
         logln("getScreenBounds failed: can't send message");
-        return {};
     }
 
-    Message<ScreenBounds> res(this);
-    MessageHelper::Error err;
-    if (res.read(m_sockCmdOut.get(), &err)) {
-        return {DATA(res)->x, DATA(res)->y, DATA(res)->w, DATA(res)->h};
-    } else {
-        logln("getScreenBounds failed: failed to read ScreenBounds message: " << err.toString());
-        return {};
-    }
+    return m_lastScreenBounds;
 }
 
 void ProcessorClient::setParameterValue(int paramIdx, float value) {
     traceScope();
 
-    std::lock_guard<std::mutex> lock(m_mtx);
+    std::lock_guard<std::mutex> lock(m_cmdMtx);
 
     Message<ParameterValue> msg(this);
     DATA(msg)->idx = 0;
@@ -611,7 +655,7 @@ void ProcessorClient::setParameterValue(int paramIdx, float value) {
 float ProcessorClient::getParameterValue(int paramIdx) {
     traceScope();
 
-    std::lock_guard<std::mutex> lock(m_mtx);
+    std::lock_guard<std::mutex> lock(m_cmdMtx);
 
     Message<GetParameterValue> msg(this);
     DATA(msg)->idx = 0;
@@ -628,6 +672,7 @@ float ProcessorClient::getParameterValue(int paramIdx) {
 
     logln("getParameterValue failed: failed to read parameter value for paramIdx=" << paramIdx << ": "
                                                                                    << err.toString());
+    m_sockCmdOut->close();
 
     return 0.0f;
 }
@@ -639,7 +684,7 @@ std::vector<Srv::ParameterValue> ProcessorClient::getAllParameterValues() {
         return {};
     }
 
-    std::lock_guard<std::mutex> lock(m_mtx);
+    std::lock_guard<std::mutex> lock(m_cmdMtx);
 
     Message<GetAllParameterValues> msg(this);
     PLD(msg).setNumber(0);
@@ -649,9 +694,11 @@ std::vector<Srv::ParameterValue> ProcessorClient::getAllParameterValues() {
     for (int i = 0; i < (int)m_parameters.size(); i++) {
         Message<ParameterValue> msgVal(this);
         MessageHelper::Error err;
-        if (msgVal.read(m_sockCmdOut.get(), &err)) {
+        if (msgVal.read(m_sockCmdOut.get(), &err, 2000)) {
             ret.push_back({DATA(msgVal)->paramIdx, DATA(msgVal)->value});
         } else {
+            logln("getAllParameterValues failed: " << err.toString());
+            m_sockCmdOut->close();
             break;
         }
     }

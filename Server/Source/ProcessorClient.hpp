@@ -45,10 +45,6 @@ class ProcessorClient : public Thread, public LogTag {
     std::function<void(Message<Key>&)> onKeysFromSandbox;
     std::function<void(bool ok, const String& err)> onStatusChange;
 
-    void handleMessage(std::shared_ptr<Message<Key>> msg);
-    void handleMessage(std::shared_ptr<Message<ParameterValue>> msg);
-    void handleMessage(std::shared_ptr<Message<ParameterGesture>> msg);
-
     bool load(const String& settings, String& err);
     void unload();
 
@@ -89,7 +85,7 @@ class ProcessorClient : public Thread, public LogTag {
     HandshakeRequest m_cfg;
     ChildProcess m_process;
     std::unique_ptr<StreamingSocket> m_sockCmdIn, m_sockCmdOut, m_sockAudio;
-    std::mutex m_mtx;
+    std::mutex m_cmdMtx, m_audioMtx;
     std::shared_ptr<Meter> m_bytesOutMeter, m_bytesInMeter;
     String m_error;
 
@@ -106,6 +102,7 @@ class ProcessorClient : public Thread, public LogTag {
     AudioPlayHead* m_playhead = nullptr;
     std::atomic_bool m_suspended{false};
     String m_lastSettings;
+    juce::Rectangle<int> m_lastScreenBounds;
 
     ChannelSet m_activeChannels;
     ChannelMapper m_channelMapper;
@@ -126,6 +123,11 @@ class ProcessorClient : public Thread, public LogTag {
 
     template <typename T>
     void processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages);
+
+    void handleMessage(std::shared_ptr<Message<Key>> msg);
+    void handleMessage(std::shared_ptr<Message<ParameterValue>> msg);
+    void handleMessage(std::shared_ptr<Message<ParameterGesture>> msg);
+    void handleMessage(std::shared_ptr<Message<ScreenBounds>> msg);
 };
 
 }  // namespace e47
