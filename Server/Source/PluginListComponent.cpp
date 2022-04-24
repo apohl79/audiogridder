@@ -16,8 +16,7 @@ namespace e47 {
 
 class PluginListComponent::TableModel : public TableListBoxModel {
   public:
-    TableModel(PluginListComponent& c, KnownPluginList& l, std::set<String>& e)
-        : owner(c), list(l), exlist(e) {}
+    TableModel(PluginListComponent& c, KnownPluginList& l, std::set<String>& e) : owner(c), list(l), exlist(e) {}
 
     int getNumRows() override {
         return list.getNumTypes() + list.getBlacklistedFiles().size() + static_cast<int>(exlist.size());

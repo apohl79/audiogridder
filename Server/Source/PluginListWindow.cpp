@@ -21,9 +21,9 @@ PluginListWindow::PluginListWindow(App* app, KnownPluginList& list, const String
       m_deadMansPedalFile(deadMansPedalFile) {
     setUsingNativeTitleBar(true);
     m_plugmgr.addDefaultFormats();
-    setContentOwned(new PluginListComponent(m_plugmgr, m_pluginlist, m_app->getServer()->getExcludeList(),
-                                                        m_deadMansPedalFile),
-                    true);
+    setContentOwned(
+        new PluginListComponent(m_plugmgr, m_pluginlist, m_app->getServer()->getExcludeList(), m_deadMansPedalFile),
+        true);
 
     setResizable(true, false);
     centreWithSize(700, 600);

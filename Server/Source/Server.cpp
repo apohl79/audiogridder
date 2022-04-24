@@ -342,7 +342,7 @@ void Server::saveKnownPluginList(KnownPluginList& plist, int srvId) {
         blackList.insert(entry);
     }
     plist.clearBlacklistedFiles();
-    for (auto& entry: blackList) {
+    for (auto& entry : blackList) {
         plist.addToBlacklist(entry);
     }
 
@@ -637,7 +637,6 @@ void Server::scanForPlugins(const std::vector<String>& include) {
             bool excluded = shouldExclude(name, include);
             if ((nullptr == plugindesc || fmt->pluginNeedsRescanning(*plugindesc)) &&
                 !m_pluginlist.getBlacklistedFiles().contains(fileOrId) && !excluded) {
-
                 ScanThread* scanThread = nullptr;
                 do {
                     for (auto& t : scanThreads) {
@@ -647,7 +646,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
                         }
                         sleep(5);
                     }
-                } while(scanThread == nullptr);
+                } while (scanThread == nullptr);
 
                 logln("  scanning: " << name);
                 String splashName = name;
