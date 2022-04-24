@@ -235,7 +235,7 @@ void App::Server::checkConnections() {
     int removed = 0;
     while (i < m_connections.size()) {
         auto c = m_connections[i];
-        bool timeout = Time::currentTimeMillis() - c->status.lastUpdated > 15000;
+        bool timeout = Time::currentTimeMillis() - c->status.lastUpdated > 20000;
         bool dead = (c->initialized && !c->connected);
         if (timeout || dead) {
             logln("lost connection " << String::toHexString((uint64)c.get()) << " (name=" << c->status.name
