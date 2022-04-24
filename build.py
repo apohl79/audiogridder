@@ -633,7 +633,7 @@ def main():
     lastToolchain = ''
 
     if getPlatform(args) == 'macos':
-        if args.arch == 'arm64':
+        if 'arch' in vars(args) and args.arch == 'arm64':
             args.macostarget = '11.1'
         if args.mode == 'conf':
             (newToolchain, lastToolchain, sysroot) = setMacToolchain(args, args.macostoolchain)

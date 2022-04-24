@@ -569,8 +569,6 @@
 			<dict>
 				<key>POSTINSTALL_PATH</key>
 				<dict>
-					<key>PATH</key>
-					<string>coresPerms.sh</string>
 					<key>PATH_TYPE</key>
 					<integer>1</integer>
 				</dict>

@@ -14,24 +14,22 @@ Name: "{autoprograms}\AudioGridderServer"; Filename: "{app}\AudioGridderServer.e
 
 [Code]
 function NextButtonClick(PageId: Integer): Boolean;
-begin
-    Result := True;
-    if (PageId = wpReady) and RunFileExists() then begin
-        MsgBox('AudioGridder Server seems to be running. Please terminate it before you continue!', mbError, MB_OK);
-    end;
-end;
-
-function RunFileExists(): Boolean;
 var
+  Running: Boolean;
   FindRec: TFindRec;
-  FileName: string;
+  FileName: String;
 begin
-  Result := False;
-  FileName := ExpandConstant('{userappdata}\AudioGridder\audiogridderserver*.running');
-  if FindFirst(FileName, FindRec) then
-  try
-    Result := FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY = 0;
-  finally
-    FindClose(FindRec);
+  Result := True;
+  if (PageId = wpReady) then begin
+    FileName := ExpandConstant('{userappdata}\AudioGridder\audiogridderserver*.running');
+    if FindFirst(FileName, FindRec) then
+    try
+      Running := FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY = 0;
+    finally
+      FindClose(FindRec);
+    end;
+    if (Running) then begin
+      MsgBox('AudioGridder Server seems to be running. Please terminate it before you continue!', mbError, MB_OK);
+    end;
   end;
 end;
