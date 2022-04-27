@@ -152,7 +152,7 @@ std::shared_ptr<AudioPluginInstance> Processor::loadPlugin(const String& id, dou
     if (nullptr != plugdesc) {
         return loadPlugin(*plugdesc, sampleRate, blockSize, err);
     } else {
-        err = "failed to find plugin descriptor";
+        err = "Plugin with ID " + id + " not found";
         logln(err);
     }
     return nullptr;
