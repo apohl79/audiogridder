@@ -280,6 +280,7 @@ static constexpr int DEFAULT_NUM_RECENTS = 10;
 static constexpr int DEFAULT_LOAD_PLUGIN_TIMEOUT = 15000;
 
 static constexpr uint32 BG_COLOR = 0xff222222;
+static constexpr uint32 TOOLTIP_BG_COLOR = 0xe0323232;
 static constexpr uint32 BUTTON_COLOR = 0xff333333;
 static constexpr uint32 SLIDERTRACK_COLOR = 0xffffc13b;
 static constexpr uint32 SLIDERTHUMB_COLOR = 0xaaffffff;
@@ -315,6 +316,7 @@ struct ThemeInitailizer : Component {
         lf.setColour(FileBrowserComponent::currentPathBoxArrowColourId, Colour(Defaults::ACTIVE_COLOR));
         lf.setColour(DirectoryContentsDisplayComponent::highlightColourId,
                      Colour(Defaults::ACTIVE_COLOR).withAlpha(0.05f));
+        lf.setColour(TooltipWindow::backgroundColourId, Colour(Defaults::TOOLTIP_BG_COLOR));
         if (auto lfv4 = dynamic_cast<LookAndFeel_V4*>(&lf)) {
             lfv4->getCurrentColourScheme().setUIColour(LookAndFeel_V4::ColourScheme::widgetBackground,
                                                        Colour(Defaults::BG_COLOR));
@@ -331,6 +333,7 @@ struct ThemeInitailizer : Component {
         lf.setColour(ComboBox::backgroundColourId, Colour(Defaults::BUTTON_COLOR));
         lf.setColour(ListBox::backgroundColourId, Colour(Defaults::BG_COLOR));
         lf.setColour(AlertWindow::backgroundColourId, Colour(Defaults::BG_COLOR));
+        lf.setColour(TooltipWindow::backgroundColourId, Colour(Defaults::TOOLTIP_BG_COLOR));
         if (auto lfv4 = dynamic_cast<LookAndFeel_V4*>(&lf)) {
             lfv4->getCurrentColourScheme().setUIColour(LookAndFeel_V4::ColourScheme::widgetBackground,
                                                        Colour(Defaults::BG_COLOR));
