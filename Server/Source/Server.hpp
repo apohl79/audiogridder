@@ -57,7 +57,7 @@ class Server : public Thread, public LogTag {
     void setScreenQuality(float q) { m_screenJpgQuality = q; }
     bool getScreenDiffDetection() const { return m_screenDiffDetection; }
     void setScreenDiffDetection(bool b) { m_screenDiffDetection = b; }
-    bool getScreenCapturingFFmpeg() const { return m_sandboxModeRuntime != SANDBOX_PLUGIN || m_screenCapturingFFmpeg; }
+    bool getScreenCapturingFFmpeg() const { return m_sandboxModeRuntime != SANDBOX_PLUGIN && m_screenCapturingFFmpeg; }
     void setScreenCapturingFFmpeg(bool b) { m_screenCapturingFFmpeg = b; }
     ScreenRecorder::EncoderMode getScreenCapturingFFmpegEncoder() const { return m_screenCapturingFFmpegEncMode; }
     void setScreenCapturingFFmpegEncoder(ScreenRecorder::EncoderMode m) { m_screenCapturingFFmpegEncMode = m; }
@@ -117,6 +117,11 @@ class Server : public Thread, public LogTag {
     template <typename T>
     inline T getOpt(const String& name, T def) const {
         return jsonGetValue(m_opts, name, def);
+    }
+
+    template <typename T>
+    inline void setOpt(const String& name, T val) {
+        m_opts[name.toStdString()] = val;
     }
 
   private:

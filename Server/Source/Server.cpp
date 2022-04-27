@@ -159,7 +159,7 @@ void Server::saveConfig() {
     json j;
     j["Tracer"] = Tracer::isEnabled();
     j["Logger"] = Logger::isEnabled();
-    j["ID"] = m_id;
+    j["ID"] = getId();
     j["NAME"] = m_name.toStdString();
 #ifdef JUCE_MAC
     j["AU"] = m_enableAU;
