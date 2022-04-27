@@ -56,8 +56,25 @@ class PluginListComponent::TableModel : public TableListBoxModel {
             } else {
                 name = list.getBlacklistedFiles()[idx];
             }
+
+            File f(name);
+            String type;
+            if (f.exists()) {
+                name = f.getFileNameWithoutExtension();
+                type = f.getFileExtension().toUpperCase().substring(1);
+#if JUCE_MAC
+
+            } else if (name.startsWith("AudioUnit")) {
+                AudioUnitPluginFormat fmt;
+                name = fmt.getNameOfPluginFromIdentifier(name);
+                type = "AudioUnit";
+#endif
+            }
+
             if (columnId == nameCol) {
                 text = name;
+            } else if (columnId == typeCol) {
+                text = type;
             } else if (columnId == descCol) {
                 text = excluded ? "Deactivated" : "Failed";
             }
@@ -263,6 +280,7 @@ void PluginListComponent::addPluginItems(const std::vector<int> indexes) {
         m_excludeList.erase(name);
     }
 
+    getApp()->getServer()->saveConfig();
     getApp()->getServer()->addPlugins(names, [this, names](bool success) {
         if (!success) {
             for (auto& name : names) {
@@ -307,7 +325,7 @@ PopupMenu PluginListComponent::createMenuForRow(int rowNumber) {
                 m_table.deselectAllRows();
             });
         } else {
-            menu.addItem("Remove from blacklist (Force rescan at next start)", [this] {
+            menu.addItem("Remove from blacklist", [this] {
                 rescanPluginItems(m_tableModel->selectedRows);
                 m_table.deselectAllRows();
             });
