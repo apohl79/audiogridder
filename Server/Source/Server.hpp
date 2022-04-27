@@ -152,7 +152,7 @@ class Server : public Thread, public LogTag {
     bool m_vstNoStandardFolders;
     bool m_scanForPlugins = true;
     bool m_crashReporting = true;
-    SandboxMode m_sandboxMode = SANDBOX_NONE, m_sandboxModeRuntime = SANDBOX_NONE;
+    SandboxMode m_sandboxMode = SANDBOX_PLUGIN, m_sandboxModeRuntime = SANDBOX_NONE;
     bool m_sandboxLogAutoclean = true;
 
     HashMap<String, std::shared_ptr<SandboxMaster>, DefaultHashFunctions, CriticalSection> m_sandboxes;
