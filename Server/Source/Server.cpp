@@ -575,8 +575,7 @@ void Server::scanNextPlugin(const String& id, const String& fmt, int srvId) {
 
 void Server::scanForPlugins() {
     traceScope();
-    std::vector<String> emptylist;
-    scanForPlugins(emptylist);
+    scanForPlugins({});
 }
 
 void Server::scanForPlugins(const std::vector<String>& include) {
@@ -670,6 +669,8 @@ void Server::scanForPlugins(const std::vector<String>& include) {
         }
     }
 
+    std::set<String> newBlacklistedPlugins;
+
     for (auto& t : scanThreads) {
         while (t.isThreadRunning()) {
             sleep(50);
@@ -682,7 +683,23 @@ void Server::scanForPlugins(const std::vector<String>& include) {
             loadKnownPluginList(plist, t.id);
 
             for (auto& p : plist.getBlacklistedFiles()) {
-                m_pluginlist.addToBlacklist(p);
+                if (!m_pluginlist.getBlacklistedFiles().contains(p)) {
+                    m_pluginlist.addToBlacklist(p);
+                    String name;
+                    File f(p);
+                    if (f.exists()) {
+                        name = f.getFileNameWithoutExtension() + " (" +
+                               f.getFileExtension().toUpperCase().substring(1) + ")";
+#if JUCE_MAC
+                    } else if (p.startsWith("AudioUnit")) {
+                        AudioUnitPluginFormat fmt;
+                        name = fmt.getNameOfPluginFromIdentifier(p) + " (AU)";
+#endif
+                    } else {
+                        name = p;
+                    }
+                    newBlacklistedPlugins.insert(name);
+                }
             }
             for (auto p : plist.getTypes()) {
                 m_pluginlist.addType(p);
@@ -698,6 +715,26 @@ void Server::scanForPlugins(const std::vector<String>& include) {
         m_pluginexclude.erase(name);
     }
     logln("scan for plugins finished.");
+
+    if (!newBlacklistedPlugins.empty()) {
+        StringArray showList;
+        for (auto& p : newBlacklistedPlugins) {
+            showList.add(p);
+            if (showList.size() == 10) {
+                break;
+            }
+        }
+        String msg = "The following plugins failed during the plaugin scan:";
+        msg << newLine << newLine;
+        msg << showList.joinIntoString(newLine);
+        msg << newLine;
+        if (newBlacklistedPlugins.size() > 10) {
+            msg << "... " << (newBlacklistedPlugins.size() - 10) << " more plugin(s)." << newLine;
+        }
+        msg << newLine << newLine;
+        msg << "You can force a rescan via Plugin Manager.";
+        AlertWindow::showMessageBox(AlertWindow::WarningIcon, "Failed Plugins", msg, "OK");
+    }
 }
 
 void Server::run() {
