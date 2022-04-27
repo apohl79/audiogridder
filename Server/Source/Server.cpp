@@ -514,7 +514,7 @@ bool Server::scanPlugin(const String& id, const String& format, int srvId) {
                     plist.addToBlacklist(f);
                 }
             }
-            Thread::sleep(500);
+            Thread::sleep(1000);
         }
     } while (!success && retries-- > 0);
 
