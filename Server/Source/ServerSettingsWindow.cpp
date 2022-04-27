@@ -67,6 +67,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 
     int row = 0;
     String tmpStr;
+    String tooltip;
 
     auto label = std::make_unique<Label>();
     label->setText("Server Name:", NotificationType::dontSendNotification);
@@ -86,7 +87,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     addChildAndSetID(label.get(), "lbl");
     m_components.push_back(std::move(label));
 
-    int idConfig = m_app->getServer()->getId(true);
+    int idConfig = m_app->getServer()->getId();
     String id;
     id << idConfig;
     m_idText.setText(id);
@@ -101,32 +102,13 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 
     row++;
 
-    int idReal = m_app->getServer()->getId();
-    if (idConfig != idReal) {
-        // server started with -id where the passed id is different from the config
-        label = std::make_unique<Label>();
-        label->setText("Server ID (commandline override):", NotificationType::dontSendNotification);
-        label->setBounds(getLabelBounds(row));
-        label->setAlpha(0.5f);
-        addChildAndSetID(label.get(), "lbl");
-        m_components.push_back(std::move(label));
-
-        String idOverride;
-        idOverride << idReal;
-
-        label = std::make_unique<Label>();
-        label->setText(idOverride, NotificationType::dontSendNotification);
-        label->setBounds(getFieldBounds(row));
-        label->setAlpha(0.5f);
-        addChildAndSetID(label.get(), "lbl");
-        m_components.push_back(std::move(label));
-
-        row++;
-    }
-
+    tooltip << "Chain Isolation: Each AG plugin chain created by an AG plugin will run in a dedicated process."
+            << newLine << newLine
+            << "Plugin Isolation: Each plugin loaded into an AG plugin chain will run in a dedicated process.";
     label = std::make_unique<Label>();
     label->setText("Sandbox Mode:", NotificationType::dontSendNotification);
     label->setBounds(getLabelBounds(row));
+    label->setTooltip(tooltip);
     addChildAndSetID(label.get(), "lbl");
     m_components.push_back(std::move(label));
 
@@ -135,8 +117,10 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_sandboxMode.addItem("Chain Isolation", 2);
     m_sandboxMode.addItem("Plugin Isolation", 3);
     m_sandboxMode.setSelectedItemIndex(m_app->getServer()->getSandboxMode());
+    m_sandboxMode.setTooltip(tooltip);
     addChildAndSetID(&m_sandboxMode, "sandbox");
 
+    tooltip.clear();
     row++;
 
     label = std::make_unique<Label>();
@@ -231,17 +215,22 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 
     row += largeFieldRows;
 
+    tooltip = "If you select this, only custom folders will be scanned.";
     label = std::make_unique<Label>();
     label->setText("Do not include VST standard folders:", NotificationType::dontSendNotification);
     label->setBounds(getLabelBounds(row));
+    label->setTooltip(tooltip);
+
     addChildAndSetID(label.get(), "lbl");
     m_components.push_back(std::move(label));
 
     m_vstNoStandardFolders.setBounds(getCheckBoxBounds(row));
     m_vstNoStandardFolders.setToggleState(m_app->getServer()->getVSTNoStandardFolders(),
                                           NotificationType::dontSendNotification);
+    m_vstNoStandardFolders.setTooltip(tooltip);
     addChildAndSetID(&m_vstNoStandardFolders, "vstnostandarddirs");
 
+    tooltip.clear();
     row++;
 
     label = std::make_unique<Label>();
@@ -256,13 +245,28 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 
     row++;
 
+    tooltip << "FFmpeg (webp): Use FFmpeg for screen capturing with webp encoding. This is recommended as it gives "
+               "best quality at lowest bandwidth costs."
+            << newLine << newLine;
+    tooltip << "FFmpeg (mjepg): Use FFmpeg for screen capturing with mjpeg encoding. This setting has similar quality "
+               "as webp encoding but needs more bandwidth. Use this if you have issues with webp."
+            << newLine << newLine;
+    tooltip << "Legacy: This mode takes screenshots every 50ms. Use this only if FFmpeg does not work for you."
+            << newLine << newLine;
+    tooltip << "Disabled (Local Mode): If you run AG server and your DAW on the same computer you should enable this "
+               "mode. It positions the plugin windows next to the AG plugin window and allows you to open multiple "
+               "plugin windows at the same time."
+            << newLine << newLine;
+    tooltip << "Disabled: No screen caturing.";
     label = std::make_unique<Label>();
     label->setText("Screen Capturing Mode:", NotificationType::dontSendNotification);
     label->setBounds(getLabelBounds(row));
+    label->setTooltip(tooltip);
     addChildAndSetID(label.get(), "lbl");
     m_components.push_back(std::move(label));
 
     m_screenCapturingMode.setBounds(getWideFieldBounds(row));
+    m_screenCapturingMode.setTooltip(tooltip);
     m_screenCapturingMode.addItem("FFmpeg (webp)", 1);
     m_screenCapturingMode.addItem("FFmpeg (mjpeg)", 2);
     m_screenCapturingMode.addItem("Legacy", 3);
@@ -352,6 +356,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_screenCapturingMode.onChange();
     addChildAndSetID(&m_screenCapturingMode, "captmode");
 
+    tooltip.clear();
     row++;
 
     label = std::make_unique<Label>();
@@ -499,7 +504,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
         Tracer::setEnabled(m_tracer.getToggleState());
         Logger::setEnabled(m_logger.getToggleState());
         auto appCpy = app;
-        appCpy->getServer()->setId(m_idText.getText().getIntValue());
+        appCpy->getServer()->setOpt("ID", m_idText.getText().getIntValue());
         appCpy->getServer()->setName(m_nameText.getText());
         appCpy->getServer()->setEnableAU(m_auSupport.getToggleState());
         appCpy->getServer()->setEnableVST3(m_vst3Support.getToggleState());

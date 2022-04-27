@@ -32,6 +32,7 @@ class ServerSettingsWindow : public DocumentWindow, public LogTag {
     TextButton m_saveButton;
     Label m_screenJpgQualityLbl, m_screenDiffDetectionLbl, m_screenCapturingQualityLbl, m_pluginWindowsOnTopLbl;
     ComboBox m_screenCapturingMode, m_screenCapturingQuality, m_sandboxMode;
+    TooltipWindow m_tooltipWindow;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ServerSettingsWindow)
 };
