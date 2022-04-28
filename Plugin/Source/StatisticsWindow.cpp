@@ -181,7 +181,8 @@ StatisticsWindow::StatisticsWindow()
 #endif
     setBounds(WindowPositions::get(pt, getBounds()));
     setVisible(true);
-    windowToFront(this);
+    //windowToFront(this);
+    setAlwaysOnTop(true);
 }
 
 StatisticsWindow::~StatisticsWindow() {
