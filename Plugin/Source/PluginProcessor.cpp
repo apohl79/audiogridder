@@ -887,7 +887,7 @@ void PluginProcessor::autoRetry() {
             }
 
             if (reconnect) {
-                logln("auto retry, " << (3 - ++m_autoReconnects) << " atempts left");
+                logln("auto retry, " << (3 - ++m_autoReconnects) << " attempts left");
                 m_client->reconnect();
             }
         }

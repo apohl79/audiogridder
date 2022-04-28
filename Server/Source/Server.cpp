@@ -711,6 +711,8 @@ void Server::scanForPlugins(const std::vector<String>& include) {
 
     m_pluginlist.sort(KnownPluginList::sortAlphabetically, true);
 
+    getApp()->setSplashInfo("Scanning finished.");
+
     for (auto& name : neverSeenList) {
         m_pluginexclude.erase(name);
     }
