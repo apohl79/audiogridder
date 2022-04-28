@@ -874,7 +874,9 @@ void PluginProcessor::autoRetry() {
                     auto& plug = m_loadedPlugins[(size_t)i];
                     if (!plug.ok) {
                         if (plug.error.startsWith("failed to initialize sandbox") ||
-                            plug.error.startsWith("failed loading plugin")) {
+                            plug.error.startsWith("failed loading plugin") ||
+                            plug.error.startsWith("failed to finish load: timeout before") ||
+                            plug.error == "failed to get result: E_TIMEOUT") {
                             reconnect = true;
                         } else {
                             reconnect = false;
@@ -885,6 +887,7 @@ void PluginProcessor::autoRetry() {
             }
 
             if (reconnect) {
+                logln("auto retry, " << (3 - ++m_autoReconnects) << " atempts left");
                 m_client->reconnect();
             }
         }

@@ -519,8 +519,9 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
             logln("load error: " << err);
             return false;
         }
+
         if (timeout.getMillisecondsLeft() == 0) {
-            err = "timeout";
+            err = "failed to finish load: timeout before getting presets";
             logln(err);
             return false;
         }
@@ -533,7 +534,7 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
         }
         presets = StringArray::fromTokens(msgPresets.payload.getString(), "|", "");
         if (timeout.getMillisecondsLeft() == 0) {
-            err = "timeout";
+            err = "failed to finish load: timeout before getting parameters";
             logln(err);
             return false;
         }
