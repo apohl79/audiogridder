@@ -24,14 +24,41 @@ PluginMonitorWindow::PluginMonitorWindow(PluginMonitor* mon, App* app)
     addAndMakeVisible(m_logo);
 
     m_title.setText("AGridder Monitor", NotificationType::dontSendNotification);
-    m_title.setBounds(30, 10, m_totalWidth - 30, 16);
-    auto f = m_title.getFont();
-    f.setHeight(f.getHeight() - 2);
-    f.setBold(true);
-    m_title.setFont(f);
+    m_title.setBounds(30, 10, m_totalWidth / 2, 16);
+    auto font = m_title.getFont();
+    font.setHeight(font.getHeight() - 2);
+    font.setBold(true);
+    m_title.setFont(font);
     m_title.setAlpha(0.8f);
     m_title.addMouseListener(this, true);
     addAndMakeVisible(m_title);
+
+    int legendX = 260;
+    font.setBold(false);
+
+    auto addLegend = [&](Status& legend, Label& label, const String& text) {
+        legend.setBounds(legendX, 10, 6, 16);
+        legendX += 8;
+        addAndMakeVisible(legend);
+        label.setText(text, NotificationType::dontSendNotification);
+        label.setFont(font);
+        label.setAlpha(0.3f);
+        label.setBounds(legendX, 10, font.getStringWidth(text) + 18, 16);
+        addAndMakeVisible(label);
+        legendX += label.getWidth();
+    };
+
+    m_legendOk.setColor(true, true);
+    addLegend(m_legendOk, m_legendOkLbl, "ok");
+    m_legendNotLoaded.setColor(true, false);
+    addLegend(m_legendNotLoaded, m_legendNotLoadedLbl, "not loaded");
+    m_legendNotConnected.setColor(false, false);
+    addLegend(m_legendNotConnected, m_legendNotConnectedLbl, "not connected");
+
+    m_main.setBounds(0, 0, m_totalWidth, m_totalHeight);
+    m_viewPort.setViewedComponent(&m_main, false);
+    m_viewPort.setBounds(0, 35, m_totalWidth, m_totalHeight);
+    addAndMakeVisible(m_viewPort);
 
     updatePosition();
     setAlwaysOnTop(true);
@@ -57,13 +84,13 @@ void PluginMonitorWindow::mouseUp(const MouseEvent& event) {
 
 void PluginMonitorWindow::update() {
     for (auto& comp : m_components) {
-        removeChildComponent(comp.get());
+        m_main.removeChildComponent(comp.get());
     }
     m_components.clear();
 
     int borderLR = 15;  // left/right border
-    int borderTB = 15;  // top/bottom border
-    int rowHeight = 18;
+    int borderTB = 0;  // top/bottom border
+    int rowHeight = 19;
 
     int colWidth[] = {m_channelColWidth, m_channelNameWidth, 190, 45, 30, 65, 10};
 
@@ -84,14 +111,14 @@ void PluginMonitorWindow::update() {
         for (int i = c; i < c + span; i++) {
             width += colWidth[i];
         }
-        return juce::Rectangle<int>(left, borderTB + r * rowHeight, width, rowHeight);
+        return juce::Rectangle<int>(left, borderTB + r * rowHeight + 1, width, rowHeight - 1);
     };
 
     auto getLineBounds = [&](int r) {
         return juce::Rectangle<int>(borderLR + 2, borderTB + r * rowHeight - 1, getWidth() - borderLR * 2, 1);
     };
 
-    int row = 1;
+    int row = 0;
 
     if (m_mon->showChannelName) {
         addLabel("Channel", "", getLabelBounds(row, 0, 2), Justification::topLeft, 1.0f);
@@ -105,15 +132,14 @@ void PluginMonitorWindow::update() {
 
     row++;
 
-    for (auto& c : m_app->getServer().getConnections()) {
-        auto& s = c->status;
-        auto line = std::make_unique<HirozontalLine>(getLineBounds(row));
-        addChildAndSetID(line.get(), "line");
+    auto addRow = [&](App::Connection::Status& s, bool boldLine) {
+        auto line = std::make_unique<HirozontalLine>(getLineBounds(row), boldLine);
+        m_main.addChildAndSetID(line.get(), "line");
         m_components.push_back(std::move(line));
 
         if (m_mon->showChannelColor) {
             auto chan = std::make_unique<Channel>(getLabelBounds(row, 0), Colour(s.colour));
-            addChildAndSetID(chan.get(), "led");
+            m_main.addChildAndSetID(chan.get(), "led");
             m_components.push_back(std::move(chan));
         }
         if (m_mon->showChannelName) {
@@ -129,10 +155,28 @@ void PluginMonitorWindow::update() {
         addLabel(String(s.blocks), s.loadedPluginsErr, getLabelBounds(row, 4), Justification::topRight);
         addLabel(String(s.perf95th, 2) + " ms", s.loadedPluginsErr, getLabelBounds(row, 5), Justification::topRight);
         auto led = std::make_unique<Status>(getLabelBounds(row, 6), s.connected, s.loadedPluginsOk);
-        addChildAndSetID(led.get(), "led");
+        m_main.addChildAndSetID(led.get(), "led");
         m_components.push_back(std::move(led));
 
         row++;
+    };
+
+    bool first = true;
+
+    for (auto& c : m_app->getServer().getConnections()) {
+        if (!c->status.connected || !c->status.loadedPluginsOk) {
+            addRow(c->status, first);
+            first = false;
+        }
+    }
+
+    first = true;
+
+    for (auto& c : m_app->getServer().getConnections()) {
+        if (c->status.connected && c->status.loadedPluginsOk) {
+            addRow(c->status, first);
+            first = false;
+        }
     }
 
     for (auto* c : getChildren()) {
@@ -154,7 +198,7 @@ void PluginMonitorWindow::addLabel(const String& txt, const String& tooltip, juc
     label->setAlpha(alpha);
     label->setBounds(bounds);
     label->setJustificationType(just);
-    addChildAndSetID(label.get(), "lbl");
+    m_main.addChildAndSetID(label.get(), "lbl");
     m_components.push_back(std::move(label));
 }
 
@@ -172,9 +216,9 @@ void PluginMonitorWindow::updatePosition() {
         logln("error: no primary display");
         return;
     }
-    auto desktopRect = disp->totalArea;
+    auto desktopRect = disp->userArea;
     int x = desktopRect.getWidth() - width - 20;
-    int y = 50;
+    int y = desktopRect.getY() + 20;
     WindowPositions::PositionType pt = WindowPositions::PluginMonFx;
     juce::Rectangle<int> upperBounds;
 
@@ -193,7 +237,11 @@ void PluginMonitorWindow::updatePosition() {
         y = upperBounds.getBottom() + 20;
     }
 
-    setBounds(x, y, width, m_totalHeight);
+    int totalHeight = jmin(m_totalHeight, 600);
+    m_main.setBounds(m_main.getBounds().withHeight(m_totalHeight));
+    m_viewPort.setBounds(m_viewPort.getBounds().withHeight(totalHeight));
+    m_viewPort.setScrollBarsShown(totalHeight < m_totalHeight, false);
+    setBounds(x, y, width, totalHeight + 40);
     WindowPositions::set(pt, getBounds());
 }
 
@@ -221,7 +269,7 @@ void PluginMonitorWindow::Status::paint(Graphics& g) {
 
 void PluginMonitorWindow::HirozontalLine::paint(Graphics& g) {
     g.setColour(Colours::white);
-    g.setOpacity(0.05f);
+    g.setOpacity(m_bold ? 0.10f : 0.05f);
     g.fillAll();
 }
 

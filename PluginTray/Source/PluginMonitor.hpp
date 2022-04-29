@@ -33,20 +33,13 @@ class PluginMonitorWindow : public TopLevelWindow, public LogTagDelegate {
     void update();
 
   private:
-    PluginMonitor* m_mon;
-    App* m_app;
-    ImageComponent m_logo;
-    Label m_title;
-    int m_totalWidth = 490;
-    int m_totalHeight = 32;
-    int m_channelColWidth = 20;
-    int m_channelNameWidth = 100;
-    std::vector<std::unique_ptr<Component>> m_components;
-    TooltipWindow m_tooltipWindow;
-
-    void addLabel(const String& txt, const String& tooltip, juce::Rectangle<int> bounds,
-                  Justification just = Justification::topLeft, float alpha = 0.6f);
-    void updatePosition();
+    class PluginMonitorComponent : public Component {
+      public:
+        void paint(Graphics& g) override {
+            g.fillAll(getLookAndFeel().findColour(ResizableWindow::backgroundColourId));  // clear the background
+        }
+        friend class PluginMonitorWindow;
+    };
 
     class Channel : public Component {
       public:
@@ -64,8 +57,13 @@ class PluginMonitorWindow : public TopLevelWindow, public LogTagDelegate {
 
     class Status : public Component {
       public:
+        Status() {}
         Status(juce::Rectangle<int> bounds, bool connected, bool loadedPluginsOk) {
             setBounds(bounds);
+            setColor(connected, loadedPluginsOk);
+        }
+
+        void setColor(bool connected, bool loadedPluginsOk) {
             m_col = connected
                         ? loadedPluginsOk ? Colour(Defaults::PLUGIN_OK_COLOR) : Colour(Defaults::PLUGIN_NOTLOADED_COLOR)
                         : Colour(Defaults::PLUGIN_NOTCONNECTED_COLOR);
@@ -79,9 +77,31 @@ class PluginMonitorWindow : public TopLevelWindow, public LogTagDelegate {
 
     class HirozontalLine : public Component {
       public:
-        HirozontalLine(juce::Rectangle<int> bounds) { setBounds(bounds); }
+        HirozontalLine(juce::Rectangle<int> bounds, bool bold) : m_bold(bold) { setBounds(bounds); }
         void paint(Graphics& g) override;
+
+      private:
+        bool m_bold;
     };
+
+    PluginMonitor* m_mon;
+    App* m_app;
+    PluginMonitorComponent m_main;
+    Viewport m_viewPort;
+    ImageComponent m_logo;
+    Label m_title;
+    Status m_legendOk, m_legendNotConnected, m_legendNotLoaded;
+    Label m_legendOkLbl, m_legendNotConnectedLbl, m_legendNotLoadedLbl;
+    int m_totalWidth = 490;
+    int m_totalHeight = 32;
+    int m_channelColWidth = 20;
+    int m_channelNameWidth = 100;
+    std::vector<std::unique_ptr<Component>> m_components;
+    TooltipWindow m_tooltipWindow;
+
+    void addLabel(const String& txt, const String& tooltip, juce::Rectangle<int> bounds,
+                  Justification just = Justification::topLeft, float alpha = 0.6f);
+    void updatePosition();
 };
 
 class PluginMonitor : public LogTag, public Timer {

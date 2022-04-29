@@ -21,7 +21,11 @@ namespace e47 {
 
 class App : public JUCEApplication, public LogTag {
   public:
-    App() : LogTag("app"), m_tray(this), m_srv(this), m_mon(this) {}
+    App() : LogTag("app"), m_srv(this), m_mon(this) {
+#if !JUCE_LINUX
+        m_tray = std::make_unique<Tray>(this);
+#endif
+    }
     ~App() override {}
 
     const String getApplicationName() override { return ProjectInfo::projectName; }
@@ -161,7 +165,7 @@ class App : public JUCEApplication, public LogTag {
 
   private:
     bool m_keepRunning = false;
-    Tray m_tray;
+    std::unique_ptr<Tray> m_tray;
     Server m_srv;
     std::unordered_map<String, Array<ServerPlugin>> m_recents;
     PluginMonitor m_mon;
