@@ -388,7 +388,7 @@ inline WORD getVK(uint16_t keyCode) {
     } else if (ch == "Numpad4") {
         vk = VK_NUMPAD4;
     } else if (ch == "Numpad5") {
-        vk = VK_NUMPAD5,
+        vk = VK_NUMPAD5;
     } else if (ch == "Numpad6") {
         vk = VK_NUMPAD6;
     } else if (ch == "Numpad7") {
@@ -495,7 +495,7 @@ void setCopyKeys(uint16_t& key, uint64_t& flags) {
 #if defined(JUCE_MAC)
     flags |= kCGEventFlagMaskCommand;
 #elif defined(JUCE_WINDOWS)
-    flags |= VK_CONTRL;
+    flags |= VK_CONTROL;
 #endif
 }
 
@@ -504,7 +504,7 @@ void setPasteKeys(uint16_t& key, uint64_t& flags) {
 #if defined(JUCE_MAC)
     flags |= kCGEventFlagMaskCommand;
 #elif defined(JUCE_WINDOWS)
-    flags |= VK_CONTRL;
+    flags |= VK_CONTROL;
 #endif
 }
 
@@ -513,7 +513,7 @@ void setCutKeys(uint16_t& key, uint64_t& flags) {
 #if defined(JUCE_MAC)
     flags |= kCGEventFlagMaskCommand;
 #elif defined(JUCE_WINDOWS)
-    flags |= VK_CONTRL;
+    flags |= VK_CONTROL;
 #endif
 }
 
@@ -522,7 +522,7 @@ void setSelectAllKeys(uint16_t& key, uint64_t& flags) {
 #if defined(JUCE_MAC)
     flags |= kCGEventFlagMaskCommand;
 #elif defined(JUCE_WINDOWS)
-    flags |= VK_CONTRL;
+    flags |= VK_CONTROL;
 #endif
 }
 
