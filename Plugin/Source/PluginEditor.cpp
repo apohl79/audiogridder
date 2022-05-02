@@ -638,7 +638,7 @@ void PluginEditor::showServerMenu() {
     if (m_processor.getClient().isReadyLockFree()) {
         m.addItem("Reload", [this] {
             traceScope();
-            m_processor.getClient().reconnect();
+            m_processor.getClient().close();
         });
         m.addSeparator();
     }
@@ -715,7 +715,7 @@ void PluginEditor::showServerMenu() {
             });
             srvMenu.addItem("Reconnect", [this] {
                 traceScope();
-                m_processor.getClient().reconnect();
+                m_processor.getClient().close();
             });
             subm.addSubMenu(s, srvMenu, true, nullptr, true, 0);
         } else {
