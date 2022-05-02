@@ -122,13 +122,16 @@ void Client::run() {
 
         if (isReadyLockFree()) {
             TimeStatistic::Timeout timeout(1000);
-            while (timeout.getMillisecondsLeft() > 0 && !threadShouldExit()) {
+            while (isReadyLockFree() && timeout.getMillisecondsLeft() > 0 && !threadShouldExit()) {
                 MessageHelper::Error err;
                 auto msg = msgFactory.getNextMessage(m_cmdIn.get(), &err, 100);
                 if (nullptr != msg) {
                     switch (msg->getType()) {
                         case Key::Type:
                             handleMessage(Message<Any>::convert<Key>(msg));
+                            break;
+                        case Clipboard::Type:
+                            handleMessage(Message<Any>::convert<Clipboard>(msg));
                             break;
                         case ParameterValue::Type:
                             handleMessage(Message<Any>::convert<ParameterValue>(msg));
@@ -191,6 +194,10 @@ void Client::handleMessage(std::shared_ptr<Message<Key>> msg) {
 #else
     ignoreUnused(msg);
 #endif
+}
+
+void Client::handleMessage(std::shared_ptr<Message<Clipboard>> msg) {
+    SystemClipboard::copyTextToClipboard(pPLD(msg).getString());
 }
 
 void Client::handleMessage(std::shared_ptr<Message<ParameterValue>> msg) {
@@ -338,7 +345,7 @@ void Client::init() {
                                                        {{"id", String(srvInfo.getID())}, {"n", String(resp.port)}});
             logln("connecting worker: " << workerSocketPath.getFullPathName());
             m_cmdOut->connect(workerSocketPath);
-        } else {
+         } else {
             logln("connecting worker: " << srvInfo.getHost() << ":" << resp.port);
             m_cmdOut->connect(srvInfo.getHost(), resp.port);
         }
@@ -433,6 +440,9 @@ void Client::close() {
     traceScope();
     if (m_ready) {
         logln("closing");
+        if (m_onCloseCallback) {
+            m_onCloseCallback();
+        }
     }
     m_ready = false;
     LockByID lock(*this, CLOSE);
@@ -910,19 +920,47 @@ bool Client::keyPressed(const KeyPress& kp, Component* /* originatingComponent *
     if (!isReadyLockFree() || m_processor->getActivePlugin() == -1) {
         return false;
     };
-    bool consumed = true;
     auto modkeys = kp.getModifiers();
+    bool consumed = true, isCopy = false, isPaste = false, isCut = false, isSelectAll = false;
+
+#if JUCE_MAC
+    isCopy = modkeys.isCommandDown() && kp.isKeyCode('C');
+    isPaste = modkeys.isCommandDown() && kp.isKeyCode('V');
+    isCut = modkeys.isCommandDown() && kp.isKeyCode('X');
+    isSelectAll = modkeys.isCommandDown() && kp.isKeyCode('A');
+#else
+    isCopy = modkeys.isCtrlDown() && kp.isKeyCode('C');
+    isPaste = modkeys.isCtrlDown() && kp.isKeyCode('V');
+    isCut = modkeys.isCtrlDown() && kp.isKeyCode('X');
+    isSelectAll = modkeys.isCtrlDown() && kp.isKeyCode('A');
+#endif
+
     std::vector<uint16_t> keysToPress;
-    if (modkeys.isShiftDown()) {
-        keysToPress.push_back(getKeyCode("Shift"));
+    if (!isCopy && !isPaste) {
+        if (modkeys.isShiftDown()) {
+            keysToPress.push_back(getKeyCode("Shift"));
+        }
+        if (modkeys.isCtrlDown()) {
+            keysToPress.push_back(getKeyCode("Control"));
+        }
+        if (modkeys.isAltDown()) {
+            keysToPress.push_back(getKeyCode("Option"));
+        }
+        if (modkeys.isCommandDown()) {
+            keysToPress.push_back(getKeyCode("Command"));
+        }
     }
-    if (modkeys.isCtrlDown()) {
-        keysToPress.push_back(getKeyCode("Control"));
-    }
-    if (modkeys.isAltDown()) {
-        keysToPress.push_back(getKeyCode("Option"));
-    }
-    if (kp.isKeyCurrentlyDown(KeyPress::escapeKey)) {
+    if (isCopy || isPaste || isCut || isSelectAll) {
+        keysToPress.push_back(getKeyCode(isCopy ? "Copy" : isPaste ? "Paste" : isCut ? "Cut" : "SelectAll"));
+
+        if (isPaste) {
+            auto cbStr = SystemClipboard::getTextFromClipboard();
+            Message<Clipboard> msg(this);
+            PLD(msg).setString(cbStr);
+            LockByID lock(*this, KEYPRESSED);
+            msg.send(m_cmdOut.get());
+        }
+    } else if (kp.isKeyCurrentlyDown(KeyPress::escapeKey)) {
         keysToPress.push_back(getKeyCode("Escape"));
     } else if (kp.isKeyCurrentlyDown(KeyPress::spaceKey)) {
         keysToPress.push_back(getKeyCode("Space"));
@@ -989,6 +1027,40 @@ bool Client::keyPressed(const KeyPress& kp, Component* /* originatingComponent *
         keysToPress.push_back(getKeyCode("F18"));
     } else if (kp.isKeyCurrentlyDown(KeyPress::F19Key)) {
         keysToPress.push_back(getKeyCode("F19"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPad0)) {
+        keysToPress.push_back(getKeyCode("Numpad0"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPad1)) {
+        keysToPress.push_back(getKeyCode("Numpad1"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPad2)) {
+        keysToPress.push_back(getKeyCode("Numpad2"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPad3)) {
+        keysToPress.push_back(getKeyCode("Numpad3"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPad4)) {
+        keysToPress.push_back(getKeyCode("Numpad4"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPad5)) {
+        keysToPress.push_back(getKeyCode("Numpad5"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPad6)) {
+        keysToPress.push_back(getKeyCode("Numpad6"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPad7)) {
+        keysToPress.push_back(getKeyCode("Numpad7"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPad8)) {
+        keysToPress.push_back(getKeyCode("Numpad8"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPad9)) {
+        keysToPress.push_back(getKeyCode("Numpad9"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPadMultiply)) {
+        keysToPress.push_back(getKeyCode("Numpad*"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPadDelete)) {
+        keysToPress.push_back(getKeyCode("NumpadClear"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPadAdd)) {
+        keysToPress.push_back(getKeyCode("Numpad+"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPadSubtract)) {
+        keysToPress.push_back(getKeyCode("Numpad-"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPadEquals)) {
+        keysToPress.push_back(getKeyCode("Numpad="));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPadDivide)) {
+        keysToPress.push_back(getKeyCode("Numpad/"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPadDecimalPoint)) {
+        keysToPress.push_back(getKeyCode("Numpad."));
     } else {
         auto c = static_cast<char>(kp.getKeyCode());
         String key(CharPointer_UTF8(&c), 1);
@@ -1047,7 +1119,6 @@ void Client::updatePluginList(bool sendRequest) {
     auto list = StringArray::fromLines(listChunk);
     for (auto& line : list) {
         if (!line.isEmpty()) {
-            auto parts = StringArray::fromTokens(line, "|", "");
             m_plugins.push_back(ServerPlugin::fromString(line));
         }
     }

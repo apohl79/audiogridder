@@ -55,6 +55,7 @@ class Worker : public Thread, public LogTag {
     void handleMessage(std::shared_ptr<Message<CPULoad>> msg);
     void handleMessage(std::shared_ptr<Message<PluginList>> msg);
     void handleMessage(std::shared_ptr<Message<GetScreenBounds>> msg);
+    void handleMessage(std::shared_ptr<Message<Clipboard>> msg);
 
   private:
     std::shared_ptr<StreamingSocket> m_masterSocket;
@@ -74,9 +75,30 @@ class Worker : public Thread, public LogTag {
         bool keyPressed(const KeyPress& kp, Component*);
     };
 
+    struct ClipboardTracker : Timer {
+        String current;
+        Worker* worker;
+
+        ClipboardTracker(Worker* w) : worker(w) {}
+        ~ClipboardTracker() override { stopTimer(); }
+
+        void start() { startTimer(200); }
+        void stop() { stopTimer(); }
+
+        void timerCallback() override {
+            auto val = SystemClipboard::getTextFromClipboard();
+            if (val != current) {
+                current = val;
+                worker->sendClipboard(val);
+            }
+        }
+    };
+
     std::unique_ptr<KeyWatcher> m_keyWatcher;
+    std::unique_ptr<ClipboardTracker> m_clipboardTracker;
 
     void sendKeys(const std::vector<uint16_t>& keysToPress);
+    void sendClipboard(const String& val);
     void sendParamValueChange(int idx, int paramIdx, float val);
     void sendParamGestureChange(int idx, int paramIdx, bool guestureIsStarting);
     void sendStatusChange(int idx, bool ok, const String& err);

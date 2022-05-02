@@ -392,6 +392,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     bool audioConnectionOk();
 
     void handleMessage(std::shared_ptr<Message<Key>> msg);
+    void handleMessage(std::shared_ptr<Message<Clipboard>> msg);
     void handleMessage(std::shared_ptr<Message<ParameterValue>> msg);
     void handleMessage(std::shared_ptr<Message<ParameterGesture>> msg);
     void handleMessage(std::shared_ptr<Message<PluginStatus>> msg);

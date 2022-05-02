@@ -35,7 +35,8 @@ Worker::Worker(std::shared_ptr<StreamingSocket> masterSocket, const HandshakeReq
       m_screen(std::make_shared<ScreenWorker>(this)),
       m_msgFactory(this),
       m_sandboxModeRuntime(sandboxModeRuntime),
-      m_keyWatcher(std::make_unique<KeyWatcher>(this)) {
+      m_keyWatcher(std::make_unique<KeyWatcher>(this)),
+      m_clipboardTracker(std::make_unique<ClipboardTracker>(this)) {
     traceScope();
     initAsyncFunctors();
     count++;
@@ -53,6 +54,7 @@ Worker::~Worker() {
     m_audio.reset();
     m_screen.reset();
     m_keyWatcher.reset();
+    m_clipboardTracker.reset();
     count--;
 }
 
@@ -192,6 +194,9 @@ void Worker::run() {
                 case GetScreenBounds::Type:
                     handleMessage(Message<Any>::convert<GetScreenBounds>(msg));
                     break;
+                case Clipboard::Type:
+                    handleMessage(Message<Any>::convert<Clipboard>(msg));
+                    break;
                 default:
                     logln("unknown message type " << msg->getType());
             }
@@ -324,6 +329,8 @@ void Worker::handleMessage(std::shared_ptr<Message<EditPlugin>> msg) {
         m_activeEditorIdx = idx;
         if (getApp()->getServer()->getScreenLocalMode()) {
             runOnMsgThreadAsync([this] { getApp()->addKeyListener(getThreadId(), m_keyWatcher.get()); });
+        } else if (!getApp()->getServer()->getScreenCapturingOff()) {
+            m_clipboardTracker->start();
         }
     }
 }
@@ -335,6 +342,7 @@ void Worker::handleMessage(std::shared_ptr<Message<HidePlugin>> /* msg */, bool 
             getApp()->getServer()->sandboxHideEditor();
         }
         m_screen->hideEditor();
+        m_clipboardTracker->stop();
         m_activeEditorIdx = -1;
     }
     logln("hiding done (worker)");
@@ -382,6 +390,14 @@ void Worker::handleMessage(std::shared_ptr<Message<Key>> msg) {
                     setControlKey(flags);
                 } else if (isAltKey(codes[i])) {
                     setAltKey(flags);
+                } else if (isCopyKey(codes[i])) {
+                    setCopyKeys(key, flags);
+                } else if (isPasteKey(codes[i])) {
+                    setPasteKeys(key, flags);
+                } else if (isCutKey(codes[i])) {
+                    setCutKeys(key, flags);
+                } else if (isSelectAllKey(codes[i])) {
+                    setSelectAllKeys(key, flags);
                 } else {
                     key = codes[i];
                 }
@@ -569,10 +585,21 @@ void Worker::handleMessage(std::shared_ptr<Message<GetScreenBounds>> /*msg*/) {
     }
 }
 
+void Worker::handleMessage(std::shared_ptr<Message<Clipboard>> msg) {
+    traceScope();
+    SystemClipboard::copyTextToClipboard(pPLD(msg).getString());
+}
+
 void Worker::sendKeys(const std::vector<uint16_t>& keysToPress) {
     Message<Key> msg(this);
     PLD(msg).setData(reinterpret_cast<const char*>(keysToPress.data()),
                      static_cast<int>(keysToPress.size() * sizeof(uint16_t)));
+    msg.send(m_cmdOut.get());
+}
+
+void Worker::sendClipboard(const String& val) {
+    Message<Clipboard> msg(this);
+    PLD(msg).setString(val);
     msg.send(m_cmdOut.get());
 }
 
@@ -583,10 +610,13 @@ bool Worker::KeyWatcher::keyPressed(const KeyPress& kp, Component*) {
         keysToPress.push_back(getKeyCode("Shift"));
     }
     if (modkeys.isCtrlDown()) {
-        keysToPress.push_back(getKeyCode("Control"));
+            keysToPress.push_back(getKeyCode("Control"));
     }
     if (modkeys.isAltDown()) {
         keysToPress.push_back(getKeyCode("Option"));
+    }
+    if (modkeys.isCommandDown()) {
+        keysToPress.push_back(getKeyCode("Command"));
     }
     if (kp.isKeyCurrentlyDown(KeyPress::escapeKey)) {
         keysToPress.push_back(getKeyCode("Escape"));
@@ -654,6 +684,40 @@ bool Worker::KeyWatcher::keyPressed(const KeyPress& kp, Component*) {
         keysToPress.push_back(getKeyCode("F18"));
     } else if (kp.isKeyCurrentlyDown(KeyPress::F19Key)) {
         keysToPress.push_back(getKeyCode("F19"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPad0)) {
+        keysToPress.push_back(getKeyCode("Numpad0"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPad1)) {
+        keysToPress.push_back(getKeyCode("Numpad1"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPad2)) {
+        keysToPress.push_back(getKeyCode("Numpad2"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPad3)) {
+        keysToPress.push_back(getKeyCode("Numpad3"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPad4)) {
+        keysToPress.push_back(getKeyCode("Numpad4"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPad5)) {
+        keysToPress.push_back(getKeyCode("Numpad5"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPad6)) {
+        keysToPress.push_back(getKeyCode("Numpad6"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPad7)) {
+        keysToPress.push_back(getKeyCode("Numpad7"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPad8)) {
+        keysToPress.push_back(getKeyCode("Numpad8"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPad9)) {
+        keysToPress.push_back(getKeyCode("Numpad9"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPadMultiply)) {
+        keysToPress.push_back(getKeyCode("Numpad*"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPadDelete)) {
+        keysToPress.push_back(getKeyCode("NumpadClear"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPadAdd)) {
+        keysToPress.push_back(getKeyCode("Numpad+"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPadSubtract)) {
+        keysToPress.push_back(getKeyCode("Numpad-"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPadEquals)) {
+        keysToPress.push_back(getKeyCode("Numpad="));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPadDivide)) {
+        keysToPress.push_back(getKeyCode("Numpad/"));
+    } else if (kp.isKeyCurrentlyDown(KeyPress::numberPadDecimalPoint)) {
+        keysToPress.push_back(getKeyCode("Numpad."));
     } else {
         auto c = static_cast<char>(kp.getKeyCode());
         String key(CharPointer_UTF8(&c), 1);
@@ -663,6 +727,7 @@ bool Worker::KeyWatcher::keyPressed(const KeyPress& kp, Component*) {
         }
     }
     worker->sendKeys(keysToPress);
+
     return true;
 }
 

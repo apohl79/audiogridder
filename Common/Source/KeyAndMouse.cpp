@@ -66,7 +66,7 @@ void mouseScrollEventInternal(float deltaX, float deltaY) {
 void keyEventInternal(uint16_t keyCode, uint64_t flags, bool keyDown, bool currentProcessOnly) {
     traceScope();
     CGEventRef ev = CGEventCreateKeyboardEvent(nullptr, keyCode, keyDown);
-    CGEventSetFlags(ev, flags | CGEventGetFlags(ev));
+    CGEventSetFlags(ev, flags);
     if (currentProcessOnly) {
         CGEventPostToPid(getpid(), ev);
     } else {
@@ -377,6 +377,40 @@ inline WORD getVK(uint16_t keyCode) {
         vk = VK_F19;
     } else if (ch == "F20") {
         vk = VK_F20;
+    } else if (ch == "Numpad0") {
+        vk = VK_NUMPAD0;
+    } else if (ch == "Numpad1") {
+        vk = VK_NUMPAD1;
+    } else if (ch == "Numpad2") {
+        vk = VK_NUMPAD2;
+    } else if (ch == "Numpad3") {
+        vk = VK_NUMPAD3;
+    } else if (ch == "Numpad4") {
+        vk = VK_NUMPAD4;
+    } else if (ch == "Numpad5") {
+        vk = VK_NUMPAD5,
+    } else if (ch == "Numpad6") {
+        vk = VK_NUMPAD6;
+    } else if (ch == "Numpad7") {
+        vk = VK_NUMPAD7;
+    } else if (ch == "Numpad8") {
+        vk = VK_NUMPAD8;
+    } else if (ch == "Numpad9") {
+        vk = VK_NUMPAD9;
+    } else if (ch == "Numpad*") {
+        vk = VK_MULTIPLY;
+    } else if (ch == "Numpad/") {
+        vk = VK_DIVIDE;
+    } else if (ch == "Numpad+") {
+        vk = VK_ADD;
+    } else if (ch == "Numpad-") {
+        vk = VK_SUBTRACT;
+    } else if (ch == "Numpad.") {
+        vk = VK_DECIMAL;
+    } else if (ch == "Numpad=") {
+        vk = 0x92;
+    } else if (ch == "NumpadClear") {
+        vk = VK_DELETE;
     }
     return vk;
 }
@@ -453,6 +487,42 @@ void setAltKey(uint64_t& flags) {
     flags |= kCGEventFlagMaskAlternate;
 #elif defined(JUCE_WINDOWS)
     flags |= VK_MENU;
+#endif
+}
+
+void setCopyKeys(uint16_t& key, uint64_t& flags) {
+    key = getKeyCode("C");
+#if defined(JUCE_MAC)
+    flags |= kCGEventFlagMaskCommand;
+#elif defined(JUCE_WINDOWS)
+    flags |= VK_CONTRL;
+#endif
+}
+
+void setPasteKeys(uint16_t& key, uint64_t& flags) {
+    key = getKeyCode("V");
+#if defined(JUCE_MAC)
+    flags |= kCGEventFlagMaskCommand;
+#elif defined(JUCE_WINDOWS)
+    flags |= VK_CONTRL;
+#endif
+}
+
+void setCutKeys(uint16_t& key, uint64_t& flags) {
+    key = getKeyCode("X");
+#if defined(JUCE_MAC)
+    flags |= kCGEventFlagMaskCommand;
+#elif defined(JUCE_WINDOWS)
+    flags |= VK_CONTRL;
+#endif
+}
+
+void setSelectAllKeys(uint16_t& key, uint64_t& flags) {
+    key = getKeyCode("A");
+#if defined(JUCE_MAC)
+    flags |= kCGEventFlagMaskCommand;
+#elif defined(JUCE_WINDOWS)
+    flags |= VK_CONTRL;
 #endif
 }
 

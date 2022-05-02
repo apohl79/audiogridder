@@ -29,6 +29,9 @@ class ServerPlugin {
           m_type(type),
           m_category(category),
           m_isInstrument(isInstrument) {
+        if (m_id.isEmpty()) {
+            m_id = m_idDeprecated;
+        }
         if (m_category.isEmpty()) {
             m_category = "Unknown";
         }

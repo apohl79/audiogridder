@@ -690,6 +690,12 @@ class Key : public BinaryPayload {
     int getKeyCount() const { return *size / (int)sizeof(uint16_t); }
 };
 
+class Clipboard : public StringPayload {
+  public:
+    static constexpr int Type = __COUNTER__;
+    Clipboard() : StringPayload(Type) {}
+};
+
 class BypassPlugin : public NumberPayload {
   public:
     static constexpr int Type = __COUNTER__;
