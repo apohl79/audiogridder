@@ -727,16 +727,7 @@ json PluginProcessor::getState(bool withServers) {
                     plug.settings = settings.toBase64Encoding();
                 }
             }
-            auto jpresets = json::array();
-            for (auto& p : plug.presets) {
-                jpresets.push_back(p.toStdString());
-            }
-            auto jparams = json::array();
-            for (auto& p : plug.params) {
-                jparams.push_back(p.toJson());
-            }
-            jplugs.push_back({plug.idDeprecated.toStdString(), plug.name.toStdString(), plug.settings.toStdString(),
-                              jpresets, jparams, plug.bypassed, plug.id.toStdString()});
+            jplugs.push_back(plug.toJson());
         }
     }
     j["loadedPlugins"] = jplugs;
@@ -782,45 +773,9 @@ bool PluginProcessor::setState(const json& j) {
         m_loadedPlugins.clear();
         m_loadedPluginsOk = false;
         m_activePlugin = -1;
-        if (j.find("loadedPlugins") != j.end()) {
+        if (jsonHasValue(j, "loadedPlugins")) {
             for (auto& plug : j["loadedPlugins"]) {
-                if (version < 1) {
-                    StringArray dummy;
-                    Array<Client::Parameter> dummy2;
-                    m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
-                                               plug[2].get<std::string>(), dummy, dummy2, false,
-                                               plug[0].get<std::string>()});
-                } else if (version == 1) {
-                    StringArray dummy;
-                    Array<Client::Parameter> dummy2;
-                    m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
-                                               plug[2].get<std::string>(), dummy, dummy2, plug[3].get<bool>(),
-                                               plug[0].get<std::string>()});
-                } else if (version == 2) {
-                    StringArray presets;
-                    for (auto& p : plug[3]) {
-                        presets.add(p.get<std::string>());
-                    }
-                    Array<e47::Client::Parameter> params;
-                    for (auto& p : plug[4]) {
-                        params.add(e47::Client::Parameter::fromJson(p));
-                    }
-                    m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
-                                               plug[2].get<std::string>(), presets, params, plug[5].get<bool>(),
-                                               plug[0].get<std::string>()});
-                } else {
-                    StringArray presets;
-                    for (auto& p : plug[3]) {
-                        presets.add(p.get<std::string>());
-                    }
-                    Array<e47::Client::Parameter> params;
-                    for (auto& p : plug[4]) {
-                        params.add(e47::Client::Parameter::fromJson(p));
-                    }
-                    m_loadedPlugins.push_back({plug[0].get<std::string>(), plug[1].get<std::string>(),
-                                               plug[2].get<std::string>(), presets, params, plug[5].get<bool>(),
-                                               plug[6].get<std::string>()});
-                }
+                m_loadedPlugins.emplace_back(plug, version);
             }
         }
     }
@@ -876,6 +831,7 @@ void PluginProcessor::autoRetry() {
                         if (plug.error.startsWith("failed to initialize sandbox") ||
                             plug.error.startsWith("failed loading plugin") ||
                             plug.error.startsWith("failed to finish load: timeout before") ||
+                            plug.error.startsWith("seems like the plugin did not load or crash") ||
                             plug.error == "failed to get result: E_TIMEOUT") {
                             reconnect = true;
                         } else {
@@ -918,7 +874,7 @@ bool PluginProcessor::loadPlugin(const ServerPlugin& plugin, String& err) {
     traceScope();
 
     StringArray presets;
-    Array<e47::Client::Parameter> params;
+    Array<Client::Parameter> params;
     bool hasEditor, scDisabled;
 
     logln("loading " << plugin.getName() << " (" << plugin.getId() << ")...");
@@ -936,8 +892,8 @@ bool PluginProcessor::loadPlugin(const ServerPlugin& plugin, String& err) {
 
     {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
-        m_loadedPlugins.push_back({plugin.getIdDeprecated(), plugin.getName(), "", presets, params, false,
-                                   plugin.getId(), hasEditor, success, err});
+        m_loadedPlugins.emplace_back(plugin.getId(), plugin.getIdDeprecated(), plugin.getName(), "", presets, params,
+                                     false, hasEditor, success, err);
     }
 
     if (success) {

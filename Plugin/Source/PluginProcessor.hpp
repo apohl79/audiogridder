@@ -116,6 +116,9 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     std::set<String> getPluginTypes() const;
 
     struct LoadedPlugin {
+        enum Indexes : uint8 { ID_DEPRECATED, NAME, SETTINGS, PRESETS, PARAMS, BYPASSED, ID };
+        enum Indexes_v1 : uint8 { BYPASSED_V1 = 3 };
+
         String idDeprecated;
         String name;
         String settings;
@@ -127,6 +130,64 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
         bool hasEditor = true;
         bool ok = false;
         String error;
+
+        json toJson() {
+            auto jpresets = json::array();
+            for (auto& p : presets) {
+                jpresets.push_back(p.toStdString());
+            }
+            auto jparams = json::array();
+            for (auto& p : params) {
+                jparams.push_back(p.toJson());
+            }
+            return {idDeprecated.toStdString(),
+                    name.toStdString(),
+                    settings.toStdString(),
+                    jpresets,
+                    jparams,
+                    bypassed,
+                    id.toStdString()};
+        }
+
+        LoadedPlugin() {}
+
+        LoadedPlugin(const json& j, int version) {
+            idDeprecated = j[ID_DEPRECATED].get<std::string>();
+            name = j[NAME].get<std::string>();
+            settings = j[SETTINGS].get<std::string>();
+            if (version == 1) {
+                bypassed = j[BYPASSED_V1].get<bool>();
+            } else if (version > 1) {
+                bypassed = j[BYPASSED].get<bool>();
+            }
+            if (version >= 2) {
+                for (auto& p : j[PRESETS]) {
+                    presets.add(p.get<std::string>());
+                }
+                for (auto& p : j[PARAMS]) {
+                    params.add(Client::Parameter::fromJson(p));
+                }
+            }
+            if (version >= 3) {
+                id = j[ID].get<std::string>();
+            } else {
+                id = idDeprecated;
+            }
+        }
+
+        LoadedPlugin(const String& id_, const String& idDeprecated_, const String& name_, const String& settings_,
+                     const StringArray& presets_, const Array<Client::Parameter>& params_, bool bypassed_,
+                     bool hasEditor_, bool ok_, const String& error_)
+            : idDeprecated(idDeprecated_),
+              name(name_),
+              settings(settings_),
+              presets(presets_),
+              params(params_),
+              bypassed(bypassed_),
+              id(id_),
+              hasEditor(hasEditor_),
+              ok(ok_),
+              error(error_) {}
     };
 
     // Called by the client to trigger resyncing the remote plugin settings
