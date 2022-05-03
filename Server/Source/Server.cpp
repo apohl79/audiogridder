@@ -144,8 +144,8 @@ void Server::loadConfig() {
     m_crashReporting = jsonGetValue(cfg, "CrashReporting", m_crashReporting);
     logln("crash reporting is " << (m_crashReporting ? "enabled" : "disabled"));
     m_sandboxMode = (SandboxMode)jsonGetValue(cfg, "SandboxMode", m_sandboxMode);
-    logln("sandbox mode is " << (m_sandboxMode == SANDBOX_CHAIN    ? "chain"
-                                 : m_sandboxMode == SANDBOX_PLUGIN ? "plugin"
+    logln("sandbox mode is " << (m_sandboxMode == SANDBOX_CHAIN    ? "chain isolation"
+                                 : m_sandboxMode == SANDBOX_PLUGIN ? "plugin isolation"
                                                                    : "disabled"));
     m_sandboxLogAutoclean = jsonGetValue(cfg, "SandboxLogAutoclean", m_sandboxLogAutoclean);
 }
