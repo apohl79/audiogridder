@@ -143,11 +143,7 @@ void Server::loadConfig() {
     m_scanForPlugins = jsonGetValue(cfg, "ScanForPlugins", m_scanForPlugins);
     m_crashReporting = jsonGetValue(cfg, "CrashReporting", m_crashReporting);
     logln("crash reporting is " << (m_crashReporting ? "enabled" : "disabled"));
-    bool sandboxLegacy = jsonGetValue(cfg, "Sandboxing", false);
-    m_sandboxMode = (SandboxMode)jsonGetValue(cfg, "SandboxMode", (int)SANDBOX_NONE);
-    if (m_sandboxMode == SANDBOX_NONE && sandboxLegacy) {
-        m_sandboxMode = SANDBOX_CHAIN;
-    }
+    m_sandboxMode = (SandboxMode)jsonGetValue(cfg, "SandboxMode", m_sandboxMode);
     logln("sandbox mode is " << (m_sandboxMode == SANDBOX_CHAIN    ? "chain"
                                  : m_sandboxMode == SANDBOX_PLUGIN ? "plugin"
                                                                    : "disabled"));
