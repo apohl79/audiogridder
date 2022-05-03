@@ -131,6 +131,10 @@ inline std::pair<CGMouseButton, CGEventType> toMouseButtonType(MouseEvType t) {
 
 #elif defined(JUCE_WINDOWS)
 
+#define FLAG_VK_SHIFT 0x1
+#define FLAG_VK_CONTROL 0x2
+#define FLAG_VK_MENU 0x4
+
 void sendInput(INPUT* in) {
     traceScope();
     if (SendInput(1, in, sizeof(INPUT)) != 1) {
@@ -174,26 +178,26 @@ void mouseEventInternal(POINT pos, DWORD evFlags, uint64_t flags) {
     event.mi.dwFlags = evFlags;
 
     // modifiers down
-    if ((flags & VK_SHIFT) == VK_SHIFT) {
+    if ((flags & FLAG_VK_SHIFT) == FLAG_VK_SHIFT) {
         sendKey(VK_SHIFT, true);
     }
-    if ((flags & VK_CONTROL) == VK_CONTROL) {
+    if ((flags & FLAG_VK_CONTROL) == FLAG_VK_CONTROL) {
         sendKey(VK_CONTROL, true);
     }
-    if ((flags & VK_MENU) == VK_MENU) {
+    if ((flags & FLAG_VK_MENU) == FLAG_VK_MENU) {
         sendKey(VK_MENU, true);
     }
 
     sendInput(&event);
 
     // modifiers up
-    if ((flags & VK_SHIFT) == VK_SHIFT) {
+    if ((flags & FLAG_VK_SHIFT) == FLAG_VK_SHIFT) {
         sendKey(VK_SHIFT, false);
     }
-    if ((flags & VK_CONTROL) == VK_CONTROL) {
+    if ((flags & FLAG_VK_CONTROL) == FLAG_VK_CONTROL) {
         sendKey(VK_CONTROL, false);
     }
-    if ((flags & VK_MENU) == VK_MENU) {
+    if ((flags & FLAG_VK_MENU) == FLAG_VK_MENU) {
         sendKey(VK_MENU, false);
     }
 }
@@ -230,13 +234,13 @@ void keyEventInternal(WORD vk, uint64_t flags, bool keyDown, void* nativeHandle)
 
     // modifiers down
     if (keyDown) {
-        if ((flags & VK_SHIFT) == VK_SHIFT) {
+        if ((flags & FLAG_VK_SHIFT) == FLAG_VK_SHIFT) {
             sendKey(VK_SHIFT, true, hwnd);
         }
-        if ((flags & VK_CONTROL) == VK_CONTROL) {
+        if ((flags & FLAG_VK_CONTROL) == FLAG_VK_CONTROL) {
             sendKey(VK_CONTROL, true, hwnd);
         }
-        if ((flags & VK_MENU) == VK_MENU) {
+        if ((flags & FLAG_VK_MENU) == FLAG_VK_MENU) {
             sendKey(VK_MENU, true, hwnd);
         }
     }
@@ -246,13 +250,13 @@ void keyEventInternal(WORD vk, uint64_t flags, bool keyDown, void* nativeHandle)
 
     // modifiers up
     if (!keyDown) {
-        if ((flags & VK_SHIFT) == VK_SHIFT) {
+        if ((flags & FLAG_VK_SHIFT) == FLAG_VK_SHIFT) {
             sendKey(VK_SHIFT, false, hwnd);
         }
-        if ((flags & VK_CONTROL) == VK_CONTROL) {
+        if ((flags & FLAG_VK_CONTROL) == FLAG_VK_CONTROL) {
             sendKey(VK_CONTROL, false, hwnd);
         }
-        if ((flags & VK_MENU) == VK_MENU) {
+        if ((flags & FLAG_VK_MENU) == FLAG_VK_MENU) {
             sendKey(VK_MENU, false, hwnd);
         }
     }
@@ -361,9 +365,9 @@ inline WORD getVK(uint16_t keyCode) {
         vk = VK_F11;
     } else if (ch == "F12") {
         vk = VK_F12;
-    } else if (ch == "F413") {
+    } else if (ch == "F13") {
         vk = VK_F13;
-    } else if (ch == "F414") {
+    } else if (ch == "F14") {
         vk = VK_F14;
     } else if (ch == "F15") {
         vk = VK_F15;
@@ -470,7 +474,7 @@ void setShiftKey(uint64_t& flags) {
 #if defined(JUCE_MAC)
     flags |= kCGEventFlagMaskShift;
 #elif defined(JUCE_WINDOWS)
-    flags |= VK_SHIFT;
+    flags |= FLAG_VK_SHIFT;
 #endif
 }
 
@@ -478,7 +482,7 @@ void setControlKey(uint64_t& flags) {
 #if defined(JUCE_MAC)
     flags |= kCGEventFlagMaskControl;
 #elif defined(JUCE_WINDOWS)
-    flags |= VK_CONTROL;
+    flags |= FLAG_VK_CONTROL;
 #endif
 }
 
@@ -486,7 +490,7 @@ void setAltKey(uint64_t& flags) {
 #if defined(JUCE_MAC)
     flags |= kCGEventFlagMaskAlternate;
 #elif defined(JUCE_WINDOWS)
-    flags |= VK_MENU;
+    flags |= FLAG_VK_MENU;
 #endif
 }
 
@@ -495,7 +499,7 @@ void setCopyKeys(uint16_t& key, uint64_t& flags) {
 #if defined(JUCE_MAC)
     flags |= kCGEventFlagMaskCommand;
 #elif defined(JUCE_WINDOWS)
-    flags |= VK_CONTROL;
+    flags |= FLAG_VK_CONTROL;
 #endif
 }
 
@@ -504,7 +508,7 @@ void setPasteKeys(uint16_t& key, uint64_t& flags) {
 #if defined(JUCE_MAC)
     flags |= kCGEventFlagMaskCommand;
 #elif defined(JUCE_WINDOWS)
-    flags |= VK_CONTROL;
+    flags |= FLAG_VK_CONTROL;
 #endif
 }
 
@@ -513,7 +517,7 @@ void setCutKeys(uint16_t& key, uint64_t& flags) {
 #if defined(JUCE_MAC)
     flags |= kCGEventFlagMaskCommand;
 #elif defined(JUCE_WINDOWS)
-    flags |= VK_CONTROL;
+    flags |= FLAG_VK_CONTROL;
 #endif
 }
 
@@ -522,7 +526,7 @@ void setSelectAllKeys(uint16_t& key, uint64_t& flags) {
 #if defined(JUCE_MAC)
     flags |= kCGEventFlagMaskCommand;
 #elif defined(JUCE_WINDOWS)
-    flags |= VK_CONTROL;
+    flags |= FLAG_VK_CONTROL;
 #endif
 }
 
