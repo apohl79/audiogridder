@@ -22,9 +22,9 @@ MenuBarWindow::MenuBarWindow(App* app)
             app->hideSplashWindow();
         });
 #ifdef JUCE_WINDOWS
-        String info = L"\xa9 2020-2021 Andreas Pohl, https://audiogridder.com";
+        String info = L"\xa9 2020-2022 Andreas Pohl, https://audiogridder.com";
 #else
-        String info = L"© 2020-2021 Andreas Pohl, https://audiogridder.com";
+        String info = L"© 2020-2022 Andreas Pohl, https://audiogridder.com";
 #endif
         app->setSplashInfo(info);
     });
@@ -65,9 +65,9 @@ void MenuBarWindow::mouseUp(const MouseEvent& /* event */) {
             m_app->hideSplashWindow();
         });
 #ifdef JUCE_WINDOWS
-        String info = L"\xa9 2020-2021 Andreas Pohl, https://audiogridder.com";
+        String info = L"\xa9 2020-2022 Andreas Pohl, https://audiogridder.com";
 #else
-        String info = L"© 2020-2021 Andreas Pohl, https://audiogridder.com";
+        String info = L"© 2020-2022 Andreas Pohl, https://audiogridder.com";
 #endif
         m_app->setSplashInfo(info);
     });
