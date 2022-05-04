@@ -61,6 +61,8 @@ class ServiceReceiver : public Thread, public LogTag {
 
     Array<ServerInfo> getServersInternal();
     bool updateServers();
+
+    bool isReachable(const ServerInfo& srv);
 };
 
 }  // namespace e47

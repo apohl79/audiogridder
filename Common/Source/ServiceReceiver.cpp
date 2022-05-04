@@ -101,6 +101,7 @@ bool ServiceReceiver::updateServers() {
     traceScope();
 
     bool changed = false;
+    Array<ServerInfo> newServers;
     auto now = Time::currentTimeMillis();
 
     {
@@ -115,8 +116,7 @@ bool ServiceReceiver::updateServers() {
                 }
             }
             if (!exists) {
-                m_servers.add(s1);
-                changed = true;
+                newServers.add(s1);
             }
         }
         for (int i = 0; i < m_servers.size();) {
@@ -129,25 +129,23 @@ bool ServiceReceiver::updateServers() {
         }
     }
 
-    // reachable check
+    // reachable checks of existing servers
     int idx = 0;
     for (auto& srv : getServersInternal()) {
-        String host = srv.getHost();
-        int port = Defaults::SERVER_PORT + srv.getID();
-        String key = host + String(port);
-        bool removed = false;
-        if (m_lastReachableChecks.count(key) == 0 || m_lastReachableChecks[key] + 30000 < now) {
-            StreamingSocket sock;
-            if (!sock.connect(host, port, 500) || (srv.getLocalMode() && !sock.isLocal())) {
-                std::lock_guard<std::mutex> lock(m_serversMtx);
-                m_servers.remove(idx);
-                removed = true;
-            }
-            sock.close();
-            m_lastReachableChecks[key] = now;
-        }
-        if (!removed) {
+        if (!isReachable(srv)) {
+            std::lock_guard<std::mutex> lock(m_serversMtx);
+            m_servers.remove(idx);
+            changed = true;
+        } else {
             idx++;
+        }
+    }
+    // reachable checks of new servers
+    for (auto& srv : newServers) {
+        if (isReachable(srv)) {
+            std::lock_guard<std::mutex> lock(m_serversMtx);
+            m_servers.add(srv);
+            changed = true;
         }
     }
 
@@ -160,6 +158,22 @@ bool ServiceReceiver::updateServers() {
     }
 
     return changed;
+}
+
+bool ServiceReceiver::isReachable(const ServerInfo& srv) {
+    auto now = Time::currentTimeMillis();
+    String host = srv.getHost();
+    int port = Defaults::SERVER_PORT + srv.getID();
+    String key = host + String(port);
+    if (m_lastReachableChecks.count(key) == 0 || m_lastReachableChecks[key] + 30000 < now) {
+        StreamingSocket sock;
+        if (!sock.connect(host, port, 500) || (srv.getLocalMode() && !sock.isLocal())) {
+            return false;
+        }
+        sock.close();
+        m_lastReachableChecks[key] = now;
+    }
+    return true;
 }
 
 int ServiceReceiver::handleRecord(int /*sock*/, const struct sockaddr* from, size_t addrlen,

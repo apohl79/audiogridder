@@ -77,7 +77,7 @@ void Client::run() {
             }
         } else {
             for (auto& si : servers) {
-                if (si.getNameAndID() == srvInfo.getNameAndID() && si != srvInfo) {
+                if (si.getHostAndID() == srvInfo.getHostAndID() && si != srvInfo) {
                     bool reconnect = si.getHostAndID() != srvInfo.getHostAndID();
                     srvInfo = si;
                     std::lock_guard<std::mutex> lock(m_srvMtx);
