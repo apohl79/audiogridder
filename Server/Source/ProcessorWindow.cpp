@@ -13,7 +13,7 @@
 
 namespace e47 {
 
-ProcessorWindow::ProcessorWindow(std::shared_ptr<Processor> proc, CaptureCallbackNative func)
+ProcessorWindow::ProcessorWindow(std::shared_ptr<Processor> proc, CaptureCallbackNative func, int x, int y)
     : DocumentWindow(proc->getName(), Colours::lightgrey, DocumentWindow::closeButton),
       LogTag("procwindow"),
       m_processor(proc),
@@ -21,12 +21,14 @@ ProcessorWindow::ProcessorWindow(std::shared_ptr<Processor> proc, CaptureCallbac
       m_callbackFFmpeg(nullptr) {
     traceScope();
     initAsyncFunctors();
+    setBounds(x, y, 100, 100);
+    logln("creating processor window for " << m_processor->getName() << " at " << x << "x" << y);
     if (m_processor->hasEditor()) {
         createEditor();
     }
 }
 
-ProcessorWindow::ProcessorWindow(std::shared_ptr<Processor> proc, CaptureCallbackFFmpeg func)
+ProcessorWindow::ProcessorWindow(std::shared_ptr<Processor> proc, CaptureCallbackFFmpeg func, int x, int y)
     : DocumentWindow(proc->getName(), Colours::lightgrey, DocumentWindow::closeButton),
       LogTag("procwindow"),
       m_processor(proc),
@@ -34,7 +36,8 @@ ProcessorWindow::ProcessorWindow(std::shared_ptr<Processor> proc, CaptureCallbac
       m_callbackFFmpeg(func) {
     traceScope();
     initAsyncFunctors();
-    logln("creating processor window: " << m_processor->getName());
+    setBounds(x, y, 100, 100);
+    logln("creating processor window for " << m_processor->getName() << " at " << x << "x" << y);
     if (m_processor->hasEditor()) {
         createEditor();
     }
@@ -42,7 +45,7 @@ ProcessorWindow::ProcessorWindow(std::shared_ptr<Processor> proc, CaptureCallbac
 
 ProcessorWindow::~ProcessorWindow() {
     traceScope();
-    logln("destroying processor window: " << m_processor->getName());
+    logln("destroying processor window for " << m_processor->getName());
     stopAsyncFunctors();
     stopCapturing();
     if (m_editor != nullptr) {
@@ -203,14 +206,14 @@ void ProcessorWindow::createEditor() {
     bool success = true;
 
     if (m_processor->isClient()) {
-        auto p = m_processor->getLastPosition();
-        m_processor->showEditor(p.x, p.y);
+        //auto p = m_processor->getLastPosition();
+        m_processor->showEditor(getX(), getY());
     } else {
         m_editor = m_processor->createEditorIfNeeded();
         if (nullptr != m_editor) {
             setContentNonOwned(m_editor, true);
             if (getApp()->getServer()->getScreenLocalMode()) {
-                setTopLeftPosition(m_processor->getLastPosition());
+                setTopLeftPosition({getX(), getY()});
             } else {
                 setTopLeftPosition(userRect.getTopLeft());
             }

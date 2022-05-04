@@ -60,8 +60,10 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     void restartServer(bool rescan = false);
     std::shared_ptr<Server> getServer() { return m_server; }
 
-    void showEditor(std::shared_ptr<Processor> proc, Thread::ThreadID tid, ProcessorWindow::CaptureCallbackFFmpeg func);
-    void showEditor(std::shared_ptr<Processor> proc, Thread::ThreadID tid, ProcessorWindow::CaptureCallbackNative func);
+    void showEditor(std::shared_ptr<Processor> proc, Thread::ThreadID tid, ProcessorWindow::CaptureCallbackFFmpeg func,
+                    int x = 0, int y = 0);
+    void showEditor(std::shared_ptr<Processor> proc, Thread::ThreadID tid, ProcessorWindow::CaptureCallbackNative func,
+                    int x = 0, int y = 0);
 
     void hideEditor(Thread::ThreadID tid = nullptr, bool updateMacOSDock = true);
     void resetEditor(Thread::ThreadID tid);
@@ -113,7 +115,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     uint32 m_exitCode = 0;
 
     template <typename T>
-    void showEditorInternal(std::shared_ptr<Processor> proc, Thread::ThreadID tid, T func);
+    void showEditorInternal(std::shared_ptr<Processor> proc, Thread::ThreadID tid, T func, int x, int y);
 
     ENABLE_ASYNC_FUNCTORS();
 };

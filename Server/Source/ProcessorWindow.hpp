@@ -22,8 +22,8 @@ class ProcessorWindow : public DocumentWindow, private Timer, public LogTag {
     using CaptureCallbackNative = std::function<void(std::shared_ptr<Image> image, int width, int height)>;
     using CaptureCallbackFFmpeg = ScreenRecorder::CaptureCallback;
 
-    ProcessorWindow(std::shared_ptr<Processor> proc, CaptureCallbackNative func);
-    ProcessorWindow(std::shared_ptr<Processor> proc, CaptureCallbackFFmpeg func);
+    ProcessorWindow(std::shared_ptr<Processor> proc, CaptureCallbackNative func, int x, int y);
+    ProcessorWindow(std::shared_ptr<Processor> proc, CaptureCallbackFFmpeg func, int x, int y);
     ~ProcessorWindow() override;
 
     void closeButtonPressed() override;

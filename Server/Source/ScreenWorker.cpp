@@ -188,6 +188,7 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
 
     runOnMsgThreadAsync([this] {
         traceScope();
+        logln("trying to hide an existing editor");
         if (getApp()->getServer()->getScreenCapturingOff()) {
             getApp()->hideEditor(m_currentTid, false);
         } else {
@@ -196,8 +197,15 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
         }
     });
 
-    if (getApp()->getServer()->getScreenCapturingFFmpeg()) {
-        runOnMsgThreadAsync([this, proc] {
+    if (getApp()->getServer()->getScreenCapturingOff()) {
+        logln("showing editor with NO callback");
+        runOnMsgThreadSync([this, proc, x, y] {
+            traceScope();
+            getApp()->showEditor(proc, m_currentTid, [](const uint8_t*, int, int, int, double) {}, x, y);
+        });
+    } else if (getApp()->getServer()->getScreenCapturingFFmpeg()) {
+        logln("showing editor with ffmpeg callback");
+        runOnMsgThreadSync([this, proc] {
             traceScope();
             getApp()->showEditor(proc, m_currentTid, [this](const uint8_t* data, int size, int w, int h, double scale) {
                 // executed in the context of the screen recorder worker thread
@@ -222,7 +230,8 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
             });
         });
     } else {
-        runOnMsgThreadAsync([this, proc] {
+        logln("showing editor with legacy callback");
+        runOnMsgThreadSync([this, proc] {
             traceScope();
             m_currentImageLock.lock();
             m_currentImage.reset();

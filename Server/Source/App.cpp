@@ -343,7 +343,7 @@ void App::restartServer(bool rescan) {
 const KnownPluginList& App::getPluginList() { return m_server->getPluginList(); }
 
 template <typename T>
-void App::showEditorInternal(std::shared_ptr<Processor> proc, Thread::ThreadID tid, T func) {
+void App::showEditorInternal(std::shared_ptr<Processor> proc, Thread::ThreadID tid, T func, int x, int y) {
     traceScope();
 
     if (tid == nullptr) {
@@ -364,7 +364,7 @@ void App::showEditorInternal(std::shared_ptr<Processor> proc, Thread::ThreadID t
         }
 
         helper.processor = proc;
-        helper.window = std::make_unique<ProcessorWindow>(proc, func);
+        helper.window = std::make_unique<ProcessorWindow>(proc, func, x, y);
 
 #ifdef JUCE_MAC
         if (getServer()->getSandboxMode() != Server::SANDBOX_PLUGIN ||
@@ -378,13 +378,13 @@ void App::showEditorInternal(std::shared_ptr<Processor> proc, Thread::ThreadID t
 }
 
 void App::showEditor(std::shared_ptr<Processor> proc, Thread::ThreadID tid,
-                     ProcessorWindow::CaptureCallbackFFmpeg func) {
-    showEditorInternal(proc, tid, func);
+                     ProcessorWindow::CaptureCallbackFFmpeg func, int x, int y) {
+    showEditorInternal(proc, tid, func, x, y);
 }
 
 void App::showEditor(std::shared_ptr<Processor> proc, Thread::ThreadID tid,
-                     ProcessorWindow::CaptureCallbackNative func) {
-    showEditorInternal(proc, tid, func);
+                     ProcessorWindow::CaptureCallbackNative func, int x, int y) {
+    showEditorInternal(proc, tid, func, x, y);
 }
 
 void App::hideEditor(Thread::ThreadID tid, bool updateMacOSDock) {
@@ -502,10 +502,13 @@ void App::restartEditor(Thread::ThreadID tid) {
     if (it != m_windows.end()) {
         if (it->second.processor != nullptr) {
             logln("recreating processor window");
-            if (nullptr != it->second.callbackFFmpeg) {
-                it->second.window = std::make_unique<ProcessorWindow>(it->second.processor, it->second.callbackFFmpeg);
-            } else if (nullptr != it->second.callbackNative) {
-                it->second.window = std::make_unique<ProcessorWindow>(it->second.processor, it->second.callbackNative);
+            auto& helper = it->second;
+            if (nullptr != helper.callbackFFmpeg) {
+                helper.window = std::make_unique<ProcessorWindow>(helper.processor, helper.callbackFFmpeg,
+                                                                  helper.window->getX(), helper.window->getY());
+            } else if (nullptr != helper.callbackNative) {
+                helper.window = std::make_unique<ProcessorWindow>(helper.processor, helper.callbackNative,
+                                                                  helper.window->getX(), helper.window->getY());
             }
         }
     } else {
