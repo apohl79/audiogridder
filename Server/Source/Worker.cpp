@@ -256,7 +256,11 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
         jresult["name"] = proc->getName().toStdString();
         jresult["hasEditor"] = proc->hasEditor();
         jresult["supportsDoublePrecision"] = proc->supportsDoublePrecisionProcessing();
-        jresult["tailSeconds"] = proc->getTailLengthSeconds();
+        auto ts = proc->getTailLengthSeconds();
+        if (ts == std::numeric_limits<double>::infinity()) {
+            ts = 0.0;
+        }
+        jresult["tailSeconds"] = ts;
         jresult["numOutputChannels"] = proc->getTotalNumOutputChannels();
         proc->setCallbacks([this](int idx, int paramIdx, float val) { sendParamValueChange(idx, paramIdx, val); },
                            [this](int idx, int paramIdx, bool gestureIsStarting) {

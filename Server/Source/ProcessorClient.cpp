@@ -334,6 +334,8 @@ bool ProcessorClient::load(const String& settings, String& err) {
         return false;
     }
 
+    logln("loading " << m_id << "...");
+
     std::lock_guard<std::mutex> lock(m_cmdMtx);
 
     TimeStatistic::Timeout timeout(15000);
@@ -366,6 +368,8 @@ bool ProcessorClient::load(const String& settings, String& err) {
             return false;
         }
 
+        logln("reading presets...");
+
         Message<Presets> msgPresets(this);
         if (!msgPresets.read(m_sockCmdOut.get(), &e, timeout.getMillisecondsLeft())) {
             err = "failed to read presets: " + e.toString();
@@ -382,6 +386,9 @@ bool ProcessorClient::load(const String& settings, String& err) {
             return false;
         }
 
+        logln("...ok");
+        logln("reading parameters...");
+
         Message<Parameters> msgParams(this);
         if (!msgParams.read(m_sockCmdOut.get(), &e, timeout.getMillisecondsLeft())) {
             err = "failed to read parameters: " + e.toString();
@@ -390,18 +397,33 @@ bool ProcessorClient::load(const String& settings, String& err) {
             return false;
         }
 
+        logln("...ok");
+
         m_parameters = msgParams.payload.getJson();
-        m_name = jresult["name"].get<std::string>();
-        m_latency = jresult["latency"].get<int>();
-        m_hasEditor = jresult["hasEditor"].get<bool>();
-        m_scDisabled = jresult["disabledSideChain"].get<bool>();
-        m_supportsDoublePrecision = jresult["supportsDoublePrecision"].get<bool>();
-        m_tailSeconds = jresult["tailSeconds"].get<double>();
-        m_numOutputChannels = jresult["numOutputChannels"].get<int>();
+
+        try {
+            m_name = jresult["name"].get<std::string>();
+            m_latency = jresult["latency"].get<int>();
+            m_hasEditor = jresult["hasEditor"].get<bool>();
+            m_scDisabled = jresult["disabledSideChain"].get<bool>();
+            m_supportsDoublePrecision = jresult["supportsDoublePrecision"].get<bool>();
+            m_tailSeconds = jresult["tailSeconds"].get<double>();
+            m_numOutputChannels = jresult["numOutputChannels"].get<int>();
+        } catch (const json::parse_error& e) {
+            err = "json error when reading result: " + String(e.what());
+            setAndLogError(err);
+            return false;
+        } catch (const std::exception& e) {
+            err = "std error when reading result: " + String(e.what());
+            setAndLogError(err);
+            return false;
+        }
+
         m_lastSettings = settings;
         m_lastScreenBounds = {};
         m_loaded = true;
         m_error.clear();
+        logln("load was successful");
 
         return true;
     } else {
