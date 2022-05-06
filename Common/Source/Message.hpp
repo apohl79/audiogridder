@@ -271,21 +271,54 @@ class AudioMessage : public LogTagDelegate {
                 MessageHelper::seterrstr(e, "response header");
                 return false;
             }
-            if (buffer.getNumChannels() < m_resHeader.channels) {
-                MessageHelper::seterr(e, MessageHelper::E_SIZE, "buffer has not enough channels");
-                return false;
+
+            bool needTmpBuffer = false;
+            int channels = jmin(buffer.getNumChannels(), m_resHeader.channels);
+            int samples = jmin(buffer.getNumSamples(), m_resHeader.samples);
+
+            if (channels < m_resHeader.channels) {
+                logln("warning: target buffer has less channels then what was received from the server, discarding audio data");
+                needTmpBuffer = true;
             }
-            if (buffer.getNumSamples() < m_resHeader.samples) {
-                MessageHelper::seterr(e, MessageHelper::E_SIZE, "buffer has not enough samples");
-                return false;
+
+            if (m_resHeader.channels < buffer.getNumChannels()) {
+                logln("warning: target buffer has more channels then what was received from the server");
             }
-            for (int chan = 0; chan < m_resHeader.channels; ++chan) {
-                if (!read(socket, buffer.getWritePointer(chan), m_resHeader.samples * (int)sizeof(T), 1000, e,
-                          &metric)) {
-                    MessageHelper::seterrstr(e, "audio data");
+
+            if (samples < m_resHeader.samples) {
+                logln("warning: target buffer has less samples then what was received from the server, discarding audio data");
+                needTmpBuffer = true;
+            }
+
+            if (m_resHeader.samples < buffer.getNumSamples()) {
+                logln("warning: target buffer has more samples then what was received from the server, audio artifacts expected");
+            }
+
+            auto readAudio = [&] (AudioBuffer<T>* targetBuffer) {
+                for (int chan = 0; chan < m_resHeader.channels; ++chan) {
+                    if (!read(socket, targetBuffer->getWritePointer(chan), m_resHeader.samples * (int)sizeof(T), 1000,
+                              e, &metric)) {
+                        MessageHelper::seterrstr(e, "audio data");
+                        return false;
+                    }
+                }
+                return true;
+            };
+
+            if (needTmpBuffer) {
+                AudioBuffer<T> tmpBuf(m_resHeader.channels, m_resHeader.samples);
+                if (!readAudio(&tmpBuf)) {
+                    return false;
+                }
+                for (int chan = 0; chan < channels; chan++) {
+                    buffer.copyFrom(chan, 0, tmpBuf, chan, 0, samples);
+                }
+            } else {
+                if (!readAudio(&buffer)) {
                     return false;
                 }
             }
+
             midi.clear();
             std::vector<char> midiData;
             MidiHeader midiHdr;

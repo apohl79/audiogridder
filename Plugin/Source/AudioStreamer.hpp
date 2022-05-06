@@ -105,8 +105,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         if (m_client->getChannelsIn() > 0) {  // fx
             buf.audio.makeCopyOf(buffer);
         } else {  // inst
-            buf.channelsRequested = m_client->getNumActiveChannels();
-            buf.samplesRequested = m_client->getSamplesPerBlock();
+            buf.channelsRequested = buffer.getNumChannels();
+            buf.samplesRequested = buffer.getNumSamples();
         }
         buf.midi.addEvents(midi, 0, buffer.getNumSamples(), 0);
         buf.posInfo = posInfo;
