@@ -651,6 +651,15 @@ void PluginEditor::showServerMenu() {
         n << blocks << " Blocks (+" << blocks * iobuf * 1000 / rate << "ms)";
         return n;
     };
+
+    subm.addItem("Allow individual buffer size by plugin", true, m_processor.getBufferSizeByPlugin(), [this] {
+        traceScope();
+        m_processor.setBufferSizeByPlugin(!m_processor.getBufferSizeByPlugin());
+        m_processor.saveConfig();
+    });
+
+    subm.addSeparator();
+
     subm.addItem("Disabled (+0ms)", true, m_processor.getNumBuffers() == 0, [this] {
         traceScope();
         m_processor.setNumBuffers(0);
@@ -803,7 +812,7 @@ void PluginEditor::showServerMenu() {
 }
 
 void PluginEditor::showSettingsMenu() {
-    PopupMenu m, subm;
+    PopupMenu m, subm, subsubm;
 #if !JucePlugin_IsSynth && !JucePlugin_IsMidiEffect
     subm.addItem("Make Default", [this] {
         traceScope();
@@ -959,34 +968,64 @@ void PluginEditor::showSettingsMenu() {
     subm.clear();
 #endif
 
-    m.addSeparator();
-    m.addItem("Show Monitor...", [this] { m_processor.showMonitor(); });
+    subm.addItem("Always", true, m_processor.getTransferMode() == PluginProcessor::TM_ALWAYS, [this] {
+        traceScope();
+        m_processor.setTransferMode(PluginProcessor::TM_ALWAYS);
+        m_processor.saveConfig();
+    });
+    subm.addItem("Only when Playing/Recording", true, m_processor.getTransferMode() == PluginProcessor::TM_WHEN_PLAYING,
+                 [this] {
+                     traceScope();
+                     m_processor.setTransferMode(PluginProcessor::TM_WHEN_PLAYING);
+                     m_processor.saveConfig();
+                 });
+#if JucePlugin_IsSynth || JucePlugin_IsMidiEffect
+    subm.addItem("Only when MIDI is playing", true, m_processor.getTransferMode() == PluginProcessor::TM_WITH_MIDI,
+                 [this] {
+                     traceScope();
+                     m_processor.setTransferMode(PluginProcessor::TM_WITH_MIDI);
+                     m_processor.saveConfig();
+                 });
+#endif
+
+    subm.addSeparator();
+
+    subm.addItem("Bypass when not ready", true, m_processor.getBypassWhenNotConnected(), [this] {
+        traceScope();
+        m_processor.setBypassWhenNotConnected(!m_processor.getBypassWhenNotConnected());
+        m_processor.saveConfig();
+    });
+
+    m.addSubMenu("Transfer Audio/MIDI", subm);
+    subm.clear();
 
     m.addSeparator();
-    subm.addItem("Show Category", true, m_processor.getMenuShowCategory(), [this] {
+
+
+    subsubm.addItem("Show Category", true, m_processor.getMenuShowCategory(), [this] {
         traceScope();
         m_processor.setMenuShowCategory(!m_processor.getMenuShowCategory());
         m_processor.saveConfig();
     });
-    subm.addItem("Show Company", true, m_processor.getMenuShowCompany(), [this] {
+    subsubm.addItem("Show Company", true, m_processor.getMenuShowCompany(), [this] {
         traceScope();
         m_processor.setMenuShowCompany(!m_processor.getMenuShowCompany());
         m_processor.saveConfig();
     });
-    subm.addItem("Disable Recents", true, m_processor.getDisableRecents(), [this] {
+    subsubm.addItem("Disable Recents", true, m_processor.getDisableRecents(), [this] {
         traceScope();
         m_processor.setDisableRecents(!m_processor.getDisableRecents());
         m_processor.saveConfig();
     });
-    subm.addItem("Disable Server Filter", true, m_processor.getNoSrvPluginListFilter(), [this] {
+    subsubm.addItem("Disable Server Filter", true, m_processor.getNoSrvPluginListFilter(), [this] {
         traceScope();
         m_processor.setNoSrvPluginListFilter(!m_processor.getNoSrvPluginListFilter());
         m_processor.saveConfig();
         m_processor.getClient().reconnect();
     });
 
-    m.addSubMenu("Plugin Menu", subm);
-    subm.clear();
+    subm.addSubMenu("Plugin Menu", subsubm);
+    subsubm.clear();
 
     float sf = Desktop::getInstance().getGlobalScaleFactor();
     auto updateZoom = [this, sf](float f) -> std::function<void()> {
@@ -1000,15 +1039,17 @@ void PluginEditor::showSettingsMenu() {
             }
         };
     };
-    subm.addItem("50%", true, sf == 0.5f, updateZoom(0.5f));
-    subm.addItem("75%", true, sf == 0.75f, updateZoom(0.75f));
-    subm.addItem("100%", true, sf == 1.0f, updateZoom(1.0f));
-    subm.addItem("125%", true, sf == 1.25f, updateZoom(1.25f));
-    subm.addItem("150%", true, sf == 1.5f, updateZoom(1.5f));
-    subm.addItem("175%", true, sf == 1.75f, updateZoom(1.75f));
-    subm.addItem("200%", true, sf == 2.0f, updateZoom(2.0f));
-    m.addSubMenu("Zoom", subm);
-    subm.clear();
+    subsubm.addItem("50%", true, sf == 0.5f, updateZoom(0.5f));
+    subsubm.addItem("75%", true, sf == 0.75f, updateZoom(0.75f));
+    subsubm.addItem("100%", true, sf == 1.0f, updateZoom(1.0f));
+    subsubm.addItem("125%", true, sf == 1.25f, updateZoom(1.25f));
+    subsubm.addItem("150%", true, sf == 1.5f, updateZoom(1.5f));
+    subsubm.addItem("175%", true, sf == 1.75f, updateZoom(1.75f));
+    subsubm.addItem("200%", true, sf == 2.0f, updateZoom(2.0f));
+    subm.addSubMenu("Zoom", subsubm);
+    subsubm.clear();
+
+    subm.addSeparator();
 
     subm.addItem("Confirm Delete", true, m_processor.getConfirmDelete(), [this] {
         traceScope();
@@ -1038,28 +1079,6 @@ void PluginEditor::showSettingsMenu() {
     m.addSubMenu("User Interface", subm);
     subm.clear();
 
-    subm.addItem("Always", true, m_processor.getTransferMode() == PluginProcessor::TM_ALWAYS, [this] {
-        traceScope();
-        m_processor.setTransferMode(PluginProcessor::TM_ALWAYS);
-        m_processor.saveConfig();
-    });
-    subm.addItem("Only when Playing/Recording", true, m_processor.getTransferMode() == PluginProcessor::TM_WHEN_PLAYING,
-                 [this] {
-                     traceScope();
-                     m_processor.setTransferMode(PluginProcessor::TM_WHEN_PLAYING);
-                     m_processor.saveConfig();
-                 });
-#if JucePlugin_IsSynth || JucePlugin_IsMidiEffect
-    subm.addItem("Only when MIDI is playing", true, m_processor.getTransferMode() == PluginProcessor::TM_WITH_MIDI,
-                 [this] {
-                     traceScope();
-                     m_processor.setTransferMode(PluginProcessor::TM_WITH_MIDI);
-                     m_processor.saveConfig();
-                 });
-#endif
-    m.addSubMenu("Transfer Audio/MIDI", subm);
-    subm.clear();
-
     subm.addItem("Always (every 10s)", true, m_processor.getSyncRemoteMode() == PluginProcessor::SYNC_ALWAYS, [this] {
         m_processor.setSyncRemoteMode(PluginProcessor::SYNC_ALWAYS);
         m_processor.saveConfig();
@@ -1079,18 +1098,12 @@ void PluginEditor::showSettingsMenu() {
 
     m.addSeparator();
 
-    m.addItem("Bypass when not ready", true, m_processor.getBypassWhenNotConnected(), [this] {
-        traceScope();
-        m_processor.setBypassWhenNotConnected(!m_processor.getBypassWhenNotConnected());
-        m_processor.saveConfig();
-    });
-    m.addItem("Allow buffer size by plugin", true, m_processor.getBufferSizeByPlugin(), [this] {
-        traceScope();
-        m_processor.setBufferSizeByPlugin(!m_processor.getBufferSizeByPlugin());
-        m_processor.saveConfig();
-    });
+    m.addItem("Show Monitor...", [this] { m_processor.showMonitor(); });
 
-    m.addSeparator();
+    m.addItem("Show Statistics...", [this] {
+        traceScope();
+        StatisticsWindow::show();
+    });
 
     subm.addItem("Logging", true, Logger::isEnabled(), [this] {
         traceScope();
@@ -1111,11 +1124,6 @@ void PluginEditor::showSettingsMenu() {
     }
     m.addSubMenu("Diagnostics", subm);
     subm.clear();
-
-    m.addItem("Show Statistics...", [this] {
-        traceScope();
-        StatisticsWindow::show();
-    });
 
     m.showAt(&m_settingsIcon);
 }
