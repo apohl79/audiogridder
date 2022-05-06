@@ -184,6 +184,8 @@ PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
     if (!m_disableTray) {
         m_tray = std::make_unique<TrayConnection>(this);
     }
+
+    memset(m_activeMidiNotes, 0, sizeof(m_activeMidiNotes));
 }
 
 PluginProcessor::~PluginProcessor() {
@@ -245,7 +247,13 @@ void PluginProcessor::loadConfig(const json& j, bool isUpdate) {
     m_menuShowCompany = jsonGetValue(j, "MenuShowCompany", m_menuShowCompany);
     m_genericEditor = jsonGetValue(j, "GenericEditor", m_genericEditor);
     m_confirmDelete = jsonGetValue(j, "ConfirmDelete", m_confirmDelete);
-    m_transferWhenPlayingOnly = jsonGetValue(j, "TransferWhenPlayingOnly", m_transferWhenPlayingOnly);
+    if (jsonHasValue(j, "TransferWhenPlayingOnly")) {
+        bool transferWhenPlayingOnly = jsonGetValue(j, "TransferWhenPlayingOnly", false);
+        setTransferMode(transferWhenPlayingOnly ? TM_WHEN_PLAYING : TM_ALWAYS);
+    } else {
+        m_transferModeFx = (TransferMode)jsonGetValue(j, "TransferModeFx", m_transferModeFx.load());
+        m_transferModeMidi = (TransferMode)jsonGetValue(j, "TransferModeMidi", m_transferModeMidi.load());
+    }
     m_syncRemote = jsonGetValue(j, "SyncRemoteMode", m_syncRemote);
     m_presetsDir = jsonGetValue(j, "PresetsDir", Defaults::PRESETS_DIR);
     m_defaultPreset = jsonGetValue(j, "DefaultPreset", m_defaultPreset);
@@ -291,7 +299,8 @@ void PluginProcessor::saveConfig(int numOfBuffers) {
     jcfg["MenuShowCompany"] = m_menuShowCompany;
     jcfg["GenericEditor"] = m_genericEditor;
     jcfg["ConfirmDelete"] = m_confirmDelete;
-    jcfg["TransferWhenPlayingOnly"] = m_transferWhenPlayingOnly;
+    jcfg["TransferModeFx"] = m_transferModeFx.load();
+    jcfg["TransferModeMidi"] = m_transferModeMidi.load();
     jcfg["Tracer"] = Tracer::isEnabled();
     jcfg["Logger"] = Logger::isEnabled();
     jcfg["SyncRemoteMode"] = m_syncRemote;
@@ -544,8 +553,39 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
         sendBuffer = &buffer;
     }
 
+    auto transferMode = getTransferMode();
+    bool transfer = transferMode == TM_ALWAYS;
+    transfer |= transferMode == TM_WHEN_PLAYING && (posInfo.isPlaying || posInfo.isRecording);
+
 #if JucePlugin_IsSynth || JucePlugin_IsMidiEffect
     buffer.clear();
+
+    bool midiIsCurrentlyPlaying = false;
+
+    if (transferMode == TM_WITH_MIDI) {
+        if (midiMessages.getNumEvents() > 0) {
+            for (auto ev : midiMessages) {
+                auto note = jmax(jmin(ev.getMessage().getNoteNumber(), 128), 0);
+                if (ev.getMessage().isNoteOn()) {
+                    m_activeMidiNotes[note] = true;
+                } else if (ev.getMessage().isNoteOff()) {
+                    m_activeMidiNotes[note] = false;
+                } else if (ev.getMessage().isAllNotesOff()) {
+                    memset(m_activeMidiNotes, 0, sizeof(m_activeMidiNotes));
+                }
+            }
+        }
+
+        for (bool noteIsActive : m_activeMidiNotes) {
+            if (noteIsActive) {
+                m_midiIsPlaying = true;
+                midiIsCurrentlyPlaying = true;
+                break;
+            }
+        }
+
+        transfer |= m_midiIsPlaying;
+    }
 #else
     // clear inactive outputs if we need no mapping, as the mapper takes care otherwise
     if (sendBuffer == &buffer) {
@@ -557,9 +597,10 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
     }
 #endif
 
-    if (!m_transferWhenPlayingOnly || posInfo.isPlaying || posInfo.isRecording) {
+    if (transfer) {
         if ((buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) || midiMessages.getNumEvents() > 0) {
             auto streamer = m_client->getStreamer<T>();
+
             if (nullptr != streamer && m_loadedPluginsOk) {
                 m_channelMapper.map(&buffer, sendBuffer);
                 streamer->send(*sendBuffer, midiMessages, posInfo);
@@ -573,6 +614,33 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
                 buffer.clear();
             }
         }
+#if JucePlugin_IsSynth || JucePlugin_IsMidiEffect
+        if (transferMode == TM_WITH_MIDI) {
+            if (midiIsCurrentlyPlaying) {
+                m_blocksWithoutMidi = 0;
+            } else {
+                m_blocksWithoutMidi++;
+            }
+
+            if (!midiIsCurrentlyPlaying && m_blocksWithoutMidi > m_client->NUM_OF_BUFFERS && m_midiIsPlaying) {
+                bool isSilence = true;
+
+                for (int ch = 0; ch < buffer.getNumChannels(); ch++) {
+                    auto mm = buffer.findMinMax(ch, 0, buffer.getNumSamples());
+                    if (mm.getStart() != 0.0 || mm.getEnd() != 0.0) {
+                        isSilence = false;
+                        break;
+                    }
+                }
+
+                if (isSilence) {
+                    m_midiIsPlaying = false;
+                }
+            }
+        }
+#endif
+    } else {
+        buffer.clear();
     }
 }
 

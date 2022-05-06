@@ -288,8 +288,19 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     void storePresetDefault();
     void resetPresetDefault();
 
-    bool getTransferWhenPlayingOnly() const { return m_transferWhenPlayingOnly; }
-    void setTransferWhenPlayingOnly(bool b) { m_transferWhenPlayingOnly = b; }
+    enum TransferMode : int { TM_ALWAYS, TM_WHEN_PLAYING, TM_WITH_MIDI };
+
+    TransferMode getTransferMode() const {
+        return (TransferMode)(m_mode == "FX" ? m_transferModeFx.load() : m_transferModeMidi.load());
+    }
+
+    void setTransferMode(TransferMode m) {
+        if (m_mode == "FX") {
+            m_transferModeFx = m;
+        } else {
+            m_transferModeMidi = m;
+        }
+    }
 
     bool getDisableTray() const { return m_disableTray; }
     void setDisableTray(bool b);
@@ -420,7 +431,9 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     float m_scale = 1.0;
     bool m_crashReporting = true;
 
-    bool m_transferWhenPlayingOnly = false;
+    std::atomic_int m_transferModeFx{TM_ALWAYS};
+    std::atomic_int m_transferModeMidi{TM_ALWAYS};
+
     bool m_disableTray = false;
     bool m_disableRecents = false;
     bool m_keepEditorOpen = false;
@@ -434,6 +447,10 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
 
     ChannelSet m_activeChannels;
     ChannelMapper m_channelMapper;
+
+    bool m_activeMidiNotes[128];
+    bool m_midiIsPlaying = false;
+    int m_blocksWithoutMidi = 0;
 
     static BusesProperties createBusesProperties(WrapperType wt) {
         int chIn = Defaults::PLUGIN_CHANNELS_IN;

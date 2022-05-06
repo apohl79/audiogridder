@@ -1038,16 +1038,25 @@ void PluginEditor::showSettingsMenu() {
     m.addSubMenu("User Interface", subm);
     subm.clear();
 
-    subm.addItem("Always", true, m_processor.getTransferWhenPlayingOnly() == false, [this] {
+    subm.addItem("Always", true, m_processor.getTransferMode() == PluginProcessor::TM_ALWAYS, [this] {
         traceScope();
-        m_processor.setTransferWhenPlayingOnly(false);
+        m_processor.setTransferMode(PluginProcessor::TM_ALWAYS);
         m_processor.saveConfig();
     });
-    subm.addItem("Only when Playing/Recording", true, m_processor.getTransferWhenPlayingOnly() == true, [this] {
-        traceScope();
-        m_processor.setTransferWhenPlayingOnly(true);
-        m_processor.saveConfig();
-    });
+    subm.addItem("Only when Playing/Recording", true, m_processor.getTransferMode() == PluginProcessor::TM_WHEN_PLAYING,
+                 [this] {
+                     traceScope();
+                     m_processor.setTransferMode(PluginProcessor::TM_WHEN_PLAYING);
+                     m_processor.saveConfig();
+                 });
+#if JucePlugin_IsSynth || JucePlugin_IsMidiEffect
+    subm.addItem("Only when MIDI is playing", true, m_processor.getTransferMode() == PluginProcessor::TM_WITH_MIDI,
+                 [this] {
+                     traceScope();
+                     m_processor.setTransferMode(PluginProcessor::TM_WITH_MIDI);
+                     m_processor.saveConfig();
+                 });
+#endif
     m.addSubMenu("Transfer Audio/MIDI", subm);
     subm.clear();
 
