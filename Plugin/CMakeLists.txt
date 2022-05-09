@@ -81,7 +81,18 @@ macro(ag_add_plugin type)
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags)
 
+  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    ag_strip(AudioGridder${type}_AU AU)
+  endif()
+
+  if(AG_VST2_PLUGIN_ENABLED)
+    ag_strip(AudioGridder${type}_VST VST)
+  endif()
+
+  ag_strip(AudioGridder${type}_VST3 VST3)
+
   if(AG_AAX_PLUGIN_ENABLED)
+    ag_strip(AudioGridder${type}_AAX AAX)
     ag_bundle_sign_aax(AudioGridder${type}_AAX)
   endif()
 

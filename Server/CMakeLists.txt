@@ -66,6 +66,8 @@ target_link_libraries(AudioGridderServer PRIVATE
   ${WEBP_LIBRARIES}
   ${SENTRY_LIBRARIES})
 
+ag_strip(AudioGridderServer Server)
+
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   target_link_libraries(AudioGridderServer PRIVATE "-framework AVFoundation -framework CoreMedia")
   if(AG_MACOS_TARGET STRGREATER_EQUAL 10.8)

@@ -160,13 +160,60 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   set(AG_WITH_SERVER off)
 endif()
 
+macro(ag_strip target_name target_dir)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    add_custom_target(${target_name}_DBGSYM ALL DEPENDS ${target_name}
+      COMMAND
+        ${CMAKE_COMMAND} -E echo "Creating DWARF file from $<TARGET_FILE:${target_name}>"
+      COMMAND
+        ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/debug/${target_dir}
+      COMMAND
+        ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${target_name}> ${CMAKE_BINARY_DIR}/debug/${target_dir}
+      COMMAND
+        /usr/bin/dsymutil -o ${CMAKE_BINARY_DIR}/debug/${target_dir}/$<TARGET_FILE_NAME:${target_name}>.dSYM $<TARGET_FILE:${target_name}>
+      )
+    add_custom_target(${target_name}_STRIP ALL DEPENDS ${target_name}_DBGSYM
+      COMMAND
+        ${CMAKE_COMMAND} -E echo "Stripping file $<TARGET_FILE:${target_name}>"
+      COMMAND
+        /usr/bin/strip -S $<TARGET_FILE:${target_name}>
+      )
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_custom_target(${target_name}_DBGSYM ALL DEPENDS ${target_name}
+      COMMAND
+        ${CMAKE_COMMAND} -E echo "Copying debug symbols for $<TARGET_FILE:${target_name}>"
+      COMMAND
+        ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/debug/${target_dir}
+      COMMAND
+        ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${target_name}> ${CMAKE_BINARY_DIR}/debug/${target_dir}
+      )
+    add_custom_target(${target_name}_STRIP ALL DEPENDS ${target_name}_DBGSYM
+      COMMAND
+        ${CMAKE_COMMAND} -E echo "Stripping file $<TARGET_FILE:${target_name}>"
+      COMMAND
+        /usr/bin/strip $<TARGET_FILE:${target_name}>
+      )
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    add_custom_target(${target_name}_STRIP ALL DEPENDS ${target_name}
+      COMMAND
+        ${CMAKE_COMMAND} -E echo "Copying debug symbols for $<TARGET_FILE:${target_name}>"
+      COMMAND
+        ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/debug/${target_dir}
+      COMMAND
+        ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${target_name}> ${CMAKE_BINARY_DIR}/debug/${target_dir}
+      COMMAND
+        ${CMAKE_COMMAND} -E copy $<TARGET_PDB_FILE:${target_name}> ${CMAKE_BINARY_DIR}/debug/${target_dir}
+      )
+  endif()
+endmacro()
+
 macro(ag_bundle_add_crashpad target_name)
   if(AG_ENABLE_SENTRY)
-    add_custom_target(${target_name}_CRASHPAD ALL DEPENDS ${target_name}
+    add_custom_target(${target_name}_CRASHPAD ALL DEPENDS ${target_name}_STRIP
       COMMAND
         ${CMAKE_COMMAND} -E echo "Adding crashpad to bundle $<TARGET_BUNDLE_DIR:${target_name}>"
       COMMAND
-        cp ${CMAKE_BINARY_DIR}/bin/crashpad_handler $<TARGET_BUNDLE_DIR:${target_name}>/Contents/MacOS
+        ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/bin/crashpad_handler $<TARGET_BUNDLE_DIR:${target_name}>/Contents/MacOS
       )
   else()
     add_custom_target(${target_name}_CRASHPAD ALL DEPENDS ${target_name}
@@ -178,7 +225,7 @@ endmacro()
 
 macro(ag_bundle_sign target_name)
   if(AG_ENABLE_CODE_SIGNING)
-    add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}_CRASHPAD
+    add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}_STRIP
       COMMAND
         ${CMAKE_COMMAND} -E echo "Signing bundle $<TARGET_BUNDLE_DIR:${target_name}>"
       COMMAND
@@ -195,14 +242,14 @@ endmacro()
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   macro(ag_bundle_sign_aax target_name)
     if(AG_ENABLE_CODE_SIGNING)
-      add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}
+      add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}_STRIP
         COMMAND
           ${CMAKE_COMMAND} -E echo "Signing AAX bundle $<TARGET_BUNDLE_DIR:${target_name}>"
         COMMAND
           aax_sign.sh $<TARGET_BUNDLE_DIR:${target_name}> || echo "AAX signing not available"
       )
     else()
-      add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}
+      add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}_STRIP
         COMMAND
           ${CMAKE_COMMAND} -E echo "Code signing disabled. Not signing AAX bundle $<TARGET_BUNDLE_DIR:${target_name}>"
       )
@@ -211,14 +258,14 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 else()
   macro(ag_bundle_sign_aax target_name)
     if(AG_ENABLE_CODE_SIGNING)
-      add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}
+      add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}_STRIP
         COMMAND
           ${CMAKE_COMMAND} -E echo "Signing AAX plugin $<TARGET_FILE_NAME:${target_name}>"
         COMMAND
           aax_sign.bat $<TARGET_FILE:${target_name}>
       )
     else()
-      add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}
+      add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}_STRIP
         COMMAND
           ${CMAKE_COMMAND} -E echo "Code signing disabled. Not signing AAX plugin $<TARGET_FILE_NAME:${target_name}>"
       )

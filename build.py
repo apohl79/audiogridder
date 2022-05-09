@@ -112,7 +112,7 @@ def getBuildDir(args):
         return 'build-' + getPlatformArch(args)
 
 def getDebugSymDir(args):
-    return 'debug-sym-' + getPlatformArch(args)
+    return getBuildDir(args) + '/debug'
 
 def getDepsDir(args):
     depsDir = args.depsroot
@@ -245,65 +245,6 @@ def build(args):
 
     cmake_command = 'cmake ' + ' '.join(cmake_params)
     execute(cmake_command)
-
-    if args.debugsymbols:
-        debSymDir = getDebugSymDir(args)
-
-        log('Creating debug symbols in ' + debSymDir + ' ...')
-
-        if os.path.isdir(debSymDir):
-            shutil.rmtree((debSymDir))
-
-        os.mkdir(debSymDir)
-
-        if platform == 'macos':
-            shutil.copytree(buildDir + '/lib', debSymDir + '/lib')
-            shutil.copytree(buildDir + '/bin', debSymDir + '/bin')
-            if not os.path.isdir(debSymDir + '/AU'):
-                os.mkdir(debSymDir + '/AU')
-            if not os.path.isdir(debSymDir + '/VST'):
-                os.mkdir(debSymDir + '/VST')
-            if not os.path.isdir(debSymDir + '/VST3'):
-                os.mkdir(debSymDir + '/VST3')
-            if not os.path.isdir(debSymDir + '/AAX'):
-                os.mkdir(debSymDir + '/AAX')
-            execute('dsymutil -o ' + debSymDir + '/AudioGridderServer.dSYM '     + buildDir + '/bin/AudioGridderServer.app/Contents/MacOS/AudioGridderServer')
-            execute('dsymutil -o ' + debSymDir + '/AudioGridderPluginTray.dSYM ' + buildDir + '/bin/AudioGridderPluginTray.app/Contents/MacOS/AudioGridderPluginTray')
-            execute('dsymutil -o ' + debSymDir + '/AU/AudioGridder.dSYM '        + buildDir + '/lib/AudioGridder.component/Contents/MacOS/AudioGridder')
-            execute('dsymutil -o ' + debSymDir + '/AU/AudioGridderInst.dSYM '    + buildDir + '/lib/AudioGridderInst.component/Contents/MacOS/AudioGridderInst')
-            execute('dsymutil -o ' + debSymDir + '/AU/AudioGridderMidi.dSYM '    + buildDir + '/lib/AudioGridderMidi.component/Contents/MacOS/AudioGridderMidi')
-            execute('dsymutil -o ' + debSymDir + '/VST/AudioGridder.dSYM '       + buildDir + '/lib/AudioGridder.vst/Contents/MacOS/AudioGridder')
-            execute('dsymutil -o ' + debSymDir + '/VST/AudioGridderInst.dSYM '   + buildDir + '/lib/AudioGridderInst.vst/Contents/MacOS/AudioGridderInst')
-            execute('dsymutil -o ' + debSymDir + '/VST/AudioGridderMidi.dSYM '   + buildDir + '/lib/AudioGridderMidi.vst/Contents/MacOS/AudioGridderMidi')
-            execute('dsymutil -o ' + debSymDir + '/VST3/AudioGridder.dSYM '      + buildDir + '/lib/AudioGridder.vst3/Contents/MacOS/AudioGridder')
-            execute('dsymutil -o ' + debSymDir + '/VST3/AudioGridderInst.dSYM '  + buildDir + '/lib/AudioGridderInst.vst3/Contents/MacOS/AudioGridderInst')
-            execute('dsymutil -o ' + debSymDir + '/VST3/AudioGridderMidi.dSYM '  + buildDir + '/lib/AudioGridderMidi.vst3/Contents/MacOS/AudioGridderMidi')
-            execute('dsymutil -o ' + debSymDir + '/AAX/AudioGridder.dSYM '       + buildDir + '/lib/AudioGridder.aaxplugin/Contents/MacOS/AudioGridder')
-            execute('dsymutil -o ' + debSymDir + '/AAX/AudioGridderInst.dSYM '   + buildDir + '/lib/AudioGridderInst.aaxplugin/Contents/MacOS/AudioGridderInst')
-            execute('dsymutil -o ' + debSymDir + '/AAX/AudioGridderMidi.dSYM '   + buildDir + '/lib/AudioGridderMidi.aaxplugin/Contents/MacOS/AudioGridderMidi')
-
-        elif platform == 'linux':
-            shutil.copy(buildDir + '/bin/AudioGridderPluginTray', debSymDir)
-            for f in glob.glob(buildDir + '/lib/*.so'):
-                shutil.copy(f, debSymDir)
-
-        elif platform == "windows":
-            shutil.copy(buildDir + '/bin/AudioGridderServer.exe', debSymDir)
-            shutil.copy(buildDir + '/bin/AudioGridderServer.pdb', debSymDir)
-            shutil.copy(buildDir + '/bin/AudioGridderPluginTray.exe', debSymDir)
-            shutil.copy(buildDir + '/bin/AudioGridderPluginTray.pdb', debSymDir)
-            if not os.path.isdir(debSymDir + '/VST'):
-                os.mkdir(debSymDir + '/VST')
-            if not os.path.isdir(debSymDir + '/VST3'):
-                os.mkdir(debSymDir + '/VST3')
-            if not os.path.isdir(debSymDir + '/AAX'):
-                os.mkdir(debSymDir + '/AAX')
-            for f in glob.glob(buildDir + '/lib/VST/*.pdb') + glob.glob(buildDir + '/lib/VST/*.dll'):
-                shutil.copy(f, debSymDir + '/VST')
-            for f in glob.glob(buildDir + '/lib/VST3/*.pdb') + glob.glob(buildDir + '/lib/VST3/*.vst3'):
-                shutil.copy(f, debSymDir + '/VST3')
-            for f in glob.glob(buildDir + '/lib/AAX/*.pdb') + glob.glob(buildDir + '/lib/AAX/*.aaxplugin'):
-                shutil.copy(f, debSymDir + '/AAX')
 
 def packs(args):
     version = getVersion()
@@ -563,8 +504,6 @@ def main():
                               help='Processor architecture (default: %(default)s)')
     parser_build.add_argument('--macos-target', dest='macostarget', metavar='TRGT', type=str, default='10.8',
                               help='MacOS deplyoment target (default: %(default)s)')
-    parser_build.add_argument('--create-debug-symbols', dest='debugsymbols', action='store_true', default=False,
-                              help='Create debug symbols for uploading to sentry (default: %(default)s)')
     parser_build.add_argument('--target', dest='target', type=str,
                               help='Set a specific build target')
     parser_build.add_argument('-c', '--clean', dest='clean', action='store_true', default=False,

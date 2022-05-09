@@ -54,6 +54,8 @@ target_link_libraries(AudioGridderPluginTray PRIVATE
   juce::juce_recommended_warning_flags
   ${SENTRY_LIBRARIES})
 
+ag_strip(AudioGridderPluginTray Tray)
+
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   ag_bundle_add_crashpad(AudioGridderPluginTray)
   ag_bundle_sign(AudioGridderPluginTray)
