@@ -317,16 +317,17 @@ bool ScreenRecorder::prepareInput() {
 
 bool ScreenRecorder::prepareOutput() {
     traceScope();
+
     if (nullptr == m_captureCodecCtx) {
         logln("prepareOutput: input not ready");
         return false;
     }
-    m_capturePacket = (AVPacket*)av_malloc(sizeof(AVPacket));
+
+    m_capturePacket = av_packet_alloc();
     if (nullptr == m_capturePacket) {
         logln("prepareOutput: unable to allocate AVPacket");
         return false;
     }
-    av_init_packet(m_capturePacket);
 
     m_captureFrame = av_frame_alloc();
     if (nullptr == m_captureFrame) {
@@ -334,12 +335,11 @@ bool ScreenRecorder::prepareOutput() {
         return false;
     }
 
-    m_outputPacket = (AVPacket*)av_malloc(sizeof(AVPacket));
+    m_outputPacket = av_packet_alloc();
     if (nullptr == m_outputPacket) {
         logln("prepareOutput: unable to allocate AVPacket");
         return false;
     }
-    av_init_packet(m_outputPacket);
 
     if (nullptr != m_outputCodecCtx && avcodec_is_open(m_outputCodecCtx)) {
         avcodec_close(m_outputCodecCtx);
@@ -412,7 +412,7 @@ bool ScreenRecorder::prepareOutput() {
     }
 
     ret = av_image_fill_arrays(m_outputFrame->data, m_outputFrame->linesize, m_outputFrameBuf,
-                               m_outputCodecCtx->pix_fmt, m_outputFrame->width, m_outputFrame->height, 1);
+                               m_outputCodecCtx->pix_fmt, m_outputFrame->width, m_outputFrame->height, 32);
     if (ret < 0) {
         logln("prepareOutput: av_image_fill_arrays failed: " << ret);
         return false;
