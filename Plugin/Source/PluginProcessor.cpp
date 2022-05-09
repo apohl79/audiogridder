@@ -135,16 +135,17 @@ PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
         }
         m_client->setLoadedPluginsString(getLoadedPluginsString());
 
-        for (auto& ap : automationParams) {
-            enableParamAutomation(std::get<0>(ap), std::get<1>(ap), std::get<2>(ap));
-        }
-
         if (updLatency) {
             updateLatency(m_client->getLatencySamples());
         }
 
-        runOnMsgThreadAsync([this] {
+        runOnMsgThreadAsync([this, automationParams] {
             traceScope();
+
+            for (auto& ap : automationParams) {
+                enableParamAutomation(std::get<0>(ap), std::get<1>(ap), std::get<2>(ap));
+            }
+
             auto* editor = getActiveEditor();
             if (editor != nullptr) {
                 dynamic_cast<PluginEditor*>(editor)->setConnected(true);
@@ -587,6 +588,9 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
         transfer |= m_midiIsPlaying;
     }
 #else
+    ignoreUnused(m_midiIsPlaying);
+    ignoreUnused(m_blocksWithoutMidi);
+
     // clear inactive outputs if we need no mapping, as the mapper takes care otherwise
     if (sendBuffer == &buffer) {
         for (int ch = 0; ch < buffer.getNumChannels(); ch++) {
