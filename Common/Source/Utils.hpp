@@ -218,7 +218,6 @@ inline bool msgThreadExistsAndNotLocked() {
 
 #define ENABLE_ASYNC_FUNCTORS()                                                                              \
     inline std::function<void()> safeLambda(std::function<void()> fn) {                                      \
-        traceScope();                                                                                        \
         if (nullptr == __m_asyncExecFlag) {                                                                  \
             logln("initAsyncFunctors() has to be called in the ctor");                                       \
             return nullptr;                                                                                  \
@@ -245,7 +244,6 @@ inline bool msgThreadExistsAndNotLocked() {
 
 #define stopAsyncFunctors()                                                               \
     do {                                                                                  \
-        traceScope();                                                                     \
         if (nullptr == __m_asyncExecFlag) {                                               \
             logln("initAsyncFunctors() has to be called in the ctor");                    \
             break;                                                                        \
