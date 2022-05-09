@@ -20,6 +20,8 @@
 #include <sys/socket.h>
 #endif
 
+#include <regex>
+
 namespace e47 {
 
 Server::Server(const json& opts) : Thread("Server"), LogTag("server"), m_opts(opts) { initAsyncFunctors(); }
@@ -761,16 +763,16 @@ void Server::checkPort() {
     args.add("-nP");
     args.add("-iTCP:" + String(port));
     if (proc.start(args, ChildProcess::wantStdOut)) {
+        std::regex re("^[^ ]+ +(\\d+) +.*\\(LISTEN\\)$");
+        std::smatch match;
         auto out = proc.readAllProcessOutput();
         for (auto& line : StringArray::fromLines(out)) {
-            if (line.endsWith("(LISTEN)")) {
-                auto parts = StringArray::fromTokens(line, " ", "");
-                if (parts.size() > 1) {
-                    auto pid = parts[1];
-                    logln("about to kill process " << pid << " that blocks server port " << port);
-                    ChildProcess kproc;
-                    kproc.start("kill " + pid);
-                }
+            auto lineStd = line.toStdString();
+            if (std::regex_search(lineStd, match, re)) {
+                auto pid = String(match[1]);
+                logln("about to kill process " << pid << " that blocks server port " << port);
+                ChildProcess kproc;
+                kproc.start("kill " + pid);
             }
         }
         sleep(3000);
