@@ -536,7 +536,7 @@ bool Server::scanPlugin(const String& id, const String& format, int srvId) {
     return success;
 }
 
-void Server::scanNextPlugin(const String& id, const String& fmt, int srvId) {
+void Server::scanNextPlugin(const String& id, const String& name, const String& fmt, int srvId) {
     traceScope();
     String fileFmt = id;
     fileFmt << "|" << fmt;
@@ -553,9 +553,16 @@ void Server::scanNextPlugin(const String& id, const String& fmt, int srvId) {
             if (proc.isRunning()) {
                 if (!AlertWindow::showOkCancelBox(
                         AlertWindow::WarningIcon, "Timeout",
-                        "The plugin scan did not finish yet. Do you want to continue to wait?", "Wait", "Abort")) {
+                        "The plugin scan for '" + name + "' did not finish yet. Do you want to continue to wait?",
+                        "Wait", "Abort")) {
                     logln("error: scan timeout, killing scan process");
                     proc.kill();
+
+                    // blacklist the plugin
+                    KnownPluginList plist;
+                    loadKnownPluginList(plist, srvId);
+                    plist.addToBlacklist(id);
+                    saveKnownPluginList(plist, srvId);
                 } else {
                     finished = false;
                 }
@@ -656,8 +663,8 @@ void Server::scanForPlugins(const std::vector<String>& include) {
 
                 getApp()->setSplashInfo(String("Scanning ") + fmt->getName() + ": " + splashName + " ...");
 
-                scanThread->fn = [this, fileOrId, name = fmt->getName(), srvId = scanThread->id] {
-                    scanNextPlugin(fileOrId, name, srvId);
+                scanThread->fn = [this, fileOrId, pluginName = name, fmtName = fmt->getName(), srvId = scanThread->id] {
+                    scanNextPlugin(fileOrId, pluginName, fmtName, srvId);
                 };
                 scanThread->startThread();
             } else {
