@@ -69,6 +69,8 @@ void initialize(const String& appName, const String& filePrefix) {
 
 void cleanup() {
     Inst::cleanup([](auto) {
+        l_tracerEnabled = false;
+        Thread::sleep(50);
         l_file.close();
         if (l_deleteFile) {
             l_file.deleteFile();
