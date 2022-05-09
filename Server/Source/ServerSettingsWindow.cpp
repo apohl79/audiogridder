@@ -501,72 +501,84 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
                            saveButtonWidth, saveButtonHeight);
     m_saveButton.onClick = [this, app] {
         traceScope();
+
         Tracer::setEnabled(m_tracer.getToggleState());
         Logger::setEnabled(m_logger.getToggleState());
+
         auto appCpy = app;
-        appCpy->getServer()->setOpt("ID", m_idText.getText().getIntValue());
-        appCpy->getServer()->setName(m_nameText.getText());
-        appCpy->getServer()->setEnableAU(m_auSupport.getToggleState());
-        appCpy->getServer()->setEnableVST3(m_vst3Support.getToggleState());
-        appCpy->getServer()->setEnableVST2(m_vst2Support.getToggleState());
-        appCpy->getServer()->setScanForPlugins(m_scanForPlugins.getToggleState());
-        appCpy->getServer()->setSandboxMode((Server::SandboxMode)m_sandboxMode.getSelectedItemIndex());
-        appCpy->getServer()->setCrashReporting(m_crashReporting.getToggleState());
-        switch (m_screenCapturingMode.getSelectedId()) {
-            case 1:
-                appCpy->getServer()->setScreenCapturingFFmpeg(true);
-                appCpy->getServer()->setScreenCapturingFFmpegEncoder(ScreenRecorder::WEBP);
-                appCpy->getServer()->setScreenCapturingOff(false);
-                appCpy->getServer()->setScreenLocalMode(false);
-                appCpy->getServer()->setPluginWindowsOnTop(false);
-                break;
-            case 2:
-                appCpy->getServer()->setScreenCapturingFFmpeg(true);
-                appCpy->getServer()->setScreenCapturingFFmpegEncoder(ScreenRecorder::MJPEG);
-                appCpy->getServer()->setScreenCapturingOff(false);
-                appCpy->getServer()->setScreenLocalMode(false);
-                appCpy->getServer()->setPluginWindowsOnTop(false);
-                break;
-            case 3:
-                appCpy->getServer()->setScreenCapturingFFmpeg(false);
-                appCpy->getServer()->setScreenCapturingOff(false);
-                appCpy->getServer()->setScreenLocalMode(false);
-                appCpy->getServer()->setPluginWindowsOnTop(false);
-                break;
-            case 4:
-                appCpy->getServer()->setScreenCapturingFFmpeg(false);
-                appCpy->getServer()->setScreenCapturingOff(true);
-                appCpy->getServer()->setScreenLocalMode(true);
-                appCpy->getServer()->setPluginWindowsOnTop(m_pluginWindowsOnTop.getToggleState());
-                break;
-            case 5:
-                appCpy->getServer()->setScreenCapturingFFmpeg(false);
-                appCpy->getServer()->setScreenCapturingOff(true);
-                appCpy->getServer()->setScreenLocalMode(false);
-                appCpy->getServer()->setPluginWindowsOnTop(m_pluginWindowsOnTop.getToggleState());
-                break;
+
+        if (auto srv = appCpy->getServer()) {
+            srv->setOpt("ID", m_idText.getText().getIntValue());
+            srv->setName(m_nameText.getText());
+            srv->setEnableAU(m_auSupport.getToggleState());
+            srv->setEnableVST3(m_vst3Support.getToggleState());
+            srv->setEnableVST2(m_vst2Support.getToggleState());
+            srv->setScanForPlugins(m_scanForPlugins.getToggleState());
+            srv->setSandboxMode((Server::SandboxMode)m_sandboxMode.getSelectedItemIndex());
+            srv->setCrashReporting(m_crashReporting.getToggleState());
+
+            switch (m_screenCapturingMode.getSelectedId()) {
+                case 1:
+                    srv->setScreenCapturingFFmpeg(true);
+                    srv->setScreenCapturingFFmpegEncoder(ScreenRecorder::WEBP);
+                    srv->setScreenCapturingOff(false);
+                    srv->setScreenLocalMode(false);
+                    srv->setPluginWindowsOnTop(false);
+                    break;
+                case 2:
+                    srv->setScreenCapturingFFmpeg(true);
+                    srv->setScreenCapturingFFmpegEncoder(ScreenRecorder::MJPEG);
+                    srv->setScreenCapturingOff(false);
+                    srv->setScreenLocalMode(false);
+                    srv->setPluginWindowsOnTop(false);
+                    break;
+                case 3:
+                    srv->setScreenCapturingFFmpeg(false);
+                    srv->setScreenCapturingOff(false);
+                    srv->setScreenLocalMode(false);
+                    srv->setPluginWindowsOnTop(false);
+                    break;
+                case 4:
+                    srv->setScreenCapturingFFmpeg(false);
+                    srv->setScreenCapturingOff(true);
+                    srv->setScreenLocalMode(true);
+                    srv->setPluginWindowsOnTop(m_pluginWindowsOnTop.getToggleState());
+                    break;
+                case 5:
+                    srv->setScreenCapturingFFmpeg(false);
+                    srv->setScreenCapturingOff(true);
+                    srv->setScreenLocalMode(false);
+                    srv->setPluginWindowsOnTop(m_pluginWindowsOnTop.getToggleState());
+                    break;
+            }
+
+            srv->setScreenCapturingFFmpegQuality(
+                (ScreenRecorder::EncoderQuality)(m_screenCapturingQuality.getSelectedId() - 1));
+            srv->setScreenDiffDetection(m_screenDiffDetection.getToggleState());
+
+            float qual = m_screenJpgQuality.getText().getFloatValue();
+            if (qual < 0.1) {
+                qual = 0.1f;
+            } else if (qual > 1) {
+                qual = 1.0f;
+            }
+            srv->setScreenQuality(qual);
+
+            if (m_vst3Folders.getText().length() > 0) {
+                srv->setVST3Folders(StringArray::fromLines(m_vst3Folders.getText()));
+            }
+            if (m_vst2Folders.getText().length() > 0) {
+                srv->setVST2Folders(StringArray::fromLines(m_vst2Folders.getText()));
+            }
+            srv->setVSTNoStandardFolders(m_vstNoStandardFolders.getToggleState());
+
+            srv->saveConfig();
         }
-        appCpy->getServer()->setScreenCapturingFFmpegQuality(
-            (ScreenRecorder::EncoderQuality)(m_screenCapturingQuality.getSelectedId() - 1));
-        appCpy->getServer()->setScreenDiffDetection(m_screenDiffDetection.getToggleState());
-        float qual = m_screenJpgQuality.getText().getFloatValue();
-        if (qual < 0.1) {
-            qual = 0.1f;
-        } else if (qual > 1) {
-            qual = 1.0f;
-        }
-        appCpy->getServer()->setScreenQuality(qual);
-        if (m_vst3Folders.getText().length() > 0) {
-            appCpy->getServer()->setVST3Folders(StringArray::fromLines(m_vst3Folders.getText()));
-        }
-        if (m_vst2Folders.getText().length() > 0) {
-            appCpy->getServer()->setVST2Folders(StringArray::fromLines(m_vst2Folders.getText()));
-        }
-        appCpy->getServer()->setVSTNoStandardFolders(m_vstNoStandardFolders.getToggleState());
-        appCpy->getServer()->saveConfig();
+
         appCpy->hideServerSettings();
         appCpy->restartServer();
     };
+
     addChildAndSetID(&m_saveButton, "save");
 
     setResizable(false, false);
