@@ -268,7 +268,7 @@ inline POINT getScaledPoint(float x, float y) {
     float dpi = (GetDeviceCaps(hDC, LOGPIXELSX) + GetDeviceCaps(hDC, LOGPIXELSY)) / 2.0f;
     ReleaseDC(0, hDC);
     if (auto* disp = Desktop::getInstance().getDisplays().getPrimaryDisplay()) {
-        float sf = dpi / 96;
+        float sf = 96 / dpi;
         float xf = (float)0xffff / disp->totalArea.getWidth();
         float yf = (float)0xffff / disp->totalArea.getHeight();
         long lx = lroundf(x * sf * xf);
