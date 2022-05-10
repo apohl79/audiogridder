@@ -386,6 +386,7 @@ void Server::shutdown() {
 
     if (m_sandboxModeRuntime == SANDBOX_NONE) {
         m_masterSocket.close();
+        m_masterSocketLocal.close();
     }
 
     signalThreadShouldExit();
