@@ -838,6 +838,8 @@ void Server::runServer() {
                    << " instrument=" << (int)desc.isInstrument);
     }
 
+    m_sandboxDeleter = std::make_unique<SandboxDeleter>();
+
     checkPort();
 
     if (getScreenLocalMode() && Defaults::unixDomainSocketsSupported()) {
@@ -934,7 +936,7 @@ void Server::runServer() {
                     logln("creating sandbox " << id);
                     if (sandbox->launchWorkerProcess(
                             File::getSpecialLocation(File::currentExecutableFile), Defaults::SANDBOX_CMD_PREFIX,
-                            {"-id", String(getId()), "-islocal", String((int)isLocal)}, 30000)) {
+                            {"-id", String(getId()), "-islocal", String((int)isLocal)}, 3000, 30000)) {
                         sandbox->onPortReceived = [this, id, clnt](int sandboxPort) {
                             traceScope();
                             if (!sendHandshakeResponse(clnt, true, sandboxPort)) {
@@ -945,7 +947,7 @@ void Server::runServer() {
                             delete clnt;
                         };
                         if (sandbox->send(SandboxMessage(SandboxMessage::CONFIG, cfg.toJson()), nullptr, true)) {
-                            m_sandboxes.set(id, sandbox);
+                            m_sandboxes.set(id, std::move(sandbox));
                         } else {
                             logln("failed to send message to sandbox");
                         }
@@ -998,28 +1000,15 @@ void Server::runServer() {
                     deadWorkers->clear();
                 }
             }
-            {
-                std::lock_guard<std::mutex> lock(m_sandboxesForDeletionMtx);
-                if (!m_sandboxesForDeletion.isEmpty()) {
-                    std::thread([deleters = std::move(m_sandboxesForDeletion)] {}).detach();
-                }
-            }
         }
 
         shutdownWorkers();
 
         if (m_sandboxes.size() > 0) {
             for (auto sandbox : m_sandboxes) {
-                m_sandboxesForDeletion.add(sandbox);
+                m_sandboxDeleter->add(sandbox);
             }
             m_sandboxes.clear();
-        }
-        {
-            std::lock_guard<std::mutex> lock(m_sandboxesForDeletionMtx);
-            if (!m_sandboxesForDeletion.isEmpty()) {
-                std::thread([deleters = std::move(m_sandboxesForDeletion)] {}).detach();
-                sleep(3000);
-            }
         }
     } else {
         logln("failed to create master listener");
@@ -1038,6 +1027,9 @@ void Server::runServer() {
             getApp()->prepareShutdown(ec);
         });
     }
+
+    logln("waiting for sandboxes to terminate");
+    m_sandboxDeleter->stopThread(-1);
 }
 
 void Server::runSandboxChain() {
@@ -1050,7 +1042,7 @@ void Server::runSandboxChain() {
     m_sandboxController = std::make_unique<SandboxSlave>(*this);
 
     if (!m_sandboxController->initialiseFromCommandLine(getOpt("commandLine", String()), Defaults::SANDBOX_CMD_PREFIX,
-                                                        30000)) {
+                                                        10000, 30000)) {
         logln("failed to initialize sandbox process");
         getApp()->prepareShutdown(App::EXIT_SANDBOX_INIT_ERROR);
         return;
@@ -1278,7 +1270,7 @@ void Server::handleDisconnectFromSandbox(SandboxMaster& sandbox) {
         Metrics::getStatistic<Meter>("NetBytesIn")->removeExtRate1min(sandbox.id);
         auto deleter = m_sandboxes[sandbox.id];
         m_sandboxes.remove(sandbox.id);
-        m_sandboxesForDeletion.add(std::move(deleter));
+        m_sandboxDeleter->add(std::move(deleter));
     }
 }
 

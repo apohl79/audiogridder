@@ -156,8 +156,6 @@ class Server : public Thread, public LogTag {
     bool m_sandboxLogAutoclean = true;
 
     HashMap<String, std::shared_ptr<SandboxMaster>, DefaultHashFunctions, CriticalSection> m_sandboxes;
-    Array<std::shared_ptr<SandboxMaster>> m_sandboxesForDeletion;
-    std::mutex m_sandboxesForDeletionMtx;
 
     std::unique_ptr<SandboxSlave> m_sandboxController;
 
@@ -167,6 +165,38 @@ class Server : public Thread, public LogTag {
     std::atomic_bool m_sandboxConnectedToMaster{false};
     HandshakeRequest m_sandboxConfig;
     String m_sandboxHasScreen;
+
+    struct SandboxDeleter : Thread {
+        Array<std::shared_ptr<SandboxMaster>> sandboxes;
+        std::mutex mtx;
+
+        SandboxDeleter() : Thread("SandboxDeleter") { startThread(); }
+
+        void add(std::shared_ptr<SandboxMaster> s) {
+            std::lock_guard<std::mutex> lock(mtx);
+            sandboxes.add(std::move(s));
+        }
+
+        void clear() {
+            std::lock_guard<std::mutex> lock(mtx);
+            for (auto sandbox : sandboxes) {
+                if (sandbox != nullptr) {
+                    sandbox->killWorkerProcess();
+                }
+            }
+            sandboxes.clear();
+        }
+
+        void run() override {
+            while (!threadShouldExit()) {
+                clear();
+                sleepExitAware(100);
+            }
+            clear();
+        }
+    };
+
+    std::unique_ptr<SandboxDeleter> m_sandboxDeleter;
 
     void scanNextPlugin(const String& id, const String& fmt, int srvId);
     void scanForPlugins();
