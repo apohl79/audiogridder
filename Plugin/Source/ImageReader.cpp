@@ -67,10 +67,8 @@ std::shared_ptr<Image> ImageReader::read(const char* data, size_t size, int widt
                     // put decoded frame into a juce image
                     sws_scale(m_swsCtx, m_inputFrame->data, m_inputFrame->linesize, 0, m_inputFrame->height,
                               m_outputFrame->data, m_outputFrame->linesize);
-                    if (nullptr == m_image || m_image->getWidth() != m_inputFrame->width ||
-                        m_image->getHeight() != m_inputFrame->height) {
-                        m_image =
-                            std::make_shared<Image>(Image::ARGB, m_inputFrame->width, m_inputFrame->height, false);
+                    if (nullptr == m_image || m_image->getWidth() != m_width || m_image->getHeight() != m_height) {
+                        m_image = std::make_shared<Image>(Image::ARGB, m_width, m_height, false);
                     }
                     Image::BitmapData bd(*m_image, 0, 0, m_image->getWidth(), m_image->getHeight());
                     memcpy(bd.data, m_outputFrame->data[0],
@@ -115,16 +113,23 @@ bool ImageReader::initCodec() {
         return false;
     }
 
-    m_inputCodecCtx = avcodec_alloc_context3(nullptr);
+    m_inputCodecCtx = avcodec_alloc_context3(m_inputCodec);
     if (nullptr == m_inputCodecCtx) {
         logln("unable to allocate codec context");
         return false;
     }
+
     m_inputCodecCtx->pix_fmt = AV_PIX_FMT_YUV420P;
     m_inputCodecCtx->time_base.num = 1;
     m_inputCodecCtx->time_base.den = 20;
     m_inputCodecCtx->width = m_width;
     m_inputCodecCtx->height = m_height;
+
+    avcodec_align_dimensions(m_inputCodecCtx, &m_inputCodecCtx->width, &m_inputCodecCtx->height);
+
+    logln("setting input codec context dimensions to " << m_inputCodecCtx->width << "x" << m_inputCodecCtx->height
+                                                       << " (unalligned " << m_width << "x" << m_height << ")");
+
     int ret = avcodec_open2(m_inputCodecCtx, m_inputCodec, nullptr);
     if (ret < 0) {
         logln("avcodec_open2 failed: " << ret);
@@ -136,16 +141,22 @@ bool ImageReader::initCodec() {
         logln("unable to allocate AVFrame");
         return false;
     }
+
     auto fmt = AV_PIX_FMT_RGB32;
     m_outputFrame->width = m_width;
     m_outputFrame->height = m_height;
     m_outputFrame->format = fmt;
-    m_outputFrameBuf =
-        (uint8_t*)av_malloc((size_t)av_image_get_buffer_size(fmt, m_width, m_height, 1) + AV_INPUT_BUFFER_PADDING_SIZE);
-    av_image_fill_arrays(m_outputFrame->data, m_outputFrame->linesize, m_outputFrameBuf, fmt, m_width, m_height, 32);
 
-    m_swsCtx = sws_getContext(m_width, m_height, m_inputCodecCtx->pix_fmt, m_width, m_height, fmt, SWS_FAST_BILINEAR,
-                              nullptr, nullptr, nullptr);
+    m_outputFrameBuf =
+        (uint8_t*)av_malloc((size_t)av_image_get_buffer_size(fmt, m_outputFrame->width, m_outputFrame->height, 1) +
+                            AV_INPUT_BUFFER_PADDING_SIZE);
+
+    av_image_fill_arrays(m_outputFrame->data, m_outputFrame->linesize, m_outputFrameBuf, fmt, m_outputFrame->width,
+                         m_outputFrame->height, 1);
+
+    m_swsCtx =
+        sws_getContext(m_inputCodecCtx->width, m_inputCodecCtx->height, m_inputCodecCtx->pix_fmt, m_outputFrame->width,
+                       m_outputFrame->height, fmt, SWS_BICUBIC, nullptr, nullptr, nullptr);
 
     logln("ready to process image stream with resolution: " << m_width << "x" << m_height << " *" << m_scale);
 

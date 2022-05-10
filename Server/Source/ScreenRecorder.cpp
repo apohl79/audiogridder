@@ -344,30 +344,28 @@ bool ScreenRecorder::prepareOutput() {
     if (nullptr != m_outputCodecCtx && avcodec_is_open(m_outputCodecCtx)) {
         avcodec_close(m_outputCodecCtx);
     } else {
-        m_outputCodecCtx = avcodec_alloc_context3(nullptr);
+        m_outputCodecCtx = avcodec_alloc_context3(m_outputCodec);
         if (nullptr == m_outputCodecCtx) {
             logln("prepareOutput: unable to allocate codec context");
             return false;
         }
     }
 
-    if (m_encMode == MJPEG) {
-        m_outputCodecCtx->pix_fmt = AV_PIX_FMT_YUVJ420P;
-    } else {
-        m_outputCodecCtx->pix_fmt = AV_PIX_FMT_YUV420P;
-    }
+    m_scaledWith = m_downScale ? (int)(m_captureRect.getWidth() / m_scale) : m_captureRect.getWidth();
+    m_scaledHeight = m_downScale ? (int)(m_captureRect.getHeight() / m_scale) : m_captureRect.getHeight();
+
+    m_outputCodecCtx->pix_fmt = m_encMode == MJPEG ? AV_PIX_FMT_YUVJ420P : AV_PIX_FMT_YUV420P;
     m_outputCodecCtx->time_base.num = 1;
     m_outputCodecCtx->time_base.den = 30;
-    if (m_downScale) {
-        logln("prepareOutput: down scaling active: " << m_scale);
-        m_outputCodecCtx->width = (int)(m_captureRect.getWidth() / m_scale);
-        m_outputCodecCtx->height = (int)(m_captureRect.getHeight() / m_scale);
-    } else {
-        m_outputCodecCtx->width = (int)(m_captureRect.getWidth());
-        m_outputCodecCtx->height = (int)(m_captureRect.getHeight());
-    }
-    logln("prepareOutput: setting output codec context dimensions to " << m_outputCodecCtx->width << "x"
-                                                                       << m_outputCodecCtx->height);
+    m_outputCodecCtx->width = m_scaledWith;
+    m_outputCodecCtx->height = m_scaledHeight;
+
+    avcodec_align_dimensions(m_outputCodecCtx, &m_outputCodecCtx->width, &m_outputCodecCtx->height);
+
+    logln("prepareOutput: setting output codec context dimensions to "
+          << m_outputCodecCtx->width << "x" << m_outputCodecCtx->height << " (unalligned " << m_scaledWith << "x"
+          << m_scaledHeight << ")");
+
     AVDictionary* opts = nullptr;
     switch (m_encMode) {
         case WEBP:
@@ -400,10 +398,11 @@ bool ScreenRecorder::prepareOutput() {
     m_outputFrame->format = m_outputCodecCtx->pix_fmt;
 
     auto outputFrameBufSize =
-        (size_t)av_image_get_buffer_size(m_outputCodecCtx->pix_fmt, m_outputFrame->width, m_outputFrame->height, 1) +
+        (size_t)av_image_get_buffer_size(m_outputCodecCtx->pix_fmt, m_outputFrame->width, m_outputFrame->height, 32) +
         AV_INPUT_BUFFER_PADDING_SIZE;
 
     logln("prepareOutput: allocating output frame buffer with " << outputFrameBufSize << " bytes");
+
     m_outputFrameBuf = (uint8_t*)av_malloc(outputFrameBufSize);
 
     if (nullptr == m_outputFrameBuf) {
@@ -419,7 +418,7 @@ bool ScreenRecorder::prepareOutput() {
     }
 
     m_swsCtx = sws_getContext(m_captureRect.getWidth(), m_captureRect.getHeight(), m_captureCodecCtx->pix_fmt,
-                              m_outputFrame->width, m_outputFrame->height, m_outputCodecCtx->pix_fmt, SWS_FAST_BILINEAR,
+                              m_outputFrame->width, m_outputFrame->height, m_outputCodecCtx->pix_fmt, SWS_BICUBIC,
                               nullptr, nullptr, nullptr);
     if (nullptr == m_swsCtx) {
         logln("prepareOutput: sws_getContext failed");
@@ -505,8 +504,8 @@ void ScreenRecorder::record() {
                             durationEnc.update();
                             if (retRCP == 0) {
                                 if (initalFramesToSkip == 0) {
-                                    m_callback(m_outputPacket->data, m_outputPacket->size, m_outputFrame->width,
-                                               m_outputFrame->height, m_downScale ? 1 : m_scale);
+                                    m_callback(m_outputPacket->data, m_outputPacket->size, m_scaledWith, m_scaledHeight,
+                                               m_downScale ? 1 : m_scale);
                                 } else {
                                     initalFramesToSkip--;
                                 }

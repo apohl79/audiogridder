@@ -80,6 +80,8 @@ class ScreenRecorder : public LogTag, public SharedInstance<ScreenRecorder> {
 
     juce::Rectangle<int> m_captureRect;
     int m_pxSize = 0;
+    int m_scaledWith = 0;
+    int m_scaledHeight = 0;
 
     static EncoderMode m_encMode;
     static double m_scale;
