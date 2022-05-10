@@ -245,11 +245,8 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 
     row++;
 
-    tooltip << "FFmpeg (webp): Use FFmpeg for screen capturing with webp encoding. This is recommended as it gives "
-               "best quality at lowest bandwidth costs."
-            << newLine << newLine;
-    tooltip << "FFmpeg (mjepg): Use FFmpeg for screen capturing with mjpeg encoding. This setting has similar quality "
-               "as webp encoding but needs more bandwidth. Use this if you have issues with webp."
+    tooltip << "FFmpeg: Use FFmpeg for screen capturing. This is recommended as it gives best quality at lowest "
+               "bandwidth costs."
             << newLine << newLine;
     tooltip << "Legacy: This mode takes screenshots every 50ms. Use this only if FFmpeg does not work for you."
             << newLine << newLine;
@@ -267,8 +264,8 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 
     m_screenCapturingMode.setBounds(getWideFieldBounds(row));
     m_screenCapturingMode.setTooltip(tooltip);
-    m_screenCapturingMode.addItem("FFmpeg (webp)", 1);
-    m_screenCapturingMode.addItem("FFmpeg (mjpeg)", 2);
+    m_screenCapturingMode.addItem("FFmpeg", 1);
+    //m_screenCapturingMode.addItem("FFmpeg (mjpeg)", 2);
     m_screenCapturingMode.addItem("Legacy", 3);
     m_screenCapturingMode.addItem("Disabled (Local Mode)", 4);
     m_screenCapturingMode.addItem("Disabled", 5);
@@ -281,16 +278,17 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
         }
     } else if (!m_app->getServer()->getScreenCapturingFFmpeg()) {
         mode = 3;
-    } else {
-        switch (m_app->getServer()->getScreenCapturingFFmpegEncoder()) {
-            case ScreenRecorder::WEBP:
-                mode = 1;
-                break;
-            case ScreenRecorder::MJPEG:
-                mode = 2;
-                break;
-        }
     }
+    // else {
+    //    switch (m_app->getServer()->getScreenCapturingFFmpegEncoder()) {
+    //        case ScreenRecorder::WEBP:
+    //            mode = 1;
+    //            break;
+    //        case ScreenRecorder::MJPEG:
+    //            mode = 2;
+    //            break;
+    //    }
+    //}
     m_screenCapturingMode.setSelectedId(mode, NotificationType::dontSendNotification);
     m_screenCapturingMode.onChange = [this] {
         switch (m_screenCapturingMode.getSelectedId()) {

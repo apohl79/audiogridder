@@ -101,19 +101,20 @@ void Server::loadConfig() {
     m_vstNoStandardFolders = jsonGetValue(cfg, "VSTNoStandardFolders", false);
     logln("include VST standard folders is " << (m_vstNoStandardFolders ? "disabled" : "enabled"));
     m_screenCapturingFFmpeg = jsonGetValue(cfg, "ScreenCapturingFFmpeg", m_screenCapturingFFmpeg);
-    String encoder;
-    if (jsonHasValue(cfg, "ScreenCapturingFFmpegEncoder")) {
-        encoder = jsonGetValue(cfg, "ScreenCapturingFFmpegEncoder", encoder);
-        if (encoder == "webp") {
-            m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
-        } else if (encoder == "mjpeg") {
-            m_screenCapturingFFmpegEncMode = ScreenRecorder::MJPEG;
-        } else {
-            logln("unknown ffmpeg encoder mode " << encoder << "! falling back to webp.");
-            m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
-            encoder = "webp";
-        }
-    }
+    String encoder = "webp";
+    m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
+    //if (jsonHasValue(cfg, "ScreenCapturingFFmpegEncoder")) {
+    //    encoder = jsonGetValue(cfg, "ScreenCapturingFFmpegEncoder", encoder);
+    //    if (encoder == "webp") {
+    //        m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
+    //    } else if (encoder == "mjpeg") {
+    //        m_screenCapturingFFmpegEncMode = ScreenRecorder::MJPEG;
+    //    } else {
+    //        logln("unknown ffmpeg encoder mode " << encoder << "! falling back to webp.");
+    //        m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
+    //        encoder = "webp";
+    //    }
+    //}
     m_screenCapturingOff = jsonGetValue(cfg, "ScreenCapturingOff", m_screenCapturingOff);
     m_screenCapturingFFmpegQuality = jsonGetValue(cfg, "ScreenCapturingFFmpegQual", m_screenCapturingFFmpegQuality);
     String scmode;
