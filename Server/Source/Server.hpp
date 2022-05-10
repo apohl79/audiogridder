@@ -178,13 +178,16 @@ class Server : public Thread, public LogTag {
         }
 
         void clear() {
-            std::lock_guard<std::mutex> lock(mtx);
-            for (auto sandbox : sandboxes) {
+            Array<std::shared_ptr<SandboxMaster>> sandboxesCpy;
+            {
+                std::lock_guard<std::mutex> lock(mtx);
+                sandboxes.swapWith(sandboxesCpy);
+            }
+            for (auto sandbox : sandboxesCpy) {
                 if (sandbox != nullptr) {
                     sandbox->killWorkerProcess();
                 }
             }
-            sandboxes.clear();
         }
 
         void run() override {
