@@ -225,9 +225,11 @@ endmacro()
 
 macro(ag_bundle_sign target_name)
   if(AG_ENABLE_CODE_SIGNING)
-    add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}_STRIP
+    add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}_CRASHPAD
       COMMAND
         ${CMAKE_COMMAND} -E echo "Signing bundle $<TARGET_BUNDLE_DIR:${target_name}>"
+      COMMAND
+        ${CMAKE_COMMAND} -E remove_directory $<TARGET_BUNDLE_DIR:${target_name}>/Contents/_CodeSignature
       COMMAND
         /usr/bin/codesign --force --sign AudioGridder --timestamp=none $<TARGET_BUNDLE_DIR:${target_name}>
       )
