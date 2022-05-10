@@ -39,13 +39,16 @@ class ImageReader : public LogTagDelegate {
   public:
     ImageReader();
 
-    std::shared_ptr<Image> read(const char* data, size_t size, int width, int height, double scale);
+    std::shared_ptr<Image> read(const char* data, size_t size, int width, int height, int widthPadded, int heightPadded,
+                                double scale);
 
   private:
     std::shared_ptr<Image> m_image;
 
     int m_width = 0;
     int m_height = 0;
+    int m_widthPadded = 0;
+    int m_heightPadded = 0;
     double m_scale = 1;
     const AVCodec* m_inputCodec = nullptr;
     AVCodecContext* m_inputCodecCtx = nullptr;

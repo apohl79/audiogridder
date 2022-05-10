@@ -58,8 +58,8 @@ class ScreenWorker : public Thread, public LogTagDelegate {
     // FFmpeg capturing
     std::vector<char> m_imageBuf;
 
-    int m_width;
-    int m_height;
+    int m_width, m_widthPadded;
+    int m_height, m_heightPadded;
     double m_scale;
     bool m_updated = false;
     uint16 m_imgCounter = 0;

@@ -89,7 +89,7 @@ StreamingSocket* accept(StreamingSocket*, int timeoutMs = 1000, std::function<bo
 /*
  * Client/Server handshake
  */
-static constexpr int AG_PROTOCOL_VERSION = 7;
+static constexpr int AG_PROTOCOL_VERSION = 8;
 
 struct HandshakeRequest {
     int version;
@@ -651,6 +651,8 @@ class ScreenCapture : public Payload {
     struct hdr_t {
         int width;
         int height;
+        int widthPadded;
+        int heightPadded;
         double scale;
         size_t size;
     };
@@ -659,10 +661,12 @@ class ScreenCapture : public Payload {
 
     ScreenCapture() : Payload(Type) { realign(); }
 
-    void setImage(int width, int height, double scale, const void* p, size_t size) {
+    void setImage(int width, int height, int widthPadded, int heightPadded, double scale, const void* p, size_t size) {
         setSize((int)(sizeof(hdr_t) + size));
         hdr->width = width;
         hdr->height = height;
+        hdr->widthPadded = widthPadded;
+        hdr->heightPadded = heightPadded;
         hdr->scale = scale;
         hdr->size = size;
         if (nullptr != p) {

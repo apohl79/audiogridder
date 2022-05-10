@@ -60,7 +60,8 @@ void ScreenWorker::runFFmpeg() {
             m_updated = false;
             if (m_imageBuf.size() > 0) {
                 if (m_imageBuf.size() <= Message<ScreenCapture>::MAX_SIZE) {
-                    msg.payload.setImage(m_width, m_height, m_scale, m_imageBuf.data(), m_imageBuf.size());
+                    msg.payload.setImage(m_width, m_height, m_widthPadded, m_heightPadded, m_scale, m_imageBuf.data(),
+                                         m_imageBuf.size());
                     lock.unlock();
                     std::lock_guard<std::mutex> socklock(m_mtx);
                     msg.send(m_socket.get());
@@ -142,7 +143,7 @@ void ScreenWorker::runNative() {
                                 "increased.");
                         }
                     } else {
-                        msg.payload.setImage(m_width, m_height, 1, mos.getData(), mos.getDataSize());
+                        msg.payload.setImage(m_width, m_height, m_width, m_height, 1, mos.getData(), mos.getDataSize());
                         std::lock_guard<std::mutex> socklock(m_mtx);
                         msg.send(m_socket.get());
                     }
@@ -150,7 +151,7 @@ void ScreenWorker::runNative() {
             }
         } else {
             // another client took over, notify this one
-            msg.payload.setImage(0, 0, 0, nullptr, 0);
+            msg.payload.setImage(0, 0, 0, 0, 0, nullptr, 0);
             std::lock_guard<std::mutex> socklock(m_mtx);
             msg.send(m_socket.get());
         }
@@ -201,33 +202,38 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
         logln("showing editor with NO callback");
         runOnMsgThreadSync([this, proc, x, y] {
             traceScope();
-            getApp()->showEditor(proc, m_currentTid, [](const uint8_t*, int, int, int, double) {}, x, y);
+            getApp()->showEditor(
+                proc, m_currentTid, [](const uint8_t*, int, int, int, int, int, double) {}, x, y);
         });
     } else if (getApp()->getServer()->getScreenCapturingFFmpeg()) {
         logln("showing editor with ffmpeg callback");
         runOnMsgThreadSync([this, proc] {
             traceScope();
-            getApp()->showEditor(proc, m_currentTid, [this](const uint8_t* data, int size, int w, int h, double scale) {
-                // executed in the context of the screen recorder worker thread
-                traceScope();
-                if (threadShouldExit()) {
-                    return;
-                }
-                // check for undetected plugin UI bounds changes
-                if (++m_imgCounter % 30 == 0) {
-                    runOnMsgThreadAsync([this] { getApp()->updateScreenCaptureArea(m_currentTid); });
-                }
-                std::lock_guard<std::mutex> lock(m_currentImageLock);
-                if (m_imageBuf.size() < (size_t)size) {
-                    m_imageBuf.resize((size_t)size);
-                }
-                memcpy(m_imageBuf.data(), data, (size_t)size);
-                m_width = w;
-                m_height = h;
-                m_scale = scale;
-                m_updated = true;
-                m_currentImageCv.notify_one();
-            });
+            getApp()->showEditor(
+                proc, m_currentTid,
+                [this](const uint8_t* data, int size, int w, int h, int wPadded, int hPadded, double scale) {
+                    // executed in the context of the screen recorder worker thread
+                    traceScope();
+                    if (threadShouldExit()) {
+                        return;
+                    }
+                    // check for undetected plugin UI bounds changes
+                    if (++m_imgCounter % 30 == 0) {
+                        runOnMsgThreadAsync([this] { getApp()->updateScreenCaptureArea(m_currentTid); });
+                    }
+                    std::lock_guard<std::mutex> lock(m_currentImageLock);
+                    if (m_imageBuf.size() < (size_t)size) {
+                        m_imageBuf.resize((size_t)size);
+                    }
+                    memcpy(m_imageBuf.data(), data, (size_t)size);
+                    m_width = w;
+                    m_height = h;
+                    m_widthPadded = wPadded;
+                    m_heightPadded = hPadded;
+                    m_scale = scale;
+                    m_updated = true;
+                    m_currentImageCv.notify_one();
+                });
         });
     } else {
         logln("showing editor with legacy callback");

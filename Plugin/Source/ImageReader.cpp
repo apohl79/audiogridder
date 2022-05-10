@@ -14,15 +14,20 @@ namespace e47 {
 
 ImageReader::ImageReader() {}
 
-std::shared_ptr<Image> ImageReader::read(const char* data, size_t size, int width, int height, double scale) {
+std::shared_ptr<Image> ImageReader::read(const char* data, size_t size, int width, int height, int widthPadded,
+                                         int heightPadded, double scale) {
     traceScope();
     if (nullptr != data) {
         if (size > 4 && data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F') {
-            if ((m_width != width || m_height != height) && nullptr != m_inputCodecCtx) {
+            if ((m_width != width || m_height != height || m_widthPadded != widthPadded ||
+                 m_heightPadded != heightPadded) &&
+                nullptr != m_inputCodecCtx) {
                 closeCodec();
             }
             m_width = width;
             m_height = height;
+            m_widthPadded = widthPadded;
+            m_heightPadded = heightPadded;
             m_scale = scale;
             if (nullptr == m_inputCodecCtx) {
                 if (!initCodec()) {
@@ -65,14 +70,13 @@ std::shared_ptr<Image> ImageReader::read(const char* data, size_t size, int widt
                 ret = avcodec_receive_frame(m_inputCodecCtx, m_inputFrame);
                 if (ret >= 0) {
                     // put decoded frame into a juce image
-                    sws_scale(m_swsCtx, m_inputFrame->data, m_inputFrame->linesize, 0, m_inputFrame->height,
+                    sws_scale(m_swsCtx, m_inputFrame->data, m_inputFrame->linesize, 0, m_heightPadded,
                               m_outputFrame->data, m_outputFrame->linesize);
                     if (nullptr == m_image || m_image->getWidth() != m_width || m_image->getHeight() != m_height) {
                         m_image = std::make_shared<Image>(Image::ARGB, m_width, m_height, false);
                     }
-                    Image::BitmapData bd(*m_image, 0, 0, m_image->getWidth(), m_image->getHeight());
-                    memcpy(bd.data, m_outputFrame->data[0],
-                           (size_t)(m_outputFrame->linesize[0] * m_outputFrame->height));
+                    Image::BitmapData bd(*m_image, 0, 0, m_width, m_height);
+                    memcpy(bd.data, m_outputFrame->data[0], (size_t)(m_outputFrame->linesize[0] * m_height));
                 }
             } while (ret == AVERROR(EAGAIN));
         } else if (size > 3 && data[1] == 'P' && data[2] == 'N' && data[3] == 'G') {
@@ -122,13 +126,10 @@ bool ImageReader::initCodec() {
     m_inputCodecCtx->pix_fmt = AV_PIX_FMT_YUV420P;
     m_inputCodecCtx->time_base.num = 1;
     m_inputCodecCtx->time_base.den = 20;
-    m_inputCodecCtx->width = m_width;
-    m_inputCodecCtx->height = m_height;
+    m_inputCodecCtx->width = m_widthPadded;
+    m_inputCodecCtx->height = m_heightPadded;
 
-    avcodec_align_dimensions(m_inputCodecCtx, &m_inputCodecCtx->width, &m_inputCodecCtx->height);
-
-    logln("setting input codec context dimensions to " << m_inputCodecCtx->width << "x" << m_inputCodecCtx->height
-                                                       << " (unalligned " << m_width << "x" << m_height << ")");
+    logln("setting input codec context dimensions to " << m_inputCodecCtx->width << "x" << m_inputCodecCtx->height);
 
     int ret = avcodec_open2(m_inputCodecCtx, m_inputCodec, nullptr);
     if (ret < 0) {
@@ -154,9 +155,8 @@ bool ImageReader::initCodec() {
     av_image_fill_arrays(m_outputFrame->data, m_outputFrame->linesize, m_outputFrameBuf, fmt, m_outputFrame->width,
                          m_outputFrame->height, 1);
 
-    m_swsCtx =
-        sws_getContext(m_inputCodecCtx->width, m_inputCodecCtx->height, m_inputCodecCtx->pix_fmt, m_outputFrame->width,
-                       m_outputFrame->height, fmt, SWS_BICUBIC, nullptr, nullptr, nullptr);
+    m_swsCtx = sws_getContext(m_widthPadded, m_heightPadded, m_inputCodecCtx->pix_fmt, m_width, m_height, fmt,
+                              SWS_BICUBIC, nullptr, nullptr, nullptr);
 
     logln("ready to process image stream with resolution: " << m_width << "x" << m_height << " *" << m_scale);
 

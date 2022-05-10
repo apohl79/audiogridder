@@ -805,7 +805,7 @@ void Client::ScreenReceiver::run() {
                 int width = (int)(PLD(msg).hdr->width / PLD(msg).hdr->scale);
                 int height = (int)(PLD(msg).hdr->height / PLD(msg).hdr->scale);
                 auto img = m_imgReader.read(DATA(msg), PLD(msg).hdr->size, PLD(msg).hdr->width, PLD(msg).hdr->height,
-                                            PLD(msg).hdr->scale);
+                                            PLD(msg).hdr->widthPadded, PLD(msg).hdr->heightPadded, PLD(msg).hdr->scale);
                 if (nullptr != img) {
                     m_client->setPluginScreen(img, width, height);
                 }

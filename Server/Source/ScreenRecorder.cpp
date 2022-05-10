@@ -21,7 +21,7 @@ bool ScreenRecorder::m_initialized = false;
 ScreenRecorder::EncoderMode ScreenRecorder::m_encMode = ScreenRecorder::WEBP;
 double ScreenRecorder::m_scale;
 int ScreenRecorder::m_quality;
-bool ScreenRecorder::m_downScale;
+bool ScreenRecorder::m_downScale = false;
 
 int WEBP_QUALITY[3] = {4000, 8000, 16000};
 int MJPEG_QUALITY[3] = {9000000, 14000000, 20000000};
@@ -52,14 +52,11 @@ void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode, EncoderQual
         return;
     }
 
-    m_downScale = quality != ENC_QUALITY_HIGH;
-
     if (m_initialized) {
         return;
     }
 
-    auto disp = Desktop::getInstance().getDisplays().getPrimaryDisplay();
-    if (nullptr != disp) {
+    if (auto disp = Desktop::getInstance().getDisplays().getPrimaryDisplay()) {
         m_scale = disp->scale;
     } else {
         m_scale = 1.0;
@@ -71,13 +68,8 @@ void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode, EncoderQual
     askForScreenRecordingPermission();
     m_inputFmtName = "avfoundation";
     m_inputStreamUrl = String(getCaptureDeviceIndex()) + ":none";
+    m_downScale = quality != ENC_QUALITY_HIGH;
 #else
-    if (m_scale != 1.0) {
-        AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Warning",
-                                         "You have set scaling to more than 100%. This is not recommended, as some "
-                                         "plugins might not render properly.",
-                                         "OK");
-    }
     m_inputFmtName = "gdigrab";
     m_inputStreamUrl = "desktop";
 #endif
@@ -504,8 +496,15 @@ void ScreenRecorder::record() {
                             durationEnc.update();
                             if (retRCP == 0) {
                                 if (initalFramesToSkip == 0) {
+                                    double scale = 1.0;
+#ifdef JUCE_MAC
+                                    // If the user chooses the highest quality, we don't downscale images from retina
+                                    // displays. But we have to let the plugin know, that it has to adjust the incomming
+                                    // image size.
+                                    scale = m_downScale ? 1.0 : m_scale;
+#endif
                                     m_callback(m_outputPacket->data, m_outputPacket->size, m_scaledWith, m_scaledHeight,
-                                               m_downScale ? 1 : m_scale);
+                                               m_outputFrame->width, m_outputFrame->height, scale);
                                 } else {
                                     initalFramesToSkip--;
                                 }

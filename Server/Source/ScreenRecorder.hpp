@@ -38,7 +38,8 @@ namespace e47 {
 
 class ScreenRecorder : public LogTag, public SharedInstance<ScreenRecorder> {
   public:
-    using CaptureCallback = std::function<void(const uint8_t* data, int size, int width, int height, double scale)>;
+    using CaptureCallback = std::function<void(const uint8_t* data, int size, int width, int height, int widthPadded,
+                                               int heightPadded, double scale)>;
 
     enum EncoderMode { WEBP, MJPEG };
 
