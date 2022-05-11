@@ -16,17 +16,17 @@ namespace e47 {
 
 class Logger : public Thread {
   public:
-    Logger(const String& appName, const String& filePrefix);
+    Logger(const String& appName, const String& filePrefix, bool linkLatest = true);
     ~Logger() override;
     void run() override;
 
     static void log(String msg);
 
     static void initialize(const String& appName, const String& filePrefix, const String& configFile,
-                           bool logDirectly = false);
+                           bool linkLatest = true, bool logDirectly = false);
 
     static void initialize() {
-        initialize({}, {}, {}, true);
+        initialize({}, {}, {}, true, true);
         setLogToErr(true);
     }
 

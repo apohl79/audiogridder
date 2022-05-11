@@ -947,7 +947,7 @@ void Server::runServer() {
                     logln("creating sandbox " << id);
                     if (sandbox->launchWorkerProcess(
                             File::getSpecialLocation(File::currentExecutableFile), Defaults::SANDBOX_CMD_PREFIX,
-                            {"-id", String(getId()), "-islocal", String((int)isLocal)}, 3000, 30000)) {
+                            {"-id", String(getId()), "-islocal", String((int)isLocal), "-clientid", id}, 3000, 30000)) {
                         sandbox->onPortReceived = [this, id, clnt](int sandboxPort) {
                             traceScope();
                             if (!sendHandshakeResponse(clnt, true, sandboxPort)) {

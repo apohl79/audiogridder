@@ -33,13 +33,13 @@ void App::initialise(const String& commandLineParameters) {
     auto args = getCommandLineParameterArray();
     enum Modes { SCAN, MASTER, SERVER, SANDBOX_CHAIN, SANDBOX_PLUGIN };
     Modes mode = MASTER;
-    String fileToScan, pluginId, error;
+    String fileToScan, pluginId, clientId, error;
     int workerPort = 0, srvId = -1;
     json jconfig;
     bool log = false, isLocal = false;
     for (int i = 0; i < args.size(); i++) {
         if (!args[i].compare("-scan") && args.size() >= i + 2) {
-            fileToScan = args[i + 1];
+            fileToScan = args[++i];
             mode = SCAN;
         } else if (!args[i].compare("-server")) {
             mode = SERVER;
@@ -49,17 +49,19 @@ void App::initialise(const String& commandLineParameters) {
             mode = SANDBOX_PLUGIN;
         } else if (!args[i].compare("-log")) {
             log = true;
-        } else if (!args[i].compare("-islocal")) {
-            isLocal = args[i + 1] == "1";
-        } else if (!args[i].compare("-pluginid")) {
-            pluginId = args[i + 1];
-        } else if (!args[i].compare("-workerport")) {
-            workerPort = args[i + 1].getIntValue();
-        } else if (!args[i].compare("-id")) {
-            srvId = args[i + 1].getIntValue();
-        } else if (!args[i].compare("-config")) {
+        } else if (!args[i].compare("-islocal") && args.size() >= i + 2) {
+            isLocal = args[++i] == "1";
+        } else if (!args[i].compare("-pluginid") && args.size() >= i + 2) {
+            pluginId = args[++i];
+        } else if (!args[i].compare("-clientid") && args.size() >= i + 2) {
+            clientId = args[++i];
+        } else if (!args[i].compare("-workerport") && args.size() >= i + 2) {
+            workerPort = args[++i].getIntValue();
+        } else if (!args[i].compare("-id") && args.size() >= i + 2) {
+            srvId = args[++i].getIntValue();
+        } else if (!args[i].compare("-config") && args.size() >= i + 2) {
             MemoryBlock config;
-            if (config.fromBase64Encoding(args[i + 1])) {
+            if (config.fromBase64Encoding(args[++i])) {
                 try {
                     jconfig = json::parse(config.begin(), config.end());
                 } catch (json::parse_error& e) {
@@ -73,6 +75,7 @@ void App::initialise(const String& commandLineParameters) {
     String cfgFile = Defaults::getConfigFileName(Defaults::ConfigServer, {{"id", String(srvId)}});
     String appName;
     String logName = getApplicationName() + "_";
+    bool linkLatest = true;
     switch (mode) {
         case MASTER:
             appName = "Master";
@@ -85,16 +88,19 @@ void App::initialise(const String& commandLineParameters) {
         case SANDBOX_PLUGIN:
             appName = "Sandbox-Plugin";
             logName = pluginId + "_";
+            linkLatest = false;
+            break;
+        case SANDBOX_CHAIN:
+            appName = "Sandbox-Chain";
+            logName = clientId + "_";
+            linkLatest = false;
             break;
         case SERVER:
             appName = "Server";
             break;
-        case SANDBOX_CHAIN:
-            appName = "Sandbox-Chain";
-            break;
     }
-    Logger::initialize(appName, logName, cfgFile);
-    Tracer::initialize(appName, logName);
+    Logger::initialize(appName, logName, cfgFile, linkLatest);
+    Tracer::initialize(appName, logName, linkLatest);
     Signals::initialize();
     Defaults::initServerTheme();
 

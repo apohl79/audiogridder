@@ -23,7 +23,7 @@ size_t Logger::m_instRefCount = 0;
 
 std::atomic_bool Logger::m_enabled{true};
 
-Logger::Logger(const String& appName, const String& filePrefix) : Thread("Logger") {
+Logger::Logger(const String& appName, const String& filePrefix, bool linkLatest) : Thread("Logger") {
 #ifdef JUCE_DEBUG
     m_logToErr = juce_isRunningUnderDebugger();
 #endif
@@ -34,12 +34,13 @@ Logger::Logger(const String& appName, const String& filePrefix) : Thread("Logger
         if (!d.exists()) {
             d.createDirectory();
         }
-        // create a latest link
-        auto latestLnk = File(Defaults::getLogFileName(appName, filePrefix, ".log", true));
-        m_file.createSymbolicLink(latestLnk, true);
+        if (linkLatest) {
+            // create a latest link
+            auto latestLnk = File(Defaults::getLogFileName(appName, filePrefix, ".log", true));
+            m_file.createSymbolicLink(latestLnk, true);
+        }
         // cleanup
-        int filesToKeep = appName == "Sandbox-Chain" ? 50 : 5;
-        cleanDirectory(d.getFullPathName(), filePrefix, ".log", filesToKeep);
+        cleanDirectory(d.getFullPathName(), filePrefix, ".log", 5);
     }
 }
 
@@ -112,12 +113,13 @@ void Logger::logToQueue(String msg) {
     m_cv.notify_one();
 }
 
-void Logger::initialize(const String& appName, const String& filePrefix, const String& configFile, bool logDirectly) {
+void Logger::initialize(const String& appName, const String& filePrefix, const String& configFile, bool linkLatest,
+                        bool logDirectly) {
     bool checkConfig = false;
     {
         std::lock_guard<std::mutex> lock(m_instMtx);
         if (nullptr == m_inst) {
-            m_inst = std::make_shared<Logger>(appName, filePrefix);
+            m_inst = std::make_shared<Logger>(appName, filePrefix, linkLatest);
             m_inst->m_logDirectly = logDirectly;
             checkConfig = true;
         }

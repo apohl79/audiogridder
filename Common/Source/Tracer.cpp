@@ -49,7 +49,7 @@ Scope::Scope(const LogTag* t, const String& f, int l, const String& ff) {
 Scope::Scope(const LogTagDelegate* t, const String& f, int l, const String& ff)
     : Scope(t->getLogTagSource(), f, l, ff) {}
 
-void initialize(const String& appName, const String& filePrefix) {
+void initialize(const String& appName, const String& filePrefix, bool linkLatest) {
     Inst::initialize([&](auto) {
         auto f = File(Defaults::getLogFileName(appName, filePrefix, ".trace")).getNonexistentSibling();
         l_file = MemoryFile(getLogTagSource(), f, NUM_OF_TRACE_RECORDS * sizeof(TraceRecord));
@@ -58,12 +58,13 @@ void initialize(const String& appName, const String& filePrefix) {
         if (!d.exists()) {
             d.createDirectory();
         }
-        // create a latest link
-        auto latestLnk = File(Defaults::getLogFileName(appName, filePrefix, ".trace", true));
-        f.createSymbolicLink(latestLnk, true);
+        if (linkLatest) {
+            // create a latest link
+            auto latestLnk = File(Defaults::getLogFileName(appName, filePrefix, ".trace", true));
+            f.createSymbolicLink(latestLnk, true);
+        }
         // cleanup
-        int filesToKeep = appName == "Sandbox-Chain" ? 50 : 5;
-        cleanDirectory(d.getFullPathName(), filePrefix, ".trace", filesToKeep);
+        cleanDirectory(d.getFullPathName(), filePrefix, ".trace", 5);
     });
 }
 

@@ -21,7 +21,7 @@ void traceMessage(const LogTag* tag, const String& file, int line, const String&
 void traceMessage(uint64 tagId, const String& tagName, const String& tagExtra, const String& file, int line,
                   const String& func, const String& msg);
 
-void initialize(const String& appName, const String& filePrefix);
+void initialize(const String& appName, const String& filePrefix, bool linkLatest = true);
 void cleanup();
 void deleteFileAtFinish();
 File getTraceFile();
