@@ -317,6 +317,7 @@ void Worker::handleMessage(std::shared_ptr<Message<DelPlugin>> msg) {
     if (idx == m_activeEditorIdx) {
         getApp()->getServer()->sandboxHideEditor();
         m_screen->hideEditor();
+        m_clipboardTracker->stop();
         m_activeEditorIdx = -1;
     }
     m_audio->delPlugin(idx);

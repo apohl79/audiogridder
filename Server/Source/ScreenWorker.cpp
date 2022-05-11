@@ -279,7 +279,7 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
 void ScreenWorker::hideEditor() {
     logln("hiding editor");
 
-    runOnMsgThreadAsync([this, tid = m_currentTid] {
+    runOnMsgThreadSync([this, tid = m_currentTid] {
         logln("hiding editor (msg thread)");
         getApp()->hideEditor(tid);
 
