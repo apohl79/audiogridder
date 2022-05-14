@@ -131,7 +131,7 @@ class ServerInfo {
     }
 
     bool operator==(const ServerInfo& other) const {
-        return m_host == other.m_host && m_name == other.m_name && m_isIpv6 == other.m_isIpv6 && m_id == other.m_id &&
+        return m_host == other.m_host && m_name == other.m_name && m_id == other.m_id &&
                m_localMode == other.m_localMode && m_version == other.m_version;
     }
 

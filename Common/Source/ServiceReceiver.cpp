@@ -115,7 +115,7 @@ bool ServiceReceiver::updateServers() {
                     break;
                 }
             }
-            if (!exists) {
+            if (!exists && !newServers.contains(s1)) {
                 newServers.add(s1);
             }
         }
