@@ -5,7 +5,7 @@ project(AUDIOGRIDDER_PLUGIN VERSION 1.0.0)
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/Source AG_SOURCES_PLUGIN)
 
 macro(ag_add_plugin type)
-  cmake_parse_arguments(AG "" "PLUGIN_CODE;IS_SYNTH;IS_MIDI_EFFECT;VST3_CATEGORY;VST_CATEGORY;AU_TYPE" "" ${ARGN})
+  cmake_parse_arguments(AG "" "PLUGIN_CODE;IS_SYNTH;IS_MIDI_EFFECT;VST3_CATEGORY;VST_CATEGORY;AAX_CATEGORY;AU_TYPE" "" ${ARGN})
 
   set(pluginname "AGridder")
   set(productname "AudioGridder")
@@ -45,7 +45,7 @@ macro(ag_add_plugin type)
     VST_NUM_MIDI_OUTS 16
     VST2_CATEGORY ${AG_VST_CATEGORY}
     VST3_CATEGORIES Network ${AG_VST3_CATEGORY}
-    AAX_CATEGORY AAX_ePlugInCategory_None
+    AAX_CATEGORY ${AG_AAX_CATEGORY}
     AU_MAIN_TYPE ${AG_AU_TYPE}
     COPY_PLUGIN_AFTER_BUILD FALSE)
 
@@ -156,6 +156,7 @@ ag_add_plugin(Fx
   IS_MIDI_EFFECT FALSE
   VST3_CATEGORY Fx
   VST_CATEGORY kPlugCategEffect
+  AAX_CATEGORY AAX_EPlugInCategory_Effect
   AU_TYPE kAudioUnitType_Effect)
 
 ag_add_plugin(Inst
@@ -164,6 +165,7 @@ ag_add_plugin(Inst
   IS_MIDI_EFFECT FALSE
   VST3_CATEGORY Instrument
   VST_CATEGORY kPlugCategSynth
+  AAX_CATEGORY AAX_ePlugInCategory_SWGenerators
   AU_TYPE kAudioUnitType_MusicDevice)
 
 ag_add_plugin(Midi
@@ -172,4 +174,5 @@ ag_add_plugin(Midi
   IS_MIDI_EFFECT TRUE
   VST3_CATEGORY Fx
   VST_CATEGORY kPlugCategEffect
+  AAX_CATEGORY AAX_ePlugInCategory_None
   AU_TYPE kAudioUnitType_MIDIProcessor)
