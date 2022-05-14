@@ -520,7 +520,8 @@ template <typename T>
 void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
     traceScope();
 
-    if (m_bypassWhenNotConnected && (!m_client->isReadyLockFree() || !m_loadedPluginsOk)) {
+    if (m_bypassWhenNotConnected &&
+        (!m_client->isReadyLockFree() || !m_loadedPluginsOk || getNumOfLoadedPlugins() == 0)) {
         processBlockBypassed(buffer, midiMessages);
         return;
     }
