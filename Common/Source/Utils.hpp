@@ -43,6 +43,8 @@ using namespace std::chrono_literals;
     static LogTag __tag(t); \
     auto getLogTagSource = [] { return &__tag; }
 
+#define setLogTagByRef(t) auto getLogTagSource = [&] { return &t; }
+
 #define traceln(M)                                                                        \
     do {                                                                                  \
         if (Tracer::isEnabled() && nullptr != getLogTagSource()) {                        \
@@ -55,6 +57,24 @@ using namespace std::chrono_literals;
 #define _createUniqueVar_(P, S) P##S
 #define _createUniqueVar(P, S) _createUniqueVar_(P, S)
 #define traceScope() Tracer::Scope _createUniqueVar(__scope, __LINE__)(getLogTagSource(), __FILE__, __LINE__, __func__)
+
+#define printBusesLayout(l)                                                             \
+    do {                                                                                \
+        logln("input buses: " << l.inputBuses.size());                                  \
+        for (int i = 0; i < l.inputBuses.size(); i++) {                                 \
+            logln("  [" << i << "] " << l.inputBuses[i].size() << " channel(s)");       \
+            for (auto ct : l.inputBuses[i].getChannelTypes()) {                         \
+                logln("    <- " << AudioChannelSet::getAbbreviatedChannelTypeName(ct)); \
+            }                                                                           \
+        }                                                                               \
+        logln("output buses: " << l.outputBuses.size());                                \
+        for (int i = 0; i < l.outputBuses.size(); i++) {                                \
+            logln("  [" << i << "] " << l.outputBuses[i].size() << " channel(s)");      \
+            for (auto ct : l.outputBuses[i].getChannelTypes()) {                        \
+                logln("    -> " << AudioChannelSet::getAbbreviatedChannelTypeName(ct)); \
+            }                                                                           \
+        }                                                                               \
+    } while (0)
 
 namespace e47 {
 

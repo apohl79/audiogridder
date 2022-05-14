@@ -32,7 +32,8 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
         AudioPlayHead::CurrentPositionInfo* m_posInfo;
     };
 
-    ProcessorChain(const BusesProperties& props, const HandshakeRequest& cfg) : AudioProcessor(props), m_cfg(cfg) {}
+    ProcessorChain(const LogTag* tag, const BusesProperties& props, const HandshakeRequest& cfg)
+        : AudioProcessor(props), LogTagDelegate(tag), m_cfg(cfg) {}
 
     static BusesProperties createBussesProperties(int in, int out, int sc) {
         setLogTagStatic("processorchain");
@@ -110,23 +111,6 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
     void preProcessBlocks(Processor* proc);
 
     void updateNoLock();
-
-    void printBusesLayout(const AudioProcessor::BusesLayout& l) const {
-        logln("input buses: " << l.inputBuses.size());
-        for (int i = 0; i < l.inputBuses.size(); i++) {
-            logln("  [" << i << "] " << l.inputBuses[i].size() << " channel(s)");
-            for (auto ct : l.inputBuses[i].getChannelTypes()) {
-                logln("    <- " << AudioChannelSet::getAbbreviatedChannelTypeName(ct));
-            }
-        }
-        logln("output buses: " << l.outputBuses.size());
-        for (int i = 0; i < l.outputBuses.size(); i++) {
-            logln("  [" << i << "] " << l.outputBuses[i].size() << " channel(s)");
-            for (auto ct : l.outputBuses[i].getChannelTypes()) {
-                logln("    -> " << AudioChannelSet::getAbbreviatedChannelTypeName(ct));
-            }
-        }
-    }
 };
 
 }  // namespace e47

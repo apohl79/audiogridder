@@ -211,6 +211,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
         return (int)m_loadedPlugins.size();
     }
+
     LoadedPlugin& getLoadedPlugin(int idx) {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
         return idx > -1 && idx < (int)m_loadedPlugins.size() ? m_loadedPlugins[(size_t)idx] : m_unusedDummyPlugin;
@@ -516,23 +517,6 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
         }
 
         return bp;
-    }
-
-    void printBusesLayout(const AudioProcessor::BusesLayout& l) const {
-        logln("input buses: " << l.inputBuses.size());
-        for (int i = 0; i < l.inputBuses.size(); i++) {
-            logln("  [" << i << "] " << l.inputBuses[i].size() << " channel(s)");
-            for (auto ct : l.inputBuses[i].getChannelTypes()) {
-                logln("    <- " << AudioChannelSet::getAbbreviatedChannelTypeName(ct));
-            }
-        }
-        logln("output buses: " << l.outputBuses.size());
-        for (int i = 0; i < l.outputBuses.size(); i++) {
-            logln("  [" << i << "] " << l.outputBuses[i].size() << " channel(s)");
-            for (auto ct : l.outputBuses[i].getChannelTypes()) {
-                logln("    -> " << AudioChannelSet::getAbbreviatedChannelTypeName(ct));
-            }
-        }
     }
 
     ENABLE_ASYNC_FUNCTORS();
