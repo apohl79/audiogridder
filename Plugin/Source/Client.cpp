@@ -519,7 +519,7 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
     if (msg.send(m_cmdOut.get())) {
         Message<AddPluginResult> msgResult(this);
         if (!msgResult.read(m_cmdOut.get(), &e, timeout.getMillisecondsLeft())) {
-            err = "failed to get result: " + e.toString();
+            err = "seems like the plugin crashed the server or did not load (" + e.toString() + ")";
             logln("error: " << err);
             return false;
         }
