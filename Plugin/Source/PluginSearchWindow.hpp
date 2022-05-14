@@ -155,8 +155,8 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
 
     class TreePlugin : public TreeViewItem {
       public:
-        TreePlugin(const ServerPlugin& p, ClickFuction f, bool st) : m_plugin(p), m_onClick(f), m_showType(st) {}
-
+        TreePlugin(const ServerPlugin& p, ClickFuction f, bool st, bool sf = false)
+            : m_plugin(p), m_onClick(f), m_showType(st), m_showFormat(sf) {}
         bool mightContainSubItems() override { return false; }
         int getItemHeight() const override { return PluginSearchWindow::ITEM_HEIGHT; }
 
@@ -172,6 +172,10 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
             if (m_showType) {
                 g.setColour(col.withAlpha(0.1f));
                 g.drawText(m_plugin.isInstrument() ? "Inst" : "Fx", width - 35, 0, 30, height,
+                           Justification::bottomRight);
+            } else if (m_showFormat) {
+                g.setColour(col.withAlpha(0.1f));
+                g.drawText(m_plugin.getType() == "AudioUnit" ? "AU" : m_plugin.getType(), width - 35, 0, 30, height,
                            Justification::bottomRight);
             }
         }
@@ -190,6 +194,7 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
         ServerPlugin m_plugin;
         ClickFuction m_onClick;
         bool m_showType;
+        bool m_showFormat;
     };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginSearchWindow)

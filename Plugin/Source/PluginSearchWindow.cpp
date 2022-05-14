@@ -172,7 +172,7 @@ void PluginSearchWindow::updateTree(const String& filter) {
 
     if (filter.isEmpty() && !m_recents.isEmpty()) {
         for (const auto& plug : m_recents) {
-            root->addSubItem(new TreePlugin(plug, addFn, m_showType));
+            root->addSubItem(new TreePlugin(plug, addFn, false, true));
         }
         root->addSubItem(new TreeSeparator());
     }
@@ -201,11 +201,13 @@ void PluginSearchWindow::updateTree(const String& filter) {
             }
             auto* level = &typeEntry;
             if (m_processor.getMenuShowCategory()) {
-                if (nullptr == level->subMap) {
-                    level->subMap = std::make_unique<std::map<String, MenuLevel>>();
+                for (auto category : StringArray::fromTokens(plug.getCategory(), "|", "")) {
+                    if (nullptr == level->subMap) {
+                        level->subMap = std::make_unique<std::map<String, MenuLevel>>();
+                    }
+                    auto& entry = (*level->subMap)[category];
+                    level = &entry;
                 }
-                auto& entry = (*level->subMap)[plug.getCategory()];
-                level = &entry;
             }
             if (m_processor.getMenuShowCompany()) {
                 if (nullptr == level->subMap) {
