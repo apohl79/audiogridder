@@ -31,25 +31,27 @@ class ProcessorChainTest : UnitTest {
 
         int chIn = 2, chOut = 2, chSc = 0;
 
-        auto pc = std::make_unique<ProcessorChain>(ProcessorChain::createBussesProperties(chIn, chOut, chSc),
+        LogTag testTag("test");
+
+        auto pc = std::make_unique<ProcessorChain>(&testTag, ProcessorChain::createBussesProperties(chIn, chOut, chSc),
                                                    HandshakeRequest());
         expect(pc->updateChannels(chIn, chOut, chSc));
         pc.reset();
 
         chIn = chOut = 64;
-        pc = std::make_unique<ProcessorChain>(ProcessorChain::createBussesProperties(chIn, chOut, chSc),
+        pc = std::make_unique<ProcessorChain>(&testTag, ProcessorChain::createBussesProperties(chIn, chOut, chSc),
                                               HandshakeRequest());
         expect(pc->updateChannels(chIn, chOut, chSc));
         pc.reset();
 
         chSc = 2;
-        pc = std::make_unique<ProcessorChain>(ProcessorChain::createBussesProperties(chIn, chOut, chSc),
+        pc = std::make_unique<ProcessorChain>(&testTag, ProcessorChain::createBussesProperties(chIn, chOut, chSc),
                                               HandshakeRequest());
         expect(pc->updateChannels(chIn, chOut, chSc));
         pc.reset();
 
         chIn = chOut = chSc = 2;
-        pc = std::make_unique<ProcessorChain>(ProcessorChain::createBussesProperties(chIn, chOut, chSc),
+        pc = std::make_unique<ProcessorChain>(&testTag, ProcessorChain::createBussesProperties(chIn, chOut, chSc),
                                               HandshakeRequest());
         expect(pc->updateChannels(chIn, chOut, chSc));
     }
@@ -60,7 +62,9 @@ class ProcessorChainTest : UnitTest {
         double sampleRate = 48000.0;
         int blockSize = 512, chIn = 2, chOut = 2, chSc = 2;
 
-        auto pc = std::make_unique<ProcessorChain>(ProcessorChain::createBussesProperties(chIn, chOut, chSc),
+        LogTag testTag("test");
+
+        auto pc = std::make_unique<ProcessorChain>(&testTag, ProcessorChain::createBussesProperties(chIn, chOut, chSc),
                                                    HandshakeRequest());
         pc->updateChannels(chIn, chOut, chSc);
         pc->prepareToPlay(sampleRate, blockSize);

@@ -48,8 +48,7 @@ void AudioWorker::init(std::unique_ptr<StreamingSocket> s, HandshakeRequest cfg)
     m_channelMapper.createServerMapping(m_activeChannels);
     m_channelMapper.print();
     m_chain = std::make_shared<ProcessorChain>(
-        ProcessorChain::createBussesProperties(m_channelsIn, m_channelsOut, m_channelsSC), cfg);
-    m_chain->setLogTagSource(getLogTagSource());
+        getLogTagSource(), ProcessorChain::createBussesProperties(m_channelsIn, m_channelsOut, m_channelsSC), cfg);
     if (m_doublePrecission && m_chain->supportsDoublePrecisionProcessing()) {
         m_chain->setProcessingPrecision(AudioProcessor::doublePrecision);
     }

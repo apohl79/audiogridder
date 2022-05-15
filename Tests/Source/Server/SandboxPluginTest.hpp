@@ -42,7 +42,10 @@ class SandboxPluginTest : UnitTest {
         HandshakeRequest cfg = {AG_PROTOCOL_VERSION,    chIn, chOut, chSc, sampleRate, blockSize, false, 0, 0, 0,
                                 activeChannels.toInt(), 0};
 
-        auto pc = std::make_unique<ProcessorChain>(ProcessorChain::createBussesProperties(chIn, chOut, chSc), cfg);
+        LogTag testTag("test");
+
+        auto pc =
+            std::make_unique<ProcessorChain>(&testTag, ProcessorChain::createBussesProperties(chIn, chOut, chSc), cfg);
         pc->setProcessingPrecision(AudioProcessor::singlePrecision);
         pc->updateChannels(chIn, chOut, chSc);
         pc->prepareToPlay(sampleRate, blockSize);
