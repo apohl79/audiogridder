@@ -602,6 +602,18 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
     }
 #endif
 
+    traceln("  position: sample=" << posInfo.timeInSamples << ", time=" << posInfo.timeInSeconds << "s, ply="
+                                  << (int)posInfo.isPlaying << ", rec=" << (int)posInfo.isRecording);
+    traceln("  in/out buffer: channels=" << buffer.getNumChannels() << ", samples=" << buffer.getNumSamples() << ", addr=0x"
+                                  << String::toHexString((uint64)&buffer));
+    traceln("  send buffer: channels=" << sendBuffer->getNumChannels() << ", samples=" << sendBuffer->getNumSamples()
+                                       << ", addr=0x" << String::toHexString((uint64)sendBuffer));
+#if JucePlugin_IsSynth || JucePlugin_IsMidiEffect
+    traceln("  midi buffer: num events=" << midiMessages.getNumEvents() << ", ply=" << (int)m_midiIsPlaying
+                                         << ", crntly ply=" << (int)midiIsCurrentlyPlaying);
+#endif
+    traceln("  transfer: " << (transfer ? "YES" : "NO"));
+
     if (transfer) {
         if ((buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) || midiMessages.getNumEvents() > 0) {
             auto streamer = m_client->getStreamer<T>();

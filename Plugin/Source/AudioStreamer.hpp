@@ -111,6 +111,10 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         buf.midi.addEvents(midi, 0, buffer.getNumSamples(), 0);
         buf.posInfo = posInfo;
 
+        traceln("  client: input channels=" << m_client->getChannelsIn()
+                                            << ", num buffers=" << m_client->NUM_OF_BUFFERS);
+        traceln("  buffer: requesting channels=" << buf.channelsRequested << ", samples=" << buf.samplesRequested);
+
         if (m_client->NUM_OF_BUFFERS > 0) {
             m_writeQ.push(std::move(buf));
             notifyWrite();
@@ -131,15 +135,26 @@ class AudioStreamer : public Thread, public LogTagDelegate {
             return;
         }
 
+        traceln("  client: num buffers=" << m_client->NUM_OF_BUFFERS);
+
         AudioMidiBuffer buf;
 
         if (m_client->NUM_OF_BUFFERS > 0) {
+            if (m_readBuffer.workingSamples < buffer.getNumSamples()) {
+                traceln("  read buffer: working samples=" << m_readBuffer.workingSamples
+                                                          << ", channels=" << m_readBuffer.audio.getNumChannels()
+                                                          << ", samples=" << m_readBuffer.audio.getNumSamples());
+            }
+
             while (m_readBuffer.workingSamples < buffer.getNumSamples()) {
+                traceln("  waiting for data...");
                 if (!waitRead()) {
                     logln("error: " << getInstanceString() << ": waitRead failed");
                     return;
                 }
                 if (m_readQ.pop(buf)) {
+                    traceln("  pop buffer: channels=" << buf.audio.getNumChannels()
+                                                      << ", samples=" << buf.audio.getNumSamples());
                     m_readBuffer.copyFrom(buf);
                 } else {
                     logln("error: " << getInstanceString() << ": read queue empty");
@@ -147,13 +162,19 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                 }
             }
 
+            traceln("  read buffer: working samples=" << m_readBuffer.workingSamples
+                                                      << ", channels=" << m_readBuffer.audio.getNumChannels()
+                                                      << ", samples=" << m_readBuffer.audio.getNumSamples());
+
             int maxCh = jmin(buffer.getNumChannels(), m_readBuffer.audio.getNumChannels());
 
             // clear channels of the target buffer, that we have no data for in the src buffer
             for (int chan = maxCh; chan < buffer.getNumChannels(); chan++) {
+                traceln("  clearing channel " << chan << "...");
                 buffer.clear(chan, 0, buffer.getNumSamples());
             }
             for (int chan = 0; chan < maxCh; chan++) {
+                traceln("  copying channel " << chan << "...");
                 buffer.copyFrom(chan, 0, m_readBuffer.audio, chan, 0, buffer.getNumSamples());
             }
 
@@ -161,6 +182,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
             midi.addEvents(m_readBuffer.midi, 0, buffer.getNumSamples(), 0);
             m_readBuffer.midi.clear(0, buffer.getNumSamples());
             m_readBuffer.consume(buffer.getNumSamples());
+
+            traceln("  consumed " << buffer.getNumSamples() << " samples");
         } else {
             buf.channelsRequested = buffer.getNumChannels();
             buf.samplesRequested = buffer.getNumSamples();
@@ -204,24 +227,25 @@ class AudioStreamer : public Thread, public LogTagDelegate {
 
         void consume(int samples) {
             workingSamples -= samples;
-            if (workingSamples > 0) {
-                shiftSamplesToFront();
-            }
+            shiftAndResize();
         }
 
-        void shiftSamplesToFront() {
-            int start = audio.getNumSamples() - workingSamples;
-            for (int chan = 0; chan < audio.getNumChannels(); chan++) {
-                for (int s = 0; s < workingSamples; s++) {
-                    audio.setSample(chan, s, audio.getSample(chan, start + s));
+        void shiftAndResize() {
+            if (workingSamples > 0) {
+                int start = audio.getNumSamples() - workingSamples;
+                for (int chan = 0; chan < audio.getNumChannels(); chan++) {
+                    for (int s = 0; s < workingSamples; s++) {
+                        audio.setSample(chan, s, audio.getSample(chan, start + s));
+                    }
+                }
+                if (midi.getNumEvents() > 0) {
+                    MidiBuffer midiCpy;
+                    midiCpy.addEvents(midi, 0, -1, -start);
+                    midi.clear();
+                    midi.addEvents(midiCpy, 0, -1, 0);
                 }
             }
-            if (midi.getNumEvents() > 0) {
-                MidiBuffer midiCpy;
-                midiCpy.addEvents(midi, 0, -1, -start);
-                midi.clear();
-                midi.addEvents(midiCpy, 0, -1, 0);
-            }
+            audio.setSize(audio.getNumChannels(), workingSamples, true);
         }
     };
 
