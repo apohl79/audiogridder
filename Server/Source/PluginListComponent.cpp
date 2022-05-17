@@ -59,15 +59,16 @@ class PluginListComponent::TableModel : public TableListBoxModel {
 
             File f(name);
             String type;
-            if (f.exists()) {
+            if (f.getFileExtension().toLowerCase() == ".vst" || f.getFileExtension().toLowerCase() == ".vst3") {
                 name = f.getFileNameWithoutExtension();
                 type = f.getFileExtension().toUpperCase().substring(1);
+            } else {
 #if JUCE_MAC
-
-            } else if (name.startsWith("AudioUnit")) {
                 AudioUnitPluginFormat fmt;
                 name = fmt.getNameOfPluginFromIdentifier(name);
                 type = "AudioUnit";
+#else
+                type = "Unknown";
 #endif
             }
 
@@ -245,11 +246,7 @@ void PluginListComponent::removePluginItems(const std::vector<int> indexes) {
     for (int index : indexes) {
         if (index < types.size()) {
             auto p = types[index];
-            if (!p.pluginFormatName.compare("AudioUnit")) {
-                m_excludeList.insert(p.descriptiveName);
-            } else {
-                m_excludeList.insert(p.fileOrIdentifier);
-            }
+            m_excludeList.insert(p.fileOrIdentifier);
             m_list.removeType(p);
         }
     }
@@ -281,11 +278,9 @@ void PluginListComponent::addPluginItems(const std::vector<int> indexes) {
     }
 
     getApp()->getServer()->saveConfig();
-    getApp()->getServer()->addPlugins(names, [this, names](bool success) {
+    getApp()->getServer()->addPlugins(names, [this, names](bool success, const String& name) {
         if (!success) {
-            for (auto& name : names) {
-                m_excludeList.insert(name);
-            }
+            m_excludeList.insert(name);
         }
     });
 }

@@ -137,12 +137,6 @@ void Server::loadConfig() {
     m_screenJpgQuality = jsonGetValue(cfg, "ScreenQuality", m_screenJpgQuality);
     m_screenLocalMode = jsonGetValue(cfg, "ScreenLocalMode", m_screenLocalMode);
     m_pluginWindowsOnTop = jsonGetValue(cfg, "PluginWindowsOnTop", m_pluginWindowsOnTop);
-    m_pluginexclude.clear();
-    if (jsonHasValue(cfg, "ExcludePlugins")) {
-        for (auto& s : cfg["ExcludePlugins"]) {
-            m_pluginexclude.insert(s.get<std::string>());
-        }
-    }
     m_scanForPlugins = jsonGetValue(cfg, "ScanForPlugins", m_scanForPlugins);
     m_crashReporting = jsonGetValue(cfg, "CrashReporting", m_crashReporting);
     logln("crash reporting is " << (m_crashReporting ? "enabled" : "disabled"));
@@ -151,6 +145,12 @@ void Server::loadConfig() {
                                  : m_sandboxMode == SANDBOX_PLUGIN ? "plugin isolation"
                                                                    : "disabled"));
     m_sandboxLogAutoclean = jsonGetValue(cfg, "SandboxLogAutoclean", m_sandboxLogAutoclean);
+    m_pluginexclude.clear();
+    if (jsonHasValue(cfg, "ExcludePlugins")) {
+        for (auto& s : cfg["ExcludePlugins"]) {
+            m_pluginexclude.insert(s.get<std::string>());
+        }
+    }
 }
 
 void Server::saveConfig() {
@@ -243,7 +243,7 @@ void Server::loadKnownPluginList() {
             if (File(name).exists()) {
                 name = File(name).getFileName();
             }
-            if (shouldExclude(name)) {
+            if (shouldExclude(name, desc.fileOrIdentifier)) {
                 m_pluginlist.removeType(desc);
             }
         }
@@ -418,26 +418,26 @@ void Server::shutdownWorkers() {
     m_workers.clear();
 }
 
-bool Server::shouldExclude(const String& name) {
+bool Server::shouldExclude(const String& name, const String& id) {
     traceScope();
-    return shouldExclude(name, {});
+    return shouldExclude(name, id, {});
 }
 
-bool Server::shouldExclude(const String& name, const std::vector<String>& include) {
+bool Server::shouldExclude(const String& name, const String& id, const std::vector<String>& include) {
     traceScope();
     if (name.containsIgnoreCase("AGridder") || name.containsIgnoreCase("AudioGridder")) {
         return true;
     }
     if (include.size() > 0) {
         for (auto& incl : include) {
-            if (!name.compare(incl)) {
+            if (name == incl || id == incl) {
                 return false;
             }
         }
         return true;
     } else {
         for (auto& excl : m_pluginexclude) {
-            if (!name.compare(excl)) {
+            if (id == excl) {
                 return true;
             }
         }
@@ -445,7 +445,7 @@ bool Server::shouldExclude(const String& name, const std::vector<String>& includ
     return false;
 }
 
-void Server::addPlugins(const std::vector<String>& names, std::function<void(bool)> fn) {
+void Server::addPlugins(const std::vector<String>& names, std::function<void(bool, const String&)> fn) {
     traceScope();
     std::thread([this, names, fn] {
         traceScope();
@@ -456,17 +456,13 @@ void Server::addPlugins(const std::vector<String>& names, std::function<void(boo
             for (auto& name : names) {
                 bool found = false;
                 for (auto& p : m_pluginlist.getTypes()) {
-                    if (!name.compare(p.descriptiveName)) {
+                    if (!name.compare(p.fileOrIdentifier)) {
                         found = true;
                         break;
                     }
                 }
-                if (!found) {
-                    fn(false);
-                    return;
-                }
+                fn(found, name);
             }
-            fn(true);
         }
     }).detach();
 }
@@ -640,7 +636,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
             if (File(name).exists()) {
                 name = File(name).getFileName();
             }
-            bool excluded = shouldExclude(name, include);
+            bool excluded = shouldExclude(name, fileOrId, include);
             if ((nullptr == plugindesc || fmt->pluginNeedsRescanning(*plugindesc)) &&
                 !m_pluginlist.getBlacklistedFiles().contains(fileOrId) && !excluded) {
                 ScanThread* scanThread = nullptr;
@@ -672,7 +668,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
             } else {
                 logln("  (skipping: " << name << (excluded ? " excluded" : "") << ")");
             }
-            neverSeenList.erase(name);
+            neverSeenList.erase(fileOrId);
         }
     }
 

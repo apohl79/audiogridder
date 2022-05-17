@@ -78,10 +78,10 @@ class Server : public Thread, public LogTag {
     void setCrashReporting(bool b) { m_crashReporting = b; }
     const KnownPluginList& getPluginList() const { return m_pluginlist; }
     KnownPluginList& getPluginList() { return m_pluginlist; }
-    bool shouldExclude(const String& name);
-    bool shouldExclude(const String& name, const std::vector<String>& include);
+    bool shouldExclude(const String& name, const String& id);
+    bool shouldExclude(const String& name, const String& id, const std::vector<String>& include);
     auto& getExcludeList() { return m_pluginexclude; }
-    void addPlugins(const std::vector<String>& names, std::function<void(bool)> fn);
+    void addPlugins(const std::vector<String>& names, std::function<void(bool, const String&)> fn);
 
     static void loadKnownPluginList(KnownPluginList& plist, int srvId);
     static void saveKnownPluginList(KnownPluginList& plist, int srvId);
