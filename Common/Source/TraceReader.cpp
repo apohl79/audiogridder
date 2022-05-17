@@ -214,28 +214,43 @@ bool startsWith(const std::string& str, const std::string& starts) {
     return pos == 0;
 }
 
-FilterType getFilterType(const std::string& s) {
-    if (startsWith(s, "0x")) {
+FilterType getFilterType(const std::string& s, bool& inverted) {
+    if (startsWith(s, "!")) {
+        inverted = true;
+    }
+    auto str = inverted ? s.substr(1) : s;
+    if (startsWith(str, "0x")) {
         return FilterType::HEX;
-    } else if (startsWith(s, "s:")) {
+    } else if (startsWith(str, "s:")) {
         return FilterType::STR;
     }
     return FilterType::DEC;
 }
 
-void updateFilter(const std::string& f, std::set<uint64>& idFilter, std::set<std::string>& nameFilter) {
-    auto type = getFilterType(f);
+void updateFilter(const std::string& f, std::set<uint64>& idFilterIncl, std::set<uint64>& idFilterExcl,
+                  std::set<std::string>& nameFilterIncl, std::set<std::string>& nameFilterExcl) {
+    bool inverted = false;
+    auto type = getFilterType(f, inverted);
+    auto str = inverted ? f.substr(1) : f;
     if (type == FilterType::STR) {
-        nameFilter.insert(f.substr(2));
+        if (inverted){
+            nameFilterExcl.insert(str.substr(2));
+        } else {
+            nameFilterIncl.insert(str.substr(2));
+        }
     } else {
         std::stringstream s;
         if (type == FilterType::HEX) {
             s << std::hex;
         }
-        s << f;
+        s << str;
         uint64 id;
         s >> id;
-        idFilter.insert(id);
+        if (inverted){
+            idFilterExcl.insert(id);
+        } else {
+            idFilterIncl.insert(id);
+        }
     }
 }
 
@@ -254,8 +269,8 @@ int main(int argc, char** argv) {
         ("log", "Log file mode, order messages by time instead of by thread")
         ("stats", "Statistics mode")
         ("number,n", bpo::value<int>()->default_value(10), "Number of messages per thread (0 for all)")
-        ("thread,t", bpo::value<std::vector<std::string>>(), "Show specific thread(s)\n(format: 0x<hex id> | s:<name> | <decimal id>)")
-        ("tag,x", bpo::value<std::vector<std::string>>(), "Show specific tag(s)\n(format: 0x<hex id> | s:<name> | <decimal id>)")
+        ("thread,t", bpo::value<std::vector<std::string>>(), "Show specific thread(s)\n(format: [!]0x<hex id> | [!]s:<name> | [!]<decimal id>)")
+        ("tag,x", bpo::value<std::vector<std::string>>(), "Show specific tag(s)\n(format: [!]0x<hex id> | [!]s:<name> | [!]<decimal id>)")
         ("rt", "Reverse time display")
         ;
     // clang-format on
@@ -283,19 +298,19 @@ int main(int argc, char** argv) {
     using IDFilter = std::set<uint64>;
     using NameFilter = std::set<std::string>;
 
-    IDFilter threadIdFilter;
-    NameFilter threadNameFilter;
+    IDFilter threadIdFilterIncl, threadIdFilterExcl;
+    NameFilter threadNameFilterIncl, threadNameFilterExcl;
     if (opts.count("thread")) {
         for (auto& t : opts["thread"].as<std::vector<std::string>>()) {
-            updateFilter(t, threadIdFilter, threadNameFilter);
+            updateFilter(t, threadIdFilterIncl, threadIdFilterExcl, threadNameFilterIncl, threadNameFilterExcl);
         }
     }
 
-    IDFilter tagIdFilter;
-    NameFilter tagNameFilter;
+    IDFilter tagIdFilterIncl, tagIdFilterExcl;
+    NameFilter tagNameFilterIncl, tagNameFilterExcl;
     if (opts.count("tag")) {
         for (auto& t : opts["tag"].as<std::vector<std::string>>()) {
-            updateFilter(t, tagIdFilter, tagNameFilter);
+            updateFilter(t, tagIdFilterIncl, tagIdFilterExcl, tagNameFilterIncl, tagNameFilterExcl);
         }
     }
 
@@ -329,8 +344,6 @@ int main(int argc, char** argv) {
             threadNameMap[rec.threadId] = rec.threadName;
             updateColumns(rec);
             dataByTime.push_back(rec);
-            if (statsmode) {
-            }
             dataByThread[rec.threadId].push_back(std::move(rec));
             recCount++;
         }
@@ -344,8 +357,8 @@ int main(int argc, char** argv) {
 
     if (statsmode) {
         for (auto& srec : dataByTime) {
-            bool isEnter = !strncmp(srec.msg, "enter", 5);
-            bool isExit = !strncmp(srec.msg, "exit", 4);
+            bool isEnter = !strncmp(srec.msg, ">> enter", 8);
+            bool isExit = !strncmp(srec.msg, "<< exit", 7);
             if (isEnter || isExit) {
                 std::stringstream statsKey;
                 statsKey << srec.threadId << ":" << srec.tagId << ":" << srec.file << ":" << srec.line;
@@ -399,16 +412,28 @@ int main(int argc, char** argv) {
         std::cout << " threads: " << threadNameMap.size() << std::endl;
     } else if (logmode) {
         for (auto& r : dataByTime) {
-            if (threadIdFilter.size() > 0 && !exists(threadIdFilter, r.threadId)) {
+            if (threadIdFilterIncl.size() > 0 && !exists(threadIdFilterIncl, r.threadId)) {
                 continue;
             }
-            if (threadNameFilter.size() > 0 && !exists(threadNameFilter, std::string(r.threadName))) {
+            if (threadIdFilterExcl.size() > 0 && exists(threadIdFilterExcl, r.threadId)) {
                 continue;
             }
-            if (tagIdFilter.size() > 0 && !exists(tagIdFilter, r.tagId)) {
+            if (threadNameFilterIncl.size() > 0 && !exists(threadNameFilterIncl, std::string(r.threadName))) {
                 continue;
             }
-            if (tagNameFilter.size() > 0 && !exists(tagNameFilter, std::string(r.tagName))) {
+            if (threadNameFilterExcl.size() > 0 && exists(threadNameFilterExcl, std::string(r.threadName))) {
+                continue;
+            }
+            if (tagIdFilterIncl.size() > 0 && !exists(tagIdFilterIncl, r.tagId)) {
+                continue;
+            }
+            if (tagIdFilterExcl.size() > 0 && exists(tagIdFilterExcl, r.tagId)) {
+                continue;
+            }
+            if (tagNameFilterIncl.size() > 0 && !exists(tagNameFilterIncl, std::string(r.tagName))) {
+                continue;
+            }
+            if (tagNameFilterExcl.size() > 0 && exists(tagNameFilterExcl, std::string(r.tagName))) {
                 continue;
             }
             printRecord(r);
@@ -431,7 +456,10 @@ int main(int argc, char** argv) {
         }
     } else {
         for (auto& kv : dataByThread) {
-            if (threadIdFilter.size() > 0 && !exists(threadIdFilter, kv.first)) {
+            if (threadIdFilterIncl.size() > 0 && !exists(threadIdFilterIncl, kv.first)) {
+                continue;
+            }
+            if (threadIdFilterExcl.size() > 0 && exists(threadIdFilterExcl, kv.first)) {
                 continue;
             }
             std::string threadName;
@@ -439,7 +467,10 @@ int main(int argc, char** argv) {
             if (it != threadNameMap.end()) {
                 threadName = it->second;
             }
-            if (threadNameFilter.size() > 0 && !exists(threadNameFilter, threadName)) {
+            if (threadNameFilterIncl.size() > 0 && !exists(threadNameFilterIncl, threadName)) {
+                continue;
+            }
+            if (threadNameFilterExcl.size() > 0 && exists(threadNameFilterExcl, threadName)) {
                 continue;
             }
             size_t show = (size_t)opts["number"].as<int>();
@@ -450,12 +481,17 @@ int main(int argc, char** argv) {
             }
             std::stringstream threadNameId;
             threadNameId << threadName << ":" << std::hex << kv.first;
-            if (tagIdFilter.size() > 0 || tagNameFilter.size() > 0) {
+            if (tagIdFilterIncl.size() > 0 || tagIdFilterExcl.size() > 0 || tagNameFilterIncl.size() > 0 ||
+                tagNameFilterExcl.size() > 0) {
                 std::vector<TraceRecord> filter;
                 for (auto& r : kv.second) {
-                    if (exists(tagIdFilter, r.tagId)) {
+                    if (exists(tagIdFilterIncl, r.tagId)) {
                         filter.push_back(r);
-                    } else if (exists(tagNameFilter, std::string(r.tagName))) {
+                    } else if (exists(tagNameFilterIncl, std::string(r.tagName))) {
+                        filter.push_back(r);
+                    } else if (tagIdFilterExcl.size() > 0 && !exists(tagIdFilterExcl, r.tagId)) {
+                        filter.push_back(r);
+                    } else if (tagNameFilterExcl.size() > 0 && !exists(tagNameFilterExcl, std::string(r.tagName))) {
                         filter.push_back(r);
                     }
                 }
