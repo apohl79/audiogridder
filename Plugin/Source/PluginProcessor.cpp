@@ -855,12 +855,14 @@ bool PluginProcessor::setState(const json& j) {
 
     {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+        m_loadedPluginsCount = 0;
         m_loadedPlugins.clear();
         m_loadedPluginsOk = false;
         m_activePlugin = -1;
         if (jsonHasValue(j, "loadedPlugins")) {
             for (auto& plug : j["loadedPlugins"]) {
                 m_loadedPlugins.emplace_back(plug, version);
+                m_loadedPluginsCount++;
             }
         }
     }
@@ -979,6 +981,7 @@ bool PluginProcessor::loadPlugin(const ServerPlugin& plugin, String& err) {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
         m_loadedPlugins.emplace_back(plugin.getId(), plugin.getIdDeprecated(), plugin.getName(), "", presets, params,
                                      false, hasEditor, success, err);
+        m_loadedPluginsCount++;
     }
 
     if (success) {
@@ -1033,6 +1036,7 @@ void PluginProcessor::unloadPlugin(int idx) {
         for (auto it = m_loadedPlugins.begin(); it < m_loadedPlugins.end();) {
             if (i++ == idx) {
                 it = m_loadedPlugins.erase(it);
+                m_loadedPluginsCount--;
             } else {
                 if (!it->ok) {
                     allOk = false;

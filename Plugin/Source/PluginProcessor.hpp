@@ -208,8 +208,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     }
 
     int getNumOfLoadedPlugins() {
-        std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
-        return (int)m_loadedPlugins.size();
+        return (int)m_loadedPluginsCount;
     }
 
     LoadedPlugin& getLoadedPlugin(int idx) {
@@ -403,6 +402,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     std::vector<LoadedPlugin> m_loadedPlugins;
     mutable std::mutex m_loadedPluginsSyncMtx;
     std::atomic_bool m_loadedPluginsOk{false};
+    std::atomic_uint64_t m_loadedPluginsCount{0};
     int m_autoReconnects = 0;
     int m_activePlugin = -1;
     int m_lastActivePlugin = -1;
