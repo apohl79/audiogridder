@@ -615,7 +615,7 @@ bool Worker::KeyWatcher::keyPressed(const KeyPress& kp, Component*) {
         keysToPress.push_back(getKeyCode("Shift"));
     }
     if (modkeys.isCtrlDown()) {
-            keysToPress.push_back(getKeyCode("Control"));
+        keysToPress.push_back(getKeyCode("Control"));
     }
     if (modkeys.isAltDown()) {
         keysToPress.push_back(getKeyCode("Option"));

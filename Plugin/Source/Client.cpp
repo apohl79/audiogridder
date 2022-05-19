@@ -345,7 +345,7 @@ void Client::init() {
                                                        {{"id", String(srvInfo.getID())}, {"n", String(resp.port)}});
             logln("connecting worker: " << workerSocketPath.getFullPathName());
             m_cmdOut->connect(workerSocketPath);
-         } else {
+        } else {
             logln("connecting worker: " << srvInfo.getHost() << ":" << resp.port);
             m_cmdOut->connect(srvInfo.getHost(), resp.port);
         }

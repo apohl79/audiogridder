@@ -89,7 +89,7 @@ StreamingSocket* accept(StreamingSocket*, int timeoutMs = 1000, std::function<bo
 /*
  * Client/Server handshake
  */
-static constexpr int AG_PROTOCOL_VERSION = 8;
+static constexpr int AG_PROTOCOL_VERSION = 9;
 
 struct HandshakeRequest {
     int version;
@@ -168,6 +168,7 @@ class AudioMessage : public LogTagDelegate {
         int samplesRequested;   // If only midi data is sent, let the server know about the expected audio buffer size
         int numMidiEvents;
         bool isDouble;
+        Uuid traceId;
     };
 
     struct ResponseHeader {
@@ -201,6 +202,7 @@ class AudioMessage : public LogTagDelegate {
         m_reqHeader.samplesRequested = samplesRequested > -1 ? samplesRequested : buffer.getNumSamples();
         m_reqHeader.isDouble = std::is_same<T, double>::value;
         m_reqHeader.numMidiEvents = midi.getNumEvents();
+        m_reqHeader.traceId = TimeTrace::getTraceId();
         if (socket->isConnected()) {
             if (!send(socket, reinterpret_cast<const char*>(&m_reqHeader), sizeof(m_reqHeader), e, &metric)) {
                 return false;
@@ -277,7 +279,9 @@ class AudioMessage : public LogTagDelegate {
             int samples = jmin(buffer.getNumSamples(), m_resHeader.samples);
 
             if (channels < m_resHeader.channels) {
-                logln("warning: target buffer has less channels then what was received from the server, discarding audio data");
+                logln(
+                    "warning: target buffer has less channels then what was received from the server, discarding audio "
+                    "data");
                 needTmpBuffer = true;
             }
 
@@ -286,15 +290,19 @@ class AudioMessage : public LogTagDelegate {
             }
 
             if (samples < m_resHeader.samples) {
-                logln("warning: target buffer has less samples then what was received from the server, discarding audio data");
+                logln(
+                    "warning: target buffer has less samples then what was received from the server, discarding audio "
+                    "data");
                 needTmpBuffer = true;
             }
 
             if (m_resHeader.samples < buffer.getNumSamples()) {
-                logln("warning: target buffer has more samples then what was received from the server, audio artifacts expected");
+                logln(
+                    "warning: target buffer has more samples then what was received from the server, audio artifacts "
+                    "expected");
             }
 
-            auto readAudio = [&] (AudioBuffer<T>* targetBuffer) {
+            auto readAudio = [&](AudioBuffer<T>* targetBuffer) {
                 for (int chan = 0; chan < m_resHeader.channels; ++chan) {
                     if (!read(socket, targetBuffer->getWritePointer(chan), m_resHeader.samples * (int)sizeof(T), 1000,
                               e, &metric)) {
@@ -348,13 +356,16 @@ class AudioMessage : public LogTagDelegate {
 
     bool readFromClient(StreamingSocket* socket, AudioBuffer<float>& bufferF, AudioBuffer<double>& bufferD,
                         MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo, MessageHelper::Error* e,
-                        Meter& metric) {
+                        Meter& metric, Uuid& traceId) {
         traceScope();
         if (socket->isConnected()) {
             if (!read(socket, &m_reqHeader, sizeof(m_reqHeader), 0, e, &metric)) {
                 MessageHelper::seterrstr(e, "request header");
                 return false;
             }
+
+            traceId = m_reqHeader.traceId;
+
             int size = m_reqHeader.samples * (int)(m_reqHeader.isDouble ? sizeof(double) : sizeof(float));
             if (m_reqHeader.isDouble) {
                 bufferD.setSize(jmax(m_reqHeader.channels, m_reqHeader.channelsRequested),
@@ -363,6 +374,7 @@ class AudioMessage : public LogTagDelegate {
                 bufferF.setSize(jmax(m_reqHeader.channels, m_reqHeader.channelsRequested),
                                 jmax(m_reqHeader.samples, m_reqHeader.samplesRequested), false, true);
             }
+
             // Read the channel data from the client, if any
             for (int chan = 0; chan < m_reqHeader.channels; ++chan) {
                 char* data = m_reqHeader.isDouble ? reinterpret_cast<char*>(bufferD.getWritePointer(chan))
@@ -372,7 +384,9 @@ class AudioMessage : public LogTagDelegate {
                     return false;
                 }
             }
+
             midi.clear();
+
             for (int i = 0; i < m_reqHeader.numMidiEvents; i++) {
                 MidiHeader midiHdr;
                 if (!read(socket, &midiHdr, sizeof(midiHdr), 0, e, &metric)) {
@@ -389,6 +403,7 @@ class AudioMessage : public LogTagDelegate {
                     midi.addEvent(midiData.data(), midiHdr.size, midiHdr.sampleNumber);
                 }
             }
+
             if (!read(socket, &posInfo, sizeof(posInfo), 0, e, &metric)) {
                 MessageHelper::seterrstr(e, "pos info");
                 return false;

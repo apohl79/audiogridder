@@ -206,7 +206,7 @@ void ProcessorWindow::createEditor() {
     bool success = true;
 
     if (m_processor->isClient()) {
-        //auto p = m_processor->getLastPosition();
+        // auto p = m_processor->getLastPosition();
         m_processor->showEditor(getX(), getY());
     } else {
         m_editor = m_processor->createEditorIfNeeded();

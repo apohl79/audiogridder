@@ -207,9 +207,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
         m_channelMapper.print();
     }
 
-    int getNumOfLoadedPlugins() {
-        return (int)m_loadedPluginsCount;
-    }
+    int getNumOfLoadedPlugins() { return (int)m_loadedPluginsCount; }
 
     LoadedPlugin& getLoadedPlugin(int idx) {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);

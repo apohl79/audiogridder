@@ -233,7 +233,7 @@ void updateFilter(const std::string& f, std::set<uint64>& idFilterIncl, std::set
     auto type = getFilterType(f, inverted);
     auto str = inverted ? f.substr(1) : f;
     if (type == FilterType::STR) {
-        if (inverted){
+        if (inverted) {
             nameFilterExcl.insert(str.substr(2));
         } else {
             nameFilterIncl.insert(str.substr(2));
@@ -246,7 +246,7 @@ void updateFilter(const std::string& f, std::set<uint64>& idFilterIncl, std::set
         s << str;
         uint64 id;
         s >> id;
-        if (inverted){
+        if (inverted) {
             idFilterExcl.insert(id);
         } else {
             idFilterIncl.insert(id);

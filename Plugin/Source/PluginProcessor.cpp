@@ -520,11 +520,15 @@ template <typename T>
 void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
     traceScope();
 
+    auto traceCtx = TimeTrace::createTraceContext();
+
     if (m_bypassWhenNotConnected &&
         (!m_client->isReadyLockFree() || !m_loadedPluginsOk || getNumOfLoadedPlugins() == 0)) {
         processBlockBypassed(buffer, midiMessages);
         return;
     }
+
+    traceCtx->add("pb_bypass_chk");
 
     ScopedNoDenormals noDenormals;
     auto totalNumInputChannels = getTotalNumInputChannels();
@@ -602,10 +606,10 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
     }
 #endif
 
-    traceln("  position: sample=" << posInfo.timeInSamples << ", time=" << posInfo.timeInSeconds << "s, ply="
-                                  << (int)posInfo.isPlaying << ", rec=" << (int)posInfo.isRecording);
-    traceln("  in/out buffer: channels=" << buffer.getNumChannels() << ", samples=" << buffer.getNumSamples() << ", addr=0x"
-                                  << String::toHexString((uint64)&buffer));
+    traceln("  position: sample=" << posInfo.timeInSamples << ", time=" << posInfo.timeInSeconds
+                                  << "s, ply=" << (int)posInfo.isPlaying << ", rec=" << (int)posInfo.isRecording);
+    traceln("  in/out buffer: channels=" << buffer.getNumChannels() << ", samples=" << buffer.getNumSamples()
+                                         << ", addr=0x" << String::toHexString((uint64)&buffer));
     traceln("  send buffer: channels=" << sendBuffer->getNumChannels() << ", samples=" << sendBuffer->getNumSamples()
                                        << ", addr=0x" << String::toHexString((uint64)sendBuffer));
 #if JucePlugin_IsSynth || JucePlugin_IsMidiEffect
@@ -614,18 +618,36 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
 #endif
     traceln("  transfer: " << (transfer ? "YES" : "NO"));
 
+    traceCtx->add("pb_prep");
+
     if (transfer) {
         if ((buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) || midiMessages.getNumEvents() > 0) {
             auto streamer = m_client->getStreamer<T>();
 
+            traceCtx->add("pb_get_streamer");
+
             if (nullptr != streamer && m_loadedPluginsOk) {
                 m_channelMapper.map(&buffer, sendBuffer);
+
+                traceCtx->add("pb_ch_map");
+                traceCtx->startGroup();
+
                 streamer->send(*sendBuffer, midiMessages, posInfo);
+
+                traceCtx->finishGroup("pb_send");
+                traceCtx->startGroup();
+
                 streamer->read(*sendBuffer, midiMessages);
+
+                traceCtx->finishGroup("pb_read");
+
                 m_channelMapper.mapReverse(sendBuffer, &buffer);
+
+                traceCtx->add("pb_ch_map_reverse");
 
                 if (m_client->getLatencySamples() != getLatencySamples()) {
                     runOnMsgThreadAsync([this] { updateLatency(m_client->getLatencySamples()); });
+                    traceCtx->add("pb_update_latency");
                 }
             } else {
                 buffer.clear();
@@ -654,11 +676,17 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
                     m_midiIsPlaying = false;
                 }
             }
+            traceCtx->add("pb_update_midi_state");
         }
 #endif
     } else {
         buffer.clear();
     }
+
+    traceCtx->add("pb_finish");
+    traceCtx->summary(getLogTagSource(), "process block", 15.0);
+
+    TimeTrace::deleteTraceContext();
 }
 
 void PluginProcessor::processBlockBypassed(AudioBuffer<float>& buffer, MidiBuffer& /* midiMessages */) {

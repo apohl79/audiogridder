@@ -191,9 +191,9 @@ bool Processor::load(const String& settings, String& err, const PluginDescriptio
         std::shared_ptr<ProcessorClient> client;
 
         {
+            client = std::make_shared<ProcessorClient>(m_id, m_chain.getConfig());
             std::lock_guard<std::mutex> lock(m_pluginMtx);
-            m_client = std::make_shared<ProcessorClient>(m_id, m_chain.getConfig());
-            client = m_client;
+            m_client = client;
         }
 
         if (client->init()) {
@@ -261,56 +261,75 @@ void Processor::unload() {
         client->waitForThreadToExit(-1);
         client.reset();
     } else {
-        std::shared_ptr<AudioPluginInstance> p;
+        std::shared_ptr<AudioPluginInstance> plugin;
         {
             std::lock_guard<std::mutex> lock(m_pluginMtx);
-            if (m_prepared) {
-                m_plugin->releaseResources();
-            }
-            for (auto* param : m_plugin->getParameters()) {
-                param->removeListener(this);
-            }
-            p = m_plugin;
-            m_plugin.reset();
+            plugin = std::move(m_plugin);
         }
-        p.reset();
+        if (m_prepared) {
+            plugin->releaseResources();
+        }
+        for (auto* param : plugin->getParameters()) {
+            param->removeListener(this);
+        }
+        plugin.reset();
     }
 
     loadedCount--;
 }
 
-bool Processor::isLoaded() {
+bool Processor::isLoaded(std::shared_ptr<AudioPluginInstance>* plugin, std::shared_ptr<ProcessorClient>* client) {
     if (m_isClient) {
         if (auto c = getClient()) {
+            if (client) {
+                *client = c;
+            }
             return c->isOk() && c->isLoaded();
         } else {
             return false;
         }
     } else {
-        return getPlugin() != nullptr;
+        if (auto p = getPlugin()) {
+            if (plugin) {
+                *plugin = p;
+            }
+            return true;
+        }
+        return false;
     }
 }
 
 template <typename T>
 bool Processor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
     traceScope();
+
     auto fn = [&](auto p) {
+        TimeTrace::addTracePoint("proc_got_backend");
         if (!p->isSuspended()) {
             p->processBlock(buffer, midiMessages);
+            TimeTrace::addTracePoint("proc_process");
         } else {
             if (m_lastKnownLatency > 0) {
                 processBlockBypassed(buffer);
             }
         }
     };
-    if (isLoaded()) {
+
+    std::shared_ptr<AudioPluginInstance> plugin;
+    std::shared_ptr<ProcessorClient> client;
+
+    if (isLoaded(&plugin, &client)) {
+        TimeTrace::addTracePoint("proc_loaded_ok");
         if (m_isClient) {
-            fn(getClient());
+            fn(client);
         } else {
-            fn(getPlugin());
+            fn(plugin);
         }
         return true;
     }
+
+    TimeTrace::addTracePoint("proc_loaded_not_ok");
+
     return false;
 }
 

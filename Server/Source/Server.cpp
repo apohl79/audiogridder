@@ -103,7 +103,7 @@ void Server::loadConfig() {
     m_screenCapturingFFmpeg = jsonGetValue(cfg, "ScreenCapturingFFmpeg", m_screenCapturingFFmpeg);
     String encoder = "webp";
     m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
-    //if (jsonHasValue(cfg, "ScreenCapturingFFmpegEncoder")) {
+    // if (jsonHasValue(cfg, "ScreenCapturingFFmpegEncoder")) {
     //    encoder = jsonGetValue(cfg, "ScreenCapturingFFmpegEncoder", encoder);
     //    if (encoder == "webp") {
     //        m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;

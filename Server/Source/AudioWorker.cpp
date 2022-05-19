@@ -77,12 +77,17 @@ void AudioWorker::run() {
     m_chain->prepareToPlay(m_sampleRate, m_samplesPerBlock);
     bool hasToSetPlayHead = true;
 
+    auto traceCtx = TimeTrace::createTraceContext();
+    Uuid traceId;
+
     MessageHelper::Error e;
     while (!threadShouldExit() && isOk()) {
         // Read audio chunk
         if (waitForData()) {
-            if (msg.readFromClient(m_socket.get(), bufferF, bufferD, midi, posInfo, &e, *bytesIn)) {
+            if (msg.readFromClient(m_socket.get(), bufferF, bufferD, midi, posInfo, &e, *bytesIn, traceId)) {
+                traceCtx->reset(traceId);
                 std::lock_guard<std::mutex> lock(m_mtx);
+                traceCtx->add("aw_lock");
                 duration.reset();
                 if (hasToSetPlayHead) {  // do not set the playhead before it's initialized
                     m_chain->setPlayHead(&playHead);
@@ -100,19 +105,30 @@ void AudioWorker::run() {
                 bool sendOk;
                 if (msg.isDouble()) {
                     if (m_chain->supportsDoublePrecisionProcessing()) {
+                        traceCtx->add("aw_prep");
+                        traceCtx->startGroup();
                         processBlock(bufferD, midi);
+                        traceCtx->finishGroup("aw_process");
                     } else {
                         bufferF.makeCopyOf(bufferD);
+                        traceCtx->add("aw_prep");
+                        traceCtx->startGroup();
                         processBlock(bufferF, midi);
+                        traceCtx->finishGroup("aw_process");
                         bufferD.makeCopyOf(bufferF);
                     }
+                    traceCtx->add("aw_finish");
                     sendOk = msg.sendToClient(m_socket.get(), bufferD, midi, m_chain->getLatencySamples(),
                                               bufferD.getNumChannels(), &e, *bytesOut);
                 } else {
+                    traceCtx->add("aw_prep");
+                    traceCtx->startGroup();
                     processBlock(bufferF, midi);
+                    traceCtx->finishGroup("aw_process");
                     sendOk = msg.sendToClient(m_socket.get(), bufferF, midi, m_chain->getLatencySamples(),
                                               bufferF.getNumChannels(), &e, *bytesOut);
                 }
+                traceCtx->summary(getLogTagSource(), "process audio", 10.0);
                 if (!sendOk) {
                     logln("error: failed to send audio data to client: " << e.toString());
                     m_socket->close();
@@ -124,6 +140,8 @@ void AudioWorker::run() {
             }
         }
     }
+
+    TimeTrace::deleteTraceContext();
 
     m_chain->setPlayHead(nullptr);
 
@@ -148,11 +166,13 @@ void AudioWorker::processBlock(AudioBuffer<T>& buffer, MidiBuffer& midi) {
         procBuffer->setSize(numChannels, buffer.getNumSamples());
         if (m_activeChannels.getNumActiveChannels(true) > 0) {
             m_channelMapper.map(&buffer, procBuffer);
+            TimeTrace::addTracePoint("pb_ch_map");
         } else {
             procBuffer->clear();
         }
         m_chain->processBlock(*procBuffer, midi);
         m_channelMapper.mapReverse(procBuffer, &buffer);
+        TimeTrace::addTracePoint("pb_ch_map_reverse");
     }
 }
 

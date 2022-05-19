@@ -62,7 +62,8 @@ class Processor : public LogTagDelegate, public AudioProcessorParameter::Listene
 
     bool load(const String& settings, String& err, const PluginDescription* plugdesc = nullptr);
     void unload();
-    bool isLoaded();
+    bool isLoaded(std::shared_ptr<AudioPluginInstance>* plugin = nullptr,
+                  std::shared_ptr<ProcessorClient>* client = nullptr);
 
     void setChainIndex(int idx) { m_chainIdx = idx; }
 

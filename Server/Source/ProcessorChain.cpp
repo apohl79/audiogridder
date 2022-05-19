@@ -14,7 +14,7 @@ namespace e47 {
 void ProcessorChain::prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock) {
     traceScope();
     setRateAndBufferSizeDetails(sampleRate, maximumExpectedSamplesPerBlock);
-    std::lock_guard<std::mutex> lock(m_processors_mtx);
+    std::lock_guard<std::mutex> lock(m_processorsMtx);
     for (auto& proc : m_processors) {
         proc->prepareToPlay(sampleRate, maximumExpectedSamplesPerBlock);
     }
@@ -22,7 +22,7 @@ void ProcessorChain::prepareToPlay(double sampleRate, int maximumExpectedSamples
 
 void ProcessorChain::releaseResources() {
     traceScope();
-    std::lock_guard<std::mutex> lock(m_processors_mtx);
+    std::lock_guard<std::mutex> lock(m_processorsMtx);
     for (auto& proc : m_processors) {
         proc->releaseResources();
     }
@@ -30,7 +30,7 @@ void ProcessorChain::releaseResources() {
 
 void ProcessorChain::setPlayHead(AudioPlayHead* ph) {
     AudioProcessor::setPlayHead(ph);
-    std::lock_guard<std::mutex> lock(m_processors_mtx);
+    std::lock_guard<std::mutex> lock(m_processorsMtx);
     for (auto& proc : m_processors) {
         proc->setPlayHead(ph);
     }
@@ -77,7 +77,7 @@ bool ProcessorChain::updateChannels(int channelsIn, int channelsOut, int channel
     if (!setBusesLayout(layout)) {
         logln("failed to set layout");
     }
-    std::lock_guard<std::mutex> lock(m_processors_mtx);
+    std::lock_guard<std::mutex> lock(m_processorsMtx);
     m_extraChannels = 0;
     m_hasSidechain = channelsSC > 0;
     m_sidechainDisabled = false;
@@ -141,8 +141,7 @@ bool ProcessorChain::setProcessorBusesLayout(Processor* proc) {
             };
 
             auto addOutputsAndLayout = [](Array<AudioProcessor::BusesLayout>& layouts, AudioProcessor::BusesLayout& l,
-                                     int channels) {
-
+                                          int channels) {
                 // try layouts with different combinations of stereo and mono buses
                 int numStereo = channels / 2;
 
@@ -246,7 +245,7 @@ bool ProcessorChain::setProcessorBusesLayout(Processor* proc) {
 
 int ProcessorChain::getExtraChannels() {
     traceScope();
-    std::lock_guard<std::mutex> lock(m_processors_mtx);
+    std::lock_guard<std::mutex> lock(m_processorsMtx);
     return m_extraChannels;
 }
 
@@ -286,7 +285,7 @@ bool ProcessorChain::addPluginProcessor(const String& id, const String& settings
 
 void ProcessorChain::addProcessor(std::shared_ptr<Processor> processor) {
     traceScope();
-    std::lock_guard<std::mutex> lock(m_processors_mtx);
+    std::lock_guard<std::mutex> lock(m_processorsMtx);
     processor->setChainIndex((int)m_processors.size());
     m_processors.push_back(processor);
     updateNoLock();
@@ -295,7 +294,7 @@ void ProcessorChain::addProcessor(std::shared_ptr<Processor> processor) {
 void ProcessorChain::delProcessor(int idx) {
     traceScope();
     int i = 0;
-    std::lock_guard<std::mutex> lock(m_processors_mtx);
+    std::lock_guard<std::mutex> lock(m_processorsMtx);
     for (auto it = m_processors.begin(); it < m_processors.end(); it++) {
         if (i++ == idx) {
             m_processors.erase(it);
@@ -307,7 +306,7 @@ void ProcessorChain::delProcessor(int idx) {
 
 void ProcessorChain::update() {
     traceScope();
-    std::lock_guard<std::mutex> lock(m_processors_mtx);
+    std::lock_guard<std::mutex> lock(m_processorsMtx);
     updateNoLock();
 }
 
@@ -345,7 +344,7 @@ void ProcessorChain::updateNoLock() {
 
 std::shared_ptr<Processor> ProcessorChain::getProcessor(int index) {
     traceScope();
-    std::lock_guard<std::mutex> lock(m_processors_mtx);
+    std::lock_guard<std::mutex> lock(m_processorsMtx);
     if (index > -1 && (size_t)index < m_processors.size()) {
         return m_processors[(size_t)index];
     }
@@ -354,7 +353,7 @@ std::shared_ptr<Processor> ProcessorChain::getProcessor(int index) {
 
 void ProcessorChain::exchangeProcessors(int idxA, int idxB) {
     traceScope();
-    std::lock_guard<std::mutex> lock(m_processors_mtx);
+    std::lock_guard<std::mutex> lock(m_processorsMtx);
     if (idxA > -1 && (size_t)idxA < m_processors.size() && idxB > -1 && (size_t)idxB < m_processors.size()) {
         std::swap(m_processors[(size_t)idxA], m_processors[(size_t)idxB]);
         m_processors[(size_t)idxA]->setChainIndex(idxA);
@@ -364,7 +363,7 @@ void ProcessorChain::exchangeProcessors(int idxA, int idxB) {
 
 float ProcessorChain::getParameterValue(int idx, int paramIdx) {
     traceScope();
-    std::lock_guard<std::mutex> lock(m_processors_mtx);
+    std::lock_guard<std::mutex> lock(m_processorsMtx);
     if (idx > -1 && (size_t)idx < m_processors.size()) {
         if (auto p = m_processors[(size_t)idx]) {
             return p->getParameterValue(paramIdx);
@@ -376,14 +375,14 @@ float ProcessorChain::getParameterValue(int idx, int paramIdx) {
 void ProcessorChain::clear() {
     traceScope();
     releaseResources();
-    std::lock_guard<std::mutex> lock(m_processors_mtx);
+    std::lock_guard<std::mutex> lock(m_processorsMtx);
     m_processors.clear();
 }
 
 String ProcessorChain::toString() {
     traceScope();
     String ret;
-    std::lock_guard<std::mutex> lock(m_processors_mtx);
+    std::lock_guard<std::mutex> lock(m_processorsMtx);
     bool first = true;
     for (auto& proc : m_processors) {
         if (!first) {
@@ -411,17 +410,21 @@ void ProcessorChain::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& mi
     }
 
     {
-        std::lock_guard<std::mutex> lock(m_processors_mtx);
+        std::lock_guard<std::mutex> lock(m_processorsMtx);
+        TimeTrace::addTracePoint("chain_lock");
         for (auto& proc : m_processors) {
+            TimeTrace::startGroup();
             if (proc->processBlock(buffer, midiMessages)) {
                 latency += proc->getLatencySamples();
             }
+            TimeTrace::finishGroup("chain_process: " + proc->getName());
         }
     }
 
     if (latency != getLatencySamples()) {
         logln("updating latency samples to " << latency);
         setLatencySamples(latency);
+        TimeTrace::addTracePoint("chain_set_latency");
     }
 }
 

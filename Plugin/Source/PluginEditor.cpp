@@ -1001,7 +1001,6 @@ void PluginEditor::showSettingsMenu() {
 
     m.addSeparator();
 
-
     subsubm.addItem("Show Category", true, m_processor.getMenuShowCategory(), [this] {
         traceScope();
         m_processor.setMenuShowCategory(!m_processor.getMenuShowCategory());

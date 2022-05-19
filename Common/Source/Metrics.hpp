@@ -266,6 +266,127 @@ class Metrics : public Thread, public LogTag, public SharedInstance<Metrics> {
     static std::mutex m_statsMtx;
 };
 
+#define TRACE_STRCPY(dst, src)                              \
+    do {                                                    \
+        int len = jmin((int)sizeof(dst) - 1, src.length()); \
+        strncpy(dst, src.getCharPointer(), (size_t)len);    \
+        dst[len] = 0;                                       \
+    } while (0)
+
+class TimeTrace {
+  public:
+    struct Record {
+        double timeSpentMs = 0;
+        char name[32] = {0};
+        enum Type : uint8_t { TRACE, START_GROUP, FINISH_GROUP };
+        Type type = TRACE;
+    };
+
+    struct TraceContext {
+        TimeStatistic::Duration duration;
+        std::vector<Record> records;
+        Uuid uuid;
+
+        void add(const String& name, Record::Type type = Record::TRACE) {
+            Record r;
+            r.timeSpentMs = duration.update();
+            r.type = type;
+            TRACE_STRCPY(r.name, name);
+            records.push_back(std::move(r));
+        }
+
+        void startGroup() { add({}, Record::START_GROUP); }
+
+        void finishGroup(const String& name) { add(name, Record::FINISH_GROUP); }
+
+        double totalMs() const {
+            double total = 0.0;
+            for (auto& r : records) {
+                total += r.timeSpentMs;
+            }
+            return total;
+        }
+
+        void summary(const LogTag* tag, const String& name, double treshold) const {
+            auto ms = totalMs();
+            if (ms > treshold) {
+                setLogTagByRef(*tag);
+                logln(name << " took " << ms << "ms (" << uuid.toDashedString() << ")");
+
+                std::vector<double> groupLevel;
+
+                auto getIndent = [](size_t i) {
+                    String s;
+                    s << std::string(2 * (i + 1), ' ');
+                    return s;
+                };
+
+                for (auto& trec : records) {
+                    switch (trec.type) {
+                        case Record::TRACE:
+                            logln(getIndent(groupLevel.size()) << (groupLevel.empty() ? "- " : "+ ") << trec.name
+                                                               << ": " << trec.timeSpentMs << "ms");
+                            if (!groupLevel.empty()) {
+                                groupLevel.back() += trec.timeSpentMs;
+                            }
+                            break;
+                        case Record::START_GROUP:
+                            groupLevel.push_back(0.0);
+                            break;
+                        case Record::FINISH_GROUP:
+                            auto groupMs = trec.timeSpentMs + groupLevel.back();
+                            groupLevel.pop_back();
+                            logln(getIndent(groupLevel.size()) << "= " << trec.name << ": " << groupMs << "ms");
+                            if (!groupLevel.empty()) {
+                                groupLevel.back() += groupMs;
+                            }
+                            break;
+                    }
+                }
+            }
+        }
+
+        void reset(Uuid id = Uuid()) {
+            duration.reset();
+            records.clear();
+            if (id != Uuid::null()) {
+                uuid = id;
+            } else {
+                uuid = Uuid();
+            }
+        }
+    };
+
+    static std::shared_ptr<TraceContext> createTraceContext();
+    static std::shared_ptr<TraceContext> getTraceContext();
+    static void deleteTraceContext();
+
+    static inline void addTracePoint(const String& name) {
+        if (auto ctx = getTraceContext()) {
+            ctx->add(name);
+        }
+    }
+
+    static inline void startGroup() {
+        if (auto ctx = getTraceContext()) {
+            ctx->startGroup();
+        }
+    }
+
+    static inline void finishGroup(const String& name) {
+        if (auto ctx = getTraceContext()) {
+            ctx->finishGroup(name);
+        }
+    }
+
+    static inline Uuid getTraceId() {
+        if (auto ctx = getTraceContext()) {
+            return ctx->uuid;
+        }
+        return Uuid::null();
+    }
+};
+
 }  // namespace e47
 
 #endif /* Metrics_hpp */

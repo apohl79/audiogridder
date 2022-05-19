@@ -93,7 +93,7 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
 
   private:
     std::vector<std::shared_ptr<Processor>> m_processors;
-    std::mutex m_processors_mtx;
+    std::mutex m_processorsMtx;
 
     std::atomic_bool m_supportsDoublePrecision{true};
     std::atomic<double> m_tailSecs{0.0};

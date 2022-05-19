@@ -15,6 +15,8 @@ namespace e47 {
 Metrics::StatsMap Metrics::m_stats;
 std::mutex Metrics::m_statsMtx;
 
+thread_local std::shared_ptr<TimeTrace::TraceContext> t_traceCtx;
+
 void TimeStatistic::update(double t) {
     m_meter.increment();
     std::lock_guard<std::mutex> lock(m_timesMtx);
@@ -196,5 +198,14 @@ Metrics::StatsMap Metrics::getStats() {
 }
 
 void Metrics::cleanup() { SharedInstance::cleanup(); }
+
+std::shared_ptr<TimeTrace::TraceContext> TimeTrace::createTraceContext() {
+    t_traceCtx = std::make_shared<TimeTrace::TraceContext>();
+    return t_traceCtx;
+}
+
+std::shared_ptr<TimeTrace::TraceContext> TimeTrace::getTraceContext() { return t_traceCtx; }
+
+void TimeTrace::deleteTraceContext() { t_traceCtx.reset(); }
 
 }  // namespace e47

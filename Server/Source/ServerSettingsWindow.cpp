@@ -265,7 +265,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_screenCapturingMode.setBounds(getWideFieldBounds(row));
     m_screenCapturingMode.setTooltip(tooltip);
     m_screenCapturingMode.addItem("FFmpeg", 1);
-    //m_screenCapturingMode.addItem("FFmpeg (mjpeg)", 2);
+    // m_screenCapturingMode.addItem("FFmpeg (mjpeg)", 2);
     m_screenCapturingMode.addItem("Legacy", 3);
     m_screenCapturingMode.addItem("Disabled (Local Mode)", 4);
     m_screenCapturingMode.addItem("Disabled", 5);

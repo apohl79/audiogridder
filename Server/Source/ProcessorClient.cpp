@@ -618,10 +618,15 @@ void ProcessorClient::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
     MessageHelper::Error e;
     AudioMessage msg(this);
 
+    TimeTrace::addTracePoint("pc_prep_buffer");
+
     m_channelMapper.map(&buffer, sendBuffer);
+    TimeTrace::addTracePoint("pc_ch_map");
 
     {
         std::lock_guard<std::mutex> lock(m_audioMtx);
+
+        TimeTrace::addTracePoint("pc_lock");
 
         if (!msg.sendToServer(m_sockAudio.get(), *sendBuffer, midiMessages, posInfo, sendBuffer->getNumChannels(),
                               sendBuffer->getNumSamples(), &e, *m_bytesOutMeter)) {
@@ -630,14 +635,20 @@ void ProcessorClient::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
             return;
         }
 
+        TimeTrace::addTracePoint("pc_send");
+
         if (!msg.readFromServer(m_sockAudio.get(), *sendBuffer, midiMessages, &e, *m_bytesInMeter)) {
             logln("error while reading audio message from sandbox: " << e.toString());
             m_sockAudio->close();
             return;
         }
+
+        TimeTrace::addTracePoint("pc_read");
     }
 
     m_channelMapper.mapReverse(sendBuffer, &buffer);
+
+    TimeTrace::addTracePoint("pc_ch_map_reverse");
 }
 
 void ProcessorClient::processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMessages) {

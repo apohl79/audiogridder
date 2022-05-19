@@ -115,9 +115,13 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                                             << ", num buffers=" << m_client->NUM_OF_BUFFERS);
         traceln("  buffer: requesting channels=" << buf.channelsRequested << ", samples=" << buf.samplesRequested);
 
+        TimeTrace::addTracePoint("as_prep");
+
         if (m_client->NUM_OF_BUFFERS > 0) {
             m_writeQ.push(std::move(buf));
+            TimeTrace::addTracePoint("as_push");
             notifyWrite();
+            TimeTrace::addTracePoint("as_notify");
         } else {
             m_durationLocal.reset();
             m_durationGlobal.reset();
@@ -125,6 +129,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                 logln("error: " << getInstanceString() << ": send failed");
                 setError();
             }
+            TimeTrace::addTracePoint("as_send");
         }
     }
 
@@ -146,12 +151,16 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                                                           << ", samples=" << m_readBuffer.audio.getNumSamples());
             }
 
+            TimeTrace::startGroup();
+
             while (m_readBuffer.workingSamples < buffer.getNumSamples()) {
                 traceln("  waiting for data...");
                 if (!waitRead()) {
                     logln("error: " << getInstanceString() << ": waitRead failed");
+                    TimeTrace::finishGroup("as_wait_read_failed");
                     return;
                 }
+                TimeTrace::addTracePoint("as_wait_read");
                 if (m_readQ.pop(buf)) {
                     traceln("  pop buffer: channels=" << buf.audio.getNumChannels()
                                                       << ", samples=" << buf.audio.getNumSamples());
@@ -160,7 +169,10 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                     logln("error: " << getInstanceString() << ": read queue empty");
                     return;
                 }
+                TimeTrace::addTracePoint("as_pop");
             }
+
+            TimeTrace::finishGroup("as_get_buffer");
 
             traceln("  read buffer: working samples=" << m_readBuffer.workingSamples
                                                       << ", channels=" << m_readBuffer.audio.getNumChannels()
@@ -183,6 +195,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
             m_readBuffer.midi.clear(0, buffer.getNumSamples());
             m_readBuffer.consume(buffer.getNumSamples());
 
+            TimeTrace::addTracePoint("as_consume");
+
             traceln("  consumed " << buffer.getNumSamples() << " samples");
         } else {
             buf.channelsRequested = buffer.getNumChannels();
@@ -194,6 +208,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                 setError();
                 return;
             }
+            TimeTrace::addTracePoint("as_read");
             m_durationLocal.update();
             m_durationGlobal.update();
             buffer.makeCopyOf(buf.audio);

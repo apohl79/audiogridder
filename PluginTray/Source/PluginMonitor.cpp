@@ -89,7 +89,7 @@ void PluginMonitorWindow::update() {
     m_components.clear();
 
     int borderLR = 15;  // left/right border
-    int borderTB = 0;  // top/bottom border
+    int borderTB = 0;   // top/bottom border
     int rowHeight = 19;
 
     int colWidth[] = {m_channelColWidth, m_channelNameWidth, 190, 45, 30, 65, 10};

@@ -383,13 +383,13 @@ void App::showEditorInternal(std::shared_ptr<Processor> proc, Thread::ThreadID t
     }
 }
 
-void App::showEditor(std::shared_ptr<Processor> proc, Thread::ThreadID tid,
-                     ProcessorWindow::CaptureCallbackFFmpeg func, int x, int y) {
+void App::showEditor(std::shared_ptr<Processor> proc, Thread::ThreadID tid, ProcessorWindow::CaptureCallbackFFmpeg func,
+                     int x, int y) {
     showEditorInternal(proc, tid, func, x, y);
 }
 
-void App::showEditor(std::shared_ptr<Processor> proc, Thread::ThreadID tid,
-                     ProcessorWindow::CaptureCallbackNative func, int x, int y) {
+void App::showEditor(std::shared_ptr<Processor> proc, Thread::ThreadID tid, ProcessorWindow::CaptureCallbackNative func,
+                     int x, int y) {
     showEditorInternal(proc, tid, func, x, y);
 }
 
