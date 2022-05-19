@@ -591,6 +591,9 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
         }
 
         transfer |= m_midiIsPlaying;
+
+        // keep transferring while the plugin UI is open
+        transfer |= getActiveEditor() != nullptr;
     }
 #else
     ignoreUnused(m_midiIsPlaying);
