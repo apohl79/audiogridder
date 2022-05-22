@@ -1,6 +1,8 @@
 [Setup]
 AppName=AudioGridder
 AppVersion=#STR_VER#
+AppPublisher="Andreas Pohl, e47"
+AppPublisherURL="https://audiogridder.com"
 DefaultDirName={commonpf64}\AudioGridderServer
 DefaultGroupName=AudioGridder
 OutputBaseFilename=AudioGridderServer_#STR_VER#

@@ -262,9 +262,23 @@ else()
     if(AG_ENABLE_CODE_SIGNING)
       add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}_STRIP
         COMMAND
+          ${CMAKE_COMMAND} -E echo "Creating AAX plugin bundle $<TARGET_FILE_NAME:${target_name}>"
+        COMMAND
+          ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/lib/AAX/signed/$<TARGET_FILE_NAME:${target_name}>/Contents/x64
+        COMMAND
+          ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${target_name}> ${CMAKE_BINARY_DIR}/lib/AAX/signed/$<TARGET_FILE_NAME:${target_name}>/Contents/x64
+        COMMAND
+          ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/package/desktop.ini ${CMAKE_BINARY_DIR}/lib/AAX/signed/$<TARGET_FILE_NAME:${target_name}>
+        COMMAND
+          attrib +h +r +s ${CMAKE_BINARY_DIR}/lib/AAX/signed/$<TARGET_FILE_NAME:${target_name}>/desktop.ini
+        COMMAND
+          ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/package/PlugIn.ico ${CMAKE_BINARY_DIR}/lib/AAX/signed/$<TARGET_FILE_NAME:${target_name}>
+        COMMAND
+          attrib +h +r +s ${CMAKE_BINARY_DIR}/lib/AAX/signed/$<TARGET_FILE_NAME:${target_name}>/PlugIn.ico
+        COMMAND
           ${CMAKE_COMMAND} -E echo "Signing AAX plugin $<TARGET_FILE_NAME:${target_name}>"
         COMMAND
-          aax_sign.bat $<TARGET_FILE:${target_name}>
+          aax_sign.bat ${CMAKE_BINARY_DIR}/lib/AAX/signed/$<TARGET_FILE_NAME:${target_name}>
       )
     else()
       add_custom_target(${target_name}_SIGN ALL DEPENDS ${target_name}_STRIP
