@@ -138,7 +138,7 @@ inline std::pair<CGMouseButton, CGEventType> toMouseButtonType(MouseEvType t) {
 void sendInput(INPUT* in) {
     traceScope();
     if (SendInput(1, in, sizeof(INPUT)) != 1) {
-        logln("SendInput failed: " << GetLastErrorStr());
+        logln("SendInput failed: " << getLastErrorStr());
     }
 }
 
@@ -147,7 +147,7 @@ void sendKey(WORD vk, bool keyDown, HWND hwnd = NULL) {
     if (hwnd) {
         auto msg = keyDown ? WM_KEYDOWN : WM_KEYUP;
         if (SendMessage(hwnd, msg, vk, 1)) {
-            logln("SendMessage failed: " << GetLastErrorStr());
+            logln("SendMessage failed: " << getLastErrorStr());
         }
     } else {
         INPUT event;

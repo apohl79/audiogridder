@@ -78,9 +78,7 @@ using namespace std::chrono_literals;
 
 namespace e47 {
 
-#ifdef JUCE_WINDOWS
-String GetLastErrorStr();
-#endif
+String getLastErrorStr();
 
 class ServerInfo {
   public:

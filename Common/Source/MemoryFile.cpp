@@ -33,28 +33,28 @@ void MemoryFile::open(bool overwriteIfExists) {
                        (FILE_SHARE_READ | FILE_SHARE_WRITE), NULL, overwriteIfExists ? CREATE_ALWAYS : OPEN_ALWAYS,
                        FILE_ATTRIBUTE_TEMPORARY, NULL);
     if (m_fd == INVALID_HANDLE_VALUE) {
-        logln("CreateFileA failed: " << GetLastErrorStr());
+        logln("CreateFileA failed: " << getLastErrorStr());
         return;
     }
     LONG sizeh = (m_size >> (sizeof(LONG) * 8));
     LONG sizel = (m_size & 0xffffffff);
     auto res = SetFilePointer(m_fd, sizel, &sizeh, FILE_BEGIN);
     if (INVALID_SET_FILE_POINTER == res) {
-        logln("SetFilePointer failed: " << GetLastErrorStr());
+        logln("SetFilePointer failed: " << getLastErrorStr());
         return;
     }
     if (!SetEndOfFile(m_fd)) {
-        logln("SetEndOfFile failed: " << GetLastErrorStr());
+        logln("SetEndOfFile failed: " << getLastErrorStr());
         return;
     }
     m_mapped_hndl = CreateFileMappingA(m_fd, NULL, PAGE_READWRITE, 0, 0, NULL);
     if (NULL == m_mapped_hndl) {
-        logln("CreateFileMappingA failed: " << GetLastErrorStr());
+        logln("CreateFileMappingA failed: " << getLastErrorStr());
         return;
     }
     m = MapViewOfFileEx(m_mapped_hndl, FILE_MAP_WRITE, 0, 0, 0, NULL);
     if (NULL == m) {
-        logln("MapViewOfFileEx failed: " << GetLastErrorStr());
+        logln("MapViewOfFileEx failed: " << getLastErrorStr());
         return;
     }
 #else

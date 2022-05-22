@@ -183,8 +183,8 @@ size_t mdns_query_recv(int sock, void* buffer, size_t capacity, mdns_record_call
 //  Returns 0 if success, or <0 if error.
 int mdns_query_answer(int sock, const void* address, size_t address_size, void* buffer, size_t capacity,
                       uint16_t query_id, const char* service, size_t service_length, const char* hostname,
-                      size_t hostname_length, uint32_t ipv4, const uint8_t* ipv6, uint16_t port, const char* txt,
-                      size_t txt_length);
+                      size_t hostname_length, uint32_t ipv4, const uint8_t* ipv6, uint16_t port,
+                      const char** txt_records, size_t* txt_lengths, size_t txt_size);
 
 // Internal functions
 

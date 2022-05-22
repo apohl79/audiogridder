@@ -103,7 +103,7 @@ int ServiceResponder::handleRecord(int sock, const struct sockaddr* from, size_t
         if (service == Defaults::MDNS_SERVICE_NAME) {
             uint16_t unicast = (rclass & MDNS_UNICAST_RESPONSE);
             // logln(fromaddrstr << " : question PTR " << service);
-            // logln("  answer " << m_hostname << "." << MDNS_SERVICE_NAME << " port " << m_port << " ("
+            // logln("  answer " << m_hostname << "." << Defaults::MDNS_SERVICE_NAME << " port " << m_port << " ("
             //                  << (unicast ? "unicast" : "multicast") << ")");
             if (!unicast) {
                 addrlen = 0;
@@ -114,12 +114,20 @@ int ServiceResponder::handleRecord(int sock, const struct sockaddr* from, size_t
             j["LM"] = m_localMode;
             j["LOAD"] = CPUInfo::getUsage();
             j["V"] = AUDIOGRIDDER_VERSION;
-            String txtRecord;
-            txtRecord << "INFO=" << j.dump();
-            mdns_query_answer(sock, from, addrlen, m_sendBuffer, sizeof(m_sendBuffer), query_id,
-                              service.getCharPointer(), (size_t)service.length(), m_hostname.getCharPointer(),
-                              (size_t)m_hostname.length(), m_connector.getAddr4(), m_connector.getAddr6(),
-                              (uint16_t)m_port, txtRecord.getCharPointer(), (size_t)txtRecord.length());
+
+            String txtInfoRecord;
+
+            txtInfoRecord << "INFO=" << j.dump();
+
+            std::vector<const char*> txt_records = {txtInfoRecord.getCharPointer()};
+            std::vector<size_t> txt_lengths = {(size_t)txtInfoRecord.length()};
+
+            if (mdns_query_answer(sock, from, addrlen, m_sendBuffer, sizeof(m_sendBuffer), query_id,
+                                  service.getCharPointer(), (size_t)service.length(), m_hostname.getCharPointer(),
+                                  (size_t)m_hostname.length(), m_connector.getAddr4(), m_connector.getAddr6(),
+                                  (uint16_t)m_port, txt_records.data(), txt_lengths.data(), txt_records.size()) != 0) {
+                logln("failed to send mDNS answer: " << getLastErrorStr());
+            }
         }
     }
     return 0;

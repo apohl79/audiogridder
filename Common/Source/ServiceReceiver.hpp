@@ -43,8 +43,8 @@ class ServiceReceiver : public Thread, public LogTag {
     static std::mutex m_instMtx;
     static size_t m_instRefCount;
 
-    char m_entryBuffer[256];
-    mdns_record_txt_t m_txtBuffer[128];
+    char m_entryBuffer[1024];
+    mdns_record_txt_t m_txtBuffer[512];
     int m_curId;
     int m_curPort;
     String m_curName;

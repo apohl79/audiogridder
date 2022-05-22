@@ -43,8 +43,8 @@ class ServiceResponder : public Thread, public LogTag {
     bool m_localMode;
     mDNSConnector m_connector;
 
-    char m_sendBuffer[256];
-    char m_nameBuffer[256];
+    char m_sendBuffer[1024];
+    char m_nameBuffer[1024];
 };
 
 }  // namespace e47

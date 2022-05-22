@@ -15,15 +15,19 @@
 
 namespace e47 {
 
+String getLastErrorStr() {
 #ifdef JUCE_WINDOWS
-String GetLastErrorStr() {
     DWORD err = GetLastError();
     LPSTR lpMsgBuf;
     FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
                   err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&lpMsgBuf, 0, NULL);
     return String(lpMsgBuf);
-}
+#else
+    std::vector<char> buf(512);
+    ignoreUnused(strerror_r(errno, buf.data(), buf.size()));
+    return String(buf.data());
 #endif
+}
 
 void windowToFront(Component* c) {
     setLogTagStatic("utils");
