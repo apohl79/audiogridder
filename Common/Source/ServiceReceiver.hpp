@@ -48,6 +48,7 @@ class ServiceReceiver : public Thread, public LogTag {
     int m_curId;
     int m_curPort;
     String m_curName;
+    String m_curUuid;
     float m_curLoad;
     bool m_curLocalMode;
     String m_curVersion;

@@ -215,6 +215,7 @@ int ServiceReceiver::handleRecord(int /*sock*/, const struct sockaddr* from, siz
                     } else if (key == "INFO") {
                         json j = json::parse(MDNS_TO_JUCE_STRING(m_txtBuffer[itxt].value).toStdString());
                         m_curId = jsonGetValue(j, "ID", 0);
+                        m_curUuid = jsonGetValue(j, "UUID", String());
                         m_curLoad = jsonGetValue(j, "LOAD", 0.0f);
                         m_curLocalMode = jsonGetValue(j, "LM", false);
                         m_curVersion = jsonGetValue(j, "V", String("unknown"));
@@ -227,8 +228,9 @@ int ServiceReceiver::handleRecord(int /*sock*/, const struct sockaddr* from, siz
     }
     if (complete) {
         auto host = mDNSConnector::ipToString(from, addrlen, true);
-        m_currentResult.add(
-            ServerInfo(host, m_curName, from->sa_family == AF_INET6, m_curId, m_curLoad, m_curLocalMode, m_curVersion));
+        m_currentResult.add(ServerInfo(host, m_curName, from->sa_family == AF_INET6, m_curId,
+                                       m_curUuid.isNotEmpty() ? m_curUuid : Uuid::null(), m_curLoad, m_curLocalMode,
+                                       m_curVersion));
     }
     return 0;
 }

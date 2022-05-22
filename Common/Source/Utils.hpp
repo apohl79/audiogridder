@@ -107,6 +107,9 @@ class ServerInfo {
             if (hostParts.size() > 5) {
                 m_localMode = hostParts[5] == "1";
             }
+            if (hostParts.size() > 6) {
+                m_uuid = hostParts[6];
+            }
         } else {
             m_host = s;
             m_id = 0;
@@ -115,12 +118,13 @@ class ServerInfo {
         refresh();
     }
 
-    ServerInfo(const String& host, const String& name, bool ipv6, int id, float load, bool localMode,
+    ServerInfo(const String& host, const String& name, bool ipv6, int id, Uuid uuid, float load, bool localMode,
                const String& version = "")
         : m_host(host),
           m_name(name),
           m_isIpv6(ipv6),
           m_id(id),
+          m_uuid(uuid),
           m_load(load),
           m_localMode(localMode),
           m_version(version) {
@@ -132,6 +136,7 @@ class ServerInfo {
           m_name(other.m_name),
           m_isIpv6(other.m_isIpv6),
           m_id(other.m_id),
+          m_uuid(other.m_uuid),
           m_load(other.m_load),
           m_localMode(other.m_localMode),
           m_version(other.m_version) {
@@ -143,6 +148,7 @@ class ServerInfo {
         m_name = other.m_name;
         m_isIpv6 = other.m_isIpv6;
         m_id = other.m_id;
+        m_uuid = other.m_uuid;
         m_load = other.m_load;
         m_localMode = other.m_localMode;
         m_version = other.m_version;
@@ -151,11 +157,18 @@ class ServerInfo {
     }
 
     bool operator==(const ServerInfo& other) const {
-        return m_host == other.m_host && m_name == other.m_name && m_id == other.m_id &&
+        return m_host == other.m_host && m_name == other.m_name && m_id == other.m_id && m_uuid == other.m_uuid &&
                m_localMode == other.m_localMode && m_version == other.m_version;
     }
 
     bool operator!=(const ServerInfo& other) const { return !operator==(other); }
+
+    bool matches(const ServerInfo& other) const {
+        if (m_uuid != Uuid::null() && other.m_uuid != Uuid::null()) {
+            return m_uuid == other.m_uuid;
+        }
+        return getNameAndID() == other.getNameAndID();
+    }
 
     bool isValid() const { return m_id > -1; }
     const String& getHost() const { return m_host; }
@@ -168,6 +181,8 @@ class ServerInfo {
     void setVersion(const String& v) { m_version = v; }
     int getID() const { return m_id; }
     void setID(int id) { m_id = id; }
+    Uuid getUUID() const { return m_uuid; }
+    void setUUID(Uuid uuid) { m_uuid = uuid; }
     float getLoad() const { return m_load; }
     void setLoad(float l) { m_load = l; }
     bool getLocalMode() const { return m_localMode; }
@@ -197,6 +212,7 @@ class ServerInfo {
         ret << "name=" << m_name << ", ";
         ret << "host=" << m_host << ", ";
         ret << "id=" << m_id << ", ";
+        ret << "uuid=" << m_uuid.toDashedString() << ", ";
         ret << "localmode=" << (int)m_localMode << ", ";
         ret << "version=" << m_version;
         if (m_load > 0.0f) {
@@ -225,6 +241,7 @@ class ServerInfo {
     String m_host, m_name;
     bool m_isIpv6 = false;
     int m_id = -1;
+    Uuid m_uuid = Uuid::null();
     float m_load = 0.0f;
     bool m_localMode = false;
     String m_version;

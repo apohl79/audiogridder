@@ -70,6 +70,7 @@ void Server::loadConfig() {
     Logger::setEnabled(jsonGetValue(cfg, "Logger", Logger::isEnabled()));
     m_id = jsonGetValue(cfg, "ID", m_id);
     m_name = jsonGetValue(cfg, "NAME", m_name);
+    m_uuid = jsonGetValue(cfg, "UUID", m_uuid.toDashedString());
 #ifdef JUCE_MAC
     m_enableAU = jsonGetValue(cfg, "AU", m_enableAU);
     logln("AudioUnit support " << (m_enableAU ? "enabled" : "disabled"));
@@ -160,6 +161,7 @@ void Server::saveConfig() {
     j["Logger"] = Logger::isEnabled();
     j["ID"] = getId();
     j["NAME"] = m_name.toStdString();
+    j["UUID"] = m_uuid.toDashedString().toStdString();
 #ifdef JUCE_MAC
     j["AU"] = m_enableAU;
 #endif
@@ -829,7 +831,7 @@ void Server::runServer() {
 
     setNonBlocking(m_masterSocket.getRawSocketHandle());
 
-    ServiceResponder::initialize(m_port + getId(), getId(), m_name, getScreenLocalMode());
+    ServiceResponder::initialize(m_port + getId(), getId(), m_name, m_uuid, getScreenLocalMode());
 
     if (m_name.isEmpty()) {
         m_name = ServiceResponder::getHostName();
