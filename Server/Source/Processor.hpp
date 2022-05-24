@@ -318,6 +318,8 @@ class Processor : public LogTagDelegate, public AudioProcessorParameter::Listene
 
     template <typename T>
     void processBlockBypassedInternal(AudioBuffer<T>& buffer, Array<Array<T>>& bypassBuffer);
+
+    ENABLE_ASYNC_FUNCTORS();
 };
 
 }  // namespace e47

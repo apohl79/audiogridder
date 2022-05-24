@@ -49,7 +49,8 @@ ProcessorWindow::~ProcessorWindow() {
     stopAsyncFunctors();
     stopCapturing();
     if (m_editor != nullptr) {
-        delete m_editor;
+        // delay the deletion of the editor until the processor unloads
+        //delete m_editor;
         m_editor = nullptr;
     } else if (m_processor->isClient()) {
         m_processor->hideEditor();

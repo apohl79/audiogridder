@@ -24,14 +24,19 @@ Processor::Processor(ProcessorChain& chain, const String& id, double sampleRate,
       m_isClient(isClient),
       m_fmt(id.startsWith("VST3")  ? VST3
             : id.startsWith("VST") ? VST
-                                   : AU) {}
+                                   : AU) {
+    initAsyncFunctors();
+}
 
 Processor::Processor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize)
     : Processor(chain, id, sampleRate, blockSize,
                 getApp()->getServer()->getSandboxMode() == Server::SANDBOX_PLUGIN &&
                     getApp()->getServer()->getSandboxModeRuntime() == Server::SANDBOX_NONE) {}
 
-Processor::~Processor() { unload(); }
+Processor::~Processor() {
+    unload();
+    stopAsyncFunctors();
+}
 
 String Processor::createPluginID(const PluginDescription& d) {
     return d.pluginFormatName + "-" + String::toHexString(d.uniqueId);
@@ -271,6 +276,12 @@ void Processor::unload() {
         }
         for (auto* param : plugin->getParameters()) {
             param->removeListener(this);
+        }
+        if (auto* e = plugin->getActiveEditor()) {
+            runOnMsgThreadAsync([this, e] {
+                traceScope();
+                delete e;
+            });
         }
         plugin.reset();
     }
