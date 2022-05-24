@@ -52,9 +52,19 @@ ServiceResponder::~ServiceResponder() {
     stopThread(-1);
 }
 
-void ServiceResponder::setHostName(const String& hostname) { m_inst->m_hostname = hostname; }
+void ServiceResponder::setHostName(const String& hostname) {
+    if (nullptr != m_inst) {
+        m_inst->m_hostname = hostname;
+    }
+}
 
-const String& ServiceResponder::getHostName() { return m_inst->m_hostname; }
+const String& ServiceResponder::getHostName() {
+    if (nullptr != m_inst) {
+        return m_inst->m_hostname;
+    }
+    static String empty;
+    return empty;
+}
 
 void ServiceResponder::initialize(int port, int id, const String& hostname, Uuid uuid, bool localMode) {
     m_inst = std::make_unique<ServiceResponder>(port, id, hostname, uuid, localMode);
