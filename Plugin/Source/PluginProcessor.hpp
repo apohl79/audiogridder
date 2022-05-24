@@ -276,7 +276,11 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
         return (int)lround(m_client->NUM_OF_BUFFERS * getBlockSize() * 1000 / getSampleRate());
     }
 
-    void showMonitor() { m_tray->showMonitor(); }
+    void showMonitor() {
+        if (m_tray != nullptr) {
+            m_tray->showMonitor();
+        }
+    }
 
     String getPresetDir() const { return m_presetsDir; }
     void setPresetDir(const String& d) { m_presetsDir = d; }
