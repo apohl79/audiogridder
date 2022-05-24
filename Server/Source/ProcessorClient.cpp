@@ -165,19 +165,20 @@ bool ProcessorClient::startSandbox() {
 bool ProcessorClient::connectSandbox() {
     logln("connecting to sandbox at port " << m_port);
 
+    bool success = true;
+
     bool hasUnixDomainSockets = Defaults::unixDomainSocketsSupported();
     auto socketPath = Defaults::getSocketPath(Defaults::SANDBOX_PLUGIN_SOCK, {{"n", String(m_port)}});
 
-    auto resetSocketsAndFalse = [this] {
-        m_sockCmdIn.reset();
-        m_sockCmdOut.reset();
+    {
+        std::lock_guard<std::mutex> lock(m_audioMtx);
         m_sockAudio.reset();
-        return false;
-    };
+    }
 
     {
         std::lock_guard<std::mutex> lock(m_cmdMtx);
 
+        m_sockCmdIn.reset();
         m_sockCmdOut = std::make_unique<StreamingSocket>();
 
         // let the process come up and bind to the port
@@ -194,48 +195,61 @@ bool ProcessorClient::connectSandbox() {
             }
         }
 
-        if (!m_sockCmdOut->isConnected()) {
-            setAndLogError("failed to setup sandbox command-out connection");
-            return resetSocketsAndFalse();
-        }
+        if (m_sockCmdOut->isConnected()) {
+            m_sockCmdIn = std::make_unique<StreamingSocket>();
 
-        m_sockCmdIn = std::make_unique<StreamingSocket>();
-        if (hasUnixDomainSockets) {
-            if (!m_sockCmdIn->connect(socketPath)) {
-                setAndLogError("failed to setup sandbox command-in connection");
-                return resetSocketsAndFalse();
+            if (hasUnixDomainSockets) {
+                if (!m_sockCmdIn->connect(socketPath)) {
+                    setAndLogError("failed to setup sandbox command-in connection");
+                    success = false;
+                }
+            } else {
+                if (!m_sockCmdIn->connect("127.0.0.1", m_port)) {
+                    setAndLogError("failed to setup sandbox command-in connection");
+                    success = false;
+                }
             }
         } else {
-            if (!m_sockCmdIn->connect("127.0.0.1", m_port)) {
-                setAndLogError("failed to setup sandbox command-in connection");
-                return resetSocketsAndFalse();
-            }
+            setAndLogError("failed to setup sandbox command-out connection");
+            success = false;
+        }
+
+        if (!success) {
+            m_sockCmdOut.reset();
+            m_sockCmdIn.reset();
         }
     }
 
-    {
+    if (success) {
         std::lock_guard<std::mutex> lock(m_audioMtx);
 
         m_sockAudio = std::make_unique<StreamingSocket>();
+
         if (hasUnixDomainSockets) {
             if (!m_sockAudio->connect(socketPath)) {
                 setAndLogError("failed to setup sandbox audio connection");
-                return resetSocketsAndFalse();
+                success = false;
             }
         } else {
             if (!m_sockAudio->connect("127.0.0.1", m_port)) {
                 setAndLogError("failed to setup sandbox audio connection");
-                return resetSocketsAndFalse();
+                success = false;
             }
         }
 
-        m_bytesOutMeter = Metrics::getStatistic<Meter>("SandboxBytesOut");
-        m_bytesInMeter = Metrics::getStatistic<Meter>("SandboxBytesIn");
+        if (success) {
+            m_bytesOutMeter = Metrics::getStatistic<Meter>("SandboxBytesOut");
+            m_bytesInMeter = Metrics::getStatistic<Meter>("SandboxBytesIn");
+        } else {
+            m_sockAudio.reset();
+        }
     }
 
-    logln("connected to sandbox successfully");
+    if (success) {
+        logln("connected to sandbox successfully");
+    }
 
-    return true;
+    return success;
 }
 
 void ProcessorClient::run() {
