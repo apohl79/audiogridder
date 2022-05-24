@@ -866,7 +866,7 @@ void Server::runServer() {
             StreamingSocket* clnt = nullptr;
             bool isLocal = false;
             if (m_masterSocketLocal.isConnected()) {
-                if ((clnt = accept(&m_masterSocketLocal, 100, [this] { return threadShouldExit(); }))) {
+                if ((clnt = accept(&m_masterSocketLocal, 100, [this] { return threadShouldExit(); })) != nullptr) {
                     isLocal = true;
                 }
             }
