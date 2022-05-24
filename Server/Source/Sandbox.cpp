@@ -14,14 +14,20 @@ SandboxPeer::SandboxPeer(Server& server) : LogTagDelegate(&server), m_server(ser
 SandboxPeer::~SandboxPeer() { stopAsyncFunctors(); }
 
 bool SandboxPeer::send(const SandboxMessage& msg, ResponseCallback callback, bool shouldBlock) {
+    traceScope();
     MemoryBlock block;
     msg.serialize(block);
     auto hash = msg.id.hash();
     bool ret = true;
-    auto fn = [this, block, hash, callback, &ret] {
-        ret = sendMessage(block);
-        if (ret && callback) {
+    bool* pret = shouldBlock ? &ret : nullptr;
+    auto fn = [this, block, hash, callback, pret] {
+        traceScope();
+        bool result = sendMessage(block);
+        if (result && callback) {
             m_callbacks.set(hash, callback);
+        }
+        if (nullptr != pret) {
+            *pret = result;
         }
     };
     if (shouldBlock) {
@@ -33,6 +39,7 @@ bool SandboxPeer::send(const SandboxMessage& msg, ResponseCallback callback, boo
 }
 
 void SandboxPeer::read(const MemoryBlock& data) {
+    traceScope();
     try {
         auto j = json::parse(data.begin(), data.end());
         SandboxMessage msg(j["type"].get<SandboxMessage::Type>(), j["data"], j["uuid"].get<std::string>());
@@ -50,9 +57,13 @@ void SandboxPeer::read(const MemoryBlock& data) {
 
 SandboxMaster::SandboxMaster(Server& server, const String& i) : SandboxPeer(server), id(i) {}
 
-void SandboxMaster::handleConnectionLost() { m_server.handleDisconnectFromSandbox(*this); }
+void SandboxMaster::handleConnectionLost() {
+    traceScope();
+    m_server.handleDisconnectFromSandbox(*this);
+}
 
 void SandboxMaster::handleMessage(const SandboxMessage& msg) {
+    traceScope();
     if (msg.type == SandboxMessage::SANDBOX_PORT) {
         int port = msg.data["port"].get<int>();
         logln("received port " << port << " from sandbox " << id);
