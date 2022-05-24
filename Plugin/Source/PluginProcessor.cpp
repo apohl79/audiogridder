@@ -192,6 +192,7 @@ PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
 PluginProcessor::~PluginProcessor() {
     traceScope();
     stopAsyncFunctors();
+    m_tray.reset();
     logln("plugin shutdown: terminating client");
     m_client->signalThreadShouldExit();
     m_client->close();
@@ -200,7 +201,6 @@ PluginProcessor::~PluginProcessor() {
     if (Client::count == 0) {
         StatisticsWindow::hide();
     }
-    m_tray.reset();
     logln("plugin shutdown: cleaning up");
     WindowPositions::cleanup();
     Metrics::cleanup();
