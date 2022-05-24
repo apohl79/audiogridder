@@ -302,6 +302,13 @@ bool ScreenRecorder::prepareInput() {
         return false;
     }
 
+    if (m_captureCodecCtx->pix_fmt < 0 || m_captureCodecCtx->pix_fmt >= AV_PIX_FMT_NB) {
+        logln("prepareInput: invalid input pixel format: " << m_captureCodecCtx->pix_fmt);
+        return false;
+    }
+
+    logln("prepareInput: input pixel format is " << m_captureCodecCtx->pix_fmt);
+
     m_pxSize = av_image_get_linesize(m_captureCodecCtx->pix_fmt, 10, 0) / 10;
 
     return true;
