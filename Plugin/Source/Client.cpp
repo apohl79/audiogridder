@@ -328,7 +328,7 @@ void Client::init() {
 
         HandshakeResponse resp;
         MessageHelper::Error err;
-        if (!read(m_cmdOut.get(), &resp, sizeof(resp), 5000, &err)) {
+        if (!read(m_cmdOut.get(), &resp, sizeof(resp), LOAD_PLUGIN_TIMEOUT, &err)) {
             logln("handshake error: " << err.toString());
             m_cmdOut->close();
             return;
@@ -630,7 +630,7 @@ MemoryBlock Client::getPluginSettings(int idx) {
     } else {
         Message<PluginSettings> res(this);
         MessageHelper::Error err;
-        if (res.read(m_cmdOut.get(), &err, 10000)) {
+        if (res.read(m_cmdOut.get(), &err, LOAD_PLUGIN_TIMEOUT)) {
             if (*res.payload.size > 0) {
                 block.append(res.payload.data, (size_t)*res.payload.size);
             }
@@ -1111,7 +1111,7 @@ void Client::updatePluginList(bool sendRequest) {
     }
     m_plugins.clear();
     MessageHelper::Error err;
-    if (!msg.read(m_cmdOut.get(), &err, 5000)) {
+    if (!msg.read(m_cmdOut.get(), &err, LOAD_PLUGIN_TIMEOUT)) {
         logln("failed reading plugin list: " << err.toString());
         return;
     }
