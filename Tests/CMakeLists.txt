@@ -5,6 +5,7 @@ project(AUDIOGRIDDER_TESTS VERSION 1.0.0)
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/Source AG_SOURCES_TESTS)
 aux_source_directory(${CMAKE_SOURCE_DIR}/Common/Source AG_SOURCES_COMMON)
 aux_source_directory(${CMAKE_SOURCE_DIR}/Server/Source AG_SOURCES_SERVER)
+aux_source_directory(${CMAKE_SOURCE_DIR}/Plugin/Source AG_SOURCES_PLUGIN)
 list(REMOVE_ITEM AG_SOURCES_COMMON "${CMAKE_SOURCE_DIR}/Common/Source/TraceReader.cpp")
 
 include_directories(${CMAKE_SOURCE_DIR})
@@ -20,8 +21,7 @@ macro(ag_add_testrunner type)
 
   target_sources(${BINNAME} PRIVATE
     ${AG_SOURCES_TESTS}
-    ${AG_SOURCES_COMMON}
-    ${AG_SOURCES_SERVER})
+    ${AG_SOURCES_COMMON})
 
   target_compile_features(${BINNAME} PRIVATE cxx_std_14)
 
@@ -38,11 +38,17 @@ macro(ag_add_testrunner type)
     BOOST_ALL_NO_LIB)
 
   if(${type} STREQUAL "server")
+    target_sources(${BINNAME} PRIVATE ${AG_SOURCES_SERVER})
     target_compile_definitions(${BINNAME} PRIVATE
       AG_UNIT_TEST_SERVER
       AG_SERVER
       JUCE_PLUGINHOST_VST3=1
       JUCE_PLUGINHOST_VST=1)
+  elseif(${type} STREQUAL "fx")
+    target_sources(${BINNAME} PRIVATE ${AG_SOURCES_PLUGIN})
+    target_compile_definitions(${BINNAME} PRIVATE
+      AG_UNIT_TEST_PLUGIN_FX
+      AG_PLUGIN)
   endif()
 
   set(LINK_LIBRARIES
@@ -79,3 +85,4 @@ macro(ag_add_testrunner type)
 endmacro()
 
 ag_add_testrunner(server)
+ag_add_testrunner(fx)

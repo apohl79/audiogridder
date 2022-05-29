@@ -39,20 +39,26 @@ PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
     String appName = m_mode;
     String logName = "AudioGridderPlugin_";
 
+#ifndef AG_UNIT_TESTS
     Logger::initialize(appName, logName, Defaults::getConfigFileName(Defaults::ConfigPlugin));
+#endif
 
     m_client = std::make_unique<Client>(this);
     setLogTagSource(m_client.get());
     logln(m_mode << " plugin loaded, " << getWrapperTypeDescription(wrapperType)
                  << " (version: " << AUDIOGRIDDER_VERSION << ", build date: " << AUDIOGRIDDER_BUILD_DATE << ")");
 
+#ifndef AG_UNIT_TESTS
     Tracer::initialize(appName, logName);
     Signals::initialize();
-    Metrics::initialize();
     WindowPositions::initialize();
+#endif
+
+    Metrics::initialize();
 
     traceScope();
 
+#ifndef AG_UNIT_TESTS
     ServiceReceiver::initialize(m_instId.hash(), [this] {
         traceScope();
         runOnMsgThreadAsync([this] {
@@ -64,13 +70,12 @@ PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
         });
     });
 
-    updateLatency(0);
-
     loadConfig();
 
     if (supportsCrashReporting() && m_crashReporting) {
         Sentry::initialize();
     }
+#endif
 
     m_unusedParam.name = "(unassigned)";
     m_unusedDummyPlugin.name = "(unused)";
@@ -413,15 +418,17 @@ void PluginProcessor::changeProgramName(int /* index */, const String& /* newNam
 
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
     traceScope();
-    logln("prepareToPlay: sampleRate = " << sampleRate << ", samplesPerBlock=" << samplesPerBlock);
+    logln("prepareToPlay: sampleRate = " << sampleRate << ", samplesPerBlock = " << samplesPerBlock);
 
     if (!m_client->isThreadRunning()) {
         m_client->startThread();
     }
 
+#ifndef AG_UNIT_TESTS
     if (!m_disableTray && m_tray != nullptr && !m_tray->isThreadRunning()) {
         m_tray->startThread();
     }
+#endif
 
     printBusesLayout(getBusesLayout());
 
@@ -458,6 +465,8 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
     m_client->init(channelsIn, channelsOut, channelsSC, sampleRate, samplesPerBlock, isUsingDoublePrecision());
 
     m_prepared = true;
+
+    updateLatency(m_client->getLatencySamples());
 }
 
 void PluginProcessor::releaseResources() {
@@ -522,6 +531,9 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
 
     auto traceCtx = TimeTrace::createTraceContext();
 
+    traceln("proc: m_bypassWhenNotConnected=" << (int)m_bypassWhenNotConnected.load()
+                                              << ", clientOk=" << (int)m_client->isReadyLockFree());
+
     if (m_bypassWhenNotConnected &&
         (!m_client->isReadyLockFree() || !m_loadedPluginsOk || getNumOfLoadedPlugins() == 0)) {
         processBlockBypassed(buffer, midiMessages);
@@ -543,9 +555,11 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
         totalNumOutputChannels = buffer.getNumChannels();
     }
 
-    auto* phead = getPlayHead();
     AudioPlayHead::CurrentPositionInfo posInfo;
-    phead->getCurrentPosition(posInfo);
+
+    if (auto* phead = getPlayHead()) {
+        phead->getCurrentPosition(posInfo);
+    }
 
     // buffer to be send
     int sendBufChannels = m_activeChannels.getNumActiveChannelsCombined();

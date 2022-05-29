@@ -45,6 +45,7 @@ void Client::run() {
     MessageFactory msgFactory(this);
     bool lastState = isReady();
     while (!threadShouldExit()) {
+#ifndef AG_UNIT_TESTS
         // Check for config updates from other clients
         auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigPlugin));
         int newNum;
@@ -62,6 +63,7 @@ void Client::run() {
             LOAD_PLUGIN_TIMEOUT = newNum;
         }
         m_processor->loadConfig(cfg, true);
+#endif
 
         // Start/stop tray connection, if the setting changed
         m_processor->setDisableTray(m_processor->getDisableTray());

@@ -19,6 +19,10 @@
 
 using json = nlohmann::json;
 
+#ifndef JucePlugin_Name
+#define JucePlugin_Name "AGridder"
+#endif
+
 namespace e47 {
 
 class WrapperTypeReaderAudioProcessor : public AudioProcessor {

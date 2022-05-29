@@ -16,6 +16,10 @@
 #include "Server/SandboxPluginTest.hpp"
 #endif
 
+#ifdef AG_UNIT_TEST_PLUGIN_FX
+#include "Plugin/AudioStreamerTest.hpp"
+#endif
+
 namespace e47 {
 
 class ConsoleUnitTestRunner : public UnitTestRunner {

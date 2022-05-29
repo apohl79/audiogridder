@@ -147,6 +147,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     bool isServerLocalMode() const { return m_srvLocalMode; }
     int getChannelsIn() const { return m_channelsIn; }
     int getChannelsOut() const { return m_channelsOut; }
+    int getChannelsSC() const { return m_channelsSC; }
     int getNumActiveChannels() const;
     double getSampleRate() const { return m_rate; }
     int getSamplesPerBlock() const { return m_samplesPerBlock; }

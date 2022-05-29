@@ -274,19 +274,24 @@ class AudioMessage : public LogTagDelegate {
                 return false;
             }
 
+            traceln("  buffer: channels=" << buffer.getNumChannels() << ", samples=" << buffer.getNumSamples());
+            traceln("  header: channels=" << m_resHeader.channels << ", samples=" << m_resHeader.samples);
+
             bool needTmpBuffer = false;
             int channels = jmin(buffer.getNumChannels(), m_resHeader.channels);
             int samples = jmin(buffer.getNumSamples(), m_resHeader.samples);
 
             if (channels < m_resHeader.channels) {
-                logln(
-                    "warning: target buffer has less channels then what was received from the server, discarding audio "
-                    "data");
+                logln("warning: target buffer has "
+                      << (m_resHeader.channels - channels)
+                      << " channels less then what was received from the server, discarding audio "
+                         "data");
                 needTmpBuffer = true;
             }
 
             if (m_resHeader.channels < buffer.getNumChannels()) {
-                logln("warning: target buffer has more channels then what was received from the server");
+                logln("warning: target buffer has " << (buffer.getNumChannels() - m_resHeader.channels)
+                                                    << " more channels then what was received from the server");
             }
 
             if (samples < m_resHeader.samples) {
@@ -363,6 +368,9 @@ class AudioMessage : public LogTagDelegate {
                 MessageHelper::seterrstr(e, "request header");
                 return false;
             }
+
+            traceln("  buffer: channels=" << bufferF.getNumChannels() << ", samples=" << bufferF.getNumSamples());
+            traceln("  header: channels=" << m_reqHeader.channels << ", samples=" << m_reqHeader.samples);
 
             traceId = m_reqHeader.traceId;
 
