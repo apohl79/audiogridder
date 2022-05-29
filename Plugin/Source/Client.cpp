@@ -78,13 +78,23 @@ void Client::run() {
                 srvInfo = servers[0];
             }
         } else {
+            // if a server has multiple IPs we have to make sure that we don't trigger reconnects every time
+            bool hostMatchExists = false;
             for (auto& si : servers) {
-                if (si.matches(srvInfo) && si != srvInfo) {
+                if (si.getHostAndID() == srvInfo.getHostAndID()) {
+                    hostMatchExists = true;
+                    break;
+                }
+            }
+            for (auto& si : servers) {
+                if (si.matches(srvInfo) && si != srvInfo &&
+                    (!hostMatchExists || si.getHostAndID() == srvInfo.getHostAndID())) {
                     bool reconnect = si.getHostAndID() != srvInfo.getHostAndID();
                     srvInfo = si;
                     std::lock_guard<std::mutex> lock(m_srvMtx);
                     m_srvInfo = si;
                     if (reconnect) {
+                        logln("server info changed, triggering reconnect");
                         m_needsReconnect = true;
                     }
                 }
