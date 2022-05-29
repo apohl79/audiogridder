@@ -62,6 +62,11 @@ class ProcessorClient : public Thread, public LogTag {
     bool checkBusesLayoutSupported(const AudioProcessor::BusesLayout&) { return true; }
     bool setBusesLayout(const AudioProcessor::BusesLayout&) { return true; }
     AudioProcessor::BusesLayout getBusesLayout() { return {}; }
+    int getBusCount(bool) { return 0; }
+    bool canAddBus(bool) { return false; }
+    bool canRemoveBus(bool) { return false; }
+    bool addBus(bool) { return false; }
+    bool removeBus(bool) { return false; }
     void setPlayHead(AudioPlayHead*);
     void enableAllBuses();
     const json& getParameters();

@@ -269,6 +269,11 @@ class Processor : public LogTagDelegate, public AudioProcessorParameter::Listene
     backendMethodWithReturnArgs1(checkBusesLayoutSupported, bool, false, const AudioProcessor::BusesLayout&);
     backendMethodWithReturnArgs1(setBusesLayout, bool, false, const AudioProcessor::BusesLayout&);
     backendMethodWithReturn(getBusesLayout, AudioProcessor::BusesLayout, {});
+    backendMethodWithReturnArgs1(getBusCount, int, 0, bool);
+    backendMethodWithReturnArgs1(canAddBus, bool, false, bool);
+    backendMethodWithReturnArgs1(canRemoveBus, bool, false, bool);
+    backendMethodWithReturnArgs1(addBus, bool, false, bool);
+    backendMethodWithReturnArgs1(removeBus, bool, false, bool);
     backendMethodWithArgs1(setPlayHead, AudioPlayHead*);
     backendMethodWithReturn(getNumPrograms, int, 1);
     backendMethodWithReturnArgs1(getProgramName, const String, {}, int);

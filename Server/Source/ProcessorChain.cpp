@@ -107,124 +107,163 @@ bool ProcessorChain::setProcessorBusesLayout(Processor* proc) {
     if (!supported) {
         logln("standard layout not supported");
 
-        // try with mono or without sidechain
-        if (hasSidechain) {
-            if (layout.getChannelSet(true, 1).size() > 1) {
-                logln("trying with mono sidechain bus");
-                layout.inputBuses.remove(1);
-                layout.inputBuses.add(AudioChannelSet::mono());
-                supported = proc->checkBusesLayoutSupported(layout) && proc->setBusesLayout(layout);
+        auto addChannelSets = [](Array<AudioChannelSet>& channelSets, int numStereo, int numMono) {
+            channelSets.clear();
+            for (int ch = 0; ch < numStereo; ch++) {
+                channelSets.add(AudioChannelSet::stereo());
             }
+            for (int ch = 0; ch < numMono; ch++) {
+                channelSets.add(AudioChannelSet::mono());
+            }
+        };
 
-            if (!supported) {
-                logln("trying without sidechain bus");
-                layout.inputBuses.remove(1);
-                supported = proc->checkBusesLayoutSupported(layout) && proc->setBusesLayout(layout);
-                if (supported) {
-                    proc->setNeedsDisabledSidechain(true);
-                    m_sidechainDisabled = true;
+        auto getLayouts = [&](int chOut, int chInMax) {
+            Array<AudioProcessor::BusesLayout> layouts;
+            AudioProcessor::BusesLayout tmp;
+
+            // try layouts with one bus with the exact number of channels
+            for (auto channelSet : AudioChannelSet::channelSetsWithNumberOfChannels(chOut)) {
+                tmp.inputBuses.clear();
+                tmp.outputBuses.clear();
+
+                tmp.outputBuses.add(channelSet);
+
+                // no inputs
+                layouts.add(tmp);
+
+                // matching inputs & outputs
+                tmp.inputBuses.add(channelSet);
+                layouts.add(tmp);
+
+                // stereo sidechain
+                tmp.inputBuses.add(AudioChannelSet::stereo());
+                layouts.add(tmp);
+                tmp.inputBuses.remove(1);
+
+                // mono sidechain
+                tmp.inputBuses.add(AudioChannelSet::mono());
+                layouts.add(tmp);
+
+                // try to add layouts with less inputs
+                for (int chIn = chInMax; chIn > 0; chIn--) {
+                    if (chIn == chOut) {
+                        continue;
+                    }
+                    for (auto channelSet2 : AudioChannelSet::channelSetsWithNumberOfChannels(chIn)) {
+                        tmp.inputBuses.clear();
+                        tmp.inputBuses.add(channelSet2);
+                        layouts.add(tmp);
+                    }
                 }
             }
-        }
 
-        if (!supported && layout.getMainOutputChannels() > 2 && layout.getMainInputChannels() == 0) {
-            auto addInputs = [](AudioProcessor::BusesLayout& l, int channels) {
-                l.inputBuses.clear();
+            // try layouts with different combinations of stereo and mono buses
+            int numStereoOut = chOut / 2;
 
-                if (channels == 1) {
-                    l.inputBuses.add(AudioChannelSet::mono());
-                } else if (channels == 2) {
-                    l.inputBuses.add(AudioChannelSet::stereo());
+            while (numStereoOut >= 0) {
+                int numMonoOut = chOut - numStereoOut * 2;
+
+                addChannelSets(tmp.outputBuses, numStereoOut, numMonoOut);
+
+                for (int chIn = chInMax; chIn >= 0; chIn--) {
+                    int numStereoIn = chIn / 2;
+
+                    while (numStereoIn >= 0) {
+                        int numMonoIn = chIn - numStereoIn * 2;
+
+                        addChannelSets(tmp.inputBuses, numStereoOut, numMonoOut);
+                        layouts.add(tmp);
+
+                        numStereoIn--;
+                    }
+                }
+
+                numStereoOut--;
+            }
+
+            return layouts;
+        };
+
+        auto alignBuses = [&](bool isInput, int numBuses, Array<AudioChannelSet>& chSets) {
+            if (numBuses < chSets.size()) {
+                if (proc->canAddBus(isInput)) {
+                    while (numBuses++ < chSets.size()) {
+                        proc->addBus(isInput);
+                    }
                 } else {
-                    l.inputBuses.add(AudioChannelSet::discreteChannels(channels));
+                    return false;
                 }
-            };
-
-            auto addOutputsAndLayout = [](Array<AudioProcessor::BusesLayout>& layouts, AudioProcessor::BusesLayout& l,
-                                          int channels) {
-                // try layouts with different combinations of stereo and mono buses
-                int numStereo = channels / 2;
-
-                while (numStereo >= 0) {
-                    l.outputBuses.clear();
-
-                    int numMono = channels - numStereo * 2;
-
-                    for (int ch = 0; ch < numStereo; ch++) {
-                        l.outputBuses.add(AudioChannelSet::stereo());
+            } else if (numBuses > chSets.size()) {
+                if (proc->canRemoveBus(isInput)) {
+                    while (numBuses-- > chSets.size()) {
+                        proc->removeBus(isInput);
                     }
+                } else {
+                    return false;
+                }
+            }
+            return true;
+        };
 
-                    for (int ch = 0; ch < numMono; ch++) {
-                        l.outputBuses.add(AudioChannelSet::mono());
-                    }
-
-                    layouts.add(l);
-
-                    numStereo--;
+        auto check = [&](int channels, int channelsMax) {
+            for (auto& l : getLayouts(channels, channelsMax)) {
+                if (!alignBuses(true, proc->getBusCount(true), l.inputBuses)) {
+                    continue;
+                }
+                if (!alignBuses(false, proc->getBusCount(false), l.outputBuses)) {
+                    continue;
                 }
 
-                // try layouts with one bus with the exact number of channels
-                for (auto channelSet : AudioChannelSet::channelSetsWithNumberOfChannels(channels)) {
-                    l.outputBuses.clear();
-                    l.outputBuses.add(channelSet);
-                    layouts.add(l);
-                }
-            };
+                //logln("=== TESTING ===");
+                //printBusesLayout(l);
 
-            auto check = [&](int channels) {
-                Array<AudioProcessor::BusesLayout> layouts;
-                AudioProcessor::BusesLayout layout2;
-
-                addOutputsAndLayout(layouts, layout2, channels);
-
-                addInputs(layout2, 2);
-                addOutputsAndLayout(layouts, layout2, channels);
-
-                addInputs(layout2, 1);
-                addOutputsAndLayout(layouts, layout2, channels);
-
-                for (auto& l : layouts) {
-                    if (proc->checkBusesLayoutSupported(l) && proc->setBusesLayout(l)) {
-                        return true;
-                    }
+                if (proc->checkBusesLayoutSupported(l) && proc->setBusesLayout(l)) {
+                    //logln("=== SUCCESS ===");
+                    return true;
                 }
 
-                return false;
-            };
-
-            int channelsToTry = Defaults::PLUGIN_CHANNELS_MAX;
-
-            do {
-                logln("trying instrument-multi-bus layouts with " << channelsToTry << " channels");
-                supported = check(channelsToTry--);
-            } while (!supported && channelsToTry > 0);
-        }
-
-        if (!supported) {
-            if (hasSidechain) {
-                logln("disabling sidechain input to use the plugins I/O layout");
-                m_sidechainDisabled = true;
+                //logln("=== FAILED ===");
             }
 
-            // when getting here, make sure we always disable the sidechain for this plugin
-            proc->setNeedsDisabledSidechain(true);
+            return false;
+        };
 
-            logln("falling back to the plugins default layout");
+        int channelsToTry = jmax(getTotalNumInputChannels(), getTotalNumOutputChannels());
+        int channelsCurrent = channelsToTry;
 
-            supported = true;
+        do {
+            logln("trying layouts with " << channelsToTry << " channels");
+            supported = check(channelsCurrent--, channelsToTry);
+        } while (!supported && channelsCurrent > 0);
+    }
+
+    if (!supported) {
+        if (hasSidechain) {
+            logln("disabling sidechain input to use the plugins I/O layout");
+            m_sidechainDisabled = true;
         }
+
+        // when getting here, make sure we always disable the sidechain for this plugin
+        proc->setNeedsDisabledSidechain(true);
+
+        logln("falling back to the plugins default layout");
+
+        supported = true;
     }
 
     auto procLayout = proc->getBusesLayout();
 
     // main bus IN
     int extraInChannels = procLayout.getMainInputChannels() - layout.getMainInputChannels();
+
     // check extra busses IN
     for (int busIdx = 1; busIdx < procLayout.inputBuses.size(); busIdx++) {
         extraInChannels += procLayout.inputBuses[busIdx].size();
     }
+
     // main bus OUT
     int extraOutChannels = procLayout.getMainOutputChannels() - layout.getMainOutputChannels();
+
     // check extra busses OUT
     for (int busIdx = 1; busIdx < procLayout.outputBuses.size(); busIdx++) {
         extraOutChannels += procLayout.outputBuses[busIdx].size();
