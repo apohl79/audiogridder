@@ -456,8 +456,8 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
 
     logln("uncapped channel config: " << channelsIn << ":" << channelsOut << "+" << channelsSC);
 
-    channelsIn = jmin(channelsIn, 16);
-    channelsSC = jmin(channelsSC, 16);
+    channelsIn = jmin(channelsIn, 32);
+    channelsSC = jmin(channelsSC, 2);
     channelsOut = jmin(channelsOut, 64);
     m_activeChannels.setNumChannels(channelsIn + channelsSC, channelsOut);
     updateChannelMapping();
