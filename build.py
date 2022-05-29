@@ -427,7 +427,7 @@ def tests(args):
         for f in glob.glob('TestsData/**/*.zip'):
             extractFile(f)
 
-    for t in ['testrunner-server']:
+    for t in ['testrunner-server', 'testrunner-fx']:
         if platform == 'windows':
             t = t + '.exe'
 

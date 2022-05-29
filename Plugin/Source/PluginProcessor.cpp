@@ -211,9 +211,11 @@ PluginProcessor::~PluginProcessor() {
     Metrics::cleanup();
     ServiceReceiver::cleanup(m_instId.hash());
     logln("plugin unloaded");
+#ifndef AG_UNIT_TESTS
     Tracer::cleanup();
     Logger::cleanup();
     Sentry::cleanup();
+#endif
 }
 
 void PluginProcessor::loadConfig() {
