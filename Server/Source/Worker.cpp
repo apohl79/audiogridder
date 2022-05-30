@@ -330,7 +330,7 @@ void Worker::handleMessage(std::shared_ptr<Message<EditPlugin>> msg) {
     int idx = pDATA(msg)->index;
     if (auto proc = m_audio->getProcessor(idx)) {
         getApp()->getServer()->sandboxShowEditor();
-        m_screen->showEditor(getThreadId(), proc, pDATA(msg)->x, pDATA(msg)->y);
+        m_screen->showEditor(getThreadId(), proc, pDATA(msg)->x, pDATA(msg)->y, [this, idx] { sendHideEditor(idx); });
         m_activeEditorIdx = idx;
         if (getApp()->getServer()->getScreenLocalMode()) {
             runOnMsgThreadAsync([this] { getApp()->addKeyListener(getThreadId(), m_keyWatcher.get()); });
@@ -766,6 +766,13 @@ void Worker::sendStatusChange(int idx, bool ok, const String& err) {
     logln("sending plugin status (index=" << idx << ", ok=" << (int)ok << ", err=" << err << ")");
     Message<PluginStatus> msg(this);
     PLD(msg).setJson({{"idx", idx}, {"ok", ok}, {"err", err.toStdString()}});
+    msg.send(m_cmdOut.get());
+}
+
+void Worker::sendHideEditor(int idx) {
+    logln("sending hide editor (index=" << idx << ")");
+    Message<HidePlugin> msg(this);
+    PLD(msg).setNumber(idx);
     msg.send(m_cmdOut.get());
 }
 

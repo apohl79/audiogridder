@@ -13,7 +13,6 @@
 namespace e47 {
 
 std::atomic_uint32_t Processor::loadedCount{0};
-// std::mutex Processor::m_pluginLoaderMtx;
 
 Processor::Processor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize, bool isClient)
     : LogTagDelegate(chain.getLogTagSource()),
@@ -255,6 +254,10 @@ void Processor::unload() {
         return;
     }
 
+    if (nullptr != m_window) {
+        runOnMsgThreadSync([this] { m_window.reset(); });
+    }
+
     if (m_isClient) {
         std::shared_ptr<ProcessorClient> client;
         {
@@ -276,12 +279,6 @@ void Processor::unload() {
         }
         for (auto* param : plugin->getParameters()) {
             param->removeListener(this);
-        }
-        if (auto* e = plugin->getActiveEditor()) {
-            runOnMsgThreadAsync([this, e] {
-                traceScope();
-                delete e;
-            });
         }
         plugin.reset();
     }
@@ -506,6 +503,48 @@ AudioProcessorEditor* Processor::getActiveEditor() {
     if (auto p = getPlugin()) {
         return p->getActiveEditor();
     }
+    return nullptr;
+}
+
+std::shared_ptr<ProcessorWindow> Processor::getOrCreateEditorWindow(Thread::ThreadID tid,
+                                                                    ProcessorWindow::CaptureCallbackFFmpeg func,
+                                                                    std::function<void()> onHide, int x, int y) {
+    return getOrCreateEditorWindowInternal(tid, func, onHide, x, y);
+}
+
+std::shared_ptr<ProcessorWindow> Processor::getOrCreateEditorWindow(Thread::ThreadID tid,
+                                                                    ProcessorWindow::CaptureCallbackNative func,
+                                                                    std::function<void()> onHide, int x, int y) {
+    return getOrCreateEditorWindowInternal(tid, func, onHide, x, y);
+}
+
+template <typename T>
+std::shared_ptr<ProcessorWindow> Processor::getOrCreateEditorWindowInternal(Thread::ThreadID tid, T func,
+                                                                            std::function<void()> onHide, int x,
+                                                                            int y) {
+    if (nullptr == m_window) {
+        m_window = std::make_shared<ProcessorWindow>(shared_from_this(), tid, func, onHide, x, y);
+    }
+    return m_window;
+}
+
+std::shared_ptr<ProcessorWindow> Processor::recreateEditorWindow() {
+    if (nullptr != m_window) {
+        auto pos = m_window->getPosition();
+        auto tid = m_window->getTid();
+        auto onHide = m_window->getOnHide();
+        if (auto func = m_window->getCaptureCallbackFFmpeg()) {
+            m_window.reset();
+            return getOrCreateEditorWindowInternal(tid, func, onHide, pos.x, pos.y);
+        }
+        if (auto func = m_window->getCaptureCallbackNative()) {
+            m_window.reset();
+            return getOrCreateEditorWindowInternal(tid, func, onHide, pos.x, pos.y);
+        }
+    }
+
+    logln("error: can't recreate editor as no window exists");
+
     return nullptr;
 }
 

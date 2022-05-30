@@ -12,13 +12,16 @@
 #include "Defaults.hpp"
 #include "ProcessorClient.hpp"
 #include "ParameterValue.hpp"
+#include "ProcessorWindow.hpp"
 
 namespace e47 {
 
 class ProcessorChain;
 class SandboxPluginTest;
 
-class Processor : public LogTagDelegate, public AudioProcessorParameter::Listener {
+class Processor : public LogTagDelegate,
+                  public AudioProcessorParameter::Listener,
+                  public std::enable_shared_from_this<Processor> {
   public:
     static std::atomic_uint32_t loadedCount;
 
@@ -93,6 +96,15 @@ class Processor : public LogTagDelegate, public AudioProcessorParameter::Listene
     // Non client methods to create a plugin UI
     AudioProcessorEditor* createEditorIfNeeded();
     AudioProcessorEditor* getActiveEditor();
+    std::shared_ptr<ProcessorWindow> getOrCreateEditorWindow(Thread::ThreadID tid,
+                                                             ProcessorWindow::CaptureCallbackFFmpeg func,
+                                                             std::function<void()> onHide, int x, int y);
+    std::shared_ptr<ProcessorWindow> getOrCreateEditorWindow(Thread::ThreadID tid,
+                                                             ProcessorWindow::CaptureCallbackNative func,
+                                                             std::function<void()> onHide, int x, int y);
+    std::shared_ptr<ProcessorWindow> recreateEditorWindow();
+    std::shared_ptr<ProcessorWindow> getEditorWindow() const { return m_window; }
+    void resetEditorWindow() { m_window.reset(); }
 
     // Client methods to tell the sandbox to create the plugin UI
     void showEditor(int x, int y);
@@ -291,6 +303,7 @@ class Processor : public LogTagDelegate, public AudioProcessorParameter::Listene
     bool m_isClient;
     std::shared_ptr<AudioPluginInstance> m_plugin;
     std::shared_ptr<ProcessorClient> m_client;
+    std::shared_ptr<ProcessorWindow> m_window;
     std::mutex m_pluginMtx;
     int m_additionalScreenSpace = 0;
     bool m_fullscreen = false;
@@ -323,6 +336,10 @@ class Processor : public LogTagDelegate, public AudioProcessorParameter::Listene
 
     template <typename T>
     void processBlockBypassedInternal(AudioBuffer<T>& buffer, Array<Array<T>>& bypassBuffer);
+
+    template <typename T>
+    std::shared_ptr<ProcessorWindow> getOrCreateEditorWindowInternal(Thread::ThreadID tid, T func,
+                                                                     std::function<void()> onHide, int x, int y);
 
     ENABLE_ASYNC_FUNCTORS();
 };

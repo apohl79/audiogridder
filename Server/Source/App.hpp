@@ -60,10 +60,10 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     void restartServer(bool rescan = false);
     std::shared_ptr<Server> getServer() { return m_server; }
 
-    void showEditor(std::shared_ptr<Processor> proc, Thread::ThreadID tid, ProcessorWindow::CaptureCallbackFFmpeg func,
-                    int x = 0, int y = 0);
-    void showEditor(std::shared_ptr<Processor> proc, Thread::ThreadID tid, ProcessorWindow::CaptureCallbackNative func,
-                    int x = 0, int y = 0);
+    void showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> proc, ProcessorWindow::CaptureCallbackFFmpeg func,
+                    std::function<void()> onHide, int x = 0, int y = 0);
+    void showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> proc, ProcessorWindow::CaptureCallbackNative func,
+                    std::function<void()> onHide, int x = 0, int y = 0);
 
     void hideEditor(Thread::ThreadID tid = nullptr, bool updateMacOSDock = true);
     void resetEditor(Thread::ThreadID tid);
@@ -95,16 +95,8 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     std::unique_ptr<std::thread> m_child;
     std::atomic_bool m_stopChild{false};
 
-    struct ProcessorWindowHelper {
-        std::unique_ptr<ProcessorWindow> window;
-        std::shared_ptr<Processor> processor;
-        ProcessorWindow::CaptureCallbackFFmpeg callbackFFmpeg;
-        ProcessorWindow::CaptureCallbackNative callbackNative;
-        void reset();
-    };
-
-    std::unordered_map<uint64, ProcessorWindowHelper> m_windows;
-    std::mutex m_windowsMtx;
+    std::unordered_map<uint64, std::shared_ptr<Processor>> m_processors;
+    std::mutex m_processorsMtx;
 
     std::unique_ptr<PluginListWindow> m_pluginListWindow;
     std::unique_ptr<ServerSettingsWindow> m_srvSettingsWindow;
@@ -115,7 +107,11 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     uint32 m_exitCode = 0;
 
     template <typename T>
-    void showEditorInternal(std::shared_ptr<Processor> proc, Thread::ThreadID tid, T func, int x, int y);
+    void showEditorInternal(Thread::ThreadID tid, std::shared_ptr<Processor> proc, T func, std::function<void()> onHide,
+                            int x, int y);
+
+    std::shared_ptr<Processor> getCurrentWindowProcInternal(Thread::ThreadID tid);
+    std::shared_ptr<ProcessorWindow> getCurrentWindow(Thread::ThreadID tid);
 
     ENABLE_ASYNC_FUNCTORS();
 };

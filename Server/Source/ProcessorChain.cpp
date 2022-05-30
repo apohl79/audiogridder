@@ -214,15 +214,15 @@ bool ProcessorChain::setProcessorBusesLayout(Processor* proc) {
                     continue;
                 }
 
-                //logln("=== TESTING ===");
-                //printBusesLayout(l);
+                // logln("=== TESTING ===");
+                // printBusesLayout(l);
 
                 if (proc->checkBusesLayoutSupported(l) && proc->setBusesLayout(l)) {
-                    //logln("=== SUCCESS ===");
+                    // logln("=== SUCCESS ===");
                     return true;
                 }
 
-                //logln("=== FAILED ===");
+                // logln("=== FAILED ===");
             }
 
             return false;
@@ -336,6 +336,7 @@ void ProcessorChain::delProcessor(int idx) {
     std::lock_guard<std::mutex> lock(m_processorsMtx);
     for (auto it = m_processors.begin(); it < m_processors.end(); it++) {
         if (i++ == idx) {
+            (*it)->unload();
             m_processors.erase(it);
             break;
         }
@@ -415,6 +416,9 @@ void ProcessorChain::clear() {
     traceScope();
     releaseResources();
     std::lock_guard<std::mutex> lock(m_processorsMtx);
+    for (auto& proc : m_processors) {
+        proc->unload();
+    }
     m_processors.clear();
 }
 

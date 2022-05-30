@@ -170,12 +170,21 @@ void ScreenWorker::shutdown() {
     m_currentImageCv.notify_one();
 }
 
-void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> proc, int x, int y) {
+void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> proc, int x, int y,
+                              std::function<void()> onHide) {
     traceScope();
     logln("showing editor for " << proc->getName() << " at " << x << "x" << y);
 
+    auto lastTid = m_currentTid;
     m_currentTid = tid;
     m_imgCounter = 0;
+
+    auto onHide2 = [this, onHide] {
+        m_visible = false;
+        if (nullptr != onHide) {
+            onHide();
+        }
+    };
 
     if (m_visible && proc.get() == m_currentProc && proc == getApp()->getCurrentWindowProc(m_currentTid)) {
         logln("already showing editor");
@@ -200,17 +209,17 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
 
     if (getApp()->getServer()->getScreenCapturingOff()) {
         logln("showing editor with NO callback");
-        runOnMsgThreadSync([this, proc, x, y] {
+        runOnMsgThreadSync([this, proc, x, y, onHide2] {
             traceScope();
             getApp()->showEditor(
-                proc, m_currentTid, [](const uint8_t*, int, int, int, int, int, double) {}, x, y);
+                m_currentTid, proc, [](const uint8_t*, int, int, int, int, int, double) {}, onHide2, x, y);
         });
     } else if (getApp()->getServer()->getScreenCapturingFFmpeg()) {
         logln("showing editor with ffmpeg callback");
-        runOnMsgThreadSync([this, proc] {
+        runOnMsgThreadSync([this, proc, onHide2] {
             traceScope();
             getApp()->showEditor(
-                proc, m_currentTid,
+                m_currentTid, proc,
                 [this](const uint8_t* data, int size, int w, int h, int wPadded, int hPadded, double scale) {
                     // executed in the context of the screen recorder worker thread
                     traceScope();
@@ -233,36 +242,40 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
                     m_scale = scale;
                     m_updated = true;
                     m_currentImageCv.notify_one();
-                });
+                },
+                onHide2);
         });
     } else {
         logln("showing editor with legacy callback");
-        runOnMsgThreadSync([this, proc] {
+        runOnMsgThreadSync([this, proc, onHide2] {
             traceScope();
             m_currentImageLock.lock();
             m_currentImage.reset();
             m_lastImage.reset();
             m_currentImageLock.unlock();
 
-            getApp()->showEditor(proc, m_currentTid, [this](std::shared_ptr<Image> i, int w, int h) {
-                traceScope();
-                if (nullptr != i) {
-                    if (threadShouldExit()) {
-                        return;
+            getApp()->showEditor(
+                m_currentTid, proc,
+                [this](std::shared_ptr<Image> i, int w, int h) {
+                    traceScope();
+                    if (nullptr != i) {
+                        if (threadShouldExit()) {
+                            return;
+                        }
+                        std::lock_guard<std::mutex> lock(m_currentImageLock);
+                        m_lastImage = m_currentImage;
+                        m_currentImage = i;
+                        if (m_lastImage == nullptr || m_lastImage->getBounds() != m_currentImage->getBounds() ||
+                            m_diffImage == nullptr) {
+                            m_diffImage = std::make_shared<Image>(Image::ARGB, w, h, false);
+                        }
+                        m_width = w;
+                        m_height = h;
+                        m_updated = true;
+                        m_currentImageCv.notify_one();
                     }
-                    std::lock_guard<std::mutex> lock(m_currentImageLock);
-                    m_lastImage = m_currentImage;
-                    m_currentImage = i;
-                    if (m_lastImage == nullptr || m_lastImage->getBounds() != m_currentImage->getBounds() ||
-                        m_diffImage == nullptr) {
-                        m_diffImage = std::make_shared<Image>(Image::ARGB, w, h, false);
-                    }
-                    m_width = w;
-                    m_height = h;
-                    m_updated = true;
-                    m_currentImageCv.notify_one();
-                }
-            });
+                },
+                onHide2);
         });
     }
 

@@ -65,7 +65,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
 
     void run() {
         traceScope();
-        bool isDouble =  std::is_same<T, double>::value;
+        bool isDouble = std::is_same<T, double>::value;
         logln("audio streamer ready, isDouble = " << (int)isDouble);
         while (!threadShouldExit() && !m_error && m_socket->isConnected()) {
             while (m_writeQ.read_available() > 0) {
@@ -116,7 +116,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         if (m_client->NUM_OF_BUFFERS > 0) {
             bool notify = false;
             if (m_client->isFx()) {  // fx
-                traceln("  buffer (in): channels=" << buffer.getNumChannels() << ", samples=" << buffer.getNumSamples());
+                traceln("  buffer (in): channels=" << buffer.getNumChannels()
+                                                   << ", samples=" << buffer.getNumSamples());
                 m_writeBuffer.copyFrom(buffer, midi);
                 traceln("  buffer (write, after copy): working samples=" << m_writeBuffer.workingSamples);
                 if (m_writeBuffer.workingSamples >= m_client->getSamplesPerBlock()) {
@@ -265,7 +266,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         MidiBuffer midi;
         AudioPlayHead::CurrentPositionInfo posInfo;
 
-        void copyFrom(const AudioMidiBuffer& src, int numChannels = -1, int numSamples = -1, bool verifySampleOffset = false) {
+        void copyFrom(const AudioMidiBuffer& src, int numChannels = -1, int numSamples = -1,
+                      bool verifySampleOffset = false) {
             if (verifySampleOffset && sampleOffset + (uint32)workingSamples != src.sampleOffset) {
                 setLogTagStatic("audiostreamer");
                 logln("warning: sample offset mismatch: " << (sampleOffset + (uint32)workingSamples) << " expected but "
@@ -274,7 +276,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
             copyFrom(src.audio, src.midi, numChannels, numSamples);
         }
 
-        void copyFrom(const AudioBuffer<T>& srcBuffer, const MidiBuffer& srcMidi, int numChannels = -1, int numSamples = -1) {
+        void copyFrom(const AudioBuffer<T>& srcBuffer, const MidiBuffer& srcMidi, int numChannels = -1,
+                      int numSamples = -1) {
             if (numChannels == -1) {
                 numChannels = srcBuffer.getNumChannels();
             }
@@ -282,8 +285,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                 numSamples = srcBuffer.getNumSamples();
             }
             if (numChannels > 0) {
-                if ((audio.getNumSamples() - workingSamples) < numSamples ||
-                    audio.getNumChannels() < numChannels) {
+                if ((audio.getNumSamples() - workingSamples) < numSamples || audio.getNumChannels() < numChannels) {
                     audio.setSize(numChannels, workingSamples + numSamples, true);
                 }
                 for (int chan = 0; chan < numChannels; chan++) {

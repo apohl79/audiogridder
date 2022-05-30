@@ -13,12 +13,15 @@
 
 namespace e47 {
 
-ProcessorWindow::ProcessorWindow(std::shared_ptr<Processor> proc, CaptureCallbackNative func, int x, int y)
+ProcessorWindow::ProcessorWindow(std::shared_ptr<Processor> proc, Thread::ThreadID tid, CaptureCallbackNative func,
+                                 std::function<void()> onHide, int x, int y)
     : DocumentWindow(proc->getName(), Colours::lightgrey, DocumentWindow::closeButton),
       LogTag("procwindow"),
       m_processor(proc),
+      m_tid(tid),
       m_callbackNative(func),
-      m_callbackFFmpeg(nullptr) {
+      m_callbackFFmpeg(nullptr),
+      m_onHide(onHide) {
     traceScope();
     initAsyncFunctors();
     setBounds(x, y, 100, 100);
@@ -28,12 +31,15 @@ ProcessorWindow::ProcessorWindow(std::shared_ptr<Processor> proc, CaptureCallbac
     }
 }
 
-ProcessorWindow::ProcessorWindow(std::shared_ptr<Processor> proc, CaptureCallbackFFmpeg func, int x, int y)
+ProcessorWindow::ProcessorWindow(std::shared_ptr<Processor> proc, Thread::ThreadID tid, CaptureCallbackFFmpeg func,
+                                 std::function<void()> onHide, int x, int y)
     : DocumentWindow(proc->getName(), Colours::lightgrey, DocumentWindow::closeButton),
       LogTag("procwindow"),
       m_processor(proc),
+      m_tid(tid),
       m_callbackNative(nullptr),
-      m_callbackFFmpeg(func) {
+      m_callbackFFmpeg(func),
+      m_onHide(onHide) {
     traceScope();
     initAsyncFunctors();
     setBounds(x, y, 100, 100);
@@ -49,8 +55,7 @@ ProcessorWindow::~ProcessorWindow() {
     stopAsyncFunctors();
     stopCapturing();
     if (m_editor != nullptr) {
-        // delay the deletion of the editor until the processor unloads
-        //delete m_editor;
+        delete m_editor;
         m_editor = nullptr;
     } else if (m_processor->isClient()) {
         m_processor->hideEditor();
@@ -58,7 +63,12 @@ ProcessorWindow::~ProcessorWindow() {
     m_processor->setLastPosition(getPosition());
 }
 
-void ProcessorWindow::closeButtonPressed() { getApp()->hideEditor(); }
+void ProcessorWindow::closeButtonPressed() {
+    getApp()->hideEditor(m_tid);
+    if (nullptr != m_onHide) {
+        m_onHide();
+    }
+}
 
 void ProcessorWindow::forgetEditor() {
     traceScope();
@@ -162,6 +172,15 @@ void ProcessorWindow::setVisible(bool b) {
     if (!m_processor->isClient()) {
         Component::setVisible(b);
     }
+    if (b) {
+        if (m_processor->isClient()) {
+            m_processor->showEditor(getX(), getY());
+        } else {
+            windowToFront(this);
+        }
+        m_startCapturingRetry = 0;
+        startCapturing();
+    }
 }
 
 void ProcessorWindow::move(int x, int y) {
@@ -204,11 +223,10 @@ void ProcessorWindow::createEditor() {
         userRect = disp->userArea;
     }
 
-    bool success = true;
-
     if (m_processor->isClient()) {
-        // auto p = m_processor->getLastPosition();
         m_processor->showEditor(getX(), getY());
+        m_startCapturingRetry = 0;
+        startCapturing();
     } else {
         m_editor = m_processor->createEditorIfNeeded();
         if (nullptr != m_editor) {
@@ -218,21 +236,12 @@ void ProcessorWindow::createEditor() {
             } else {
                 setTopLeftPosition(userRect.getTopLeft());
             }
-            Component::setVisible(true);
             if (getApp()->getServer()->getPluginWindowsOnTop()) {
                 setAlwaysOnTop(true);
-            } else {
-                windowToFront(this);
             }
         } else {
             logln("failed to create editor");
-            success = false;
         }
-    }
-
-    if (success) {
-        m_startCapturingRetry = 0;
-        startCapturing();
     }
 }
 

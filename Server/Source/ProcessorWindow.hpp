@@ -22,8 +22,10 @@ class ProcessorWindow : public DocumentWindow, private Timer, public LogTag {
     using CaptureCallbackNative = std::function<void(std::shared_ptr<Image> image, int width, int height)>;
     using CaptureCallbackFFmpeg = ScreenRecorder::CaptureCallback;
 
-    ProcessorWindow(std::shared_ptr<Processor> proc, CaptureCallbackNative func, int x, int y);
-    ProcessorWindow(std::shared_ptr<Processor> proc, CaptureCallbackFFmpeg func, int x, int y);
+    ProcessorWindow(std::shared_ptr<Processor> proc, Thread::ThreadID tid, CaptureCallbackNative func,
+                    std::function<void()> onHide, int x, int y);
+    ProcessorWindow(std::shared_ptr<Processor> proc, Thread::ThreadID tid, CaptureCallbackFFmpeg func,
+                    std::function<void()> onHide, int x, int y);
     ~ProcessorWindow() override;
 
     void closeButtonPressed() override;
@@ -42,12 +44,17 @@ class ProcessorWindow : public DocumentWindow, private Timer, public LogTag {
 
     CaptureCallbackFFmpeg getCaptureCallbackFFmpeg() const { return m_callbackFFmpeg; }
     CaptureCallbackNative getCaptureCallbackNative() const { return m_callbackNative; }
+    std::function<void()> getOnHide() const { return m_onHide; }
+
+    Thread::ThreadID getTid() const { return m_tid; }
 
   private:
     std::shared_ptr<Processor> m_processor;
+    Thread::ThreadID m_tid;
     AudioProcessorEditor* m_editor = nullptr;
     CaptureCallbackNative m_callbackNative;
     CaptureCallbackFFmpeg m_callbackFFmpeg;
+    std::function<void()> m_onHide;
     juce::Rectangle<int> m_screenCaptureRect, m_totalRect;
     int m_startCapturingRetry;
 

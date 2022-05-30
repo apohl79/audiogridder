@@ -349,7 +349,8 @@ void App::restartServer(bool rescan) {
 const KnownPluginList& App::getPluginList() { return m_server->getPluginList(); }
 
 template <typename T>
-void App::showEditorInternal(std::shared_ptr<Processor> proc, Thread::ThreadID tid, T func, int x, int y) {
+void App::showEditorInternal(Thread::ThreadID tid, std::shared_ptr<Processor> proc, T func,
+                             std::function<void()> onHide, int x, int y) {
     traceScope();
 
     if (tid == nullptr) {
@@ -358,19 +359,20 @@ void App::showEditorInternal(std::shared_ptr<Processor> proc, Thread::ThreadID t
     }
 
     if (proc->hasEditor()) {
-        std::lock_guard<std::mutex> lock(m_windowsMtx);
+        std::lock_guard<std::mutex> lock(m_processorsMtx);
 
         logln("showing editor: tid=0x" << String::toHexString((uint64)tid));
 
-        auto& helper = m_windows[(uint64)tid];
-
-        if (helper.window != nullptr) {
-            logln("showEditor: resetting existing processor window");
-            helper.reset();
+        if (auto currProc = getCurrentWindowProcInternal(tid)) {
+            if (auto currWindow = currProc->getEditorWindow()) {
+                currWindow->setVisible(false);
+            }
         }
 
-        helper.processor = proc;
-        helper.window = std::make_unique<ProcessorWindow>(proc, func, x, y);
+        if (auto window = proc->getOrCreateEditorWindow(tid, func, onHide, x, y)) {
+            window->setVisible(true);
+            m_processors[(uint64)tid] = proc;
+        }
 
 #ifdef JUCE_MAC
         if (getServer()->getSandboxMode() != Server::SANDBOX_PLUGIN ||
@@ -383,64 +385,65 @@ void App::showEditorInternal(std::shared_ptr<Processor> proc, Thread::ThreadID t
     }
 }
 
-void App::showEditor(std::shared_ptr<Processor> proc, Thread::ThreadID tid, ProcessorWindow::CaptureCallbackFFmpeg func,
-                     int x, int y) {
-    showEditorInternal(proc, tid, func, x, y);
+void App::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> proc, ProcessorWindow::CaptureCallbackFFmpeg func,
+                     std::function<void()> onHide, int x, int y) {
+    showEditorInternal(tid, proc, func, onHide, x, y);
 }
 
-void App::showEditor(std::shared_ptr<Processor> proc, Thread::ThreadID tid, ProcessorWindow::CaptureCallbackNative func,
-                     int x, int y) {
-    showEditorInternal(proc, tid, func, x, y);
+void App::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> proc, ProcessorWindow::CaptureCallbackNative func,
+                     std::function<void()> onHide, int x, int y) {
+    showEditorInternal(tid, proc, func, onHide, x, y);
 }
 
 void App::hideEditor(Thread::ThreadID tid, bool updateMacOSDock) {
     traceScope();
 
-    std::lock_guard<std::mutex> lock(m_windowsMtx);
+    std::lock_guard<std::mutex> lock(m_processorsMtx);
 
     if (tid == nullptr) {
-        if (!m_windows.empty()) {
+        if (!m_processors.empty()) {
             logln("hiding all editors");
 
             // hide all windows
-            for (auto it = m_windows.begin(); it != m_windows.end();) {
-                it->second.reset();
-                it = m_windows.erase(it);
+            for (auto it = m_processors.begin(); it != m_processors.end(); it++) {
+                if (auto window = it->second->getEditorWindow()) {
+                    if (window->isVisible()) {
+                        window->setVisible(false);
+                    }
+                }
             }
         }
     } else {
         logln("hiding editor: tid=0x" << String::toHexString((uint64)tid));
 
-        auto it = m_windows.find((uint64)tid);
-        if (it != m_windows.end()) {
-            it->second.reset();
-            m_windows.erase(it);
+        if (auto window = getCurrentWindow(tid)) {
+            if (window->isVisible()) {
+                window->setVisible(false);
+            }
         } else {
             logln("failed to hide editor: tid does not match a window owner");
         }
     }
 
 #ifdef JUCE_MAC
-    if (updateMacOSDock &&
-        (getServer()->getSandboxMode() != Server::SANDBOX_PLUGIN ||
-         getServer()->getSandboxModeRuntime() == Server::SANDBOX_PLUGIN) &&
-        m_windows.empty()) {
-        Process::setDockIconVisible(false);
+    if (updateMacOSDock && (getServer()->getSandboxMode() != Server::SANDBOX_PLUGIN ||
+                            getServer()->getSandboxModeRuntime() == Server::SANDBOX_PLUGIN)) {
+        bool windowVisible = false;
+        for (auto& pair : m_processors) {
+            if (auto window = pair.second->getEditorWindow()) {
+                if (window->isVisible()) {
+                    windowVisible = true;
+                    break;
+                }
+            }
+        }
+        if (!windowVisible) {
+            Process::setDockIconVisible(false);
+        }
     }
 #else
     ignoreUnused(updateMacOSDock);
 #endif
-}
-
-void App::ProcessorWindowHelper::reset() {
-    if (nullptr != window) {
-        if (nullptr != processor && nullptr == processor->getActiveEditor() && window->hasEditor()) {
-            window->forgetEditor();
-        }
-        window->setVisible(false);
-    }
-    window.reset();
-    processor.reset();
 }
 
 void App::bringEditorToFront(Thread::ThreadID tid) {
@@ -448,40 +451,46 @@ void App::bringEditorToFront(Thread::ThreadID tid) {
 
     logln("bringing editor to front: tid=0x" << String::toHexString((uint64)tid));
 
-    std::lock_guard<std::mutex> lock(m_windowsMtx);
+    std::lock_guard<std::mutex> lock(m_processorsMtx);
 
-    auto it = m_windows.find((uint64)tid);
-    if (it != m_windows.end()) {
-        if (it->second.window != nullptr) {
-            it->second.window->toTop();
-        }
+    if (auto window = getCurrentWindow(tid)) {
+        window->toTop();
     } else {
         logln("bringEditorToFront failed: no window for tid");
     }
 }
 
 std::shared_ptr<Processor> App::getCurrentWindowProc(Thread::ThreadID tid) {
-    std::lock_guard<std::mutex> lock(m_windowsMtx);
-    auto it = m_windows.find((uint64)tid);
-    if (it != m_windows.end()) {
-        return it->second.processor;
+    std::lock_guard<std::mutex> lock(m_processorsMtx);
+    return getCurrentWindowProcInternal(tid);
+}
+
+std::shared_ptr<Processor> App::getCurrentWindowProcInternal(Thread::ThreadID tid) {
+    auto it = m_processors.find((uint64)tid);
+    if (it != m_processors.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
+std::shared_ptr<ProcessorWindow> App::getCurrentWindow(Thread::ThreadID tid) {
+    if (auto proc = getCurrentWindowProcInternal(tid)) {
+        return proc->getEditorWindow();
     }
     return nullptr;
 }
 
 void App::moveEditor(Thread::ThreadID tid, int x, int y) {
     traceScope();
+
     if (getServer()->getScreenLocalMode()) {
         logln("moving editor: tid=0x" << String::toHexString((uint64)tid));
 
-        std::lock_guard<std::mutex> lock(m_windowsMtx);
+        std::lock_guard<std::mutex> lock(m_processorsMtx);
 
-        auto it = m_windows.find((uint64)tid);
-        if (it != m_windows.end()) {
-            if (it->second.window != nullptr) {
-                logln("moving editor window to " << x << "x" << y);
-                it->second.window->move(x, y);
-            }
+        if (auto window = getCurrentWindow(tid)) {
+            logln("moving editor window to " << x << "x" << y);
+            window->move(x, y);
         } else {
             logln("moveEditor failed: no window for tid");
         }
@@ -491,32 +500,21 @@ void App::moveEditor(Thread::ThreadID tid, int x, int y) {
 void App::resetEditor(Thread::ThreadID tid) {
     traceScope();
 
-    std::lock_guard<std::mutex> lock(m_windowsMtx);
+    std::lock_guard<std::mutex> lock(m_processorsMtx);
 
-    auto it = m_windows.find((uint64)tid);
-    if (it != m_windows.end()) {
-        it->second.window.reset();
+    if (auto proc = getCurrentWindowProcInternal(tid)) {
+        proc->resetEditorWindow();
     }
 }
 
 void App::restartEditor(Thread::ThreadID tid) {
     traceScope();
 
-    std::lock_guard<std::mutex> lock(m_windowsMtx);
+    std::lock_guard<std::mutex> lock(m_processorsMtx);
 
-    auto it = m_windows.find((uint64)tid);
-    if (it != m_windows.end()) {
-        if (it->second.processor != nullptr) {
-            logln("recreating processor window");
-            auto& helper = it->second;
-            if (nullptr != helper.callbackFFmpeg) {
-                helper.window = std::make_unique<ProcessorWindow>(helper.processor, helper.callbackFFmpeg,
-                                                                  helper.window->getX(), helper.window->getY());
-            } else if (nullptr != helper.callbackNative) {
-                helper.window = std::make_unique<ProcessorWindow>(helper.processor, helper.callbackNative,
-                                                                  helper.window->getX(), helper.window->getY());
-            }
-        }
+    if (auto proc = getCurrentWindowProcInternal(tid)) {
+        logln("recreating processor window");
+        proc->recreateEditorWindow();
     } else {
         logln("restartEditor failed: no window for tid");
     }
@@ -525,47 +523,50 @@ void App::restartEditor(Thread::ThreadID tid) {
 void App::addKeyListener(Thread::ThreadID tid, KeyListener* l) {
     traceScope();
 
-    std::lock_guard<std::mutex> lock(m_windowsMtx);
+    std::lock_guard<std::mutex> lock(m_processorsMtx);
 
-    auto it = m_windows.find((uint64)tid);
-    if (it != m_windows.end() && it->second.window != nullptr) {
-        it->second.window->addKeyListener(l);
+    if (auto window = getCurrentWindow(tid)) {
+        window->addKeyListener(l);
     }
 }
 
 void App::updateScreenCaptureArea(Thread::ThreadID tid, int val) {
     traceScope();
 
-    std::lock_guard<std::mutex> lock(m_windowsMtx);
+    std::lock_guard<std::mutex> lock(m_processorsMtx);
 
-    auto it = m_windows.find((uint64)tid);
-    if (it != m_windows.end() && it->second.window != nullptr && it->second.processor != nullptr) {
+    if (auto proc = getCurrentWindowProcInternal(tid)) {
         if (val != 0) {
-            it->second.processor->updateScreenCaptureArea(val);
+            proc->updateScreenCaptureArea(val);
         }
-        it->second.window->updateScreenCaptureArea();
+        if (auto window = proc->getEditorWindow()) {
+            window->updateScreenCaptureArea();
+        }
     }
 }
 
 Point<float> App::localPointToGlobal(Thread::ThreadID tid, Point<float> lp) {
     traceScope();
 
-    std::lock_guard<std::mutex> lock(m_windowsMtx);
+    std::lock_guard<std::mutex> lock(m_processorsMtx);
 
-    auto it = m_windows.find((uint64)tid);
-    if (it != m_windows.end() && it->second.window != nullptr) {
-        auto ret = it->second.window->localPointToGlobal(lp);
-        if (!it->second.processor->isFullscreen()) {
-            ret.y += it->second.window->getTitleBarHeight();
-        } else {
-            if (auto* disp = Desktop::getInstance().getDisplays().getPrimaryDisplay()) {
-                ret.x -= disp->userArea.getX();
-                ret.y -= disp->userArea.getY();
+    if (auto proc = getCurrentWindowProcInternal(tid)) {
+        if (auto window = proc->getEditorWindow()) {
+            auto ret = window->localPointToGlobal(lp);
+            if (!proc->isFullscreen()) {
+                ret.y += window->getTitleBarHeight();
+            } else {
+                if (auto* disp = Desktop::getInstance().getDisplays().getPrimaryDisplay()) {
+                    ret.x -= disp->userArea.getX();
+                    ret.y -= disp->userArea.getY();
+                }
             }
+            return ret;
+        } else {
+            logln("failed to resolve local to global point: no active window");
         }
-        return ret;
     } else {
-        logln("failed to resolve local to global point: no active window");
+        logln("failed to resolve local to global point: no active processor");
     }
 
     return lp;

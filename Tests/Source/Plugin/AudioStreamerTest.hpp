@@ -163,8 +163,8 @@ class AudioStreamerTest : public UnitTest {
         beginTest("Send + Receive - Matching block size");
 
         // we send 1 at the first two calls and expect 0 to come back, because we have two blocks buffered
-        sendReadAndCheck(1.0f, 0.0f, blockSize); // 512
-        sendReadAndCheck(0.0f, 0.0f, blockSize); // 1024
+        sendReadAndCheck(1.0f, 0.0f, blockSize);  // 512
+        sendReadAndCheck(0.0f, 0.0f, blockSize);  // 1024
         sendReadAndCheck(0.0f, 1.0f, blockSize);
         sendReadAndCheck(0.0f, 0.0f, blockSize);
 
@@ -176,23 +176,22 @@ class AudioStreamerTest : public UnitTest {
         sendReadAndCheck(0.0f, 0.0f, blockSizeHalf);
         sendReadAndCheck(0.0f, 0.0f, blockSizeHalf);
 
-        sendReadAndCheck(1.0f, 0.0f, blockSizeHalf); // 256
-        sendReadAndCheck(0.0f, 0.0f, blockSizeHalf); // 512
-        sendReadAndCheck(0.0f, 0.0f, blockSizeHalf); // 768
-        sendReadAndCheck(0.0f, 0.0f, blockSizeHalf); // 1024
+        sendReadAndCheck(1.0f, 0.0f, blockSizeHalf);  // 256
+        sendReadAndCheck(0.0f, 0.0f, blockSizeHalf);  // 512
+        sendReadAndCheck(0.0f, 0.0f, blockSizeHalf);  // 768
+        sendReadAndCheck(0.0f, 0.0f, blockSizeHalf);  // 1024
         sendReadAndCheck(0.0f, 1.0f, blockSizeHalf);
         sendReadAndCheck(0.0f, 0.0f, blockSizeHalf);
 
-        sendReadAndCheck(1.0f, 0.0f, 128); // 128
-        sendReadAndCheck(0.0f, 0.0f, 512); // 640
-        sendReadAndCheck(0.0f, 0.0f, 384); // 1024
+        sendReadAndCheck(1.0f, 0.0f, 128);  // 128
+        sendReadAndCheck(0.0f, 0.0f, 512);  // 640
+        sendReadAndCheck(0.0f, 0.0f, 384);  // 1024
         sendReadAndCheck(0.0f, 1.0f, 128);
 
         proc.releaseResources();
 
         mock.stopThread(-1);
     }
-
 };
 
 static AudioStreamerTest audioStreamerTest;

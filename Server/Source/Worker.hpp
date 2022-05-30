@@ -102,6 +102,7 @@ class Worker : public Thread, public LogTag {
     void sendParamValueChange(int idx, int paramIdx, float val);
     void sendParamGestureChange(int idx, int paramIdx, bool guestureIsStarting);
     void sendStatusChange(int idx, bool ok, const String& err);
+    void sendHideEditor(int idx);
 
     ENABLE_ASYNC_FUNCTORS();
 };
