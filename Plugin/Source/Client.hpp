@@ -148,6 +148,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     int getChannelsIn() const { return m_channelsIn; }
     int getChannelsOut() const { return m_channelsOut; }
     int getChannelsSC() const { return m_channelsSC; }
+    bool isFx() const { return m_channelsIn > 0; }
     int getNumActiveChannels() const;
     double getSampleRate() const { return m_rate; }
     int getSamplesPerBlock() const { return m_samplesPerBlock; }

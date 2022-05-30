@@ -106,33 +106,51 @@ class AudioStreamer : public Thread, public LogTagDelegate {
             return;
         }
 
-        AudioMidiBuffer buf;
-
-        if (m_client->getChannelsIn() > 0) {  // fx
-            buf.audio.makeCopyOf(buffer);
-        } else {  // inst
-            buf.channelsRequested = buffer.getNumChannels();
-            buf.samplesRequested = buffer.getNumSamples();
-        }
-        buf.midi.addEvents(midi, 0, buffer.getNumSamples(), 0);
-        buf.posInfo = posInfo;
-
-        traceln("  client: input channels=" << m_client->getChannelsIn()
-                                            << ", num buffers=" << m_client->NUM_OF_BUFFERS);
-        traceln("  buffer: requesting channels=" << buf.channelsRequested << ", samples=" << buf.samplesRequested);
+        traceln("  client: numBuffers=" << m_client->NUM_OF_BUFFERS << ", blockSize=" << m_client->getSamplesPerBlock()
+                                        << ", isFx=" << (int)m_client->isFx());
         traceln("  queues: r.size=" << m_readQ.read_available() << ", r.samples=" << m_readSamples
                                     << ", w.size=" << m_writeQ.read_available() << ", w.samples=" << m_writeSamples);
 
         TimeTrace::addTracePoint("as_prep");
 
         if (m_client->NUM_OF_BUFFERS > 0) {
-            buf.sampleOffset = m_nextWriteOffset.fetch_add((uint32)buffer.getNumSamples());
-            m_writeQ.push(std::move(buf));
-            m_writeSamples += (size_t)buffer.getNumSamples();
-            TimeTrace::addTracePoint("as_push");
-            notifyWrite();
-            TimeTrace::addTracePoint("as_notify");
+            bool notify = false;
+            if (m_client->isFx()) {  // fx
+                traceln("  buffer (in): channels=" << buffer.getNumChannels() << ", samples=" << buffer.getNumSamples());
+                m_writeBuffer.copyFrom(buffer, midi);
+                traceln("  buffer (write, after copy): working samples=" << m_writeBuffer.workingSamples);
+                if (m_writeBuffer.workingSamples >= m_client->getSamplesPerBlock()) {
+                    AudioMidiBuffer buf;
+                    buf.sampleOffset = m_nextWriteOffset.fetch_add((uint32)m_client->getSamplesPerBlock());
+                    buf.posInfo = posInfo;
+                    buf.copyFromAndConsume(m_writeBuffer, m_client->getSamplesPerBlock());
+                    traceln("  buffer (out): samples=" << buf.audio.getNumSamples() << ", offset=" << buf.sampleOffset);
+                    traceln("  buffer (write, after send): working samples=" << m_writeBuffer.workingSamples);
+                    m_writeQ.push(std::move(buf));
+                    m_writeSamples += (size_t)m_client->getSamplesPerBlock();
+                    notify = true;
+                }
+            } else {
+                AudioMidiBuffer buf;
+                buf.channelsRequested = buffer.getNumChannels();
+                buf.samplesRequested = buffer.getNumSamples();
+                buf.midi.addEvents(midi, 0, buffer.getNumSamples(), 0);
+                buf.sampleOffset = m_nextWriteOffset.fetch_add((uint32)buffer.getNumSamples());
+                buf.posInfo = posInfo;
+                traceln("  buffer (out): channels=" << buf.channelsRequested << ", samples=" << buf.samplesRequested
+                                                    << ", offset=" << buf.sampleOffset);
+                m_writeQ.push(std::move(buf));
+                m_writeSamples += (size_t)buffer.getNumSamples();
+                notify = true;
+            }
+            if (notify) {
+                TimeTrace::addTracePoint("as_push");
+                notifyWrite();
+                TimeTrace::addTracePoint("as_notify");
+            }
         } else {
+            AudioMidiBuffer buf;
+            buf.copyFrom(buffer, midi, m_client->isFx() ? -1 : 0, -1);
             m_durationLocal.reset();
             m_durationGlobal.reset();
             if (!sendInternal(buf)) {
@@ -177,7 +195,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                     m_readSamples -= (size_t)buf.audio.getNumSamples();
                     traceln("  pop buffer: channels=" << buf.audio.getNumChannels()
                                                       << ", samples=" << buf.audio.getNumSamples());
-                    m_readBuffer.copyFrom(buf);
+                    m_readBuffer.copyFrom(buf, -1, -1, true);
                 } else {
                     logln("error: " << getInstanceString() << ": read queue empty");
                     return;
@@ -247,23 +265,59 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         MidiBuffer midi;
         AudioPlayHead::CurrentPositionInfo posInfo;
 
-        void copyFrom(AudioMidiBuffer& src) {
-            if (src.audio.getNumChannels() > 0) {
-                if ((audio.getNumSamples() - workingSamples) < src.audio.getNumSamples() ||
-                    audio.getNumChannels() < src.audio.getNumChannels()) {
-                    audio.setSize(src.audio.getNumChannels(), workingSamples + src.audio.getNumSamples(), true);
+        void copyFrom(const AudioMidiBuffer& src, int numChannels = -1, int numSamples = -1, bool verifySampleOffset = false) {
+            if (verifySampleOffset && sampleOffset + (uint32)workingSamples != src.sampleOffset) {
+                setLogTagStatic("audiostreamer");
+                logln("warning: sample offset mismatch: " << (sampleOffset + (uint32)workingSamples) << " expected but "
+                                                          << src.sampleOffset << " received");
+            }
+            copyFrom(src.audio, src.midi, numChannels, numSamples);
+        }
+
+        void copyFrom(const AudioBuffer<T>& srcBuffer, const MidiBuffer& srcMidi, int numChannels = -1, int numSamples = -1) {
+            if (numChannels == -1) {
+                numChannels = srcBuffer.getNumChannels();
+            }
+            if (numSamples == -1) {
+                numSamples = srcBuffer.getNumSamples();
+            }
+            if (numChannels > 0) {
+                if ((audio.getNumSamples() - workingSamples) < numSamples ||
+                    audio.getNumChannels() < numChannels) {
+                    audio.setSize(numChannels, workingSamples + numSamples, true);
                 }
-                if (sampleOffset + (uint32)workingSamples != src.sampleOffset) {
-                    setLogTagStatic("audiostreamer");
-                    logln("warning: sample offset mismatch: " << (sampleOffset + (uint32)workingSamples)
-                                                              << " expected but " << src.sampleOffset << " received");
-                }
-                for (int chan = 0; chan < src.audio.getNumChannels(); chan++) {
-                    audio.copyFrom(chan, workingSamples, src.audio, chan, 0, src.audio.getNumSamples());
+                for (int chan = 0; chan < numChannels; chan++) {
+                    audio.copyFrom(chan, workingSamples, srcBuffer, chan, 0, numSamples);
                 }
             }
-            midi.addEvents(midi, 0, src.audio.getNumSamples(), workingSamples);
-            workingSamples += src.audio.getNumSamples();
+            midi.addEvents(srcMidi, 0, numSamples, workingSamples);
+            workingSamples += numSamples;
+        }
+
+        void copyFromAndConsume(AudioMidiBuffer& src, int numSamples = -1) {
+            if (numSamples == -1) {
+                numSamples = src.audio.getNumSamples();
+            }
+            moveOrCopyFrom(src.audio, src.midi, numSamples);
+            src.consume(numSamples);
+        }
+
+        void moveOrCopyFrom(AudioBuffer<T>& srcBuffer, MidiBuffer& srcMidi, int numSamples) {
+            if (srcBuffer.getNumChannels() > 0) {
+                if (numSamples == srcBuffer.getNumSamples()) {
+                    audio = std::move(srcBuffer);
+                } else {
+                    if ((audio.getNumSamples() - workingSamples) < numSamples ||
+                        audio.getNumChannels() < srcBuffer.getNumChannels()) {
+                        audio.setSize(srcBuffer.getNumChannels(), workingSamples + numSamples, true);
+                    }
+                    for (int chan = 0; chan < srcBuffer.getNumChannels(); chan++) {
+                        audio.copyFrom(chan, workingSamples, srcBuffer, chan, 0, numSamples);
+                    }
+                }
+            }
+            midi.addEvents(srcMidi, 0, numSamples, workingSamples);
+            workingSamples += numSamples;
         }
 
         void consume(int samples) {
@@ -300,7 +354,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
     TimeStatistic::Duration m_durationGlobal, m_durationLocal;
     std::shared_ptr<Meter> m_bytesOutMeter, m_bytesInMeter;
 
-    AudioMidiBuffer m_readBuffer;
+    AudioMidiBuffer m_readBuffer, m_writeBuffer;
 
     std::atomic_bool m_error{false};
 
