@@ -611,6 +611,10 @@ void Worker::sendClipboard(const String& val) {
 bool Worker::KeyWatcher::keyPressed(const KeyPress& kp, Component*) {
     std::vector<uint16_t> keysToPress;
     auto modkeys = kp.getModifiers();
+    auto c = static_cast<char>(kp.getKeyCode());
+    String key(CharPointer_UTF8(&c), 1);
+    auto keyCode = getKeyCode(key.toUpperCase().toStdString());
+
     if (modkeys.isShiftDown()) {
         keysToPress.push_back(getKeyCode("Shift"));
     }
@@ -621,6 +625,12 @@ bool Worker::KeyWatcher::keyPressed(const KeyPress& kp, Component*) {
         keysToPress.push_back(getKeyCode("Option"));
     }
     if (modkeys.isCommandDown()) {
+#if JUCE_MAC
+        if (key.toUpperCase() == "Q") {
+            // don't shut down the server
+            return true;
+        }
+#endif
         keysToPress.push_back(getKeyCode("Command"));
     }
     if (kp.isKeyCurrentlyDown(KeyPress::escapeKey)) {
@@ -724,11 +734,8 @@ bool Worker::KeyWatcher::keyPressed(const KeyPress& kp, Component*) {
     } else if (kp.isKeyCurrentlyDown(KeyPress::numberPadDecimalPoint)) {
         keysToPress.push_back(getKeyCode("Numpad."));
     } else {
-        auto c = static_cast<char>(kp.getKeyCode());
-        String key(CharPointer_UTF8(&c), 1);
-        auto kc = getKeyCode(key.toUpperCase().toStdString());
-        if (NOKEY != kc) {
-            keysToPress.push_back(kc);
+        if (NOKEY != keyCode) {
+            keysToPress.push_back(keyCode);
         }
     }
     worker->sendKeys(keysToPress);
