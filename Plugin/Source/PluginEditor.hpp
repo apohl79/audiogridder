@@ -38,6 +38,7 @@ class PluginEditor : public AudioProcessorEditor,
 
     void updateParamValue(int paramIdx);
     void updatePluginStatus(int idx, bool ok, const String& err);
+    void hidePluginFromServer(int idx);
 
   private:
     PluginProcessor& m_processor;

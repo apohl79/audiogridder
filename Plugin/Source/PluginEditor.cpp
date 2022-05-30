@@ -1319,4 +1319,15 @@ void PluginEditor::updatePluginStatus(int idx, bool ok, const String& err) {
     }
 }
 
+void PluginEditor::hidePluginFromServer(int idx) {
+    int active = m_processor.getActivePlugin();
+    if (active == idx) {
+        m_wantsScreenUpdates = false;
+        m_processor.getClient().setPluginScreenUpdateCallback(nullptr);
+        unhighlightPluginButton(idx);
+        resetPluginScreen();
+        resized();
+    }
+}
+
 }  // namespace e47

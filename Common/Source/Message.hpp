@@ -89,7 +89,7 @@ StreamingSocket* accept(StreamingSocket*, int timeoutMs = 1000, std::function<bo
 /*
  * Client/Server handshake
  */
-static constexpr int AG_PROTOCOL_VERSION = 9;
+static constexpr int AG_PROTOCOL_VERSION = 10;
 
 struct HandshakeRequest {
     int version;
@@ -642,10 +642,10 @@ class EditPlugin : public DataPayload<editplugin_t> {
     EditPlugin() : DataPayload<editplugin_t>(Type) {}
 };
 
-class HidePlugin : public Payload {
+class HidePlugin : public NumberPayload {
   public:
     static constexpr int Type = __COUNTER__;
-    HidePlugin() : Payload(Type) {}
+    HidePlugin() : NumberPayload(Type) {}
 };
 
 class GetScreenBounds : public NumberPayload {

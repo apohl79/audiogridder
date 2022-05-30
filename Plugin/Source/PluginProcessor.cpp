@@ -1136,6 +1136,17 @@ void PluginProcessor::hidePlugin(bool updateServer) {
     m_activePlugin = -1;
 }
 
+void PluginProcessor::hidePluginFromServer(int idx) {
+    if (m_activePlugin == idx) {
+        runOnMsgThreadAsync([this, idx] {
+            if (auto* e = dynamic_cast<PluginEditor*>(getActiveEditor())) {
+                e->hidePluginFromServer(idx);
+                m_activePlugin = -1;
+            }
+        });
+    }
+}
+
 bool PluginProcessor::isBypassed(int idx) {
     traceScope();
     std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);

@@ -223,6 +223,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     String getLoadedPluginsString() const;
     void editPlugin(int idx, int x, int y);
     void hidePlugin(bool updateServer = true);
+    void hidePluginFromServer(int idx);
     int getActivePlugin() const { return m_activePlugin; }
     int getLastActivePlugin() const { return m_lastActivePlugin; }
     bool isEditAlways() const { return m_editAlways; }

@@ -154,6 +154,9 @@ void Client::run() {
                         case PluginStatus::Type:
                             handleMessage(Message<Any>::convert<PluginStatus>(msg));
                             break;
+                        case HidePlugin::Type:
+                            handleMessage(Message<Any>::convert<HidePlugin>(msg));
+                            break;
                         default:
                             logln("unknown message type " << msg->getType());
                     }
@@ -229,6 +232,10 @@ void Client::handleMessage(std::shared_ptr<Message<PluginStatus>> msg) {
     } catch (const json::exception& e) {
         logln("failed to update plugin status: " << e.what());
     }
+}
+
+void Client::handleMessage(std::shared_ptr<Message<HidePlugin>> msg) {
+    m_processor->hidePluginFromServer(pPLD(msg).getNumber());
 }
 
 void Client::setServer(const ServerInfo& srv) {
