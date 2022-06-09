@@ -220,7 +220,8 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
             traceScope();
             getApp()->showEditor(
                 m_currentTid, proc,
-                [this](const uint8_t* data, int size, int w, int h, int wPadded, int hPadded, double scale) {
+                [this, tid = m_currentTid](const uint8_t* data, int size, int w, int h, int wPadded, int hPadded,
+                                           double scale) {
                     // executed in the context of the screen recorder worker thread
                     traceScope();
                     if (threadShouldExit()) {
@@ -228,7 +229,7 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
                     }
                     // check for undetected plugin UI bounds changes
                     if (++m_imgCounter % 30 == 0) {
-                        runOnMsgThreadAsync([this] { getApp()->updateScreenCaptureArea(m_currentTid); });
+                        runOnMsgThreadAsync([tid] { getApp()->updateScreenCaptureArea(tid); });
                     }
                     std::lock_guard<std::mutex> lock(m_currentImageLock);
                     if (m_imageBuf.size() < (size_t)size) {
@@ -292,7 +293,7 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
 void ScreenWorker::hideEditor() {
     logln("hiding editor");
 
-    runOnMsgThreadSync([this, tid = m_currentTid] {
+    runOnMsgThreadAsync([this, tid = m_currentTid] {
         logln("hiding editor (msg thread)");
         getApp()->hideEditor(tid);
 
