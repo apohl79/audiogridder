@@ -311,7 +311,7 @@ endmacro()
 
 # Remove some warnings from the JUCE list as the JUCE code triggers those itself...
 if((CMAKE_CXX_COMPILER_ID STREQUAL "Clang") OR (CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang"))
-  target_compile_options(juce_recommended_warning_flags INTERFACE -Wno-unused-variable -Wno-unused-function -Wno-deprecated)
+  target_compile_options(juce_recommended_warning_flags INTERFACE -Wno-unused-variable -Wno-unused-function -Wno-deprecated -Wno-switch-enum)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   target_compile_options(juce_recommended_warning_flags INTERFACE -Wno-unused-variable -Wno-unused-but-set-variable)
 endif()
