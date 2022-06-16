@@ -70,7 +70,8 @@ class ProcessorChainTest : UnitTest {
         pc->prepareToPlay(sampleRate, blockSize);
 
         KnownPluginList pl;
-        Server::loadKnownPluginList(pl, 999);
+        json playouts;
+        Server::loadKnownPluginList(pl, playouts, 999);
 
         for (auto desc : pl.getTypes()) {
             auto id = Processor::createPluginID(desc);

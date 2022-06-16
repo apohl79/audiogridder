@@ -70,7 +70,7 @@ class SplashWindow : public TopLevelWindow {
         m_date.setBounds(getWidth() - 400, getHeight() - 23, 395, 20);
         addChildAndSetID(&m_date, "date");
 
-        m_info.setBounds(160, 190, 410, 25);
+        m_info.setBounds(160, 170, 410, 105);
         font.setHeight(15);
         font.setStyleFlags(Font::plain);
         m_info.setAlpha(0.8f);

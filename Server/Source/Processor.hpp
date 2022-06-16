@@ -49,8 +49,16 @@ class Processor : public LogTagDelegate,
         return String(j.dump());
     }
 
-    static std::unique_ptr<PluginDescription> findPluginDescritpion(const String& id);
-    static std::unique_ptr<PluginDescription> findPluginDescritpion(const String& id, const KnownPluginList& pluglist);
+    static std::unique_ptr<PluginDescription> findPluginDescritpion(const String& id, String* idNormalized = nullptr);
+    static std::unique_ptr<PluginDescription> findPluginDescritpion(const String& id, const KnownPluginList& pluglist,
+                                                                    String* idNormalized = nullptr);
+
+    static Array<AudioProcessor::BusesLayout> findSupportedLayouts(std::shared_ptr<AudioPluginInstance> proc,
+                                                                   bool checkOnly = true, int srvId = 0);
+    static Array<AudioProcessor::BusesLayout> findSupportedLayouts(Processor* proc, bool checkOnly = true,
+                                                                   int srvId = 0);
+
+    const Array<AudioProcessor::BusesLayout>& getSupportedBusLayouts() const;
 
     bool isClient() const { return m_isClient; }
 
@@ -61,7 +69,7 @@ class Processor : public LogTagDelegate,
     static std::shared_ptr<AudioPluginInstance> loadPlugin(const PluginDescription& plugdesc, double sampleRate,
                                                            int blockSize, String& err);
     static std::shared_ptr<AudioPluginInstance> loadPlugin(const String& fileOrIdentifier, double sampleRate,
-                                                           int blockSize, String& err);
+                                                           int blockSize, String& err, String* idNormalized = nullptr);
 
     bool load(const String& settings, String& err, const PluginDescription* plugdesc = nullptr);
     void unload();
@@ -298,6 +306,7 @@ class Processor : public LogTagDelegate,
     ProcessorChain& m_chain;
     int m_chainIdx = -1;
     String m_id;
+    String m_idNormalized;
     double m_sampleRate;
     int m_blockSize;
     bool m_isClient;

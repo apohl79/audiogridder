@@ -36,7 +36,7 @@ void App::initialise(const String& commandLineParameters) {
     String fileToScan, pluginId, clientId, error;
     int workerPort = 0, srvId = -1;
     json jconfig;
-    bool log = false, isLocal = false;
+    bool log = false, isLocal = false, secondRun = false;
     for (int i = 0; i < args.size(); i++) {
         if (!args[i].compare("-scan") && args.size() >= i + 2) {
             fileToScan = args[++i];
@@ -49,6 +49,8 @@ void App::initialise(const String& commandLineParameters) {
             mode = SANDBOX_PLUGIN;
         } else if (!args[i].compare("-log")) {
             log = true;
+        } else if (!args[i].compare("-secondrun")) {
+            secondRun = true;
         } else if (!args[i].compare("-islocal") && args.size() >= i + 2) {
             isLocal = args[++i] == "1";
         } else if (!args[i].compare("-pluginid") && args.size() >= i + 2) {
@@ -131,7 +133,7 @@ void App::initialise(const String& commandLineParameters) {
                     format = parts[1];
                 }
                 logln("scan mode: format=" << format << " id=" << id);
-                bool success = Server::scanPlugin(id, format, srvId > -1 ? srvId : 0);
+                bool success = Server::scanPlugin(id, format, srvId > -1 ? srvId : 0, secondRun);
                 logln("..." << (success ? "success" : "failed"));
                 setApplicationReturnValue(success ? 0 : 1);
                 quit();
@@ -572,6 +574,27 @@ Point<float> App::localPointToGlobal(Thread::ThreadID tid, Point<float> lp) {
     return lp;
 }
 
+App::ErrorCallback App::getWorkerErrorCallback(Thread::ThreadID tid) {
+    std::lock_guard<std::mutex> lock(m_workerErrorCallbacksMtx);
+
+    auto it = m_workerErrorCallbacks.find((uint64)tid);
+    if (it != m_workerErrorCallbacks.end()) {
+        return it->second;
+    }
+
+    return nullptr;
+}
+
+void App::setWorkerErrorCallback(Thread::ThreadID tid, ErrorCallback fn) {
+    std::lock_guard<std::mutex> lock(m_workerErrorCallbacksMtx);
+
+    if (nullptr != fn) {
+        m_workerErrorCallbacks[(uint64)tid] = fn;
+    } else {
+        m_workerErrorCallbacks.erase((uint64)tid);
+    }
+}
+
 PopupMenu App::getMenuForIndex(int topLevelMenuIndex, const String& /* menuName */) {
     PopupMenu menu;
     if (topLevelMenuIndex == 0) {  // Settings
@@ -604,8 +627,7 @@ PopupMenu App::getMenuForIndex(int topLevelMenuIndex, const String& /* menuName 
         menu.addSeparator();
         menu.addItem("Rescan", [this] { restartServer(true); });
         menu.addItem("Wipe Cache & Rescan", [this] {
-            m_server->getPluginList().clear();
-            m_server->saveKnownPluginList();
+            m_server->saveKnownPluginList(true);
             restartServer(true);
         });
     }

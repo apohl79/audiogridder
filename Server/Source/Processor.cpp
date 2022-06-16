@@ -10,6 +10,10 @@
 #include "App.hpp"
 #include "Server.hpp"
 
+#if JUCE_WINDOWS
+#include <signal.h>
+#endif
+
 namespace e47 {
 
 std::atomic_uint32_t Processor::loadedCount{0};
@@ -100,11 +104,12 @@ String Processor::convertJUCEtoAGPluginID(const String& id) {
     return convertedId;
 }
 
-std::unique_ptr<PluginDescription> Processor::findPluginDescritpion(const String& id) {
-    return findPluginDescritpion(id, getApp()->getPluginList());
+std::unique_ptr<PluginDescription> Processor::findPluginDescritpion(const String& id, String* idNormalized) {
+    return findPluginDescritpion(id, getApp()->getPluginList(), idNormalized);
 }
 
-std::unique_ptr<PluginDescription> Processor::findPluginDescritpion(const String& id, const KnownPluginList& pluglist) {
+std::unique_ptr<PluginDescription> Processor::findPluginDescritpion(const String& id, const KnownPluginList& pluglist,
+                                                                    String* idNormalized) {
     std::unique_ptr<PluginDescription> plugdesc;
     setLogTagStatic("processor");
     traceScope();
@@ -117,13 +122,190 @@ std::unique_ptr<PluginDescription> Processor::findPluginDescritpion(const String
         if (descId == id || descIdWithName == id || descIdWithName == convertedId || descIdDepricated == id ||
             descIdDepricated == convertedId) {
             plugdesc = std::make_unique<PluginDescription>(desc);
+            if (nullptr != idNormalized) {
+                *idNormalized = descId;
+            }
         }
     }
     // fallback with filename
     if (nullptr == plugdesc) {
         plugdesc = pluglist.getTypeForFile(id);
+        if (nullptr != idNormalized) {
+            *idNormalized = id;
+        }
     }
     return plugdesc;
+}
+
+Array<AudioProcessor::BusesLayout> Processor::findSupportedLayouts(std::shared_ptr<AudioPluginInstance> proc,
+                                                                   bool checkOnly, int srvId) {
+    setLogTagStatic("processor");
+
+    int busesIn = proc->getBusCount(true);
+    int busesOut = proc->getBusCount(false);
+    int channelsIn = busesIn > 0 ? Defaults::PLUGIN_FX_CHANNELS_IN + Defaults::PLUGIN_FX_CHANNELS_SC
+                                 : Defaults::PLUGIN_INST_CHANNELS_IN;
+    int channelsOut = busesIn > 0 ? Defaults::PLUGIN_FX_CHANNELS_OUT : Defaults::PLUGIN_INST_CHANNELS_OUT;
+
+    logln("the processor has " << busesIn << " input and " << busesOut << " output buses");
+    logln("testing with " << channelsIn << " input and " << channelsOut << " output channels");
+
+    Array<AudioProcessor::BusesLayout> layouts;
+
+    layouts.add(proc->getBusesLayout());
+
+    auto addChannelSets = [](Array<AudioChannelSet>& channelSets, int numStereo, int numMono) {
+        channelSets.clear();
+        for (int ch = 0; ch < numStereo; ch++) {
+            channelSets.add(AudioChannelSet::stereo());
+        }
+        for (int ch = 0; ch < numMono; ch++) {
+            channelSets.add(AudioChannelSet::mono());
+        }
+    };
+
+    auto addLayouts = [&](int chOut, int chInMax) {
+        if (busesOut == 1 && chOut > 2) {
+            // try layouts with one bus with the exact number of channels
+            for (auto channelSet : AudioChannelSet::channelSetsWithNumberOfChannels(chOut)) {
+                AudioProcessor::BusesLayout tmp;
+
+                tmp.outputBuses.add(channelSet);
+
+                if (busesIn == 0) {
+                    // no inputs
+                    layouts.addIfNotAlreadyThere(tmp);
+                } else if (busesIn == 1) {
+                    // matching inputs & outputs
+                    tmp.inputBuses.add(channelSet);
+                    layouts.addIfNotAlreadyThere(tmp);
+                } else if (busesIn == 2) {
+                    // stereo sidechain
+                    tmp.inputBuses.add(AudioChannelSet::stereo());
+                    layouts.addIfNotAlreadyThere(tmp);
+                    tmp.inputBuses.remove(1);
+
+                    // mono sidechain
+                    tmp.inputBuses.add(AudioChannelSet::mono());
+                    layouts.addIfNotAlreadyThere(tmp);
+                }
+
+                if (busesIn == 1) {
+                    // try to add layouts with less inputs
+                    for (int chIn = chInMax; chIn > 0; chIn--) {
+                        if (chIn == chOut) {
+                            continue;
+                        }
+                        for (auto channelSet2 : AudioChannelSet::channelSetsWithNumberOfChannels(chIn)) {
+                            tmp.inputBuses.clear();
+                            tmp.inputBuses.add(channelSet2);
+                            layouts.addIfNotAlreadyThere(tmp);
+                        }
+                    }
+                }
+            }
+        }
+
+        // try layouts with different combinations of stereo and mono buses
+        int numStereoOut = chOut / 2;
+
+        while (numStereoOut >= 0) {
+            AudioProcessor::BusesLayout tmp;
+
+            int numMonoOut = chOut - numStereoOut * 2;
+
+            if (busesOut == numStereoOut + numMonoOut) {
+                addChannelSets(tmp.outputBuses, numStereoOut, numMonoOut);
+
+                if (busesIn == 0) {
+                    // no inputs
+                    layouts.addIfNotAlreadyThere(tmp);
+                }
+
+                for (int chIn = chInMax; chIn > 0; chIn--) {
+                    int numStereoIn = chIn / 2;
+
+                    while (numStereoIn >= 0) {
+                        int numMonoIn = chIn - numStereoIn * 2;
+
+                        if (busesIn == numStereoIn + numMonoIn) {
+                            addChannelSets(tmp.inputBuses, numStereoIn, numMonoIn);
+                            layouts.addIfNotAlreadyThere(tmp);
+                        }
+
+                        numStereoIn--;
+                    }
+                }
+            }
+
+            numStereoOut--;
+        }
+    };
+
+    Array<AudioProcessor::BusesLayout> ret;
+
+    for (int channelsOutWorking = channelsOut; channelsOutWorking > 0; channelsOutWorking--) {
+        addLayouts(channelsOutWorking, channelsIn);
+    }
+
+    logln("trying " << layouts.size() << " layouts (checkOnly=" << (int)checkOnly << ")...");
+
+    // checkBusesLayoutSupported() returns false in many cases where a layout still works, so we prefer
+    // setBusesLayout(). This - on the other hand - might "hang" for some apple AUs for some specific layouts, so we
+    // give it 2 seconds and kill the process, as this should only be called with checkOnly=false from the
+    // scanner. If we kill the process, we will launch the scanner again and pass checkOnly=true the second time.
+    std::unique_ptr<FnThread> timeoutThread;
+    std::atomic_bool timeoutActive{false};
+
+    if (!checkOnly) {
+        timeoutThread = std::make_unique<FnThread>(
+            [&] {
+                while (!Thread::currentThreadShouldExit()) {
+                    if (timeoutActive) {
+                        sleepExitAwareWithCondition(2000, [&] { return !timeoutActive.load(); });
+                        if (timeoutActive) {
+                            raise(SIGABRT);
+                        }
+                    }
+                    sleepExitAware(50);
+                }
+            },
+            "TimeoutThread", true);
+    }
+
+    // Create an error file that we remove after testing, if we fail, the scanner will trigger a second run
+    auto errFile = File(Defaults::getConfigFileName(Defaults::ScanLayoutError, {{"id", String(srvId)}}));
+    errFile.create();
+
+    for (auto& l : layouts) {
+        if (!checkOnly) {
+            timeoutActive = true;
+        }
+
+        bool supported = checkOnly ? proc->checkBusesLayoutSupported(l) : proc->setBusesLayout(l);
+
+        if (!checkOnly) {
+            timeoutActive = false;
+        }
+
+        logln("  " << describeLayout(l) << ": " << (supported ? "OK" : "not supported"));
+
+        if (supported) {
+            ret.add(l);
+        }
+    }
+
+    errFile.deleteFile();
+
+    return ret;
+}
+
+Array<AudioProcessor::BusesLayout> Processor::findSupportedLayouts(Processor* proc, bool checkOnly, int srvId) {
+    return findSupportedLayouts(proc->getPlugin(), checkOnly, srvId);
+}
+
+const Array<AudioProcessor::BusesLayout>& Processor::getSupportedBusLayouts() const {
+    return getApp()->getServer()->getPluginLayouts(m_idNormalized);
 }
 
 std::shared_ptr<AudioPluginInstance> Processor::loadPlugin(const PluginDescription& plugdesc, double sampleRate,
@@ -149,10 +331,10 @@ std::shared_ptr<AudioPluginInstance> Processor::loadPlugin(const PluginDescripti
 }
 
 std::shared_ptr<AudioPluginInstance> Processor::loadPlugin(const String& id, double sampleRate, int blockSize,
-                                                           String& err) {
+                                                           String& err, String* idNormalized) {
     setLogTagStatic("processor");
     traceScope();
-    auto plugdesc = findPluginDescritpion(id);
+    auto plugdesc = findPluginDescritpion(id, idNormalized);
     if (nullptr != plugdesc) {
         return loadPlugin(*plugdesc, sampleRate, blockSize, err);
     } else {
@@ -191,32 +373,37 @@ bool Processor::load(const String& settings, String& err, const PluginDescriptio
     }
 
     bool loaded = false;
+
     if (m_isClient) {
-        std::shared_ptr<ProcessorClient> client;
+        if (auto desc = findPluginDescritpion(m_id, &m_idNormalized)) {
+            std::shared_ptr<ProcessorClient> client;
 
-        {
-            client = std::make_shared<ProcessorClient>(m_id, m_chain.getConfig());
-            std::lock_guard<std::mutex> lock(m_pluginMtx);
-            m_client = client;
-        }
+            {
+                client = std::make_shared<ProcessorClient>(m_idNormalized, m_chain.getConfig());
+                std::lock_guard<std::mutex> lock(m_pluginMtx);
+                m_client = client;
+            }
 
-        if (client->init()) {
-            loaded = client->load(settings, err);
-            if (loaded) {
-                client->startThread();
+            if (client->init()) {
+                loaded = client->load(settings, err);
+                if (loaded) {
+                    client->startThread();
+                }
+            } else {
+                err = "failed to initialize sandbox";
+                if (client->getError().isNotEmpty()) {
+                    err << ": " << client->getError();
+                }
             }
         } else {
-            err = "failed to initialize sandbox";
-            if (client->getError().isNotEmpty()) {
-                err << ": " << client->getError();
-            }
+            err = "Plugin with ID " + m_id + " not found";
         }
     } else {
         std::shared_ptr<AudioPluginInstance> p;
         if (nullptr != plugdesc) {
             p = loadPlugin(*plugdesc, m_sampleRate, m_blockSize, err);
         } else {
-            p = loadPlugin(m_id, m_sampleRate, m_blockSize, err);
+            p = loadPlugin(m_id, m_sampleRate, m_blockSize, err, &m_idNormalized);
         }
         if (nullptr != p) {
             {

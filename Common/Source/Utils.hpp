@@ -294,30 +294,30 @@ inline bool msgThreadExistsAndNotLocked() {
         }                                                                                 \
     } while (0)
 
-#define sleepExitAware(t)                                            \
-    do {                                                             \
-        int __sleepstep = 50;                                        \
-        if (t < __sleepstep) {                                       \
-            Thread::sleep(t);                                        \
-        } else {                                                     \
-            int __sleepfor = t / __sleepstep;                        \
-            while (!currentThreadShouldExit() && __sleepfor-- > 0) { \
-                Thread::sleep(__sleepstep);                          \
-            }                                                        \
-        }                                                            \
-    } while (0)
-
-#define sleepExitAwareWithCondition(t, c)                                    \
+#define sleepExitAware(t)                                                    \
     do {                                                                     \
         int __sleepstep = 50;                                                \
         if (t < __sleepstep) {                                               \
             Thread::sleep(t);                                                \
         } else {                                                             \
             int __sleepfor = t / __sleepstep;                                \
-            while (!currentThreadShouldExit() && !c() && __sleepfor-- > 0) { \
+            while (!Thread::currentThreadShouldExit() && __sleepfor-- > 0) { \
                 Thread::sleep(__sleepstep);                                  \
             }                                                                \
         }                                                                    \
+    } while (0)
+
+#define sleepExitAwareWithCondition(t, c)                                            \
+    do {                                                                             \
+        int __sleepstep = 50;                                                        \
+        if (t < __sleepstep) {                                                       \
+            Thread::sleep(t);                                                        \
+        } else {                                                                     \
+            int __sleepfor = t / __sleepstep;                                        \
+            while (!Thread::currentThreadShouldExit() && !c() && __sleepfor-- > 0) { \
+                Thread::sleep(__sleepstep);                                          \
+            }                                                                        \
+        }                                                                            \
     } while (0)
 
 }  // namespace e47
@@ -378,25 +378,31 @@ inline void waitForThreadAndLog(const LogTag* tag, Thread* t, int millisUntilWar
     }
 }
 
-inline json configParseFile(const String& configFile, String* err = nullptr) {
+inline json jsonReadFile(const String& filename, bool binary, String* err = nullptr) {
     setLogTagStatic("utils");
     auto setErr = [&](const String& s) {
         if (nullptr != err) {
             *err = s;
         }
     };
-    File cfg(configFile);
-    if (cfg.exists()) {
-        FileInputStream fis(cfg);
+    File file(filename);
+    if (file.existsAsFile() && file.getSize() > 0) {
+        FileInputStream fis(file);
         if (fis.openedOk()) {
             try {
-                return json::parse(fis.readEntireStreamAsString().toStdString());
+                if (binary) {
+                    std::vector<uint8> data((size_t)fis.getTotalLength());
+                    fis.read(data.data(), (int)data.size());
+                    return json::from_msgpack(data);
+                } else {
+                    return json::parse(fis.readEntireStreamAsString().toStdString());
+                }
             } catch (json::parse_error& e) {
-                logln("parsing config file " << configFile << " failed: " << e.what());
+                logln("parsing json file " << filename << " failed: " << e.what());
                 setErr(e.what());
             }
         } else {
-            logln("failed to open config file " << configFile << ": " << fis.getStatus().getErrorMessage());
+            logln("failed to open json file " << filename << ": " << fis.getStatus().getErrorMessage());
             setErr(fis.getStatus().getErrorMessage());
         }
     } else {
@@ -405,16 +411,35 @@ inline json configParseFile(const String& configFile, String* err = nullptr) {
     return {};
 }
 
-inline void configWriteFile(const String& configFile, const json& j) {
-    File cfg(configFile);
-    if (cfg.exists()) {
-        cfg.deleteFile();
+inline void jsonWriteFile(const String& filename, const json& j, bool binary) {
+    File file(filename);
+    if (file.exists()) {
+        file.deleteFile();
     } else {
-        cfg.create();
+        file.create();
     }
-    FileOutputStream fos(cfg);
-    fos.writeText(j.dump(4), false, false, "\n");
+    try {
+        FileOutputStream fos(file);
+        if (binary) {
+            std::vector<uint8> data;
+            if (!j.empty()) {
+                json::to_msgpack(j, data);
+            }
+            fos.write(data.data(), data.size());
+        } else {
+            fos.writeText(j.dump(4), false, false, "\n");
+        }
+    } catch (const json::exception& e) {
+        setLogTagStatic("utils");
+        logln("failed to write json file " << filename << ": " << e.what());
+    }
 }
+
+inline json configParseFile(const String& configFile, String* err = nullptr) {
+    return jsonReadFile(configFile, false, err);
+}
+
+inline void configWriteFile(const String& configFile, const json& j) { jsonWriteFile(configFile, j, false); }
 
 inline bool jsonHasValue(const json& j, const String& name) { return j.find(name.toStdString()) != j.end(); }
 
@@ -475,6 +500,111 @@ inline void cleanDirectory(const String& path, const String& filePrefix, const S
     }
 }
 
+#if JUCE_MODULE_AVAILABLE_juce_audio_processors
+inline String describeLayout(const AudioProcessor::BusesLayout& l) {
+    String sout;
+    StringArray sbuses;
+
+    int count = 1;
+    String last;
+
+    auto addLast = [&] {
+        if (count > 1) {
+            sbuses.add(String(count) + "x" + last);
+        } else {
+            sbuses.add(last);
+        }
+        count = 1;
+    };
+
+    auto addBuses = [&](const Array<AudioChannelSet>& buses, bool twoBusesAsSC = false) {
+        if (buses.isEmpty()) {
+            sout << "-";
+        } else {
+            sbuses.clearQuick();
+            last.clear();
+            count = 1;
+            for (int i = 0; i < buses.size(); i++) {
+                auto sbus = buses[i].getDescription().replace(" Surround", "");
+                if (sbus.startsWith("Discrete #")) {
+                    sbus = sbus.substring(10) + "ch";
+                }
+                if (last == sbus) {
+                    count++;
+                } else if (last.isNotEmpty()) {
+                    addLast();
+                }
+                last = sbus;
+            }
+            addLast();
+            if (sbuses.size() == 2 && twoBusesAsSC) {
+                sout << sbuses.joinIntoString(",") << " (Sidechain)";
+            } else {
+                sout << sbuses.joinIntoString(",");
+            }
+        }
+    };
+
+    sout << "Inputs: ";
+    addBuses(l.inputBuses, true);
+
+    sout << " / Outputs: ";
+    addBuses(l.outputBuses);
+
+    return sout;
+}
+
+inline String serializeLayout(const AudioProcessor::BusesLayout& l) {
+    json j;
+    if (l.inputBuses.size() > 0) {
+        for (auto& bus : l.inputBuses) {
+            j["inputBuses"].push_back(bus.getSpeakerArrangementAsString().toStdString());
+        }
+    } else {
+        j["inputBuses"] = json::array();
+    }
+    if (l.outputBuses.size() > 0) {
+        for (auto& bus : l.outputBuses) {
+            j["outputBuses"].push_back(bus.getSpeakerArrangementAsString().toStdString());
+        }
+    } else {
+        j["outputBuses"] = json::array();
+    }
+    return j.dump();
+}
+
+inline AudioProcessor::BusesLayout deserializeLayout(const String& s) {
+    AudioProcessor::BusesLayout ret;
+    try {
+        json j = json::parse(s.toStdString());
+        for (auto& jbus : j["inputBuses"]) {
+            ret.inputBuses.add(AudioChannelSet::fromAbbreviatedString(jbus.get<std::string>()));
+        }
+        for (auto& jbus : j["outputBuses"]) {
+            ret.outputBuses.add(AudioChannelSet::fromAbbreviatedString(jbus.get<std::string>()));
+        }
+    } catch (const json::parse_error& e) {
+        setLogTagStatic("utils");
+        logln("failed to deserialize layout: " << e.what());
+    }
+    return ret;
+}
+
+inline int getLayoutNumChannels(const AudioProcessor::BusesLayout& l, bool isInput) {
+    int num = 0;
+    if (isInput) {
+        for (auto& bus : l.inputBuses) {
+            num += bus.size();
+        }
+    } else {
+        for (auto& bus : l.outputBuses) {
+            num += bus.size();
+        }
+    }
+    return num;
+}
+#endif
+
 struct FnThread : Thread {
     std::function<void()> fn;
 
@@ -485,7 +615,11 @@ struct FnThread : Thread {
         }
     }
 
-    virtual ~FnThread() override { stopThread(-1); }
+    virtual ~FnThread() override {
+        if (isThreadRunning()) {
+            stopThread(-1);
+        }
+    }
 
     void run() override {
         if (fn != nullptr) {
@@ -495,5 +629,33 @@ struct FnThread : Thread {
     }
 };
 
+struct FnTimer : Timer {
+    std::function<void()> fn;
+    bool oneTime = true;
+
+    FnTimer(std::function<void()> f = nullptr, int intervalMs = 0, bool oneTime_ = true, bool autoStart = true)
+        : fn(f), oneTime(oneTime_) {
+        if (autoStart) {
+            startTimer(intervalMs);
+        }
+    }
+
+    virtual ~FnTimer() override {
+        stopTimer();
+        fn = nullptr;
+    }
+
+    void timerCallback() override {
+        if (nullptr != fn) {
+            fn();
+        }
+        if (oneTime) {
+            stopTimer();
+            fn = nullptr;
+        }
+    }
+};
+
 }  // namespace e47
+
 #endif /* Utils_hpp */

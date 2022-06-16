@@ -33,18 +33,28 @@ static constexpr int SCAREA_FULLSCREEN = 0xFFFF;
 
 static constexpr int PLUGIN_CHANNELS_MAX = 64;
 
+static constexpr int PLUGIN_FX_CHANNELS_IN = 30;
+static constexpr int PLUGIN_FX_CHANNELS_OUT = 32;
+static constexpr int PLUGIN_FX_CHANNELS_SC = 2;
+
+static constexpr int PLUGIN_INST_CHANNELS_IN = 0;
+static constexpr int PLUGIN_INST_CHANNELS_OUT = 64;
+static constexpr int PLUGIN_INST_CHANNELS_SC = 0;
+
+#if AG_PLUGIN
 #if JucePlugin_IsMidiEffect
-static constexpr int PLUGIN_CHANNELS_IN = 0;
-static constexpr int PLUGIN_CHANNELS_OUT = 0;
+static constexpr int PLUGIN_CHANNELS_IN = 2;
+static constexpr int PLUGIN_CHANNELS_OUT = 2;
 static constexpr int PLUGIN_CHANNELS_SC = 0;
 #elif JucePlugin_IsSynth
-static constexpr int PLUGIN_CHANNELS_IN = 0;
-static constexpr int PLUGIN_CHANNELS_OUT = 64;
-static constexpr int PLUGIN_CHANNELS_SC = 0;
+static constexpr int PLUGIN_CHANNELS_IN = PLUGIN_INST_CHANNELS_IN;
+static constexpr int PLUGIN_CHANNELS_OUT = PLUGIN_INST_CHANNELS_OUT;
+static constexpr int PLUGIN_CHANNELS_SC = PLUGIN_INST_CHANNELS_SC;
 #else
-static constexpr int PLUGIN_CHANNELS_IN = 16;
-static constexpr int PLUGIN_CHANNELS_OUT = 16;
-static constexpr int PLUGIN_CHANNELS_SC = 2;
+static constexpr int PLUGIN_CHANNELS_IN = PLUGIN_FX_CHANNELS_IN;
+static constexpr int PLUGIN_CHANNELS_OUT = PLUGIN_FX_CHANNELS_OUT;
+static constexpr int PLUGIN_CHANNELS_SC = PLUGIN_FX_CHANNELS_SC;
+#endif
 #endif
 
 #ifndef JUCE_WINDOWS
@@ -58,6 +68,8 @@ static const String PLUGIN_CONFIG_FILE = "~/.audiogridder/audiogridderplugin.cfg
 static const String PLUGIN_TRAY_CONFIG_FILE = "~/.audiogridder/audiogridderplugintray.cfg";
 static const String KNOWN_PLUGINS_FILE = "~/.audiogridder/audiogridderserver{id}.cache";
 static const String DEAD_MANS_FILE = "~/.audiogridder/audiogridderserver{id}.crash";
+static const String SCAN_LAYOUT_ERROR_FILE = "~/.audiogridder/audiogridderserver{id}.scanlayout";
+static const String PLUGIN_LAYOUTS_FILE = "~/.audiogridder/audiogridderserver{id}.layouts";
 static const String SERVER_RUN_FILE = "~/.audiogridder/audiogridderserver{id}.running";
 static const String SERVER_WINDOW_POSITIONS_FILE = "~/.audiogridder/audiogridderserver{id}.winpos";
 static const String PLUGIN_WINDOW_POSITIONS_FILE = "~/.audiogridder/audiogridderplugin.winpos";
@@ -88,6 +100,12 @@ static const String KNOWN_PLUGINS_FILE =
     "\\AudioGridder\\audiogridderserver{id}.cache";
 static const String DEAD_MANS_FILE = File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
                                      "\\AudioGridder\\audiogridderserver{id}.crash";
+static const String SCAN_LAYOUT_ERROR_FILE =
+    File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
+    "\\AudioGridder\\audiogridderserver{id}.scanlayout";
+static const String PLUGIN_LAYOUTS_FILE =
+    File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
+    "\\AudioGridder\\audiogridderserver{id}.layouts";
 static const String SERVER_RUN_FILE = File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
                                       "\\AudioGridder\\audiogridderserver{id}.running";
 static const String SERVER_WINDOW_POSITIONS_FILE =
@@ -102,6 +120,19 @@ static const String DOMAIN_SOCKETS_DIR =
     File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() + "\\AudioGridder\\sockets";
 
 #endif
+
+enum ConfigFileType {
+    ConfigServer,
+    ConfigServerRun,
+    ConfigPlugin,
+    ConfigPluginCache,
+    ConfigPluginTray,
+    ConfigDeadMan,
+    WindowPositionsServer,
+    WindowPositionsPlugin,
+    ScanLayoutError,
+    PluginLayouts
+};
 
 inline String getLogDirName() {
 #ifdef JUCE_LINUX
@@ -178,18 +209,7 @@ inline String getSentryCrashpadPath() {
     return {};
 }
 
-enum ConfigFile {
-    ConfigServer,
-    ConfigServerRun,
-    ConfigPlugin,
-    ConfigPluginCache,
-    ConfigPluginTray,
-    ConfigDeadMan,
-    WindowPositionsServer,
-    WindowPositionsPlugin
-};
-
-inline String getConfigFileName(ConfigFile type, const std::unordered_map<String, String>& replace = {}) {
+inline String getConfigFileName(ConfigFileType type, const std::unordered_map<String, String>& replace = {}) {
     String file;
     String fileOld;
     switch (type) {
@@ -219,6 +239,12 @@ inline String getConfigFileName(ConfigFile type, const std::unordered_map<String
             break;
         case WindowPositionsPlugin:
             file = PLUGIN_WINDOW_POSITIONS_FILE;
+            break;
+        case ScanLayoutError:
+            file = SCAN_LAYOUT_ERROR_FILE;
+            break;
+        case PluginLayouts:
+            file = PLUGIN_LAYOUTS_FILE;
             break;
     }
     if (fileOld.isNotEmpty()) {

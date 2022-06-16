@@ -42,6 +42,7 @@ class Server : public Thread, public LogTag {
     const String& getName() const { return m_name; }
     void setName(const String& name);
     Uuid getUuid() const { return m_uuid; }
+
     bool getEnableAU() const { return m_enableAU; }
     void setEnableAU(bool b) { m_enableAU = b; }
     bool getEnableVST3() const { return m_enableVST3; }
@@ -77,19 +78,22 @@ class Server : public Thread, public LogTag {
     void setSandboxMode(SandboxMode m) { m_sandboxMode = m; }
     bool getCrashReporting() const { return m_crashReporting; }
     void setCrashReporting(bool b) { m_crashReporting = b; }
-    const KnownPluginList& getPluginList() const { return m_pluginlist; }
-    KnownPluginList& getPluginList() { return m_pluginlist; }
+
+    const KnownPluginList& getPluginList() const { return m_pluginList; }
+    KnownPluginList& getPluginList() { return m_pluginList; }
+    const Array<AudioProcessor::BusesLayout>& getPluginLayouts(const String& id);
+
     bool shouldExclude(const String& name, const String& id);
     bool shouldExclude(const String& name, const String& id, const std::vector<String>& include);
-    auto& getExcludeList() { return m_pluginexclude; }
+    auto& getExcludeList() { return m_pluginExclude; }
     void addPlugins(const std::vector<String>& names, std::function<void(bool, const String&)> fn);
 
-    static void loadKnownPluginList(KnownPluginList& plist, int srvId);
-    static void saveKnownPluginList(KnownPluginList& plist, int srvId);
+    static void loadKnownPluginList(KnownPluginList& plist, json& playouts, int srvId);
+    static void saveKnownPluginList(KnownPluginList& plist, json& playouts, int srvId);
 
-    void saveKnownPluginList();
+    void saveKnownPluginList(bool wipe = false);
 
-    static bool scanPlugin(const String& id, const String& format, int srvId);
+    static bool scanPlugin(const String& id, const String& format, int srvId, bool secondRun = false);
 
     void sandboxShowEditor();
     void sandboxHideEditor();
@@ -136,8 +140,10 @@ class Server : public Thread, public LogTag {
     StreamingSocket m_masterSocket, m_masterSocketLocal;
     using WorkerList = Array<std::shared_ptr<Worker>>;
     WorkerList m_workers;
-    KnownPluginList m_pluginlist;
-    std::set<String> m_pluginexclude;
+    KnownPluginList m_pluginList;
+    json m_jpluginLayouts;
+    std::unordered_map<String, Array<AudioProcessor::BusesLayout>> m_pluginLayouts;
+    std::set<String> m_pluginExclude;
     bool m_enableAU = true;
     bool m_enableVST3 = true;
     bool m_enableVST2 = true;
@@ -203,11 +209,12 @@ class Server : public Thread, public LogTag {
 
     std::unique_ptr<SandboxDeleter> m_sandboxDeleter;
 
-    void scanNextPlugin(const String& id, const String& name, const String& fmt, int srvId);
+    void scanNextPlugin(const String& id, const String& name, const String& fmt, int srvId, bool secondRun = false);
     void scanForPlugins();
     void scanForPlugins(const std::vector<String>& include);
 
     void loadKnownPluginList();
+    bool parsePluginLayouts(const String& id = {});
 
     void checkPort();
     void runServer();
