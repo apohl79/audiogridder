@@ -153,11 +153,11 @@ void ScreenRecorder::cleanupOutput() {
     }
 }
 
-void ScreenRecorder::start(juce::Rectangle<int> rect, CaptureCallback fn) {
+void ScreenRecorder::start(juce::Rectangle<int> rect, CaptureCallback callbackFn, ErrorCallback errorFn) {
     traceScope();
 
     if (!m_initialized) {
-        logln("screen recording not possible: initialization failed");
+        logError("screen recording not possible: initialization failed");
         return;
     }
 
@@ -168,9 +168,13 @@ void ScreenRecorder::start(juce::Rectangle<int> rect, CaptureCallback fn) {
 
         m_captureRect = rect * m_scale;
 
-        if (nullptr != fn) {
-            m_callback = fn;
+        if (nullptr != callbackFn) {
+            m_captureCallback = callbackFn;
             shouldResume = true;
+        }
+
+        if (nullptr != errorFn) {
+            m_errorCallback = errorFn;
         }
     }
 
@@ -193,7 +197,7 @@ void ScreenRecorder::stop() {
         if (m_thread->joinable()) {
             m_thread->join();
         } else {
-            logln("error: thread is not joinable");
+            logln("error in stop: thread is not joinable");
             m_thread->detach();
         }
         m_thread.reset();
@@ -206,7 +210,7 @@ void ScreenRecorder::resume(Rectangle<int> rect) {
     traceScope();
 
     if (!m_initialized) {
-        logln("screen recording not possible: initialization failed");
+        logError("screen recording not possible: initialization failed");
         return;
     }
 
@@ -215,7 +219,7 @@ void ScreenRecorder::resume(Rectangle<int> rect) {
     std::lock_guard<std::mutex> lock(m_startStopMtx);
 
     if (nullptr != m_thread) {
-        logln("error: detaching thread in resume()");
+        logln("error in resume: detaching thread");
         m_thread->detach();
     }
 
@@ -259,13 +263,13 @@ bool ScreenRecorder::prepareInput() {
     m_captureFmtCtx = avformat_alloc_context();
     ret = avformat_open_input(&m_captureFmtCtx, m_inputStreamUrl.getCharPointer(), m_inputFmt, &opts);
     if (ret != 0) {
-        logln("prepareInput: avformat_open_input failed: " << ret);
+        logError("prepareInput: avformat_open_input failed: err = " + String(ret));
         return false;
     }
 
     ret = avformat_find_stream_info(m_captureFmtCtx, nullptr);
     if (ret < 0) {
-        logln("prepareInput: avformat_find_stream_info failed: " << ret);
+        logError("prepareInput: avformat_find_stream_info failed: " + String(ret));
         return false;
     }
 
@@ -277,33 +281,33 @@ bool ScreenRecorder::prepareInput() {
         }
     }
     if (m_captureStreamIndex < 0) {
-        logln("prepareInput: unable to find video stream");
+        logError("prepareInput: unable to find video stream");
         return false;
     }
 
     m_captureCodec = avcodec_find_decoder(m_captureStream->codecpar->codec_id);
     if (nullptr == m_captureCodec) {
-        logln("prepareInput: unable to find capture codec");
+        logError("prepareInput: unable to find capture codec");
         return false;
     }
     m_captureCodecCtx = avcodec_alloc_context3(m_captureCodec);
     if (nullptr == m_captureCodecCtx) {
-        logln("prepareInput: unable to allocate codec context");
+        logError("prepareInput: unable to allocate codec context");
         return false;
     }
     ret = avcodec_parameters_to_context(m_captureCodecCtx, m_captureStream->codecpar);
     if (ret < 0) {
-        logln("prepareInput: avcodec_parameters_to_context failed: " << ret);
+        logError("prepareInput: avcodec_parameters_to_context failed: err = " + String(ret));
         return false;
     }
     ret = avcodec_open2(m_captureCodecCtx, m_captureCodec, nullptr);
     if (ret < 0) {
-        logln("prepareInput: avcodec_open2 failed: " << ret);
+        logError("prepareInput: avcodec_open2 failed: err = " + String(ret));
         return false;
     }
 
     if (m_captureCodecCtx->pix_fmt < 0 || m_captureCodecCtx->pix_fmt >= AV_PIX_FMT_NB) {
-        logln("prepareInput: invalid input pixel format: " << m_captureCodecCtx->pix_fmt);
+        logError("prepareInput: invalid input pixel format: pix_fmt = " + String(m_captureCodecCtx->pix_fmt));
         return false;
     }
 
@@ -318,25 +322,25 @@ bool ScreenRecorder::prepareOutput() {
     traceScope();
 
     if (nullptr == m_captureCodecCtx) {
-        logln("prepareOutput: input not ready");
+        logError("prepareOutput: input not ready");
         return false;
     }
 
     m_capturePacket = av_packet_alloc();
     if (nullptr == m_capturePacket) {
-        logln("prepareOutput: unable to allocate AVPacket");
+        logError("prepareOutput: unable to allocate AVPacket");
         return false;
     }
 
     m_captureFrame = av_frame_alloc();
     if (nullptr == m_captureFrame) {
-        logln("prepareOutput: unable to allocate AVFrame");
+        logError("prepareOutput: unable to allocate AVFrame");
         return false;
     }
 
     m_outputPacket = av_packet_alloc();
     if (nullptr == m_outputPacket) {
-        logln("prepareOutput: unable to allocate AVPacket");
+        logError("prepareOutput: unable to allocate AVPacket");
         return false;
     }
 
@@ -345,7 +349,7 @@ bool ScreenRecorder::prepareOutput() {
     } else {
         m_outputCodecCtx = avcodec_alloc_context3(m_outputCodec);
         if (nullptr == m_outputCodecCtx) {
-            logln("prepareOutput: unable to allocate codec context");
+            logError("prepareOutput: unable to allocate codec context");
             return false;
         }
     }
@@ -378,15 +382,15 @@ bool ScreenRecorder::prepareOutput() {
     }
     int ret = avcodec_open2(m_outputCodecCtx, m_outputCodec, &opts);
     if (ret < 0) {
-        logln("prepareOutput: avcodec_open2 failed: " << ret);
+        logError("prepareOutput: avcodec_open2 failed: err = " + String(ret));
         return false;
     }
 
     if (nullptr == m_outputFrame) {
-        logln("prepareOutput: allocating new output frame");
+        logError("prepareOutput: allocating new output frame");
         m_outputFrame = av_frame_alloc();
         if (nullptr == m_outputFrame) {
-            logln("prepareOutput: unable to allocate AVFrame");
+            logError("prepareOutput: unable to allocate AVFrame");
             return false;
         }
     } else {
@@ -405,14 +409,14 @@ bool ScreenRecorder::prepareOutput() {
     m_outputFrameBuf = (uint8_t*)av_malloc(outputFrameBufSize);
 
     if (nullptr == m_outputFrameBuf) {
-        logln("prepareOutput: unable to allocate output frame buffer");
+        logError("prepareOutput: unable to allocate output frame buffer");
         return false;
     }
 
     ret = av_image_fill_arrays(m_outputFrame->data, m_outputFrame->linesize, m_outputFrameBuf,
                                m_outputCodecCtx->pix_fmt, m_outputFrame->width, m_outputFrame->height, 32);
     if (ret < 0) {
-        logln("prepareOutput: av_image_fill_arrays failed: " << ret);
+        logError("prepareOutput: av_image_fill_arrays failed: err = " + String(ret));
         return false;
     }
 
@@ -420,14 +424,14 @@ bool ScreenRecorder::prepareOutput() {
                               m_outputFrame->width, m_outputFrame->height, m_outputCodecCtx->pix_fmt, SWS_BICUBIC,
                               nullptr, nullptr, nullptr);
     if (nullptr == m_swsCtx) {
-        logln("prepareOutput: sws_getContext failed");
+        logError("prepareOutput: sws_getContext failed");
         return false;
     }
 
     if (nullptr == m_cropFrame) {
         m_cropFrame = av_frame_alloc();
         if (nullptr == m_cropFrame) {
-            logln("prepareOutput: unable to allocate AVFrame");
+            logError("prepareOutput: unable to allocate AVFrame");
             return false;
         }
     } else {
@@ -437,7 +441,7 @@ bool ScreenRecorder::prepareOutput() {
     m_cropFrame->height = m_captureRect.getHeight();
     m_cropFrame->format = m_captureCodecCtx->pix_fmt;
     if (av_frame_get_buffer(m_cropFrame, 0) < 0) {
-        logln("prepareOutput: unable to allocate AVFrame crop buffers");
+        logError("prepareOutput: unable to allocate AVFrame crop buffers");
         return false;
     }
 
@@ -463,7 +467,7 @@ void ScreenRecorder::record() {
                 durationPkt.reset();
                 int retSDP = avcodec_send_packet(m_captureCodecCtx, m_capturePacket);
                 if (retSDP < 0) {
-                    logln("avcodec_send_packet failed: " << retSDP);
+                    logError("record: avcodec_send_packet failed: err = " + String(retSDP));
                     break;
                 }
                 int retRCF;
@@ -494,7 +498,7 @@ void ScreenRecorder::record() {
                         durationEnc.reset();
                         int retSDF = avcodec_send_frame(m_outputCodecCtx, m_outputFrame);
                         if (retSDF < 0) {
-                            logln("avcodec_send_frame failed: " << retSDF);
+                            logln("record: avcodec_send_frame failed: " + String(retSDF));
                             break;
                         }
                         int retRCP;
@@ -510,8 +514,9 @@ void ScreenRecorder::record() {
                                     // image size.
                                     scale = m_downScale ? 1.0 : m_scale;
 #endif
-                                    m_callback(m_outputPacket->data, m_outputPacket->size, m_scaledWith, m_scaledHeight,
-                                               m_outputFrame->width, m_outputFrame->height, scale);
+                                    m_captureCallback(m_outputPacket->data, m_outputPacket->size, m_scaledWith,
+                                                      m_scaledHeight, m_outputFrame->width, m_outputFrame->height,
+                                                      scale);
                                 } else {
                                     initalFramesToSkip--;
                                 }

@@ -40,13 +40,14 @@ class ScreenRecorder : public LogTag, public SharedInstance<ScreenRecorder> {
   public:
     using CaptureCallback = std::function<void(const uint8_t* data, int size, int width, int height, int widthPadded,
                                                int heightPadded, double scale)>;
+    using ErrorCallback = std::function<void(const String&)>;
 
     enum EncoderMode { WEBP, MJPEG };
 
     ScreenRecorder();
     ~ScreenRecorder();
 
-    void start(juce::Rectangle<int> rect, CaptureCallback fn);
+    void start(juce::Rectangle<int> rect, CaptureCallback callbackFn, ErrorCallback errorFn);
     void resume(juce::Rectangle<int> rect = {});
     void stop();
 
@@ -94,7 +95,8 @@ class ScreenRecorder : public LogTag, public SharedInstance<ScreenRecorder> {
     std::atomic_bool m_capture{false};
     std::mutex m_startStopMtx;
 
-    CaptureCallback m_callback;
+    CaptureCallback m_captureCallback;
+    ErrorCallback m_errorCallback;
 
     bool prepareInput();
     bool prepareOutput();
@@ -103,6 +105,13 @@ class ScreenRecorder : public LogTag, public SharedInstance<ScreenRecorder> {
     void cleanupOutput();
 
     void record();
+
+    inline void logError(const String& err) {
+        if (nullptr != m_errorCallback) {
+            m_errorCallback(err);
+        }
+        logln(err);
+    }
 };
 
 }  // namespace e47

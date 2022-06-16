@@ -61,6 +61,7 @@ class Worker : public Thread, public LogTag {
     std::shared_ptr<StreamingSocket> m_masterSocket;
     std::unique_ptr<StreamingSocket> m_cmdIn;
     std::unique_ptr<StreamingSocket> m_cmdOut;
+    std::mutex m_cmdOutMtx;
     HandshakeRequest m_cfg;
     std::shared_ptr<AudioWorker> m_audio;
     std::shared_ptr<ScreenWorker> m_screen;
@@ -103,6 +104,7 @@ class Worker : public Thread, public LogTag {
     void sendParamGestureChange(int idx, int paramIdx, bool guestureIsStarting);
     void sendStatusChange(int idx, bool ok, const String& err);
     void sendHideEditor(int idx);
+    void sendError(const String& error);
 
     ENABLE_ASYNC_FUNCTORS();
 };

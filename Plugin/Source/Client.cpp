@@ -157,6 +157,9 @@ void Client::run() {
                         case HidePlugin::Type:
                             handleMessage(Message<Any>::convert<HidePlugin>(msg));
                             break;
+                        case ServerError::Type:
+                            handleMessage(Message<Any>::convert<ServerError>(msg));
+                            break;
                         default:
                             logln("unknown message type " << msg->getType());
                     }
@@ -236,6 +239,13 @@ void Client::handleMessage(std::shared_ptr<Message<PluginStatus>> msg) {
 
 void Client::handleMessage(std::shared_ptr<Message<HidePlugin>> msg) {
     m_processor->hidePluginFromServer(pPLD(msg).getNumber());
+}
+
+void Client::handleMessage(std::shared_ptr<Message<ServerError>> msg) {
+    runOnMsgThreadAsync([chain = getLoadedPluginsString(), err = pPLD(msg).getString()] {
+        AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Server Error",
+                                         "The server reported an error for plugin chain '" + chain + "': " + err);
+    });
 }
 
 void Client::setServer(const ServerInfo& srv) {

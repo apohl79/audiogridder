@@ -130,7 +130,11 @@ void ProcessorWindow::startCapturing() {
                     if (rec->isRecording()) {
                         rec->stop();
                     }
-                    rec->start(m_screenCaptureRect, m_callbackFFmpeg);
+                    rec->start(m_screenCaptureRect, m_callbackFFmpeg, [tid = m_tid](const String& err) {
+                        if (auto onErr = getApp()->getWorkerErrorCallback(tid)) {
+                            onErr("Screen capturing failed: " + err);
+                        }
+                    });
                 } else {
                     logln("error: no screen recorder");
                 }

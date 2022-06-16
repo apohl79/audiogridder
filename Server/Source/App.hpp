@@ -75,6 +75,10 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     Point<float> localPointToGlobal(Thread::ThreadID tid, Point<float> lp);
     void addKeyListener(Thread::ThreadID tid, KeyListener* l);
 
+    using ErrorCallback = std::function<void(const String&)>;
+    ErrorCallback getWorkerErrorCallback(Thread::ThreadID tid);
+    void setWorkerErrorCallback(Thread::ThreadID tid, ErrorCallback fn);
+
     void hidePluginList();
     void hideServerSettings();
     void hideStatistics();
@@ -97,6 +101,9 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
 
     std::unordered_map<uint64, std::shared_ptr<Processor>> m_processors;
     std::mutex m_processorsMtx;
+
+    std::unordered_map<uint64, ErrorCallback> m_workerErrorCallbacks;
+    std::mutex m_workerErrorCallbacksMtx;
 
     std::unique_ptr<PluginListWindow> m_pluginListWindow;
     std::unique_ptr<ServerSettingsWindow> m_srvSettingsWindow;

@@ -63,6 +63,12 @@ void Worker::run() {
     runCount++;
     setLogTagExtra("client:" + String::toHexString(m_cfg.clientId));
 
+    getApp()->setWorkerErrorCallback(getThreadId(), [this](const String& err) {
+        if (isThreadRunning()) {
+            sendError(err);
+        }
+    });
+
     m_noPluginListFilter = m_cfg.isFlag(HandshakeRequest::NO_PLUGINLIST_FILTER);
 
     // set master socket non-blocking
@@ -206,6 +212,8 @@ void Worker::run() {
         }
     }
 
+    getApp()->setWorkerErrorCallback(getThreadId(), nullptr);
+
     if (nullptr != m_screen) {
         if (m_activeEditorIdx > -1) {
             m_screen->hideEditor();
@@ -266,7 +274,10 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
                            [this](int idx, int paramIdx, bool gestureIsStarting) {
                                sendParamGestureChange(idx, paramIdx, gestureIsStarting);
                            },
-                           [this](Message<Key>& m) { m.send(m_cmdOut.get()); },
+                           [this](Message<Key>& m) {
+                               std::lock_guard<std::mutex> lock(m_cmdOutMtx);
+                               m.send(m_cmdOut.get());
+                           },
                            [this](int idx, bool ok, const String& procErr) { sendStatusChange(idx, ok, procErr); });
     }
     Message<AddPluginResult> msgResult(this);
@@ -519,8 +530,7 @@ void Worker::handleMessage(std::shared_ptr<Message<Rescan>> msg) {
     runOnMsgThreadAsync([this, wipe] {
         traceScope();
         if (wipe) {
-            getApp()->getServer()->getPluginList().clear();
-            getApp()->getServer()->saveKnownPluginList();
+            getApp()->getServer()->saveKnownPluginList(true);
         }
         getApp()->restartServer(true);
     });
@@ -584,6 +594,7 @@ void Worker::handleMessage(std::shared_ptr<Message<GetScreenBounds>> /*msg*/) {
     if (getApp()->getServer()->getSandboxModeRuntime() == Server::SANDBOX_PLUGIN) {
         // We don't want to block for updating the bounds of a plugin UI in a plugin isolation sandbox, so the response
         // goes back on the "command out" channel.
+        std::lock_guard<std::mutex> lock(m_cmdOutMtx);
         res.send(m_cmdOut.get());
     } else {
         res.send(m_cmdIn.get());
@@ -599,12 +610,14 @@ void Worker::sendKeys(const std::vector<uint16_t>& keysToPress) {
     Message<Key> msg(this);
     PLD(msg).setData(reinterpret_cast<const char*>(keysToPress.data()),
                      static_cast<int>(keysToPress.size() * sizeof(uint16_t)));
+    std::lock_guard<std::mutex> lock(m_cmdOutMtx);
     msg.send(m_cmdOut.get());
 }
 
 void Worker::sendClipboard(const String& val) {
     Message<Clipboard> msg(this);
     PLD(msg).setString(val);
+    std::lock_guard<std::mutex> lock(m_cmdOutMtx);
     msg.send(m_cmdOut.get());
 }
 
@@ -749,6 +762,7 @@ void Worker::sendParamValueChange(int idx, int paramIdx, float val) {
     DATA(msg)->idx = idx;
     DATA(msg)->paramIdx = paramIdx;
     DATA(msg)->value = val;
+    std::lock_guard<std::mutex> lock(m_cmdOutMtx);
     msg.send(m_cmdOut.get());
 }
 
@@ -759,6 +773,7 @@ void Worker::sendParamGestureChange(int idx, int paramIdx, bool guestureIsStarti
     DATA(msg)->idx = idx;
     DATA(msg)->paramIdx = paramIdx;
     DATA(msg)->gestureIsStarting = guestureIsStarting;
+    std::lock_guard<std::mutex> lock(m_cmdOutMtx);
     msg.send(m_cmdOut.get());
 }
 
@@ -766,6 +781,7 @@ void Worker::sendStatusChange(int idx, bool ok, const String& err) {
     logln("sending plugin status (index=" << idx << ", ok=" << (int)ok << ", err=" << err << ")");
     Message<PluginStatus> msg(this);
     PLD(msg).setJson({{"idx", idx}, {"ok", ok}, {"err", err.toStdString()}});
+    std::lock_guard<std::mutex> lock(m_cmdOutMtx);
     msg.send(m_cmdOut.get());
 }
 
@@ -773,6 +789,14 @@ void Worker::sendHideEditor(int idx) {
     logln("sending hide editor (index=" << idx << ")");
     Message<HidePlugin> msg(this);
     PLD(msg).setNumber(idx);
+    std::lock_guard<std::mutex> lock(m_cmdOutMtx);
+    msg.send(m_cmdOut.get());
+}
+
+void Worker::sendError(const String& error) {
+    Message<ServerError> msg(this);
+    PLD(msg).setString(error);
+    std::lock_guard<std::mutex> lock(m_cmdOutMtx);
     msg.send(m_cmdOut.get());
 }
 

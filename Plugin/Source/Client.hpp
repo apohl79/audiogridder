@@ -399,6 +399,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     void handleMessage(std::shared_ptr<Message<ParameterGesture>> msg);
     void handleMessage(std::shared_ptr<Message<PluginStatus>> msg);
     void handleMessage(std::shared_ptr<Message<HidePlugin>> msg);
+    void handleMessage(std::shared_ptr<Message<ServerError>> msg);
 
     ENABLE_ASYNC_FUNCTORS();
 };

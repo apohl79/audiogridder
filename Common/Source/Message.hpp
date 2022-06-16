@@ -89,7 +89,7 @@ StreamingSocket* accept(StreamingSocket*, int timeoutMs = 1000, std::function<bo
 /*
  * Client/Server handshake
  */
-static constexpr int AG_PROTOCOL_VERSION = 10;
+static constexpr int AG_PROTOCOL_VERSION = 11;
 
 struct HandshakeRequest {
     int version;
@@ -871,6 +871,12 @@ class CPULoad : public FloatPayload {
   public:
     static constexpr int Type = __COUNTER__;
     CPULoad() : FloatPayload(Type) {}
+};
+
+class ServerError : public StringPayload {
+  public:
+    static constexpr int Type = __COUNTER__;
+    ServerError() : StringPayload(Type) {}
 };
 
 template <typename T>
