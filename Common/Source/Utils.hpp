@@ -605,6 +605,42 @@ inline int getLayoutNumChannels(const AudioProcessor::BusesLayout& l, bool isInp
 }
 #endif
 
+inline String getPluginType(const String& id) {
+    String type;
+    File f(id);
+    if (f.exists()) {
+        if (f.getFileExtension().toLowerCase() == ".dll") {
+            type = "vst";
+        } else {
+            type = f.getFileExtension().toLowerCase().substring(1);
+        }
+    } else if (id.startsWith("AudioUnit")) {
+        type = "au";
+    } else {
+        type = "unknown";
+    }
+    return type;
+}
+
+inline String getPluginName(const String& id, bool withType = true) {
+    String name;
+    File f(id);
+    if (f.exists()) {
+        name = f.getFileNameWithoutExtension();
+#if JUCE_MAC && AG_SERVER
+    } else if (id.startsWith("AudioUnit")) {
+        AudioUnitPluginFormat fmt;
+        name = fmt.getNameOfPluginFromIdentifier(id);
+#endif
+    } else {
+        name = id;
+    }
+    if (withType) {
+        name << " (" << getPluginType(id) << ")";
+    }
+    return name;
+}
+
 struct FnThread : Thread {
     std::function<void()> fn;
 

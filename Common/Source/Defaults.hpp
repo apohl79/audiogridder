@@ -68,6 +68,7 @@ static const String PLUGIN_CONFIG_FILE = "~/.audiogridder/audiogridderplugin.cfg
 static const String PLUGIN_TRAY_CONFIG_FILE = "~/.audiogridder/audiogridderplugintray.cfg";
 static const String KNOWN_PLUGINS_FILE = "~/.audiogridder/audiogridderserver{id}.cache";
 static const String DEAD_MANS_FILE = "~/.audiogridder/audiogridderserver{id}.crash";
+static const String SCAN_ERROR_FILE = "~/.audiogridder/audiogridderserver{id}.scanerror";
 static const String SCAN_LAYOUT_ERROR_FILE = "~/.audiogridder/audiogridderserver{id}.scanlayout";
 static const String PLUGIN_LAYOUTS_FILE = "~/.audiogridder/audiogridderserver{id}.layouts";
 static const String SERVER_RUN_FILE = "~/.audiogridder/audiogridderserver{id}.running";
@@ -100,6 +101,8 @@ static const String KNOWN_PLUGINS_FILE =
     "\\AudioGridder\\audiogridderserver{id}.cache";
 static const String DEAD_MANS_FILE = File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
                                      "\\AudioGridder\\audiogridderserver{id}.crash";
+static const String SCAN_ERROR_FILE = File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
+                                      "\\AudioGridder\\audiogridderserver{id}.scanerror";
 static const String SCAN_LAYOUT_ERROR_FILE =
     File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
     "\\AudioGridder\\audiogridderserver{id}.scanlayout";
@@ -130,6 +133,7 @@ enum ConfigFileType {
     ConfigDeadMan,
     WindowPositionsServer,
     WindowPositionsPlugin,
+    ScanError,
     ScanLayoutError,
     PluginLayouts
 };
@@ -239,6 +243,9 @@ inline String getConfigFileName(ConfigFileType type, const std::unordered_map<St
             break;
         case WindowPositionsPlugin:
             file = PLUGIN_WINDOW_POSITIONS_FILE;
+            break;
+        case ScanError:
+            file = SCAN_ERROR_FILE;
             break;
         case ScanLayoutError:
             file = SCAN_LAYOUT_ERROR_FILE;

@@ -334,10 +334,10 @@ void Server::loadKnownPluginList(KnownPluginList& plist, json& playouts, int srv
     File layoutsFile(Defaults::getConfigFileName(Defaults::PluginLayouts, {{"id", String(srvId)}}));
 
 #ifndef AG_UNIT_TESTS
-    if (!cacheFile.exists()) {
+    if (!cacheFile.existsAsFile() && srvId < Defaults::SCAN_ID_START) {
         cacheFile = File(Defaults::getConfigFileName(Defaults::ConfigPluginCache, {{"id", "0"}}));
     }
-    if (!layoutsFile.exists()) {
+    if (!layoutsFile.existsAsFile() && srvId < Defaults::SCAN_ID_START) {
         layoutsFile = File(Defaults::getConfigFileName(Defaults::PluginLayouts, {{"id", "0"}}));
     }
 #endif
@@ -526,17 +526,22 @@ bool Server::scanPlugin(const String& id, const String& format, int srvId, bool 
     }
 
     setLogTagStatic("server");
-    logln("scanning id=" << id << " fmt=" << format);
+    logln("scanning id=" << id << " fmt=" << format << " srvId=" << srvId);
 
     KnownPluginList plist, newlist;
     json playouts;
     loadKnownPluginList(plist, playouts, srvId);
 
     File crashFile(Defaults::getConfigFileName(Defaults::ConfigDeadMan, {{"id", String(srvId)}}));
+    File errFile(Defaults::getConfigFileName(Defaults::ScanError, {{"id", String(srvId)}}));
 
     if (crashFile.existsAsFile()) {
         crashFile.deleteFile();
     }
+
+    errFile.create();
+
+    logln("starting scan...");
 
     int retries = 4;
     bool success = false;
@@ -558,6 +563,8 @@ bool Server::scanPlugin(const String& id, const String& format, int srvId, bool 
             Thread::sleep(1000);
         }
     } while (!success && retries-- > 0);
+
+    logln("...ok");
 
     for (auto& t : newlist.getTypes()) {
         auto pluginId = Processor::createPluginID(t);
@@ -592,6 +599,8 @@ bool Server::scanPlugin(const String& id, const String& format, int srvId, bool 
 
     saveKnownPluginList(plist, playouts, srvId);
 
+    errFile.deleteFile();
+
     return success;
 }
 
@@ -625,16 +634,21 @@ void Server::scanNextPlugin(const String& id, const String& name, const String& 
                     finished = false;
                 }
             } else {
-                if (!secondRun) {
-                    auto errFile = Defaults::getConfigFileName(Defaults::ScanLayoutError, {{"id", String(srvId)}});
-                    if (File(errFile).existsAsFile()) {
-                        logln("error: scan for '" << name << "' failed while testing layouts, starting second run");
-                        File(errFile).deleteFile();
-                        scanNextPlugin(id, name, fmt, srvId, true);
-                    }
+                auto layoutErrFile =
+                    File(Defaults::getConfigFileName(Defaults::ScanLayoutError, {{"id", String(srvId)}}));
+                auto errFile = File(Defaults::getConfigFileName(Defaults::ScanError, {{"id", String(srvId)}}));
+                auto ec = proc.getExitCode();
+
+                if (!secondRun && layoutErrFile.existsAsFile()) {
+                    logln("error: scan for '" << name << "' failed while testing layouts, starting second run");
+                    layoutErrFile.deleteFile();
+                    scanNextPlugin(id, name, fmt, srvId, true);
                 } else {
-                    auto ec = proc.getExitCode();
-                    if (ec != 0) {
+                    if (errFile.existsAsFile()) {
+                        logln("error: scan for '" << name << "' failed, as the plugin crashed the scanner probably");
+                        errFile.deleteFile();
+                        blacklist = true;
+                    } else if (ec != 0) {
                         logln("error: scan for '" << name << "' failed with exit code " << (int)ec);
                         blacklist = true;
                     }
@@ -664,16 +678,21 @@ void Server::scanForPlugins(const std::vector<String>& include) {
     traceScope();
     logln("scanning for plugins...");
     std::vector<std::unique_ptr<AudioPluginFormat>> fmts;
+    size_t fmtAU = 0, fmtVST = 0, fmtVST3 = 0;
+
 #if JUCE_MAC
     if (m_enableAU) {
+        fmtAU = fmts.size();
         fmts.push_back(std::make_unique<AudioUnitPluginFormat>());
     }
 #endif
     if (m_enableVST3) {
+        fmtVST3 = fmts.size();
         fmts.push_back(std::make_unique<VST3PluginFormat>());
     }
 #if JUCE_PLUGINHOST_VST
     if (m_enableVST2) {
+        fmtVST = fmts.size();
         fmts.push_back(std::make_unique<VSTPluginFormat>());
     }
 #endif
@@ -695,6 +714,9 @@ void Server::scanForPlugins(const std::vector<String>& include) {
     }
 
     std::mutex inProgressMtx;
+    std::atomic<float> progress{0};
+
+    StringArray fileOrIds;
 
     for (auto& fmt : fmts) {
         FileSearchPath searchPaths;
@@ -712,65 +734,72 @@ void Server::scanForPlugins(const std::vector<String>& include) {
         }
         searchPaths.removeRedundantPaths();
         searchPaths.removeNonExistentPaths();
-        auto fileOrIds = fmt->searchPathsForPlugins(searchPaths, true);
-        for (auto& fileOrId : fileOrIds) {
-            auto name = fmt->getNameOfPluginFromIdentifier(fileOrId);
-            auto plugindesc = m_pluginList.getTypeForFile(fileOrId);
-            if (File(name).exists()) {
-                name = File(name).getFileName();
-            }
-            bool excluded = shouldExclude(name, fileOrId, include);
-            if ((nullptr == plugindesc || fmt->pluginNeedsRescanning(*plugindesc)) &&
-                !m_pluginList.getBlacklistedFiles().contains(fileOrId) && !excluded) {
-                ScanThread* scanThread = nullptr;
-                String* inProgressName = nullptr;
-                do {
-                    for (size_t i = 0; i < scanThreads.size(); i++) {
-                        if (!scanThreads[i].isThreadRunning()) {
-                            scanThread = &scanThreads[i];
-                            inProgressName = &inProgressNames.getReference((int)i);
-                            break;
-                        }
-                        sleep(5);
-                    }
-                } while (scanThread == nullptr);
+        fileOrIds.addArray(fmt->searchPathsForPlugins(searchPaths, true));
+    }
 
-                logln("  scanning: " << name);
-                String splashName = name;
-                if (fmt->getName().compare("AudioUnit")) {
-                    File f(name);
-                    if (f.exists()) {
-                        splashName = f.getFileNameWithoutExtension();
-                    }
-                }
-                splashName << " (" << fmt->getName().toLowerCase().replace("audiounit", "au") << ")";
+    for (int idx = 0; idx < fileOrIds.size(); idx++) {
+        auto& fileOrId = fileOrIds.getReference(idx);
+        auto name = getPluginName(fileOrId, false);
+        auto type = getPluginType(fileOrId);
+        auto* fmt = type == "au"     ? fmts[fmtAU].get()
+                    : type == "vst3" ? fmts[fmtVST3].get()
+                    : type == "vst"  ? fmts[fmtVST].get()
+                                     : nullptr;
 
-                auto updateSplash = [&inProgressMtx, inProgressName, &inProgressNames](const String& newName) {
-                    std::lock_guard<std::mutex> lock(inProgressMtx);
-                    *inProgressName = newName;
-                    StringArray out = inProgressNames;
-                    out.removeEmptyStrings();
-                    if (out.isEmpty()) {
-                        getApp()->setSplashInfo("Processing scan results...");
-                    } else {
-                        getApp()->setSplashInfo(String("Scanning...") + newLine + newLine + out.joinIntoString(", "));
-                    }
-                };
-
-                updateSplash(splashName);
-
-                scanThread->fn = [this, fileOrId, pluginName = name, fmtName = fmt->getName(), srvId = scanThread->id,
-                                  updateSplash] {
-                    scanNextPlugin(fileOrId, pluginName, fmtName, srvId);
-                    updateSplash("");
-                };
-
-                scanThread->startThread();
-            } else {
-                logln("  (skipping: " << name << (excluded ? " excluded" : "") << ")");
-            }
-            neverSeenList.erase(fileOrId);
+        if (nullptr == fmt) {
+            logln("error: can't detect plugin format for " << fileOrId);
+            continue;
         }
+
+        auto plugindesc = m_pluginList.getTypeForFile(fileOrId);
+        bool excluded = shouldExclude(name, fileOrId, include);
+        if ((nullptr == plugindesc || fmt->pluginNeedsRescanning(*plugindesc)) &&
+            !m_pluginList.getBlacklistedFiles().contains(fileOrId) && !excluded) {
+            ScanThread* scanThread = nullptr;
+            String* inProgressName = nullptr;
+            do {
+                for (size_t i = 0; i < scanThreads.size(); i++) {
+                    if (!scanThreads[i].isThreadRunning()) {
+                        scanThread = &scanThreads[i];
+                        inProgressName = &inProgressNames.getReference((int)i);
+                        break;
+                    }
+                    sleep(5);
+                }
+            } while (scanThread == nullptr);
+
+            String splashName = getPluginName(fileOrId);
+
+            progress = (float)idx / fileOrIds.size() * 100.0f;
+
+            logln("  scanning: " << splashName << " (" << String(progress, 1) << "%)");
+
+            auto updateSplash = [&inProgressMtx, inProgressName, &inProgressNames, &progress](const String& newName) {
+                std::lock_guard<std::mutex> lock(inProgressMtx);
+                *inProgressName = newName;
+                StringArray out = inProgressNames;
+                out.removeEmptyStrings();
+                if (out.isEmpty()) {
+                    getApp()->setSplashInfo("Processing scan results...");
+                } else {
+                    getApp()->setSplashInfo(String("Scanning... (") + String(progress, 1) + String("%)") + newLine +
+                                            newLine + out.joinIntoString(", "));
+                }
+            };
+
+            updateSplash(splashName);
+
+            scanThread->fn = [this, fileOrId, pluginName = name, fmtName = fmt->getName(), srvId = scanThread->id,
+                              updateSplash] {
+                scanNextPlugin(fileOrId, pluginName, fmtName, srvId);
+                updateSplash("");
+            };
+
+            scanThread->startThread();
+        } else {
+            logln("  (skipping: " << name << (excluded ? " excluded" : "") << ")");
+        }
+        neverSeenList.erase(fileOrId);
     }
 
     std::set<String> newBlacklistedPlugins;
@@ -792,20 +821,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
             for (auto& p : plist.getBlacklistedFiles()) {
                 if (!m_pluginList.getBlacklistedFiles().contains(p)) {
                     m_pluginList.addToBlacklist(p);
-                    String name;
-                    File f(p);
-                    if (f.exists()) {
-                        name = f.getFileNameWithoutExtension() + " (" +
-                               f.getFileExtension().toUpperCase().substring(1) + ")";
-#if JUCE_MAC
-                    } else if (p.startsWith("AudioUnit")) {
-                        AudioUnitPluginFormat fmt;
-                        name = fmt.getNameOfPluginFromIdentifier(p) + " (AU)";
-#endif
-                    } else {
-                        name = p;
-                    }
-                    newBlacklistedPlugins.insert(name);
+                    newBlacklistedPlugins.insert(getPluginName(p));
                 }
             }
 
@@ -828,7 +844,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
             deadmanFile.readLines(lines);
 
             for (auto& line : lines) {
-                newBlacklistedPlugins.insert(line);
+                newBlacklistedPlugins.insert(getPluginName(line));
             }
 
             deadmanFile.deleteFile();

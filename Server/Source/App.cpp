@@ -132,7 +132,7 @@ void App::initialise(const String& commandLineParameters) {
                 if (parts.size() > 1) {
                     format = parts[1];
                 }
-                logln("scan mode: format=" << format << " id=" << id);
+                logln("scan mode: format=" << format << " id=" << id << " srvId=" << srvId);
                 bool success = Server::scanPlugin(id, format, srvId > -1 ? srvId : 0, secondRun);
                 logln("..." << (success ? "success" : "failed"));
                 setApplicationReturnValue(success ? 0 : 1);
