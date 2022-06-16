@@ -62,6 +62,9 @@ class PluginListComponent::TableModel : public TableListBoxModel {
             if (f.getFileExtension().toLowerCase() == ".vst" || f.getFileExtension().toLowerCase() == ".vst3") {
                 name = f.getFileNameWithoutExtension();
                 type = f.getFileExtension().toUpperCase().substring(1);
+            } else if (f.getFileExtension().toLowerCase() == ".dll") {
+                name = f.getFileNameWithoutExtension();
+                type = "VST";
             } else {
 #if JUCE_MAC
                 AudioUnitPluginFormat fmt;
