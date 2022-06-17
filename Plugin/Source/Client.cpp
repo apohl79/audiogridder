@@ -1144,11 +1144,10 @@ void Client::updatePluginList(bool sendRequest) {
         logln("failed reading plugin list: " << err.toString());
         return;
     }
-    String listChunk(PLD(msg).str, (size_t)*PLD(msg).size);
-    auto list = StringArray::fromLines(listChunk);
-    for (auto& line : list) {
-        if (!line.isEmpty()) {
-            m_plugins.push_back(ServerPlugin::fromString(line));
+    auto jlist = PLD(msg).getJson();
+    if (jsonHasValue(jlist, "plugins")) {
+        for (auto jplug : jlist["plugins"]) {
+            m_plugins.push_back(ServerPlugin::fromJson(jplug));
         }
     }
 }

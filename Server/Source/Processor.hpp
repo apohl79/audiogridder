@@ -38,15 +38,14 @@ class Processor : public LogTagDelegate,
     static String createPluginIDDepricated(const PluginDescription& d);
     static String convertJUCEtoAGPluginID(const String& id);
 
-    inline static String createString(const PluginDescription& d) {
-        json j = {{"name", d.name.toStdString()},
-                  {"company", d.manufacturerName.toStdString()},
-                  {"id", createPluginIDDepricated(d).toStdString()},
-                  {"id2", createPluginID(d).toStdString()},
-                  {"type", d.pluginFormatName.toStdString()},
-                  {"category", d.category.toStdString()},
-                  {"isInstrument", d.isInstrument}};
-        return String(j.dump());
+    inline static json createJson(const PluginDescription& d) {
+        return {{"name", d.name.toStdString()},
+                {"company", d.manufacturerName.toStdString()},
+                {"id", createPluginIDDepricated(d).toStdString()},
+                {"id2", createPluginID(d).toStdString()},
+                {"type", d.pluginFormatName.toStdString()},
+                {"category", d.category.toStdString()},
+                {"isInstrument", d.isInstrument}};
     }
 
     static std::unique_ptr<PluginDescription> findPluginDescritpion(const String& id, String* idNormalized = nullptr);

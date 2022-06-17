@@ -552,9 +552,8 @@ void Worker::handleMessage(std::shared_ptr<Message<CPULoad>> msg) {
 
 void Worker::handleMessage(std::shared_ptr<Message<PluginList>> msg) {
     traceScope();
-    String filterStr = pPLD(msg).getString();
     auto& pluginList = getApp()->getPluginList();
-    String list;
+    json jlist = json::array();
     for (auto& plugin : pluginList.getTypes()) {
         bool inputMatch = m_noPluginListFilter;
         // exact match is fine
@@ -563,15 +562,11 @@ void Worker::handleMessage(std::shared_ptr<Message<PluginList>> msg) {
         inputMatch = (m_audio->getChannelsIn() > 0 && plugin.numInputChannels > 0) || inputMatch;
         // for instruments (no inputs) allow any plugin with the isInstrument flag
         inputMatch = (m_audio->getChannelsIn() == 0 && plugin.isInstrument) || inputMatch;
-        // match filter string
-        if (inputMatch && filterStr.isNotEmpty()) {
-            inputMatch = plugin.descriptiveName.containsIgnoreCase(filterStr);
-        }
         if (inputMatch) {
-            list += Processor::createString(plugin) + "\n";
+            jlist.push_back(Processor::createJson(plugin));
         }
     }
-    pPLD(msg).setString(list);
+    pPLD(msg).setJson({{"plugins", jlist}});
     msg->send(m_cmdIn.get());
 }
 

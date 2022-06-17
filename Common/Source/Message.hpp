@@ -89,7 +89,7 @@ StreamingSocket* accept(StreamingSocket*, int timeoutMs = 1000, std::function<bo
 /*
  * Client/Server handshake
  */
-static constexpr int AG_PROTOCOL_VERSION = 11;
+static constexpr int AG_PROTOCOL_VERSION = 12;
 
 struct HandshakeRequest {
     int version;
@@ -555,6 +555,29 @@ class JsonPayload : public BinaryPayload {
     }
 };
 
+class MsgPackPayload : public BinaryPayload {
+  public:
+    MsgPackPayload(int type) : BinaryPayload(type) {}
+
+    void setJson(const json& j) {
+        std::vector<uint8> v;
+        json::to_msgpack(j, v);
+        setData((const char*)v.data(), (int)v.size());
+    }
+
+    json getJson() {
+        if (nullptr == data) {
+            return {};
+        }
+        try {
+            return json::from_msgpack(data, data + *size);
+        } catch (json::parse_error& e) {
+            logln("failed to parse msgPack payload: " << e.what());
+            return {};
+        }
+    }
+};
+
 // Using the __COUNTER__ macro below, as it is implemented on all target compilers, even though not being part of the
 // standard.
 
@@ -600,10 +623,10 @@ class Result : public Payload {
     }
 };
 
-class PluginList : public StringPayload {
+class PluginList : public MsgPackPayload {
   public:
     static constexpr int Type = __COUNTER__;
-    PluginList() : StringPayload(Type) {}
+    PluginList() : MsgPackPayload(Type) {}
 };
 
 class AddPlugin : public JsonPayload {
@@ -785,10 +808,10 @@ class RecentsList : public StringPayload {
     RecentsList() : StringPayload(Type) {}
 };
 
-class Parameters : public JsonPayload {
+class Parameters : public MsgPackPayload {
   public:
     static constexpr int Type = __COUNTER__;
-    Parameters() : JsonPayload(Type) {}
+    Parameters() : MsgPackPayload(Type) {}
 };
 
 struct parametervalue_t {
@@ -882,7 +905,7 @@ class ServerError : public StringPayload {
 template <typename T>
 class Message : public LogTagDelegate {
   public:
-    static constexpr int MAX_SIZE = 1024 * 1024 * 20;  // 20 MB
+    static constexpr int MAX_SIZE = 1024 * 1024 * 60;  // 60 MB
 
     Message(const LogTag* tag = nullptr) : LogTagDelegate(tag) {
         traceScope();

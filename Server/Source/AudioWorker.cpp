@@ -214,7 +214,7 @@ String AudioWorker::getRecentsList(String host) const {
     auto& recents = m_recents[host];
     String list;
     for (auto& r : recents) {
-        list += Processor::createString(r) + "\n";
+        list += String(Processor::createJson(r).dump()) + "\n";
     }
     return list;
 }

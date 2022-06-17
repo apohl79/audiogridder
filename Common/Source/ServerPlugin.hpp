@@ -74,14 +74,18 @@ class ServerPlugin {
     static ServerPlugin fromString(const String& s) {
         try {
             auto j = json::parse(s.toStdString());
-            return ServerPlugin(jsonGetValue(j, "name", String()), jsonGetValue(j, "company", String()),
-                                jsonGetValue(j, "id2", String()), jsonGetValue(j, "id", String()),
-                                jsonGetValue(j, "type", String()), jsonGetValue(j, "category", String()),
-                                jsonGetValue(j, "isInstrument", false));
+            return fromJson(j);
         } catch (json::parse_error&) {
             auto parts = StringArray::fromTokens(s, ";", "");
             return ServerPlugin(parts[0], parts[1], parts[2], parts[2], parts[3], parts[4], false);
         }
+    }
+
+    static ServerPlugin fromJson(const json& j) {
+        return ServerPlugin(jsonGetValue(j, "name", String()), jsonGetValue(j, "company", String()),
+                            jsonGetValue(j, "id2", String()), jsonGetValue(j, "id", String()),
+                            jsonGetValue(j, "type", String()), jsonGetValue(j, "category", String()),
+                            jsonGetValue(j, "isInstrument", false));
     }
 
     String toString() const {
