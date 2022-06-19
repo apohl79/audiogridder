@@ -363,7 +363,8 @@ void Processor::setCallbacks(ParamValueChangeCallback valueChangeFn, ParamGestur
     }
 }
 
-bool Processor::load(const String& settings, String& err, const PluginDescription* plugdesc) {
+bool Processor::load(const String& settings, const String& layout, bool multiMono, uint64 monoChannels, String& err,
+                     const PluginDescription* plugdesc) {
     traceScope();
 
     traceln("m_isClient = " << (int)m_isClient);
@@ -385,7 +386,7 @@ bool Processor::load(const String& settings, String& err, const PluginDescriptio
             }
 
             if (client->init()) {
-                loaded = client->load(settings, err);
+                loaded = client->load(settings, layout, multiMono, monoChannels, err);
                 if (loaded) {
                     client->startThread();
                 }
@@ -410,7 +411,7 @@ bool Processor::load(const String& settings, String& err, const PluginDescriptio
                 std::lock_guard<std::mutex> lock(m_pluginMtx);
                 m_plugin = p;
             }
-            if (m_chain.initPluginInstance(this, err)) {
+            if (m_chain.initPluginInstance(this, layout, err)) {
                 loaded = true;
                 for (auto* param : m_plugin->getParameters()) {
                     param->addListener(this);
@@ -428,6 +429,7 @@ bool Processor::load(const String& settings, String& err, const PluginDescriptio
     }
 
     if (loaded) {
+        m_layout = layout;
         loadedCount++;
     }
 

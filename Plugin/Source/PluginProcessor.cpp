@@ -114,7 +114,8 @@ PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
             for (auto& p : m_loadedPlugins) {
                 logln("loading " << p.name << " (" << p.id << ") [on connect]... ");
                 bool scDisabled;
-                p.ok = m_client->addPlugin(p.id, p.presets, p.params, p.hasEditor, scDisabled, p.settings, p.error);
+                p.ok = m_client->addPlugin(p.id, p.presets, p.params, p.hasEditor, scDisabled, p.settings, {}, false, 0,
+                                           p.error);
                 if (p.ok) {
                     logln("...ok");
                     updLatency = true;
@@ -421,6 +422,7 @@ void PluginProcessor::changeProgramName(int /* index */, const String& /* newNam
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
     traceScope();
     logln("prepareToPlay: sampleRate = " << sampleRate << ", samplesPerBlock = " << samplesPerBlock);
+    logln("I/O layout: " << describeLayout(getBusesLayout()));
 
     if (!m_client->isThreadRunning()) {
         m_client->startThread();
@@ -431,8 +433,6 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
         m_tray->startThread();
     }
 #endif
-
-    printBusesLayout(getBusesLayout());
 
     int channelsIn = 0;
     int channelsSC = 0;
@@ -502,16 +502,6 @@ bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
     }
     return numOfInputs <= Defaults::PLUGIN_CHANNELS_MAX && numOfOutputs <= Defaults::PLUGIN_CHANNELS_MAX;
 }
-
-// Array<std::pair<short, short>> PluginProcessor::getAUChannelInfo() const {
-//#if JucePlugin_IsSynth && JUCE_MAC
-//    Array<std::pair<short, short>> info;
-//    info.add(std::make_pair((short)0, -(short)Defaults::PLUGIN_CHANNELS_OUT));
-//    return info;
-//#else
-//    return {};
-//#endif
-//}
 
 void PluginProcessor::numChannelsChanged() {
     traceScope();
@@ -830,7 +820,7 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes) {
 json PluginProcessor::getState(bool withServers) {
     traceScope();
     json j;
-    j["version"] = 3;
+    j["version"] = 4;
     j["Mode"] = m_mode.toStdString();
 
     if (withServers) {
@@ -1004,7 +994,8 @@ std::set<String> PluginProcessor::getPluginTypes() const {
     return ret;
 }
 
-bool PluginProcessor::loadPlugin(const ServerPlugin& plugin, String& err) {
+bool PluginProcessor::loadPlugin(const ServerPlugin& plugin, const String& layout, bool multiMono, uint64 monoChannels,
+                                 String& err) {
     traceScope();
 
     StringArray presets;
@@ -1014,7 +1005,8 @@ bool PluginProcessor::loadPlugin(const ServerPlugin& plugin, String& err) {
     logln("loading " << plugin.getName() << " (" << plugin.getId() << ")...");
 
     suspendProcessing(true);
-    bool success = m_client->addPlugin(plugin.getId(), presets, params, hasEditor, scDisabled, "", err);
+    bool success = m_client->addPlugin(plugin.getId(), presets, params, hasEditor, scDisabled, {}, layout, multiMono,
+                                       monoChannels, err);
     suspendProcessing(false);
 
     if (success) {
@@ -1026,8 +1018,8 @@ bool PluginProcessor::loadPlugin(const ServerPlugin& plugin, String& err) {
 
     {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
-        m_loadedPlugins.emplace_back(plugin.getId(), plugin.getIdDeprecated(), plugin.getName(), "", presets, params,
-                                     false, hasEditor, success, err);
+        m_loadedPlugins.emplace_back(plugin.getId(), plugin.getIdDeprecated(), plugin.getName(), "", false, 0ull, "",
+                                     presets, params, false, hasEditor, success, err);
         m_loadedPluginsCount++;
     }
 

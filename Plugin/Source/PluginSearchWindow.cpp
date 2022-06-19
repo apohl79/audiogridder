@@ -45,6 +45,11 @@ PluginSearchWindow::PluginSearchWindow(float x, float y, PluginProcessor& p)
     addAndMakeVisible(&m_tree);
 
     m_recents = m_processor.getRecents();
+
+    for (auto& plug : m_processor.getPlugins()) {
+        m_pluginsByName[plug.getType() + plug.getName()] = plug;
+    }
+
     updateTree();
     updateHeight();
 
@@ -78,8 +83,7 @@ bool PluginSearchWindow::keyPressed(const KeyPress& kp, Component*) {
     } else if (kp.isKeyCurrentlyDown(KeyPress::returnKey)) {
         int num = m_tree.getNumSelectedItems();
         if (num > 0) {
-            auto item = dynamic_cast<TreePlugin*>(m_tree.getSelectedItem(0));
-            if (nullptr != item) {
+            if (auto item = dynamic_cast<TreeLayout*>(m_tree.getSelectedItem(0))) {
                 item->itemClicked();
             }
         }
@@ -122,6 +126,14 @@ void PluginSearchWindow::mouseExit(const MouseEvent&) {
     m_tree.clearSelectedItems();
 }
 
+const ServerPlugin* PluginSearchWindow::getPlugin(const String& key) {
+    auto it = m_pluginsByName.find(key);
+    if (it != m_pluginsByName.end()) {
+        return &it->second;
+    }
+    return nullptr;
+}
+
 void PluginSearchWindow::updateHeight() {
     traceScope();
     int items = m_tree.getNumRowsInTree();
@@ -157,10 +169,10 @@ void PluginSearchWindow::updateHeight() {
 void PluginSearchWindow::updateTree(const String& filter) {
     traceScope();
 
-    auto addFn = [this](const ServerPlugin& p) {
+    auto addFn = [this](const ServerPlugin& p, const String& l) {
         traceScope();
         if (m_onClick) {
-            m_onClick(p);
+            m_onClick(p, l);
         }
         hide();
     };
@@ -171,10 +183,26 @@ void PluginSearchWindow::updateTree(const String& filter) {
     m_tree.setDefaultOpenness(filter.isNotEmpty());
 
     if (filter.isEmpty() && !m_recents.isEmpty()) {
-        for (const auto& plug : m_recents) {
-            root->addSubItem(new TreePlugin(plug, addFn, false, true));
+        int countAdded = 0;
+        for (const auto& p : m_recents) {
+            if (auto* plug = getPlugin(p.getType() + p.getName())) {
+                auto* plugEntry = new TreePlugin(
+                    *plug, [this] { updateHeight(); }, false, true);
+                root->addSubItem(plugEntry);
+                if (plug->getLayouts().isEmpty()) {
+                    plugEntry->addSubItem(new TreeLayout(*plug, "Default", addFn));
+                } else {
+                    for (auto& l : plug->getLayouts()) {
+                        plugEntry->addSubItem(new TreeLayout(*plug, l, addFn));
+                    }
+                }
+                plugEntry->setOpenness(TreeViewItem::Openness::opennessClosed);
+                countAdded++;
+            }
         }
-        root->addSubItem(new TreeSeparator());
+        if (countAdded > 0) {
+            root->addSubItem(new TreeSeparator());
+        }
     }
 
     auto filterParts = StringArray::fromTokens(filter, " ", "");
@@ -237,13 +265,23 @@ void PluginSearchWindow::updateTree(const String& filter) {
 }
 
 TreeViewItem* PluginSearchWindow::createPluginMenu(const String& name, MenuLevel& level,
-                                                   std::function<void(const ServerPlugin& plug)> addFn) {
+                                                   PluginSearchWindow::ClickFunction addFn) {
     traceScope();
-    auto* m = new TreeFolder(name, [this] { updateHeight(); });
+    auto onOpenClose = [this] { updateHeight(); };
+    auto* m = new TreeFolder(name, onOpenClose);
     if (nullptr != level.entryMap) {
         for (auto& pair : *level.entryMap) {
             auto& plug = pair.second;
-            m->addSubItem(new TreePlugin(plug, addFn, m_showType));
+            auto* plugEntry = new TreePlugin(plug, onOpenClose, m_showType);
+            m->addSubItem(plugEntry);
+            if (plug.getLayouts().isEmpty()) {
+                plugEntry->addSubItem(new TreeLayout(plug, "Default", addFn));
+            } else {
+                for (auto& l : plug.getLayouts()) {
+                    plugEntry->addSubItem(new TreeLayout(plug, l, addFn));
+                }
+            }
+            plugEntry->setOpenness(TreeViewItem::Openness::opennessClosed);
         }
     }
     if (nullptr != level.subMap) {

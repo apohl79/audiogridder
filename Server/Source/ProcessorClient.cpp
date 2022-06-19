@@ -275,7 +275,7 @@ void ProcessorClient::run() {
             }
             if (m_loaded) {
                 String err;
-                if (!load(m_lastSettings, err)) {
+                if (!load(m_lastSettings, m_lastLayout, m_lastMultiMono, m_lastMonoChannels, err)) {
                     setAndLogError("reload failed: " + err);
                 }
             }
@@ -340,7 +340,8 @@ void ProcessorClient::handleMessage(std::shared_ptr<Message<ScreenBounds>> msg) 
     m_lastScreenBounds = {pDATA(msg)->x, pDATA(msg)->y, pDATA(msg)->w, pDATA(msg)->h};
 }
 
-bool ProcessorClient::load(const String& settings, String& err) {
+bool ProcessorClient::load(const String& settings, const String& layout, bool multiMono, uint64 monoChannels,
+                           String& err) {
     traceScope();
 
     if (!isOk()) {
@@ -356,7 +357,12 @@ bool ProcessorClient::load(const String& settings, String& err) {
     MessageHelper::Error e;
 
     Message<AddPlugin> msgAddPlugin(this);
-    PLD(msgAddPlugin).setJson({{"id", m_id.toStdString()}, {"settings", settings.toStdString()}});
+    PLD(msgAddPlugin)
+        .setJson({{"id", m_id.toStdString()},
+                  {"settings", settings.toStdString()},
+                  {"layout", layout.toStdString()},
+                  {"multiMono", multiMono},
+                  {"monoChannels", monoChannels}});
 
     if (msgAddPlugin.send(m_sockCmdOut.get())) {
         Message<AddPluginResult> msgResult(this);
@@ -434,6 +440,9 @@ bool ProcessorClient::load(const String& settings, String& err) {
         }
 
         m_lastSettings = settings;
+        m_lastLayout = layout;
+        m_lastMultiMono = multiMono;
+        m_lastMonoChannels = monoChannels;
         m_lastScreenBounds = {};
         m_loaded = true;
         m_error.clear();

@@ -120,11 +120,25 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     std::set<String> getPluginTypes() const;
 
     struct LoadedPlugin {
-        enum Indexes : uint8 { ID_DEPRECATED, NAME, SETTINGS, PRESETS, PARAMS, BYPASSED, ID };
+        enum Indexes : uint8 {
+            ID_DEPRECATED,
+            NAME,
+            SETTINGS,
+            PRESETS,
+            PARAMS,
+            BYPASSED,
+            ID,
+            LAYOUT,
+            MULTI_MONO,
+            MONO_CHANNELS
+        };
         enum Indexes_v1 : uint8 { BYPASSED_V1 = 3 };
 
         String idDeprecated;
         String name;
+        String layout;
+        bool multiMono = false;
+        uint64 monoChannels = 0;
         String settings;
         StringArray presets;
         Array<Client::Parameter> params;
@@ -150,7 +164,10 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
                     jpresets,
                     jparams,
                     bypassed,
-                    id.toStdString()};
+                    id.toStdString(),
+                    layout.toStdString(),
+                    multiMono,
+                    monoChannels};
         }
 
         LoadedPlugin() {}
@@ -177,13 +194,22 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
             } else {
                 id = idDeprecated;
             }
+            if (version >= 4) {
+                layout = j[LAYOUT].get<std::string>();
+                multiMono = j[MULTI_MONO].get<bool>();
+                monoChannels = j[MONO_CHANNELS].get<uint64>();
+            }
         }
 
-        LoadedPlugin(const String& id_, const String& idDeprecated_, const String& name_, const String& settings_,
-                     const StringArray& presets_, const Array<Client::Parameter>& params_, bool bypassed_,
-                     bool hasEditor_, bool ok_, const String& error_)
+        LoadedPlugin(const String& id_, const String& idDeprecated_, const String& name_, const String& layout_,
+                     bool multiMono_, uint64 monoChannels_, const String& settings_, const StringArray& presets_,
+                     const Array<Client::Parameter>& params_, bool bypassed_, bool hasEditor_, bool ok_,
+                     const String& error_)
             : idDeprecated(idDeprecated_),
               name(name_),
+              layout(layout_),
+              multiMono(multiMono_),
+              monoChannels(monoChannels_),
               settings(settings_),
               presets(presets_),
               params(params_),
@@ -218,7 +244,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
         return idx > -1 && idx < (int)m_loadedPlugins.size() ? m_loadedPlugins[(size_t)idx] : m_unusedDummyPlugin;
     }
 
-    bool loadPlugin(const ServerPlugin& plugin, String& err);
+    bool loadPlugin(const ServerPlugin& plugin, const String& layout, bool multiMono, uint64 monoChannels, String& err);
     void unloadPlugin(int idx);
     String getLoadedPluginsString() const;
     void editPlugin(int idx, int x, int y);

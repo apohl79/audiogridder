@@ -246,10 +246,15 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     auto jmsg = pPLD(msg).getJson();
     auto id = jsonGetValue(jmsg, "id", String());
     auto settings = jsonGetValue(jmsg, "settings", String());
+    auto layout = jsonGetValue(jmsg, "layout", String());
+    auto multiMono = jsonGetValue(jmsg, "multiMono", false);
+    auto monoChannels = jsonGetValue(jmsg, "monoChannels", 0ull);
+
     logln("adding plugin " << id << "...");
+
     String err;
     bool wasSidechainDisabled = m_audio->isSidechainDisabled();
-    bool success = m_audio->addPlugin(id, settings, err);
+    bool success = m_audio->addPlugin(id, settings, layout, multiMono, monoChannels, err);
     if (!success) {
         logln("error: " << err);
     }
@@ -555,15 +560,73 @@ void Worker::handleMessage(std::shared_ptr<Message<PluginList>> msg) {
     auto& pluginList = getApp()->getPluginList();
     json jlist = json::array();
     for (auto& plugin : pluginList.getTypes()) {
-        bool inputMatch = m_noPluginListFilter;
+        auto jplug = Processor::createJson(plugin);
+        auto pluginId = Processor::createPluginID(plugin);
+        int pluginChIn = 0, pluginChOut = 0;
+        bool hasMono = false;
+
+        // add layouts, that match the number of output channels
+        StringArray slayouts;
+        for (auto& l : getApp()->getServer()->getPluginLayouts(pluginId)) {
+            int chIn = getLayoutNumChannels(l, true);
+            int chOut = getLayoutNumChannels(l, false);
+
+            pluginChIn = jmax(pluginChIn, chIn);
+            pluginChOut = jmax(pluginChOut, chOut);
+
+            bool isFxChain = m_cfg.channelsIn > 0;
+            bool match = false;
+
+            if (isFxChain) {
+                if (l.inputBuses == l.outputBuses /* same inputs and outputs */ ||
+                    (l.inputBuses.size() == 2 /* main input bus and sidechain  */ &&
+                     l.outputBuses.size() == 1 /* single main output bus */ &&
+                     l.inputBuses[0] == l.outputBuses[0] /* main in and out buses are the same */)) {
+                    // if we have more than 2 outs, the layout should match the outs exactly
+                    match = match || (m_cfg.channelsOut > 2 && m_cfg.channelsOut == chOut);
+                    // if we have 1 or 2 outs, the layout should have equal or less the outputs
+                    match = match || (m_cfg.channelsOut <= 2 && m_cfg.channelsOut >= chOut);
+                }
+                if (chOut == 1) {
+                    hasMono = true;
+                }
+            } else {
+                match = plugin.isInstrument && m_cfg.channelsOut >= chOut;
+            }
+
+            if (match) {
+                slayouts.add(LogTag::getStrWithLeadingZero(chOut) + ":" + describeLayout(l, false, true, true));
+            }
+        }
+
+        if (hasMono && m_cfg.channelsOut > 1) {
+            slayouts.add("01:Multi-Mono");
+        }
+
+        auto jlayouts = json::array();
+
+        if (slayouts.isEmpty()) {
+            jlayouts.push_back("Default");
+        } else {
+            slayouts.sort(false);
+            for (auto& l : slayouts) {
+                auto parts = StringArray::fromTokens(l, ":", "");
+                jlayouts.push_back(parts[1].toStdString());
+            }
+        }
+
+        jplug["layouts"] = jlayouts;
+
+        bool match = m_noPluginListFilter;
         // exact match is fine
-        inputMatch = (m_audio->getChannelsIn() == plugin.numInputChannels) || inputMatch;
+        match = (m_cfg.channelsIn == pluginChIn) || match;
         // hide plugins with no inputs if we have inputs
-        inputMatch = (m_audio->getChannelsIn() > 0 && plugin.numInputChannels > 0) || inputMatch;
+        match = (m_cfg.channelsIn > 0 && plugin.numInputChannels > 0) || match;
         // for instruments (no inputs) allow any plugin with the isInstrument flag
-        inputMatch = (m_audio->getChannelsIn() == 0 && plugin.isInstrument) || inputMatch;
-        if (inputMatch) {
-            jlist.push_back(Processor::createJson(plugin));
+        match = (m_cfg.channelsIn == 0 && plugin.isInstrument) || match;
+
+        if (match) {
+            jlist.push_back(jplug);
         }
     }
     pPLD(msg).setJson({{"plugins", jlist}});

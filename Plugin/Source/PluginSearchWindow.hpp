@@ -23,8 +23,8 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
 
     void paint(Graphics&) override;
 
-    using ClickFuction = std::function<void(ServerPlugin s)>;
-    void onClick(ClickFuction f) { m_onClick = f; }
+    using ClickFunction = std::function<void(ServerPlugin s, String layout)>;
+    void onClick(ClickFunction f) { m_onClick = f; }
 
     void hide();
 
@@ -58,12 +58,13 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
     bool m_showType;
 
     Array<ServerPlugin> m_recents;
+    std::unordered_map<String, ServerPlugin> m_pluginsByName;
 
-    ClickFuction m_onClick;
+    ClickFunction m_onClick;
 
+    const ServerPlugin* getPlugin(const String& key);
     void updateTree(const String& filter = "");
-    TreeViewItem* createPluginMenu(const String& name, MenuLevel& level,
-                                   std::function<void(const ServerPlugin& plug)> addFn);
+    TreeViewItem* createPluginMenu(const String& name, MenuLevel& level, ClickFunction addFn);
 
     void updateHeight();
 
@@ -155,9 +156,9 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
 
     class TreePlugin : public TreeViewItem {
       public:
-        TreePlugin(const ServerPlugin& p, ClickFuction f, bool st, bool sf = false)
-            : m_plugin(p), m_onClick(f), m_showType(st), m_showFormat(sf) {}
-        bool mightContainSubItems() override { return false; }
+        TreePlugin(const ServerPlugin& p, std::function<void()> f, bool st, bool sf = false)
+            : m_plugin(p), m_onOpenClose(f), m_showType(st), m_showFormat(sf) {}
+        bool mightContainSubItems() override { return true; }
         int getItemHeight() const override { return PluginSearchWindow::ITEM_HEIGHT; }
 
         void paintItem(Graphics& g, int width, int height) override {
@@ -180,11 +181,45 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
             }
         }
 
-        void itemClicked(const MouseEvent&) override { itemClicked(); }
+        void paintOpenCloseButton(Graphics& g, const Rectangle<float>& r, Colour, bool) override {
+            auto rect = r.withTrimmedTop(3.0f);
+            rect = rect.withX(rect.getX() + 3);
+            float len = jmin(rect.getWidth(), rect.getHeight());
+            float thickness = 1.5f;
+            Colour col;
 
-        void itemClicked() {
-            if (m_onClick) {
-                m_onClick(m_plugin);
+            if (isOpen()) {
+                col = Colour(Defaults::ACTIVE_COLOR);
+            } else {
+                col = Colours::white;
+            }
+
+            Path p;
+            p.addCentredArc(rect.getCentreX(), rect.getCentreY(), len / 2, len / 2, MathConstants<float>::pi,
+                            -15 * MathConstants<float>::pi / 180, 195 * MathConstants<float>::pi / 180, true);
+            p.closeSubPath();
+
+            p.startNewSubPath(rect.getCentreX() + 2, rect.getY() + 6);
+            p.lineTo(rect.getCentreX() + 5, rect.getY() + 6);
+
+            p.startNewSubPath(rect.getCentreX() + 2, rect.getBottom() - 6);
+            p.lineTo(rect.getCentreX() + 5, rect.getBottom() - 6);
+
+            p.startNewSubPath(rect.getX() - 4, rect.getCentreY());
+            p.lineTo(rect.getX() - 1, rect.getCentreY());
+
+            g.setColour(col.withAlpha(0.2f));
+            g.fillPath(p);
+
+            g.setColour(col.withAlpha(0.8f));
+            g.strokePath(p, PathStrokeType(thickness));
+        }
+
+        void itemClicked(const MouseEvent&) override { setOpen(!isOpen()); }
+
+        void itemOpennessChanged(bool) override {
+            if (m_onOpenClose) {
+                m_onOpenClose();
             }
         }
 
@@ -192,9 +227,40 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
 
       private:
         ServerPlugin m_plugin;
-        ClickFuction m_onClick;
+        std::function<void()> m_onOpenClose;
         bool m_showType;
         bool m_showFormat;
+    };
+
+    class TreeLayout : public TreeViewItem {
+      public:
+        TreeLayout(const ServerPlugin& p, const String& l, ClickFunction f) : m_plugin(p), m_layout(l), m_onClick(f) {}
+        bool mightContainSubItems() override { return false; }
+        int getItemHeight() const override { return PluginSearchWindow::ITEM_HEIGHT; }
+
+        void paintItem(Graphics& g, int width, int height) override {
+            Colour col;
+            if (isSelected()) {
+                col = Colour(Defaults::ACTIVE_COLOR);
+            } else {
+                col = Colours::white;
+            }
+            g.setColour(col.withAlpha(0.8f));
+            g.drawText(m_layout, 8, 0, width, height, Justification::bottomLeft);
+        }
+
+        void itemClicked(const MouseEvent&) override { itemClicked(); }
+
+        void itemClicked() {
+            if (m_onClick) {
+                m_onClick(m_plugin, m_layout);
+            }
+        }
+
+      private:
+        ServerPlugin m_plugin;
+        String m_layout;
+        ClickFunction m_onClick;
     };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginSearchWindow)

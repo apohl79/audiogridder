@@ -501,7 +501,8 @@ inline void cleanDirectory(const String& path, const String& filePrefix, const S
 }
 
 #if JUCE_MODULE_AVAILABLE_juce_audio_processors
-inline String describeLayout(const AudioProcessor::BusesLayout& l) {
+inline String describeLayout(const AudioProcessor::BusesLayout& l, bool withInputs = true, bool withOutputs = true,
+                             bool shortFormat = false) {
     String sout;
     StringArray sbuses;
 
@@ -545,30 +546,40 @@ inline String describeLayout(const AudioProcessor::BusesLayout& l) {
         }
     };
 
-    sout << "Inputs: ";
-    addBuses(l.inputBuses, true);
+    if (withInputs) {
+        if (!shortFormat) {
+            sout << (shortFormat ? "" : "Inputs: ");
+        }
+        addBuses(l.inputBuses, true);
+    }
 
-    sout << " / Outputs: ";
-    addBuses(l.outputBuses);
+    if (withOutputs) {
+        if (withInputs) {
+            sout << (shortFormat ? " : " : " / Outputs: ");
+        }
+        addBuses(l.outputBuses);
+    }
 
     return sout;
 }
 
-inline String serializeLayout(const AudioProcessor::BusesLayout& l) {
-    json j;
-    if (l.inputBuses.size() > 0) {
-        for (auto& bus : l.inputBuses) {
-            j["inputBuses"].push_back(bus.getSpeakerArrangementAsString().toStdString());
-        }
-    } else {
-        j["inputBuses"] = json::array();
+inline json audioChannelSetsToJson(const Array<AudioChannelSet>& a) {
+    json j = json::array();
+    for (auto& bus : a) {
+        j.push_back(bus.getSpeakerArrangementAsString().toStdString());
     }
-    if (l.outputBuses.size() > 0) {
-        for (auto& bus : l.outputBuses) {
-            j["outputBuses"].push_back(bus.getSpeakerArrangementAsString().toStdString());
-        }
-    } else {
-        j["outputBuses"] = json::array();
+    return j;
+}
+
+inline String serializeChannelSets(const Array<AudioChannelSet>& a) { return audioChannelSetsToJson(a).dump(); }
+
+inline String serializeLayout(const AudioProcessor::BusesLayout& l, bool withInputs = true, bool withOutputs = true) {
+    json j = json::object();
+    if (withInputs) {
+        j["inputBuses"] = serializeChannelSets(l.inputBuses).toStdString();
+    }
+    if (withOutputs) {
+        j["outputBuses"] = serializeChannelSets(l.outputBuses).toStdString();
     }
     return j.dump();
 }

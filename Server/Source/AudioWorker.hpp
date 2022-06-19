@@ -58,7 +58,8 @@ class AudioWorker : public Thread, public LogTagDelegate {
     int getChannelsOut() const { return m_channelsOut; }
     int getChannelsSC() const { return m_channelsSC; }
 
-    bool addPlugin(const String& id, const String& settings, String& err);
+    bool addPlugin(const String& id, const String& settings, const String& layout, bool multiMono, uint64 monoChannels,
+                   String& err);
     void delPlugin(int idx);
     void exchangePlugins(int idxA, int idxB);
     std::shared_ptr<Processor> getProcessor(int idx) const { return m_chain->getProcessor(idx); }

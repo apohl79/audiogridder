@@ -276,10 +276,11 @@ void PluginEditor::resized() {
 void PluginEditor::buttonClicked(Button* button, const ModifierKeys& modifiers, PluginButton::AreaType area) {
     traceScope();
     if (!button->getName().compare("newPlug")) {
-        auto addFn = [this](const ServerPlugin& plug) {
+        auto addFn = [this](const ServerPlugin& plug, const String& layout) {
             traceScope();
+            bool multiMono = layout == "Multi-Mono";
             String err;
-            bool success = m_processor.loadPlugin(plug, err);
+            bool success = m_processor.loadPlugin(plug, multiMono ? "Mono" : layout, multiMono, 0, err);
             if (!success) {
                 AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Error",
                                                  "Failed to add " + plug.getName() + " plugin!\n\nError: " + err, "OK");
@@ -299,9 +300,9 @@ void PluginEditor::buttonClicked(Button* button, const ModifierKeys& modifiers, 
 
         auto bounds = button->getScreenBounds().toFloat();
         auto searchWin = std::make_unique<PluginSearchWindow>(bounds.getX(), bounds.getBottom(), m_processor);
-        searchWin->onClick([this, addFn](ServerPlugin plugin) {
+        searchWin->onClick([this, addFn](ServerPlugin plugin, String layout) {
             traceScope();
-            addFn(plugin);
+            addFn(plugin, layout);
         });
         searchWin->runModalLoop();
     } else {

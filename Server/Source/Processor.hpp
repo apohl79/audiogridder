@@ -70,7 +70,8 @@ class Processor : public LogTagDelegate,
     static std::shared_ptr<AudioPluginInstance> loadPlugin(const String& fileOrIdentifier, double sampleRate,
                                                            int blockSize, String& err, String* idNormalized = nullptr);
 
-    bool load(const String& settings, String& err, const PluginDescription* plugdesc = nullptr);
+    bool load(const String& settings, const String& layout, bool multiMono, uint64 monoChannels, String& err,
+              const PluginDescription* plugdesc = nullptr);
     void unload();
     bool isLoaded(std::shared_ptr<AudioPluginInstance>* plugin = nullptr,
                   std::shared_ptr<ProcessorClient>* client = nullptr);
@@ -93,6 +94,7 @@ class Processor : public LogTagDelegate,
     void enableAllBuses();
     void setProcessingPrecision(AudioProcessor::ProcessingPrecision p);
 
+    const String& getLayout() const { return m_layout; }
     int getExtraInChannels() const { return m_extraInChannels; }
     int getExtraOutChannels() const { return m_extraOutChannels; }
     void setExtraChannels(int in, int out);
@@ -316,6 +318,7 @@ class Processor : public LogTagDelegate,
     int m_additionalScreenSpace = 0;
     bool m_fullscreen = false;
     bool m_prepared = false;
+    String m_layout;
     int m_extraInChannels = 0;
     int m_extraOutChannels = 0;
     bool m_needsDisabledSidechain = false;

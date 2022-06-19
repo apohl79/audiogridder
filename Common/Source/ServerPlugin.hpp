@@ -21,14 +21,15 @@ class ServerPlugin {
     ServerPlugin() noexcept {}
 
     ServerPlugin(const String& name, const String& company, const String& id, const String& idDeprecated,
-                 const String& type, const String& category, bool isInstrument) noexcept
+                 const String& type, const String& category, bool isInstrument, const StringArray& layouts) noexcept
         : m_name(name),
           m_company(company),
           m_id(id),
           m_idDeprecated(idDeprecated),
           m_type(type),
           m_category(category),
-          m_isInstrument(isInstrument) {
+          m_isInstrument(isInstrument),
+          m_layouts(layouts) {
         if (m_id.isEmpty()) {
             m_id = m_idDeprecated;
         }
@@ -45,6 +46,7 @@ class ServerPlugin {
         m_type = other.m_type;
         m_category = other.m_category;
         m_isInstrument = other.m_isInstrument;
+        m_layouts = other.m_layouts;
     }
 
     ServerPlugin& operator=(const ServerPlugin& other) noexcept {
@@ -55,6 +57,7 @@ class ServerPlugin {
         m_type = other.m_type;
         m_category = other.m_category;
         m_isInstrument = other.m_isInstrument;
+        m_layouts = other.m_layouts;
         return *this;
     }
 
@@ -70,6 +73,7 @@ class ServerPlugin {
     const String& getType() const { return m_type; }
     const String& getCategory() const { return m_category; }
     bool isInstrument() const { return m_isInstrument; }
+    const StringArray& getLayouts() const { return m_layouts; }
 
     static ServerPlugin fromString(const String& s) {
         try {
@@ -77,15 +81,21 @@ class ServerPlugin {
             return fromJson(j);
         } catch (json::parse_error&) {
             auto parts = StringArray::fromTokens(s, ";", "");
-            return ServerPlugin(parts[0], parts[1], parts[2], parts[2], parts[3], parts[4], false);
+            return ServerPlugin(parts[0], parts[1], parts[2], parts[2], parts[3], parts[4], false, {});
         }
     }
 
     static ServerPlugin fromJson(const json& j) {
-        return ServerPlugin(jsonGetValue(j, "name", String()), jsonGetValue(j, "company", String()),
-                            jsonGetValue(j, "id2", String()), jsonGetValue(j, "id", String()),
-                            jsonGetValue(j, "type", String()), jsonGetValue(j, "category", String()),
-                            jsonGetValue(j, "isInstrument", false));
+        ServerPlugin plug(jsonGetValue(j, "name", String()), jsonGetValue(j, "company", String()),
+                          jsonGetValue(j, "id2", String()), jsonGetValue(j, "id", String()),
+                          jsonGetValue(j, "type", String()), jsonGetValue(j, "category", String()),
+                          jsonGetValue(j, "isInstrument", false), {});
+        if (jsonHasValue(j, "layouts")) {
+            for (auto& jlayout : j["layouts"]) {
+                plug.m_layouts.add(jlayout.get<std::string>());
+            }
+        }
+        return plug;
     }
 
     String toString() const {
@@ -97,6 +107,11 @@ class ServerPlugin {
         j["type"] = m_type.toStdString();
         j["category"] = m_category.toStdString();
         j["isInstrument"] = m_isInstrument;
+        auto jlayouts = json::array();
+        for (auto& l : m_layouts) {
+            jlayouts.push_back(l.toStdString());
+        }
+        j["layouts"] = jlayouts;
         return j.dump();
     }
 
@@ -108,6 +123,7 @@ class ServerPlugin {
     String m_type;
     String m_category;
     bool m_isInstrument;
+    StringArray m_layouts;
 };
 
 struct MenuLevel {

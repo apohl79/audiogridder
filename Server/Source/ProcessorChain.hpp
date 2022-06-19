@@ -63,7 +63,6 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
     bool isBusesLayoutSupported(const BusesLayout& /*layouts*/) const override { return true; }
 
     bool updateChannels(int channelsIn, int channelsOut, int channelsSC);
-    bool setProcessorBusesLayout(Processor* proc);
     int getExtraChannels();
 
     bool acceptsMidi() const override { return false; }
@@ -78,8 +77,9 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
     void getStateInformation(juce::MemoryBlock& /* destData */) override {}
     void setStateInformation(const void* /* data */, int /* sizeInBytes */) override {}
 
-    bool initPluginInstance(Processor* proc, String& err);
-    bool addPluginProcessor(const String& id, const String& settings, String& err);
+    bool initPluginInstance(Processor* proc, const String& layout, String& err);
+    bool addPluginProcessor(const String& id, const String& settings, const String& layout, bool multiMono,
+                            uint64 monoChannels, String& err);
     void addProcessor(std::shared_ptr<Processor> processor);
     size_t getSize() const { return m_processors.size(); }
     std::shared_ptr<Processor> getProcessor(int index);
@@ -109,6 +109,8 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
 
     template <typename T>
     void preProcessBlocks(Processor* proc);
+
+    bool setProcessorBusesLayout(Processor* proc, const String& targetOutputLayout);
 
     void updateNoLock();
 };

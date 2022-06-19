@@ -45,7 +45,7 @@ class ProcessorClient : public Thread, public LogTag {
     std::function<void(Message<Key>&)> onKeysFromSandbox;
     std::function<void(bool ok, const String& err)> onStatusChange;
 
-    bool load(const String& settings, String& err);
+    bool load(const String& settings, const String& layout, bool multiMono, uint64 monoChannels, String& err);
     void unload();
 
     bool isLoaded() const { return m_loaded; }
@@ -107,6 +107,9 @@ class ProcessorClient : public Thread, public LogTag {
     AudioPlayHead* m_playhead = nullptr;
     std::atomic_bool m_suspended{false};
     String m_lastSettings;
+    String m_lastLayout;
+    bool m_lastMultiMono;
+    uint64 m_lastMonoChannels;
     juce::Rectangle<int> m_lastScreenBounds;
 
     ChannelSet m_activeChannels;

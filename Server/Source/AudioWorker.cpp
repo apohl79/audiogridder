@@ -188,9 +188,10 @@ void AudioWorker::clear() {
     }
 }
 
-bool AudioWorker::addPlugin(const String& id, const String& settings, String& err) {
+bool AudioWorker::addPlugin(const String& id, const String& settings, const String& layout, bool multiMono,
+                            uint64 monoChannels, String& err) {
     traceScope();
-    return m_chain->addPluginProcessor(id, settings, err);
+    return m_chain->addPluginProcessor(id, settings, layout, multiMono, monoChannels, err);
 }
 
 void AudioWorker::delPlugin(int idx) {

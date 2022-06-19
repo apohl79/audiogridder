@@ -528,7 +528,7 @@ void Client::quit() {
 }
 
 bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params, bool& hasEditor, bool& scDisabled,
-                       String settings, String& err) {
+                       const String& settings, const String& layout, bool multiMono, uint64 monoChannels, String& err) {
     traceScope();
 
     if (!isReadyLockFree()) {
@@ -539,7 +539,11 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
     err.clear();
     MessageHelper::Error e;
     Message<AddPlugin> msg(this);
-    PLD(msg).setJson({{"id", id.toStdString()}, {"settings", settings.toStdString()}});
+    PLD(msg).setJson({{"id", id.toStdString()},
+                      {"settings", settings.toStdString()},
+                      {"layout", layout.toStdString()},
+                      {"multiMono", multiMono},
+                      {"monoChannels", monoChannels}});
 
     LockByID lock(*this, ADDPLUGIN);
 

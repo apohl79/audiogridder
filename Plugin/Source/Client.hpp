@@ -181,7 +181,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     void setOnCloseCallback(OnCloseCallback fn);
 
     bool addPlugin(String id, StringArray& presets, Array<Parameter>& params, bool& hasEditor, bool& scDisabled,
-                   String settings, String& err);
+                   const String& settings, const String& layout, bool multiMono, uint64 monoChannels, String& err);
     void delPlugin(int idx);
     void editPlugin(int idx, int x, int y);
     void hidePlugin();

@@ -81,12 +81,12 @@ bool ProcessorChain::updateChannels(int channelsIn, int channelsOut, int channel
     m_hasSidechain = channelsSC > 0;
     m_sidechainDisabled = false;
     for (auto& proc : m_processors) {
-        setProcessorBusesLayout(proc.get());
+        setProcessorBusesLayout(proc.get(), proc->getLayout());
     }
     return true;
 }
 
-bool ProcessorChain::setProcessorBusesLayout(Processor* proc) {
+bool ProcessorChain::setProcessorBusesLayout(Processor* proc, const String& targetOutputLayout) {
     traceScope();
 
     if (!proc->isLoaded()) {
@@ -95,69 +95,94 @@ bool ProcessorChain::setProcessorBusesLayout(Processor* proc) {
 
     auto layout = getBusesLayout();
     int chIn = getLayoutNumChannels(layout, true), chOut = getLayoutNumChannels(layout, false);
-
     auto procLayouts = proc->getSupportedBusLayouts();
+    AudioProcessor::BusesLayout targetLayout;
+    int targetChIn = 0, targetChOut = 0, extraInChannels = 0, extraOutChannels = 0;
+    bool found = false;
 
     if (procLayouts.isEmpty()) {
         logln("no processor layouts cached, checking now...");
         procLayouts = Processor::findSupportedLayouts(proc);
     }
 
-    AudioProcessor::BusesLayout targetLayout;
-    int targetChIn = 0, targetChOut = 0;
-    bool found = false;
-
-    if (procLayouts.contains(layout)) {
-        targetLayout = layout;
-        targetChIn = chIn;
-        targetChOut = chOut;
-        found = true;
-    } else {
-        // try to find a layout with a matching number of out/in channels
+    if (targetOutputLayout.isNotEmpty() && targetOutputLayout != "Default") {
         for (auto& l : procLayouts) {
             int checkChIn = getLayoutNumChannels(l, true), checkChOut = getLayoutNumChannels(l, false);
-            if (checkChOut == chOut && (chIn == 0 || checkChIn > targetChIn)) {
-                targetLayout = l;
-                targetChIn = checkChIn;
-                targetChOut = checkChOut;
-                found = true;
+            auto soutputs = describeLayout(l, false, true, true);
+            if (soutputs == targetOutputLayout) {
+                if (chIn == 0 || checkChIn == checkChOut) {
+                    targetLayout = l;
+                    targetChIn = checkChIn;
+                    targetChOut = checkChOut;
+                    found = true;
+                    break;
+                } else {
+                    if (checkChIn > targetChIn) {
+                        targetLayout = l;
+                        targetChIn = checkChIn;
+                        targetChOut = checkChOut;
+                        found = true;
+                    }
+                }
             }
         }
-
-        if (!found) {
-            // try to find the layout with the highest number of output channels followed by input channels
+    } else {
+        if (procLayouts.contains(layout)) {
+            targetLayout = layout;
+            targetChIn = chIn;
+            targetChOut = chOut;
+            found = true;
+        } else {
+            // try to find a layout with a matching number of out/in channels
             for (auto& l : procLayouts) {
                 int checkChIn = getLayoutNumChannels(l, true), checkChOut = getLayoutNumChannels(l, false);
-                if (checkChOut > targetChOut || (checkChOut == targetChOut && checkChIn > targetChIn)) {
+                if (checkChOut == chOut && (chIn == 0 || checkChIn > targetChIn)) {
                     targetLayout = l;
                     targetChIn = checkChIn;
                     targetChOut = checkChOut;
                     found = true;
                 }
             }
+
+            if (!found) {
+                // try to find the layout with the highest number of output channels followed by input channels
+                for (auto& l : procLayouts) {
+                    int checkChIn = getLayoutNumChannels(l, true), checkChOut = getLayoutNumChannels(l, false);
+                    if (checkChOut > targetChOut || (checkChOut == targetChOut && checkChIn > targetChIn)) {
+                        targetLayout = l;
+                        targetChIn = checkChIn;
+                        targetChOut = checkChOut;
+                        found = true;
+                    }
+                }
+            }
+        }
+
+        if (!found || !proc->setBusesLayout(targetLayout)) {
+            logln("failed to set target layout, falling back to the current processors layout");
+            targetLayout = proc->getBusesLayout();
+            targetChIn = getLayoutNumChannels(targetLayout, true);
+            targetChOut = getLayoutNumChannels(targetLayout, false);
         }
     }
 
-    if (!found || !proc->setBusesLayout(targetLayout)) {
-        logln("failed to set target layout, falling back to the current processors layout");
-        targetLayout = proc->getBusesLayout();
-        targetChIn = getLayoutNumChannels(targetLayout, true);
-        targetChOut = getLayoutNumChannels(targetLayout, false);
+    if (found) {
+        extraInChannels = targetChIn - chIn;
+        extraOutChannels = targetChOut - chOut;
+
+        proc->setExtraChannels(extraInChannels, extraOutChannels);
+
+        m_extraChannels = jmax(m_extraChannels, extraInChannels, extraOutChannels);
+
+        logln(extraInChannels << " extra input(s), " << extraOutChannels << " extra output(s) -> " << m_extraChannels
+                              << " extra channel(s) in total");
+
+        logln("setting processor to I/O layout: " << describeLayout(targetLayout));
+    } else {
+        logln("no matching I/O layout found, targetOutputLayout=" << targetOutputLayout);
     }
 
-    int extraInChannels = targetChIn - chIn;
-    int extraOutChannels = targetChOut - chOut;
-
-    proc->setExtraChannels(extraInChannels, extraOutChannels);
-
-    m_extraChannels = jmax(m_extraChannels, extraInChannels, extraOutChannels);
-
-    logln(extraInChannels << " extra input(s), " << extraOutChannels << " extra output(s) -> " << m_extraChannels
-                          << " extra channel(s) in total");
-
-    logln("setting processor to I/O layout: " << describeLayout(targetLayout));
-
-    return true;
+    return found;
 }
 
 int ProcessorChain::getExtraChannels() {
@@ -166,10 +191,10 @@ int ProcessorChain::getExtraChannels() {
     return m_extraChannels;
 }
 
-bool ProcessorChain::initPluginInstance(Processor* proc, String& err) {
+bool ProcessorChain::initPluginInstance(Processor* proc, const String& layout, String& err) {
     traceScope();
-    if (!setProcessorBusesLayout(proc)) {
-        err = "failed to find working I/O configuration";
+    if (!setProcessorBusesLayout(proc, layout)) {
+        err = "failed to find a working I/O configuration";
         return false;
     }
     AudioProcessor::ProcessingPrecision prec = AudioProcessor::singlePrecision;
@@ -192,11 +217,20 @@ bool ProcessorChain::initPluginInstance(Processor* proc, String& err) {
     return true;
 }
 
-bool ProcessorChain::addPluginProcessor(const String& id, const String& settings, String& err) {
+bool ProcessorChain::addPluginProcessor(const String& id, const String& settings, const String& layout, bool multiMono,
+                                        uint64 monoChannels, String& err) {
     traceScope();
-    auto proc = std::make_shared<Processor>(*this, id, getSampleRate(), getBlockSize());
-    auto success = proc->load(settings, err);
-    addProcessor(std::move(proc));
+
+    bool success = false;
+
+    if (multiMono) {
+        err = "Multi-Mono layout not yet implemented";
+    } else {
+        auto proc = std::make_shared<Processor>(*this, id, getSampleRate(), getBlockSize());
+        success = proc->load(settings, layout, multiMono, monoChannels, err);
+        addProcessor(std::move(proc));
+    }
+
     return success;
 }
 
