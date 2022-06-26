@@ -13,15 +13,14 @@
 #include "ProcessorClient.hpp"
 #include "ParameterValue.hpp"
 #include "ProcessorWindow.hpp"
+#include "AudioRingBuffer.hpp"
 
 namespace e47 {
 
 class ProcessorChain;
 class SandboxPluginTest;
 
-class Processor : public LogTagDelegate,
-                  public AudioProcessorParameter::Listener,
-                  public std::enable_shared_from_this<Processor> {
+class Processor : public LogTagDelegate, public std::enable_shared_from_this<Processor> {
   public:
     static std::atomic_uint32_t loadedCount;
 
@@ -70,11 +69,10 @@ class Processor : public LogTagDelegate,
     static std::shared_ptr<AudioPluginInstance> loadPlugin(const String& fileOrIdentifier, double sampleRate,
                                                            int blockSize, String& err, String* idNormalized = nullptr);
 
-    bool load(const String& settings, const String& layout, bool multiMono, uint64 monoChannels, String& err,
+    bool load(const String& settings, const String& layout, uint64 monoChannels, String& err,
               const PluginDescription* plugdesc = nullptr);
     void unload();
-    bool isLoaded(std::shared_ptr<AudioPluginInstance>* plugin = nullptr,
-                  std::shared_ptr<ProcessorClient>* client = nullptr);
+    bool isLoaded();
 
     void setChainIndex(int idx) { m_chainIdx = idx; }
 
@@ -93,6 +91,8 @@ class Processor : public LogTagDelegate,
     void updateLatencyBuffers();
     void enableAllBuses();
     void setProcessingPrecision(AudioProcessor::ProcessingPrecision p);
+    void setMonoChannels(uint64 channels);
+    bool isMonoChannelActive(int ch);
 
     const String& getLayout() const { return m_layout; }
     int getExtraInChannels() const { return m_extraInChannels; }
@@ -112,8 +112,13 @@ class Processor : public LogTagDelegate,
                                                              ProcessorWindow::CaptureCallbackNative func,
                                                              std::function<void()> onHide, int x, int y);
     std::shared_ptr<ProcessorWindow> recreateEditorWindow();
-    std::shared_ptr<ProcessorWindow> getEditorWindow() const { return m_window; }
-    void resetEditorWindow() { m_window.reset(); }
+    std::shared_ptr<ProcessorWindow> getEditorWindow() const { return m_windows[getWindowIndex()]; }
+    void resetEditorWindow() { m_windows[getWindowIndex()].reset(); }
+    void setActiveWindowChannel(int c) {
+        logln("setting active window channel to " << c);
+        m_activeWindowChannel = c;
+    }
+    int getActiveWindowChannel() const { return m_activeWindowChannel; }
 
     // Client methods to tell the sandbox to create the plugin UI
     void showEditor(int x, int y);
@@ -124,8 +129,8 @@ class Processor : public LogTagDelegate,
     juce::Rectangle<int> getScreenBounds();
 
     // AudioProcessorParameter::Listener
-    using ParamValueChangeCallback = std::function<void(int idx, int paramIdx, float val)>;
-    using ParamGestureChangeCallback = std::function<void(int idx, int paramIdx, float val)>;
+    using ParamValueChangeCallback = std::function<void(int idx, int channel, int paramIdx, float val)>;
+    using ParamGestureChangeCallback = std::function<void(int idx, int channel, int paramIdx, float val)>;
     using KeysFromSandboxCallback = std::function<void(Message<Key>&)>;
     using StatusChangeFromSandbox = std::function<void(int idx, bool ok, const String& err)>;
 
@@ -137,172 +142,56 @@ class Processor : public LogTagDelegate,
     void setCallbacks(ParamValueChangeCallback valueChangeFn, ParamGestureChangeCallback gestureChangeFn,
                       KeysFromSandboxCallback keysFn, StatusChangeFromSandbox statusChangeFn);
 
-    void parameterValueChanged(int parameterIndex, float newValue) override;
-    void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
-
     json getParameters();
-    void setParameterValue(int paramIdx, float value);
-    float getParameterValue(int paramIdx);
+    void setParameterValue(int channel, int paramIdx, float value);
+    float getParameterValue(int channel, int paramIdx);
 
     std::vector<Srv::ParameterValue> getAllParamaterValues();
 
-#define callBackend(method)            \
-    do {                               \
-        if (isLoaded()) {              \
-            if (m_isClient) {          \
-                getClient()->method(); \
-            } else {                   \
-                getPlugin()->method(); \
-            }                          \
-        }                              \
-    } while (0)
+    const String getName();
+    bool hasEditor();
+    bool supportsDoublePrecisionProcessing();
+    bool isSuspended();
+    double getTailLengthSeconds();
+    void getStateInformation(String& settings);
+    void setStateInformation(const String& settings);
+    bool checkBusesLayoutSupported(const AudioProcessor::BusesLayout& layout);
+    bool setBusesLayout(const AudioProcessor::BusesLayout& layout);
+    AudioProcessor::BusesLayout getBusesLayout();
+    int getBusCount(bool isInput);
+    bool canAddBus(bool isInput);
+    bool canRemoveBus(bool isInput);
+    bool addBus(bool isInput);
+    bool removeBus(bool isInput);
+    void setPlayHead(AudioPlayHead* phead);
+    int getNumPrograms();
+    void setCurrentProgram(int channel, int idx);
+    const String getProgramName(int idx);
+    int getTotalNumOutputChannels();
 
-#define callBackendWithReturn(method)         \
-    do {                                      \
-        if (isLoaded()) {                     \
-            if (m_isClient) {                 \
-                return getClient()->method(); \
-            } else {                          \
-                return getPlugin()->method(); \
-            }                                 \
-        }                                     \
-    } while (0)
-
-#define callBackendWithArgs1(method, arg1) \
-    do {                                   \
-        if (isLoaded()) {                  \
-            if (m_isClient) {              \
-                getClient()->method(arg1); \
-            } else {                       \
-                getPlugin()->method(arg1); \
-            }                              \
-        }                                  \
-    } while (0)
-
-#define callBackendWithArgs1MT(method, arg1)                            \
-    do {                                                                \
-        if (isLoaded()) {                                               \
-            if (m_isClient) {                                           \
-                getClient()->method(arg1);                              \
-            } else {                                                    \
-                runOnMsgThreadSync([&] { getPlugin()->method(arg1); }); \
-            }                                                           \
-        }                                                               \
-    } while (0)
-
-#define callBackendWithArgs2(method, arg1, arg2) \
-    do {                                         \
-        if (isLoaded()) {                        \
-            if (m_isClient) {                    \
-                getClient()->method(arg1, arg2); \
-            } else {                             \
-                getPlugin()->method(arg1, arg2); \
-            }                                    \
-        }                                        \
-    } while (0)
-
-#define callBackendWithArgs2MT(method, arg1, arg2)                            \
-    do {                                                                      \
-        if (isLoaded()) {                                                     \
-            if (m_isClient) {                                                 \
-                getClient()->method(arg1, arg2);                              \
-            } else {                                                          \
-                runOnMsgThreadSync([&] { getPlugin()->method(arg1, arg2); }); \
-            }                                                                 \
-        }                                                                     \
-    } while (0)
-
-#define callBackendWithArgs1Return(method, arg1)  \
-    do {                                          \
-        if (isLoaded()) {                         \
-            if (m_isClient) {                     \
-                return getClient()->method(arg1); \
-            } else {                              \
-                return getPlugin()->method(arg1); \
-            }                                     \
-        }                                         \
-    } while (0)
-
-#define backendMethod(method)              \
-    void method() { callBackend(method); } \
-    static constexpr char _createUniqueVar(__forceColon, __COUNTER__) = ' '
-
-#define backendMethodWithReturn(method, ReturnType, defaultReturn) \
-    ReturnType method() {                                          \
-        callBackendWithReturn(method);                             \
-        return defaultReturn;                                      \
-    }                                                              \
-    static constexpr char _createUniqueVar(__forceColon, __COUNTER__) = ' '
-
-#define backendMethodWithReturnMT(method, ReturnType, defaultReturn)      \
-    ReturnType method() {                                                 \
-        if (isLoaded()) {                                                 \
-            if (m_isClient) {                                             \
-                return getClient()->method();                             \
-            } else {                                                      \
-                ReturnType ret;                                           \
-                runOnMsgThreadSync([&] { ret = getPlugin()->method(); }); \
-                return ret;                                               \
-            }                                                             \
-        }                                                                 \
-        return defaultReturn;                                             \
-    }                                                                     \
-    static constexpr char _createUniqueVar(__forceColon, __COUNTER__) = ' '
-
-#define backendMethodWithReturnRef(method, ReturnType) \
-    ReturnType& method() {                             \
-        callBackendWithReturn(method);                 \
-        static ReturnType ret;                         \
-        return ret;                                    \
-    }                                                  \
-    static constexpr char _createUniqueVar(__forceColon, __COUNTER__) = ' '
-
-#define backendMethodWithArgs1(method, Arg1Type)                       \
-    void method(Arg1Type arg1) { callBackendWithArgs1(method, arg1); } \
-    static constexpr char _createUniqueVar(__forceColon, __COUNTER__) = ' '
-
-#define backendMethodWithArgs1MT(method, Arg1Type)                       \
-    void method(Arg1Type arg1) { callBackendWithArgs1MT(method, arg1); } \
-    static constexpr char _createUniqueVar(__forceColon, __COUNTER__) = ' '
-
-#define backendMethodWithArgs2(method, Arg1Type, Arg2Type)                                  \
-    void method(Arg1Type arg1, Arg2Type arg2) { callBackendWithArgs2(method, arg1, arg2); } \
-    static constexpr char _createUniqueVar(__forceColon, __COUNTER__) = ' '
-
-#define backendMethodWithArgs2MT(method, Arg1Type, Arg2Type)                                  \
-    void method(Arg1Type arg1, Arg2Type arg2) { callBackendWithArgs2MT(method, arg1, arg2); } \
-    static constexpr char _createUniqueVar(__forceColon, __COUNTER__) = ' '
-
-#define backendMethodWithReturnArgs1(method, ReturnType, defaultReturn, Arg1Type) \
-    ReturnType method(Arg1Type arg1) {                                            \
-        callBackendWithArgs1Return(method, arg1);                                 \
-        return defaultReturn;                                                     \
-    }                                                                             \
-    static constexpr char _createUniqueVar(__forceColon, __COUNTER__) = ' '
-
-    backendMethodWithReturn(getName, const String, {});
-    backendMethodWithReturnMT(hasEditor, bool, false);
-    backendMethodWithReturn(supportsDoublePrecisionProcessing, bool, false);
-    backendMethodWithReturn(isSuspended, bool, true);
-    backendMethodWithReturn(getTailLengthSeconds, double, 0.0);
-    backendMethodWithArgs1MT(getStateInformation, juce::MemoryBlock&);
-    backendMethodWithArgs2MT(setStateInformation, const void*, int);
-    backendMethodWithReturnArgs1(checkBusesLayoutSupported, bool, false, const AudioProcessor::BusesLayout&);
-    backendMethodWithReturnArgs1(setBusesLayout, bool, false, const AudioProcessor::BusesLayout&);
-    backendMethodWithReturn(getBusesLayout, AudioProcessor::BusesLayout, {});
-    backendMethodWithReturnArgs1(getBusCount, int, 0, bool);
-    backendMethodWithReturnArgs1(canAddBus, bool, false, bool);
-    backendMethodWithReturnArgs1(canRemoveBus, bool, false, bool);
-    backendMethodWithReturnArgs1(addBus, bool, false, bool);
-    backendMethodWithReturnArgs1(removeBus, bool, false, bool);
-    backendMethodWithArgs1(setPlayHead, AudioPlayHead*);
-    backendMethodWithReturn(getNumPrograms, int, 1);
-    backendMethodWithReturnArgs1(getProgramName, const String, {}, int);
-    backendMethodWithArgs1(setCurrentProgram, int);
-    backendMethodWithReturn(getTotalNumOutputChannels, int, 0);
+    int getChannelInstances();
 
   private:
     friend class SandboxPluginTest;
+
+    struct Listener : AudioProcessorParameter::Listener {
+        Processor* proc;
+        int channel;
+
+        Listener(Processor* p, int c) : proc(p), channel(c) {}
+
+        void parameterValueChanged(int parameterIndex, float newValue) override {
+            if (proc->onParamValueChange) {
+                proc->onParamValueChange(proc->m_chainIdx, channel, parameterIndex, newValue);
+            }
+        }
+
+        void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override {
+            if (proc->onParamGestureChange) {
+                proc->onParamGestureChange(proc->m_chainIdx, channel, parameterIndex, gestureIsStarting);
+            }
+        }
+    };
 
     ProcessorChain& m_chain;
     int m_chainIdx = -1;
@@ -311,33 +200,41 @@ class Processor : public LogTagDelegate,
     double m_sampleRate;
     int m_blockSize;
     bool m_isClient;
-    std::shared_ptr<AudioPluginInstance> m_plugin;
     std::shared_ptr<ProcessorClient> m_client;
-    std::shared_ptr<ProcessorWindow> m_window;
+    std::vector<std::shared_ptr<AudioPluginInstance>> m_plugins;
+    std::vector<std::shared_ptr<ProcessorWindow>> m_windows;
+    std::vector<std::unique_ptr<Listener>> m_listners;
+    std::vector<std::unique_ptr<AudioRingBuffer<float>>> m_multiMonoBypassBuffersF;
+    std::vector<std::unique_ptr<AudioRingBuffer<double>>> m_multiMonoBypassBuffersD;
     std::mutex m_pluginMtx;
+    std::atomic_int m_activeWindowChannel{0};
     int m_additionalScreenSpace = 0;
     bool m_fullscreen = false;
     bool m_prepared = false;
     String m_layout;
+    ChannelSet m_monoChannels;
+    std::mutex m_monoChannelsMtx;
+    int m_channels = 1;
     int m_extraInChannels = 0;
     int m_extraOutChannels = 0;
     bool m_needsDisabledSidechain = false;
-    Array<Array<float>> m_bypassBufferF;
-    Array<Array<double>> m_bypassBufferD;
+    AudioRingBuffer<float> m_bypassBufferF;
+    AudioRingBuffer<double> m_bypassBufferD;
     int m_lastKnownLatency = 0;
     Point<int> m_lastPosition = {0, 0};
 
     enum FormatType { VST, VST3, AU };
     FormatType m_fmt;
 
-    std::shared_ptr<AudioPluginInstance> getPlugin() {
-        traceScope();
+    std::shared_ptr<AudioPluginInstance> getPlugin(int channel) {
         std::lock_guard<std::mutex> lock(m_pluginMtx);
-        return m_plugin;
+        if ((size_t)channel < m_plugins.size()) {
+            return m_plugins[(size_t)channel];
+        }
+        return nullptr;
     }
 
     std::shared_ptr<ProcessorClient> getClient() {
-        traceScope();
         std::lock_guard<std::mutex> lock(m_pluginMtx);
         return m_client;
     }
@@ -346,11 +243,19 @@ class Processor : public LogTagDelegate,
     bool processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages);
 
     template <typename T>
-    void processBlockBypassedInternal(AudioBuffer<T>& buffer, Array<Array<T>>& bypassBuffer);
+    void processBlockBypassedInternal(AudioBuffer<T>& buffer, AudioRingBuffer<T>& bypassBuffer);
+
+    template <typename T>
+    void processBlockBypassedMultiMonoInternal(AudioBuffer<T>& buffer, AudioRingBuffer<T>& bypassBuffer);
+
+    void processBlockBypassedMultiMono(AudioBuffer<float>& buffer, int ch);
+    void processBlockBypassedMultiMono(AudioBuffer<double>& buffer, int ch);
 
     template <typename T>
     std::shared_ptr<ProcessorWindow> getOrCreateEditorWindowInternal(Thread::ThreadID tid, T func,
                                                                      std::function<void()> onHide, int x, int y);
+
+    inline size_t getWindowIndex() const { return (size_t)(m_channels > 1 ? m_activeWindowChannel.load() : 0); }
 
     ENABLE_ASYNC_FUNCTORS();
 };

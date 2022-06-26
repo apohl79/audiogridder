@@ -14,6 +14,7 @@
 #include "Server/ScanPluginsTest.hpp"
 #include "Server/ProcessorChainTest.hpp"
 #include "Server/SandboxPluginTest.hpp"
+#include "Server/MultiMonoTest.hpp"
 #endif
 
 #ifdef AG_UNIT_TEST_PLUGIN_FX

@@ -78,15 +78,15 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
     void setStateInformation(const void* /* data */, int /* sizeInBytes */) override {}
 
     bool initPluginInstance(Processor* proc, const String& layout, String& err);
-    bool addPluginProcessor(const String& id, const String& settings, const String& layout, bool multiMono,
-                            uint64 monoChannels, String& err);
+    bool addPluginProcessor(const String& id, const String& settings, const String& layout, uint64 monoChannels,
+                            String& err);
     void addProcessor(std::shared_ptr<Processor> processor);
     size_t getSize() const { return m_processors.size(); }
     std::shared_ptr<Processor> getProcessor(int index);
 
     void delProcessor(int idx);
     void exchangeProcessors(int idxA, int idxB);
-    float getParameterValue(int idx, int paramIdx);
+    float getParameterValue(int idx, int channel, int paramIdx);
     void update();
     void clear();
     String toString();

@@ -16,6 +16,28 @@
 
 namespace e47 {
 
+#define callBackendWithReturn(method)          \
+    do {                                       \
+        if (isLoaded()) {                      \
+            if (m_isClient) {                  \
+                return getClient()->method();  \
+            } else {                           \
+                return getPlugin(0)->method(); \
+            }                                  \
+        }                                      \
+    } while (0)
+
+#define callBackendWithArgs1Return(method, arg1)   \
+    do {                                           \
+        if (isLoaded()) {                          \
+            if (m_isClient) {                      \
+                return getClient()->method(arg1);  \
+            } else {                               \
+                return getPlugin(0)->method(arg1); \
+            }                                      \
+        }                                          \
+    } while (0)
+
 std::atomic_uint32_t Processor::loadedCount{0};
 
 Processor::Processor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize, bool isClient)
@@ -288,7 +310,9 @@ Array<AudioProcessor::BusesLayout> Processor::findSupportedLayouts(std::shared_p
             timeoutActive = false;
         }
 
-        logln("  " << describeLayout(l) << ": " << (supported ? "OK" : "not supported"));
+        if (supported) {
+            logln("  " << describeLayout(l) << ": OK");
+        }
 
         if (supported) {
             ret.add(l);
@@ -301,11 +325,16 @@ Array<AudioProcessor::BusesLayout> Processor::findSupportedLayouts(std::shared_p
 }
 
 Array<AudioProcessor::BusesLayout> Processor::findSupportedLayouts(Processor* proc, bool checkOnly, int srvId) {
-    return findSupportedLayouts(proc->getPlugin(), checkOnly, srvId);
+    return findSupportedLayouts(proc->getPlugin(0), checkOnly, srvId);
 }
 
 const Array<AudioProcessor::BusesLayout>& Processor::getSupportedBusLayouts() const {
+#ifndef AG_UNIT_TESTS
     return getApp()->getServer()->getPluginLayouts(m_idNormalized);
+#else
+    static Array<AudioProcessor::BusesLayout> ret;
+    return ret;
+#endif
 }
 
 std::shared_ptr<AudioPluginInstance> Processor::loadPlugin(const PluginDescription& plugdesc, double sampleRate,
@@ -352,18 +381,18 @@ void Processor::setCallbacks(ParamValueChangeCallback valueChangeFn, ParamGestur
     onStatusChangeFromSandbox = statusChangeFn;
 
     if (auto client = getClient()) {
-        client->onParamValueChange = [this](int paramIdx, float value) {
-            onParamValueChange(m_chainIdx, paramIdx, value);
+        client->onParamValueChange = [this](int channel, int paramIdx, float value) {
+            onParamValueChange(m_chainIdx, channel, paramIdx, value);
         };
-        client->onParamGestureChange = [this](int paramIdx, bool value) {
-            onParamGestureChange(m_chainIdx, paramIdx, value);
+        client->onParamGestureChange = [this](int channel, int paramIdx, bool value) {
+            onParamGestureChange(m_chainIdx, channel, paramIdx, value);
         };
         client->onKeysFromSandbox = [this](Message<Key>& msg) { onKeysFromSandbox(msg); };
         client->onStatusChange = [this](bool ok, const String& err) { onStatusChangeFromSandbox(m_chainIdx, ok, err); };
     }
 }
 
-bool Processor::load(const String& settings, const String& layout, bool multiMono, uint64 monoChannels, String& err,
+bool Processor::load(const String& settings, const String& layout, uint64 monoChannels, String& err,
                      const PluginDescription* plugdesc) {
     traceScope();
 
@@ -376,7 +405,13 @@ bool Processor::load(const String& settings, const String& layout, bool multiMon
     bool loaded = false;
 
     if (m_isClient) {
-        if (auto desc = findPluginDescritpion(m_id, &m_idNormalized)) {
+#ifndef AG_UNIT_TESTS
+        bool found = nullptr != findPluginDescritpion(m_id, &m_idNormalized);
+#else
+        bool found = true;
+        m_idNormalized = m_id;
+#endif
+        if (found) {
             std::shared_ptr<ProcessorClient> client;
 
             {
@@ -386,9 +421,11 @@ bool Processor::load(const String& settings, const String& layout, bool multiMon
             }
 
             if (client->init()) {
-                loaded = client->load(settings, layout, multiMono, monoChannels, err);
+                loaded = client->load(settings, layout, monoChannels, err);
                 if (loaded) {
                     client->startThread();
+                    loadedCount++;
+                    m_windows.resize(1);
                 }
             } else {
                 err = "failed to initialize sandbox";
@@ -400,37 +437,69 @@ bool Processor::load(const String& settings, const String& layout, bool multiMon
             err = "Plugin with ID " + m_id + " not found";
         }
     } else {
-        std::shared_ptr<AudioPluginInstance> p;
-        if (nullptr != plugdesc) {
-            p = loadPlugin(*plugdesc, m_sampleRate, m_blockSize, err);
-        } else {
-            p = loadPlugin(m_id, m_sampleRate, m_blockSize, err, &m_idNormalized);
-        }
-        if (nullptr != p) {
-            {
-                std::lock_guard<std::mutex> lock(m_pluginMtx);
-                m_plugin = p;
+        StringArray settingsByChannel;
+
+        if (layout == "Multi-Mono") {
+            m_channels = m_chain.getTotalNumOutputChannels();
+            m_monoChannels.setNumChannels(0, m_chain.getTotalNumOutputChannels(), 0);
+            if (monoChannels > 0) {
+                m_monoChannels = monoChannels;
+            } else {
+                m_monoChannels.setOutputRangeActive();
             }
-            if (m_chain.initPluginInstance(this, layout, err)) {
-                loaded = true;
-                for (auto* param : m_plugin->getParameters()) {
-                    param->addListener(this);
+            settingsByChannel = StringArray::fromTokens(settings, "|", "");
+            jassert(settingsByChannel.size() == m_channels);
+
+            logln("creating " << m_channels << " plugin instances for multi-mono layout");
+        }
+
+        m_plugins.resize((size_t)m_channels);
+        m_windows.resize((size_t)m_channels);
+        m_listners.resize((size_t)m_channels);
+        m_multiMonoBypassBuffersF.resize((size_t)m_channels);
+        m_multiMonoBypassBuffersD.resize((size_t)m_channels);
+
+        std::shared_ptr<AudioPluginInstance> p;
+
+        for (size_t ch = 0; ch < (size_t)m_channels; ch++) {
+            if (nullptr != plugdesc) {
+                p = loadPlugin(*plugdesc, m_sampleRate, m_blockSize, err);
+            } else {
+                p = loadPlugin(m_id, m_sampleRate, m_blockSize, err, &m_idNormalized);
+            }
+            if (nullptr != p) {
+                std::lock_guard<std::mutex> lock(m_pluginMtx);
+                m_plugins[ch] = p;
+                m_listners[ch] = std::make_unique<Listener>(this, ch);
+                m_multiMonoBypassBuffersF[ch] = std::make_unique<AudioRingBuffer<float>>();
+                m_multiMonoBypassBuffersD[ch] = std::make_unique<AudioRingBuffer<double>>();
+            }
+        }
+
+        if (m_chain.initPluginInstance(this, m_channels > 1 ? "Mono" : layout, err)) {
+            loaded = true;
+            loadedCount++;
+
+            for (size_t ch = 0; ch < (size_t)m_channels; ch++) {
+                for (auto* param : m_plugins[ch]->getParameters()) {
+                    param->addListener(m_listners[ch].get());
                 }
                 if (settings.isNotEmpty()) {
                     MemoryBlock block;
-                    block.fromBase64Encoding(settings);
-                    runOnMsgThreadSync([&] { m_plugin->setStateInformation(block.getData(), (int)(block.getSize())); });
+                    block.fromBase64Encoding(m_channels > 1 ? settingsByChannel.getReference((int)ch) : settings);
+                    runOnMsgThreadSync(
+                        [&] { m_plugins[ch]->setStateInformation(block.getData(), (int)(block.getSize())); });
                 }
-            } else {
-                std::lock_guard<std::mutex> lock(m_pluginMtx);
-                m_plugin.reset();
             }
+        } else {
+            std::lock_guard<std::mutex> lock(m_pluginMtx);
+            m_plugins.clear();
+            loaded = false;
         }
     }
 
     if (loaded) {
         m_layout = layout;
-        loadedCount++;
     }
 
     return loaded;
@@ -443,8 +512,10 @@ void Processor::unload() {
         return;
     }
 
-    if (nullptr != m_window) {
-        runOnMsgThreadSync([this] { m_window.reset(); });
+    for (auto& w : m_windows) {
+        if (nullptr != w) {
+            runOnMsgThreadSync([&] { w.reset(); });
+        }
     }
 
     if (m_isClient) {
@@ -457,42 +528,45 @@ void Processor::unload() {
         client->shutdown();
         client->waitForThreadToExit(-1);
         client.reset();
+        loadedCount--;
     } else {
         std::shared_ptr<AudioPluginInstance> plugin;
-        {
-            std::lock_guard<std::mutex> lock(m_pluginMtx);
-            plugin = std::move(m_plugin);
+        std::unique_ptr<Listener> listener;
+        for (size_t ch = 0; ch < (size_t)m_channels; ch++) {
+            {
+                std::lock_guard<std::mutex> lock(m_pluginMtx);
+                plugin = std::move(m_plugins[ch]);
+                listener = std::move(m_listners[ch]);
+            }
+            if (m_prepared) {
+                plugin->releaseResources();
+            }
+            for (auto* param : plugin->getParameters()) {
+                param->removeListener(listener.get());
+            }
+            plugin.reset();
+            listener.reset();
+            loadedCount--;
         }
-        if (m_prepared) {
-            plugin->releaseResources();
-        }
-        for (auto* param : plugin->getParameters()) {
-            param->removeListener(this);
-        }
-        plugin.reset();
+        m_channels = 1;
     }
-
-    loadedCount--;
 }
 
-bool Processor::isLoaded(std::shared_ptr<AudioPluginInstance>* plugin, std::shared_ptr<ProcessorClient>* client) {
+bool Processor::isLoaded() {
     if (m_isClient) {
         if (auto c = getClient()) {
-            if (client) {
-                *client = c;
-            }
             return c->isOk() && c->isLoaded();
         } else {
             return false;
         }
     } else {
-        if (auto p = getPlugin()) {
-            if (plugin) {
-                *plugin = p;
+        for (int ch = 0; ch < m_channels; ch++) {
+            auto p = getPlugin(ch);
+            if (p == nullptr) {
+                return false;
             }
-            return true;
         }
-        return false;
+        return true;
     }
 }
 
@@ -500,27 +574,43 @@ template <typename T>
 bool Processor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
     traceScope();
 
-    auto fn = [&](auto p) {
+    traceln("  processor: isClient=" << (int)m_isClient << ", multiMono=" << (int)(m_channels > 1)
+                                     << ", latency=" << m_lastKnownLatency);
+    traceln("  buffer: channels=" << buffer.getNumChannels() << ", samples=" << buffer.getNumSamples());
+
+    auto fn = [&](auto p, int ch, bool isPlugin) {
         TimeTrace::addTracePoint("proc_got_backend");
+        traceln("  processing ch " << ch << ": suspended=" << (int)p->isSuspended());
         if (!p->isSuspended()) {
-            p->processBlock(buffer, midiMessages);
-            TimeTrace::addTracePoint("proc_process");
+            if (isPlugin && m_channels > 1) {
+                // multi-mono
+                AudioBuffer<T> chBuffer(buffer.getArrayOfWritePointers() + ch, 1, buffer.getNumSamples());
+                p->processBlock(chBuffer, midiMessages);
+            } else {
+                p->processBlock(buffer, midiMessages);
+            }
+            TimeTrace::addTracePoint("proc_process_" + String(ch));
         } else {
             if (m_lastKnownLatency > 0) {
-                processBlockBypassed(buffer);
+                if (isPlugin && m_channels > 1) {
+                    // multi-mono
+                    AudioBuffer<T> chBuffer(buffer.getArrayOfWritePointers() + ch, 1, buffer.getNumSamples());
+                    processBlockBypassedMultiMono(chBuffer, ch);
+                } else {
+                    processBlockBypassed(buffer);
+                }
             }
         }
     };
 
-    std::shared_ptr<AudioPluginInstance> plugin;
-    std::shared_ptr<ProcessorClient> client;
-
-    if (isLoaded(&plugin, &client)) {
+    if (isLoaded()) {
         TimeTrace::addTracePoint("proc_loaded_ok");
         if (m_isClient) {
-            fn(client);
+            fn(getClient(), 0, false);
         } else {
-            fn(plugin);
+            for (int ch = 0; ch < m_channels; ch++) {
+                fn(getPlugin(ch), ch, true);
+            }
         }
         return true;
     }
@@ -539,7 +629,9 @@ bool Processor::processBlock(AudioBuffer<double>& buffer, MidiBuffer& midiMessag
 }
 
 template <typename T>
-void Processor::processBlockBypassedInternal(AudioBuffer<T>& buffer, Array<Array<T>>& bypassBuffer) {
+void Processor::processBlockBypassedInternal(AudioBuffer<T>& buffer, AudioRingBuffer<T>& bypassBuffer) {
+    traceScope();
+
     auto totalNumInputChannels = m_chain.getTotalNumInputChannels();
     auto totalNumOutputChannels = m_chain.getTotalNumOutputChannels();
 
@@ -556,8 +648,8 @@ void Processor::processBlockBypassedInternal(AudioBuffer<T>& buffer, Array<Array
         buffer.clear(i, 0, buffer.getNumSamples());
     }
 
-    if (bypassBuffer.size() < totalNumOutputChannels) {
-        logln("bypass buffer has less channels than needed, buffer: " << bypassBuffer.size()
+    if (bypassBuffer.getNumChannels() < totalNumOutputChannels) {
+        logln("bypass buffer has less channels than needed, buffer: " << bypassBuffer.getNumChannels()
                                                                       << ", needed: " << totalNumOutputChannels);
         for (auto i = 0; i < totalNumOutputChannels; ++i) {
             buffer.clear(i, 0, buffer.getNumSamples());
@@ -565,14 +657,7 @@ void Processor::processBlockBypassedInternal(AudioBuffer<T>& buffer, Array<Array
         return;
     }
 
-    for (auto c = 0; c < totalNumOutputChannels; ++c) {
-        auto& buf = bypassBuffer.getReference(c);
-        for (auto s = 0; s < buffer.getNumSamples(); ++s) {
-            buf.add(buffer.getSample(c, s));
-            buffer.setSample(c, s, buf.getFirst());
-            buf.remove(0);
-        }
-    }
+    bypassBuffer.process(buffer.getArrayOfWritePointers(), buffer.getNumSamples());
 }
 
 void Processor::processBlockBypassed(AudioBuffer<float>& buffer) {
@@ -583,14 +668,43 @@ void Processor::processBlockBypassed(AudioBuffer<double>& buffer) {
     processBlockBypassedInternal(buffer, m_bypassBufferD);
 }
 
+template <typename T>
+void Processor::processBlockBypassedMultiMonoInternal(AudioBuffer<T>& buffer, AudioRingBuffer<T>& bypassBuffer) {
+    traceScope();
+    traceln("  buffer: channels=" << buffer.getNumChannels() << ", samples=" << buffer.getNumSamples());
+    traceln("  bypass buffer: channels=" << bypassBuffer.getNumChannels()
+                                         << ", samples=" << bypassBuffer.getNumSamples());
+    bypassBuffer.process(buffer.getArrayOfWritePointers(), buffer.getNumSamples());
+}
+
+void Processor::processBlockBypassedMultiMono(AudioBuffer<float>& buffer, int ch) {
+    processBlockBypassedMultiMonoInternal(buffer, *m_multiMonoBypassBuffersF[(size_t)ch]);
+}
+
+void Processor::processBlockBypassedMultiMono(AudioBuffer<double>& buffer, int ch) {
+    processBlockBypassedMultiMonoInternal(buffer, *m_multiMonoBypassBuffersD[(size_t)ch]);
+}
+
 void Processor::prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock) {
     traceScope();
     if (isLoaded()) {
         if (!m_isClient) {
-            if (m_fmt == VST3) {
-                runOnMsgThreadSync([&] { getPlugin()->prepareToPlay(sampleRate, maximumExpectedSamplesPerBlock); });
-            } else {
-                getPlugin()->prepareToPlay(sampleRate, maximumExpectedSamplesPerBlock);
+            ChannelSet cs;
+            {
+                std::lock_guard<std::mutex> lock(m_monoChannelsMtx);
+                cs = m_monoChannels;
+            }
+            for (int ch = 0; ch < m_channels; ch++) {
+                if (m_channels == 1 || cs.isOutputActive(ch)) {
+                    if (m_fmt == VST3) {
+                        runOnMsgThreadSync(
+                            [&] { getPlugin(ch)->prepareToPlay(sampleRate, maximumExpectedSamplesPerBlock); });
+                    } else {
+                        getPlugin(ch)->prepareToPlay(sampleRate, maximumExpectedSamplesPerBlock);
+                    }
+                } else {
+                    getPlugin(ch)->suspendProcessing(true);
+                }
             }
         }
         m_prepared = true;
@@ -601,7 +715,9 @@ void Processor::releaseResources() {
     traceScope();
     if (isLoaded()) {
         if (!m_isClient) {
-            getPlugin()->releaseResources();
+            for (int ch = 0; ch < m_channels; ch++) {
+                getPlugin(ch)->releaseResources();
+            }
         }
         m_prepared = false;
     }
@@ -611,77 +727,134 @@ void Processor::suspendProcessing(const bool shouldBeSuspended) {
     traceScope();
     if (isLoaded()) {
         if (shouldBeSuspended) {
-            callBackendWithArgs1(suspendProcessing, true);
-            if (!m_isClient) {
-                getPlugin()->releaseResources();
-            }
-        } else {
-            if (!m_isClient) {
-                if (m_fmt == VST3) {
-                    runOnMsgThreadSync(
-                        [&] { getPlugin()->prepareToPlay(m_chain.getSampleRate(), m_chain.getBlockSize()); });
-                } else {
-                    getPlugin()->prepareToPlay(m_chain.getSampleRate(), m_chain.getBlockSize());
+            if (m_isClient) {
+                getClient()->suspendProcessing(true);
+            } else {
+                for (int ch = 0; ch < m_channels; ch++) {
+                    auto plugin = getPlugin(ch);
+                    if (!plugin->isSuspended()) {
+                        plugin->suspendProcessing(true);
+                        plugin->releaseResources();
+                    }
                 }
             }
-            callBackendWithArgs1(suspendProcessing, false);
+        } else {
+            if (m_isClient) {
+                getClient()->suspendProcessing(false);
+            } else {
+                for (int ch = 0; ch < m_channels; ch++) {
+                    if (m_channels > 1 && m_monoChannels.isOutputActive(ch)) {
+                        auto plugin = getPlugin(ch);
+                        if (m_fmt == VST3) {
+                            runOnMsgThreadSync(
+                                [&] { plugin->prepareToPlay(m_chain.getSampleRate(), m_chain.getBlockSize()); });
+                        } else {
+                            plugin->prepareToPlay(m_chain.getSampleRate(), m_chain.getBlockSize());
+                        }
+                        plugin->suspendProcessing(false);
+                    }
+                }
+            }
         }
     }
 }
 
 void Processor::updateLatencyBuffers() {
     traceScope();
-    logln("updating latency buffers for " << m_lastKnownLatency << " samples");
     int channels = getTotalNumOutputChannels();
-    while (m_bypassBufferF.size() < channels) {
-        Array<float> buf;
-        for (int i = 0; i < m_lastKnownLatency; i++) {
-            buf.add(0);
-        }
-        m_bypassBufferF.add(std::move(buf));
-    }
-    while (m_bypassBufferD.size() < channels) {
-        Array<double> buf;
-        for (int i = 0; i < m_lastKnownLatency; i++) {
-            buf.add(0);
-        }
-        m_bypassBufferD.add(std::move(buf));
-    }
-    for (int c = 0; c < channels; c++) {
-        auto& bufF = m_bypassBufferF.getReference(c);
-        while (bufF.size() > m_lastKnownLatency) {
-            bufF.remove(0);
-        }
-        while (bufF.size() < m_lastKnownLatency) {
-            bufF.add(0);
-        }
-        auto& bufD = m_bypassBufferD.getReference(c);
-        while (bufD.size() > m_lastKnownLatency) {
-            bufD.remove(0);
-        }
-        while (bufD.size() < m_lastKnownLatency) {
-            bufD.add(0);
+    logln("updating latency buffers of " << getName() << " to " << m_lastKnownLatency << " samples and " << channels
+                                         << " channels");
+    m_bypassBufferF.resize(channels, m_lastKnownLatency * 2);
+    m_bypassBufferF.clear();
+    m_bypassBufferF.setReadOffset(m_lastKnownLatency);
+    m_bypassBufferD.resize(channels, m_lastKnownLatency * 2);
+    m_bypassBufferD.clear();
+    m_bypassBufferD.setReadOffset(m_lastKnownLatency);
+
+    if (m_channels > 1) {
+        for (int ch = 0; ch < m_channels; ch++) {
+            if (auto& b = m_multiMonoBypassBuffersF[(size_t)ch]) {
+                b->resize(1, m_lastKnownLatency * 2);
+                b->clear();
+                b->setReadOffset(m_lastKnownLatency);
+            }
+            if (auto& b = m_multiMonoBypassBuffersD[(size_t)ch]) {
+                b->resize(1, m_lastKnownLatency * 2);
+                b->clear();
+                b->setReadOffset(m_lastKnownLatency);
+            }
         }
     }
 }
 
 void Processor::enableAllBuses() {
     traceScope();
-    if (auto p = getPlugin()) {
-        p->enableAllBuses();
+    if (isLoaded()) {
+        for (int ch = 0; ch < m_channels; ch++) {
+            getPlugin(ch)->enableAllBuses();
+        }
     }
+}
+
+void Processor::setMonoChannels(uint64 channels) {
+    if (isLoaded()) {
+        if (m_isClient) {
+            getClient()->setMonoChannels(channels);
+        } else {
+            bool changed = false;
+            {
+                std::lock_guard<std::mutex> lock(m_monoChannelsMtx);
+                if (m_monoChannels.toInt() != channels) {
+                    m_monoChannels = channels;
+                    changed = true;
+                }
+            }
+            if (changed) {
+                ChannelSet cs(channels, 0, m_channels);
+                logln("setting mono channels to: " << cs.toString());
+                for (int ch = 0; ch < m_channels; ch++) {
+                    if (auto plugin = getPlugin(ch)) {
+                        if (cs.isOutputActive(ch)) {
+                            if (plugin->isSuspended()) {
+                                if (m_fmt == VST3) {
+                                    runOnMsgThreadSync([&] {
+                                        plugin->prepareToPlay(m_chain.getSampleRate(), m_chain.getBlockSize());
+                                    });
+                                } else {
+                                    plugin->prepareToPlay(m_chain.getSampleRate(), m_chain.getBlockSize());
+                                }
+                                plugin->suspendProcessing(false);
+                            }
+                        } else {
+                            if (!plugin->isSuspended()) {
+                                plugin->suspendProcessing(true);
+                                plugin->releaseResources();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+bool Processor::isMonoChannelActive(int ch) {
+    std::lock_guard<std::mutex> lock(m_monoChannelsMtx);
+    return m_monoChannels.isOutputActive(ch);
 }
 
 void Processor::setProcessingPrecision(AudioProcessor::ProcessingPrecision prec) {
     traceScope();
-    if (auto p = getPlugin()) {
-        p->setProcessingPrecision(prec);
+    if (isLoaded()) {
+        for (int ch = 0; ch < m_channels; ch++) {
+            getPlugin(ch)->setProcessingPrecision(prec);
+        }
     }
 }
 
 AudioProcessorEditor* Processor::createEditorIfNeeded() {
     traceScope();
-    if (auto p = getPlugin()) {
+    if (auto p = getPlugin(m_activeWindowChannel)) {
         return p->createEditorIfNeeded();
     }
     return nullptr;
@@ -689,7 +862,7 @@ AudioProcessorEditor* Processor::createEditorIfNeeded() {
 
 AudioProcessorEditor* Processor::getActiveEditor() {
     traceScope();
-    if (auto p = getPlugin()) {
+    if (auto p = getPlugin(m_activeWindowChannel)) {
         return p->getActiveEditor();
     }
     return nullptr;
@@ -711,23 +884,27 @@ template <typename T>
 std::shared_ptr<ProcessorWindow> Processor::getOrCreateEditorWindowInternal(Thread::ThreadID tid, T func,
                                                                             std::function<void()> onHide, int x,
                                                                             int y) {
-    if (nullptr == m_window) {
-        m_window = std::make_shared<ProcessorWindow>(shared_from_this(), tid, func, onHide, x, y);
+    if (auto& w = m_windows[getWindowIndex()]) {
+        return w;
     }
-    return m_window;
+
+    auto w = std::make_shared<ProcessorWindow>(shared_from_this(), tid, func, onHide, x, y);
+    m_windows[getWindowIndex()] = w;
+
+    return w;
 }
 
 std::shared_ptr<ProcessorWindow> Processor::recreateEditorWindow() {
-    if (nullptr != m_window) {
-        auto pos = m_window->getPosition();
-        auto tid = m_window->getTid();
-        auto onHide = m_window->getOnHide();
-        if (auto func = m_window->getCaptureCallbackFFmpeg()) {
-            m_window.reset();
+    if (auto& w = m_windows[getWindowIndex()]) {
+        auto pos = w->getPosition();
+        auto tid = w->getTid();
+        auto onHide = w->getOnHide();
+        if (auto func = w->getCaptureCallbackFFmpeg()) {
+            w.reset();
             return getOrCreateEditorWindowInternal(tid, func, onHide, pos.x, pos.y);
         }
-        if (auto func = m_window->getCaptureCallbackNative()) {
-            m_window.reset();
+        if (auto func = w->getCaptureCallbackNative()) {
+            w.reset();
             return getOrCreateEditorWindowInternal(tid, func, onHide, pos.x, pos.y);
         }
     }
@@ -740,7 +917,7 @@ std::shared_ptr<ProcessorWindow> Processor::recreateEditorWindow() {
 void Processor::showEditor(int x, int y) {
     traceScope();
     if (auto c = getClient()) {
-        c->showEditor(x, y);
+        c->showEditor(m_activeWindowChannel, x, y);
     }
 }
 
@@ -778,7 +955,7 @@ juce::Rectangle<int> Processor::getScreenBounds() {
         } else {
             juce::Rectangle<int> ret;
             runOnMsgThreadSync([&] {
-                if (auto* e = getPlugin()->getActiveEditor()) {
+                if (auto* e = getPlugin(m_activeWindowChannel)->getActiveEditor()) {
                     ret = e->getScreenBounds();
                 }
             });
@@ -810,20 +987,6 @@ void Processor::setExtraChannels(int in, int out) {
     m_extraOutChannels = out;
 }
 
-void Processor::parameterValueChanged(int parameterIndex, float newValue) {
-    traceScope();
-    if (onParamValueChange) {
-        onParamValueChange(m_chainIdx, parameterIndex, newValue);
-    }
-}
-
-void Processor::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {
-    traceScope();
-    if (onParamGestureChange) {
-        onParamGestureChange(m_chainIdx, parameterIndex, gestureIsStarting);
-    }
-}
-
 json Processor::getParameters() {
     traceScope();
     if (isLoaded()) {
@@ -832,7 +995,8 @@ json Processor::getParameters() {
         } else {
             json jparams = json::array();
             runOnMsgThreadSync([this, &jparams] {
-                auto plugin = getPlugin();
+                // just loading the parameters of the first instance, as all instances have the same params
+                auto plugin = getPlugin(0);
                 for (auto* param : plugin->getParameters()) {
                     json jparam = {{"idx", param->getParameterIndex()},
                                    {"name", param->getName(32).toStdString()},
@@ -871,29 +1035,37 @@ json Processor::getParameters() {
     return {};
 }
 
-void Processor::setParameterValue(int paramIdx, float value) {
+void Processor::setParameterValue(int channel, int paramIdx, float value) {
     traceScope();
     if (isLoaded()) {
         if (m_isClient) {
-            getClient()->setParameterValue(paramIdx, value);
+            getClient()->setParameterValue(channel, paramIdx, value);
         } else {
-            if (auto* param = getPlugin()->getParameters()[paramIdx]) {
-                param->setValue(value);
+            if (auto plugin = getPlugin(channel)) {
+                if (auto* param = plugin->getParameters()[paramIdx]) {
+                    param->setValue(value);
+                }
+            } else {
+                logln("error in setParameterValue: no plugin for channel " << channel);
             }
         }
     }
 }
 
-float Processor::getParameterValue(int paramIdx) {
+float Processor::getParameterValue(int channel, int paramIdx) {
     traceScope();
     if (isLoaded()) {
         if (m_isClient) {
-            return getClient()->getParameterValue(paramIdx);
+            return getClient()->getParameterValue(channel, paramIdx);
         } else {
-            for (auto& param : getPlugin()->getParameters()) {
-                if (paramIdx == param->getParameterIndex()) {
-                    return param->getValue();
+            if (auto plugin = getPlugin(channel)) {
+                for (auto& param : plugin->getParameters()) {
+                    if (paramIdx == param->getParameterIndex()) {
+                        return param->getValue();
+                    }
                 }
+            } else {
+                logln("error in getParameterValue: no plugin for channel " << channel);
             }
         }
     }
@@ -907,13 +1079,239 @@ std::vector<Srv::ParameterValue> Processor::getAllParamaterValues() {
             return getClient()->getAllParameterValues();
         } else {
             std::vector<Srv::ParameterValue> ret;
-            for (auto* param : getPlugin()->getParameters()) {
-                ret.push_back({param->getParameterIndex(), param->getValue()});
+            for (int ch = 0; ch < m_channels; ch++) {
+                for (auto* param : getPlugin(ch)->getParameters()) {
+                    ret.push_back({param->getParameterIndex(), param->getValue(), ch});
+                }
             }
             return ret;
         }
     }
     return {};
+}
+
+const String Processor::getName() {
+    callBackendWithReturn(getName);
+    return {};
+}
+
+bool Processor::hasEditor() {
+    if (isLoaded()) {
+        if (m_isClient) {
+            return getClient()->hasEditor();
+        } else {
+            bool ret;
+            runOnMsgThreadSync([&] { ret = getPlugin(0)->hasEditor(); });
+            return ret;
+        }
+    }
+    return false;
+}
+
+bool Processor::supportsDoublePrecisionProcessing() {
+    callBackendWithReturn(supportsDoublePrecisionProcessing);
+    return false;
+}
+
+bool Processor::isSuspended() {
+    callBackendWithReturn(isSuspended);
+    return true;
+}
+
+double Processor::getTailLengthSeconds() {
+    if (isLoaded()) {
+        if (m_isClient) {
+            return getClient()->getTailLengthSeconds();
+        } else {
+            double ret = 0.0;
+            for (int ch = 0; ch < m_channels; ch++) {
+                ret = jmax(ret, getPlugin(ch)->getTailLengthSeconds());
+            }
+            return ret;
+        }
+    }
+    return 0.0;
+}
+
+void Processor::getStateInformation(String& settings) {
+    traceScope();
+    if (isLoaded()) {
+        if (m_isClient) {
+            getClient()->getStateInformation(settings);
+        } else {
+            StringArray saSettings;
+            runOnMsgThreadSync([&] {
+                for (int ch = 0; ch < m_channels; ch++) {
+                    MemoryBlock block;
+                    getPlugin(ch)->getStateInformation(block);
+                    saSettings.add(block.toBase64Encoding());
+                }
+            });
+            settings = saSettings.joinIntoString("|");
+        }
+    }
+}
+
+void Processor::setStateInformation(const String& settings) {
+    traceScope();
+    if (isLoaded()) {
+        if (m_isClient) {
+            getClient()->setStateInformation(settings);
+        } else {
+            auto saSettings = StringArray::fromTokens(settings, "|", "");
+            jassert(saSettings.size() == m_channels);
+            std::vector<MemoryBlock> blocks((size_t)m_channels);
+            for (int ch = 0; ch < m_channels; ch++) {
+                blocks[(size_t)ch].fromBase64Encoding(saSettings.getReference(ch));
+            }
+            runOnMsgThreadSync([&] {
+                for (int ch = 0; ch < m_channels; ch++) {
+                    getPlugin(ch)->setStateInformation(blocks[(size_t)ch].getData(), (int)blocks[(size_t)ch].getSize());
+                }
+            });
+        }
+    }
+}
+
+bool Processor::checkBusesLayoutSupported(const AudioProcessor::BusesLayout& layout) {
+    if (isLoaded()) {
+        if (!m_isClient) {
+            return getPlugin(0)->checkBusesLayoutSupported(layout);
+        }
+        return true;
+    }
+    return false;
+}
+
+bool Processor::setBusesLayout(const AudioProcessor::BusesLayout& layout) {
+    if (isLoaded()) {
+        if (!m_isClient) {
+            for (int ch = 0; ch < m_channels; ch++) {
+                if (!getPlugin(ch)->setBusesLayout(layout)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
+AudioProcessor::BusesLayout Processor::getBusesLayout() {
+    if (isLoaded()) {
+        if (!m_isClient) {
+            return getPlugin(0)->getBusesLayout();
+        }
+    }
+    return {};
+}
+
+int Processor::getBusCount(bool isInput) {
+    if (isLoaded()) {
+        if (!m_isClient) {
+            return getPlugin(0)->getBusCount(isInput);
+        }
+    }
+    return 0;
+}
+
+bool Processor::canAddBus(bool isInput) {
+    if (isLoaded()) {
+        if (!m_isClient) {
+            return getPlugin(0)->canAddBus(isInput);
+        }
+    }
+    return false;
+}
+
+bool Processor::canRemoveBus(bool isInput) {
+    if (isLoaded()) {
+        if (!m_isClient) {
+            return getPlugin(0)->canRemoveBus(isInput);
+        }
+    }
+    return false;
+}
+
+bool Processor::addBus(bool isInput) {
+    if (isLoaded()) {
+        if (!m_isClient) {
+            return getPlugin(0)->addBus(isInput);
+        }
+    }
+    return false;
+}
+
+bool Processor::removeBus(bool isInput) {
+    if (isLoaded()) {
+        if (!m_isClient) {
+            return getPlugin(0)->removeBus(isInput);
+        }
+    }
+    return false;
+}
+
+void Processor::setPlayHead(AudioPlayHead* phead) {
+    if (isLoaded()) {
+        if (m_isClient) {
+            getClient()->setPlayHead(phead);
+        } else {
+            for (int ch = 0; ch < m_channels; ch++) {
+                getPlugin(ch)->setPlayHead(phead);
+            }
+        }
+    }
+}
+
+int Processor::getNumPrograms() {
+    callBackendWithReturn(getNumPrograms);
+    return 1;
+}
+
+const String Processor::getProgramName(int idx) {
+    callBackendWithArgs1Return(getProgramName, idx);
+    return {};
+}
+
+void Processor::setCurrentProgram(int idx, int channel) {
+    if (isLoaded()) {
+        if (m_isClient) {
+            getClient()->setCurrentProgram(idx);
+        } else {
+            if (auto plugin = getPlugin(channel)) {
+                plugin->setCurrentProgram(idx);
+            } else {
+                logln("error in setCurrentProgram: no plugin for channel " << channel);
+            }
+        }
+    }
+}
+
+int Processor::getTotalNumOutputChannels() {
+    if (isLoaded()) {
+        if (m_isClient) {
+            return getClient()->getTotalNumOutputChannels();
+        } else {
+            if (m_channels > 1) {
+                return m_channels;
+            } else {
+                return getPlugin(0)->getTotalNumOutputChannels();
+            }
+        }
+    }
+    return 0;
+}
+
+int Processor::getChannelInstances() {
+    if (isLoaded()) {
+        if (m_isClient) {
+            return getClient()->getChannelInstances();
+        } else {
+            return m_channels;
+            ;
+        }
+    }
+    return 0;
 }
 
 }  // namespace e47

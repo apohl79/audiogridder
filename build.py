@@ -422,6 +422,8 @@ def tests(args):
                      'TestsData/macos/2rulessynth1.1-mac.zip')
         downloadFile('https://3fef17d2-0d9a-400d-abff-458b86c18a2a.usrfiles.com/archives/3fef17_26e379c8b1734ac4bd485cd2596ac970.zip',
                      'TestsData/windows/2rulessynth1.1-win.zip')
+        downloadFile('https://pluginguru.net/wp-content/uploads/2022/01/LoudMax_v1_41_Mac.zip', 'TestsData/macos/LoudMax_v1_41_Mac.zip')
+        downloadFile('https://www.dropbox.com/s/t5pqcl7xnj6mwn8/LoudMax_v1_41_WIN_VST3.zip?dl=1', 'TestsData/windows/LoudMax_v1_41_WIN_VST3.zip')
 
         log('extracting tests data...')
         for f in glob.glob('TestsData/**/*.zip'):

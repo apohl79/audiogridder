@@ -43,22 +43,23 @@ class GenericEditor : public Component, public LogTag {
     Array<std::unique_ptr<OnClick>> m_clickHandlers;
 
     struct GestureTracker : MouseListener, LogTagDelegate {
-        int idx;
+        int idx, channel;
         bool isTracking = false;
         PluginProcessor& processor;
 
-        GestureTracker(GenericEditor* e, int i) : LogTagDelegate(e), idx(i), processor(e->m_processor) {}
+        GestureTracker(GenericEditor* e, int i, int c)
+            : LogTagDelegate(e), idx(i), channel(c), processor(e->m_processor) {}
 
         void mouseDown(const MouseEvent&) override {
             traceScope();
             isTracking = true;
-            processor.updateParameterGestureTracking(processor.getActivePlugin(), idx, true);
+            processor.updateParameterGestureTracking(processor.getActivePlugin(), channel, idx, true);
         }
 
         void mouseUp(const MouseEvent&) override {
             traceScope();
             isTracking = false;
-            processor.updateParameterGestureTracking(processor.getActivePlugin(), idx, false);
+            processor.updateParameterGestureTracking(processor.getActivePlugin(), channel, idx, false);
         }
     };
     Array<std::unique_ptr<GestureTracker>> m_gestureTrackers;

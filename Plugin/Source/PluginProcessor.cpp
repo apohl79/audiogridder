@@ -81,7 +81,8 @@ PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
     m_unusedDummyPlugin.name = "(unused)";
     m_unusedDummyPlugin.bypassed = false;
     m_unusedDummyPlugin.ok = true;
-    m_unusedDummyPlugin.params.add(m_unusedParam);
+    m_unusedDummyPlugin.params.resize(1);
+    m_unusedDummyPlugin.params[0].push_back(m_unusedParam);
 
     for (int i = 0; i < m_numberOfAutomationSlots; i++) {
         auto pparam = new Parameter(*this, i);
@@ -106,7 +107,7 @@ PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
         traceScope();
         logln("connected");
         bool updLatency = false;
-        std::vector<std::tuple<int, int, int>> automationParams;
+        std::vector<std::tuple<int, int, int, int>> automationParams;
         int idx = 0;
         {
             std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
@@ -114,20 +115,22 @@ PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
             for (auto& p : m_loadedPlugins) {
                 logln("loading " << p.name << " (" << p.id << ") [on connect]... ");
                 bool scDisabled;
-                p.ok = m_client->addPlugin(p.id, p.presets, p.params, p.hasEditor, scDisabled, p.settings, {}, false, 0,
-                                           p.error);
+                p.ok = m_client->addPlugin(p.id, p.presets, p.params, p.hasEditor, scDisabled, p.settings, p.layout,
+                                           p.monoChannels.toInt(), p.error);
                 if (p.ok) {
                     logln("...ok");
                     updLatency = true;
                     if (p.bypassed) {
                         m_client->bypassPlugin(idx);
                     }
-                    for (auto& param : p.params) {
-                        if (param.automationSlot > -1) {
-                            if (param.automationSlot < m_numberOfAutomationSlots) {
-                                automationParams.push_back({idx, param.idx, param.automationSlot});
-                            } else {
-                                param.automationSlot = -1;
+                    for (size_t ch = 0; ch < p.params.size(); ch++) {
+                        for (auto& param : p.params[ch]) {
+                            if (param.automationSlot > -1) {
+                                if (param.automationSlot < m_numberOfAutomationSlots) {
+                                    automationParams.push_back({idx, ch, param.idx, param.automationSlot});
+                                } else {
+                                    param.automationSlot = -1;
+                                }
                             }
                         }
                     }
@@ -149,7 +152,7 @@ PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
             traceScope();
 
             for (auto& ap : automationParams) {
-                enableParamAutomation(std::get<0>(ap), std::get<1>(ap), std::get<2>(ap));
+                enableParamAutomation(std::get<0>(ap), std::get<1>(ap), std::get<2>(ap), std::get<3>(ap));
             }
 
             auto* editor = getActiveEditor();
@@ -478,11 +481,14 @@ void PluginProcessor::releaseResources() {
 }
 
 bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
+    int numOfInputs = getLayoutNumChannels(layouts, true), numOfOutputs = getLayoutNumChannels(layouts, false);
+
 #if !JucePlugin_IsSynth && !JucePlugin_IsMidiEffect
     if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet() ||
         layouts.getMainInputChannelSet().isDisabled()) {
         return false;
     }
+    return numOfInputs <= Defaults::PLUGIN_CHANNELS_IN && numOfOutputs <= Defaults::PLUGIN_CHANNELS_OUT;
 #elif JucePlugin_IsSynth
     for (auto& outbus : layouts.outputBuses) {
         for (auto ct : outbus.getChannelTypes()) {
@@ -492,15 +498,9 @@ bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
             }
         }
     }
+    return numOfOutputs <= Defaults::PLUGIN_CHANNELS_OUT;
 #endif
-    int numOfInputs = 0, numOfOutputs = 0;
-    for (auto& bus : layouts.inputBuses) {
-        numOfInputs += bus.size();
-    }
-    for (auto& bus : layouts.outputBuses) {
-        numOfOutputs += bus.size();
-    }
-    return numOfInputs <= Defaults::PLUGIN_CHANNELS_MAX && numOfOutputs <= Defaults::PLUGIN_CHANNELS_MAX;
+    return true;
 }
 
 void PluginProcessor::numChannelsChanged() {
@@ -698,7 +698,8 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
     TimeTrace::deleteTraceContext();
 }
 
-void PluginProcessor::processBlockBypassed(AudioBuffer<float>& buffer, MidiBuffer& /* midiMessages */) {
+template <typename T>
+void PluginProcessor::processBlockBypassedInternal(AudioBuffer<T>& buffer, AudioRingBuffer<T>& bypassBuffer) {
     traceScope();
 
     if (getLatencySamples() == 0) {
@@ -724,7 +725,7 @@ void PluginProcessor::processBlockBypassed(AudioBuffer<float>& buffer, MidiBuffe
 
     std::lock_guard<std::mutex> lock(m_bypassBufferMtx);
 
-    if (m_bypassBufferF.getNumChannels() < totalNumOutputChannels) {
+    if (bypassBuffer.getNumChannels() < totalNumOutputChannels) {
         logln("bypass buffer has less channels than needed");
         for (auto i = 0; i < totalNumOutputChannels; ++i) {
             buffer.clear(i, 0, buffer.getNumSamples());
@@ -732,46 +733,7 @@ void PluginProcessor::processBlockBypassed(AudioBuffer<float>& buffer, MidiBuffe
         return;
     }
 
-    m_bypassBufferF.write(buffer.getArrayOfReadPointers(), buffer.getNumSamples());
-    m_bypassBufferF.read(buffer.getArrayOfWritePointers(), buffer.getNumSamples());
-}
-
-void PluginProcessor::processBlockBypassed(AudioBuffer<double>& buffer, MidiBuffer& /* midiMessages */) {
-    traceScope();
-
-    if (getLatencySamples() == 0) {
-        return;
-    }
-
-    ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels = getTotalNumInputChannels();
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
-
-    if (totalNumInputChannels > buffer.getNumChannels()) {
-        logln("buffer has less channels than main input channels");
-        totalNumInputChannels = buffer.getNumChannels();
-    }
-    if (totalNumOutputChannels > buffer.getNumChannels()) {
-        logln("buffer has less channels than main output channels");
-        totalNumOutputChannels = buffer.getNumChannels();
-    }
-
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i) {
-        buffer.clear(i, 0, buffer.getNumSamples());
-    }
-
-    std::lock_guard<std::mutex> lock(m_bypassBufferMtx);
-
-    if (m_bypassBufferD.getNumChannels() < totalNumOutputChannels) {
-        logln("bypass buffer has less channels than needed");
-        for (auto i = 0; i < totalNumOutputChannels; ++i) {
-            buffer.clear(i, 0, buffer.getNumSamples());
-        }
-        return;
-    }
-
-    m_bypassBufferD.write(buffer.getArrayOfReadPointers(), buffer.getNumSamples());
-    m_bypassBufferD.read(buffer.getArrayOfWritePointers(), buffer.getNumSamples());
+    bypassBuffer.process(buffer.getArrayOfWritePointers(), buffer.getNumSamples());
 }
 
 void PluginProcessor::updateLatency(int samples) {
@@ -820,7 +782,7 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes) {
 json PluginProcessor::getState(bool withServers) {
     traceScope();
     json j;
-    j["version"] = 4;
+    j["version"] = 5;
     j["Mode"] = m_mode.toStdString();
 
     if (withServers) {
@@ -845,8 +807,8 @@ json PluginProcessor::getState(bool withServers) {
                 if (!m_client->isReadyLockFree()) {
                     logln("error in getState: getPluginSettings for " << plug.name << " (" << plug.id << ") failed");
                 }
-                if (settings.getSize() > 0) {
-                    plug.settings = settings.toBase64Encoding();
+                if (settings.length() > 0) {
+                    plug.settings = std::move(settings);
                 }
             }
             jplugs.push_back(plug.toJson());
@@ -929,8 +891,8 @@ void PluginProcessor::sync() {
                     if (!m_client->isReadyLockFree()) {
                         logln("error in sync: getPluginSettings for " << plug.name << " (" << plug.id << ") failed");
                     }
-                    if (settings.getSize() > 0) {
-                        plug.settings = settings.toBase64Encoding();
+                    if (settings.length() > 0) {
+                        plug.settings = std::move(settings);
                     }
                 }
             }
@@ -994,19 +956,25 @@ std::set<String> PluginProcessor::getPluginTypes() const {
     return ret;
 }
 
-bool PluginProcessor::loadPlugin(const ServerPlugin& plugin, const String& layout, bool multiMono, uint64 monoChannels,
-                                 String& err) {
+bool PluginProcessor::loadPlugin(const ServerPlugin& plugin, const String& layout, uint64 monoChannels, String& err) {
     traceScope();
 
     StringArray presets;
-    Array<Client::Parameter> params;
+    Client::ParameterByChannelList params;
     bool hasEditor, scDisabled;
 
     logln("loading " << plugin.getName() << " (" << plugin.getId() << ")...");
 
+    ChannelSet monoChannelSet(monoChannels, 0, m_client->getChannelsOut());
+
+    if (layout == "Multi-Mono" && monoChannels == 0) {
+        monoChannelSet.setOutputRangeActive();
+        monoChannels = monoChannelSet.toInt();
+    }
+
     suspendProcessing(true);
-    bool success = m_client->addPlugin(plugin.getId(), presets, params, hasEditor, scDisabled, {}, layout, multiMono,
-                                       monoChannels, err);
+    bool success =
+        m_client->addPlugin(plugin.getId(), presets, params, hasEditor, scDisabled, {}, layout, monoChannels, err);
     suspendProcessing(false);
 
     if (success) {
@@ -1018,8 +986,8 @@ bool PluginProcessor::loadPlugin(const ServerPlugin& plugin, const String& layou
 
     {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
-        m_loadedPlugins.emplace_back(plugin.getId(), plugin.getIdDeprecated(), plugin.getName(), "", false, 0ull, "",
-                                     presets, params, false, hasEditor, success, err);
+        m_loadedPlugins.emplace_back(plugin.getId(), plugin.getIdDeprecated(), plugin.getName(), layout, monoChannelSet,
+                                     0, "", presets, params, false, hasEditor, success, err);
         m_loadedPluginsCount++;
     }
 
@@ -1051,9 +1019,13 @@ bool PluginProcessor::loadPlugin(const ServerPlugin& plugin, const String& layou
 void PluginProcessor::unloadPlugin(int idx) {
     traceScope();
 
-    for (auto& p : getLoadedPlugin(idx).params) {
-        if (p.automationSlot > -1) {
-            disableParamAutomation(idx, p.idx);
+    auto& loadedPlug = getLoadedPlugin(idx);
+
+    for (size_t ch = 0; ch < loadedPlug.params.size(); ch++) {
+        for (auto& p : loadedPlug.params[ch]) {
+            if (p.automationSlot > -1) {
+                disableParamAutomation(idx, (int)ch, p.idx);
+            }
         }
     }
 
@@ -1105,12 +1077,13 @@ String PluginProcessor::getLoadedPluginsString() const {
     return ret;
 }
 
-void PluginProcessor::editPlugin(int idx, int x, int y) {
+void PluginProcessor::editPlugin(int idx, int channel, int x, int y) {
     traceScope();
-    logln("edit plugin " << idx << " x=" << x << " y=" << y);
+    logln("edit plugin " << idx << ": channel=" << channel << ", position=" << x << "x" << y);
     if (!m_genericEditor && getLoadedPlugin(idx).ok) {
-        m_client->editPlugin(idx, x, y);
+        m_client->editPlugin(idx, channel, x, y);
     }
+    getLoadedPlugin(idx).activeChannel = channel;
     m_activePlugin = idx;
 }
 
@@ -1137,6 +1110,50 @@ void PluginProcessor::hidePluginFromServer(int idx) {
             }
         });
     }
+}
+
+void PluginProcessor::enableMonoChannel(int idx, int channel) {
+    auto& loadedPlug = getLoadedPlugin(idx);
+    loadedPlug.monoChannels.setOutputActive(channel);
+    m_client->setMonoChannels(idx, loadedPlug.monoChannels.toInt());
+}
+
+void PluginProcessor::disableMonoChannel(int idx, int channel) {
+    auto& loadedPlug = getLoadedPlugin(idx);
+    loadedPlug.monoChannels.setOutputActive(channel, false);
+    m_client->setMonoChannels(idx, loadedPlug.monoChannels.toInt());
+}
+
+String PluginProcessor::getPluginChannelName(int ch) {
+    auto layout = getBusesLayout();
+    if (ch > -1 && ch < getLayoutNumChannels(layout, false)) {
+        int c = 0;
+        int idx = 0;
+        int chIdx = -1;
+        while (chIdx < 0) {
+            if (ch < c + layout.outputBuses[idx].size()) {
+                chIdx = ch - c;
+            } else {
+                c += layout.outputBuses[idx].size();
+                idx++;
+            }
+        }
+        auto ct = layout.outputBuses[idx].getTypeOfChannel(chIdx);
+        return AudioChannelSet::getAbbreviatedChannelTypeName(ct);
+    } else {
+        return String(ch);
+    }
+}
+
+StringArray PluginProcessor::getOutputChannelNames() const {
+    StringArray ret;
+    auto layout = getBusesLayout();
+    for (auto& bus : layout.outputBuses) {
+        for (int ch = 0; ch < bus.size(); ch++) {
+            ret.add(AudioChannelSet::getAbbreviatedChannelTypeName(bus.getTypeOfChannel(ch)));
+        }
+    }
+    return ret;
 }
 
 bool PluginProcessor::isBypassed(int idx) {
@@ -1218,13 +1235,14 @@ void PluginProcessor::exchangePlugins(int idxA, int idxB) {
     }
 }
 
-bool PluginProcessor::enableParamAutomation(int idx, int paramIdx, int slot) {
+bool PluginProcessor::enableParamAutomation(int idx, int channel, int paramIdx, int slot) {
     traceScope();
-    logln("enabling automation for plugin " << idx << ", parameter " << paramIdx << ", slot " << slot);
+    logln("enabling automation for plugin idx=" << idx << ", channel=" << channel << ", param index=" << paramIdx
+                                                << ", slot=" << slot);
     bool updateHost = false;
     {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
-        auto& param = m_loadedPlugins[(size_t)idx].params.getReference(paramIdx);
+        auto& param = m_loadedPlugins[(size_t)idx].params[(size_t)channel][(size_t)paramIdx];
         Parameter* pparam = nullptr;
         if (slot == -1) {
             for (slot = 0; slot < m_numberOfAutomationSlots; slot++) {
@@ -1239,6 +1257,7 @@ bool PluginProcessor::enableParamAutomation(int idx, int paramIdx, int slot) {
         }
         if (slot < m_numberOfAutomationSlots) {
             pparam->m_idx = idx;
+            pparam->m_channel = channel;
             pparam->m_paramIdx = paramIdx;
             param.automationSlot = slot;
             updateHost = true;
@@ -1253,12 +1272,12 @@ bool PluginProcessor::enableParamAutomation(int idx, int paramIdx, int slot) {
     return false;
 }
 
-void PluginProcessor::disableParamAutomation(int idx, int paramIdx) {
+void PluginProcessor::disableParamAutomation(int idx, int channel, int paramIdx) {
     traceScope();
-    logln("disabling automation for plugin " << idx << ", parameter " << paramIdx);
+    logln("disabling automation for plugin idx=" << idx << ", channel=" << channel << ", param index=" << paramIdx);
     {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
-        auto& param = m_loadedPlugins[(size_t)idx].params.getReference(paramIdx);
+        auto& param = m_loadedPlugins[(size_t)idx].params[(size_t)channel][(size_t)paramIdx];
         auto* pparam = dynamic_cast<Parameter*>(getParameters()[param.automationSlot]);
         pparam->reset();
         param.automationSlot = -1;
@@ -1271,9 +1290,11 @@ void PluginProcessor::getAllParameterValues(int idx) {
     logln("reading all parameter values for plugin " << idx);
     std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
     auto& params = m_loadedPlugins[(size_t)idx].params;
-    for (auto& res : m_client->getAllParameterValues(idx, params.size())) {
-        if (res.idx > -1 && res.idx < params.size()) {
-            auto& param = params.getReference(res.idx);
+    int count = (int)(params.size() * params[0].size());
+    for (auto& res : m_client->getAllParameterValues(idx, count)) {
+        if (res.channel > -1 && res.channel < (int)params.size() && res.idx > -1 &&
+            res.idx < (int)params[(size_t)res.channel].size()) {
+            auto& param = params[(size_t)res.channel][(size_t)res.idx];
             if (param.idx == res.idx) {
                 param.currentValue = (float)res.value;
             } else {
@@ -1283,9 +1304,9 @@ void PluginProcessor::getAllParameterValues(int idx) {
     }
 }
 
-void PluginProcessor::updateParameterValue(int idx, int paramIdx, float val, bool updateServer) {
+void PluginProcessor::updateParameterValue(int idx, int channel, int paramIdx, float val, bool updateServer) {
     traceScope();
-    runOnMsgThreadAsync([this, idx, paramIdx, val, updateServer] {
+    runOnMsgThreadAsync([this, idx, channel, paramIdx, val, updateServer] {
         traceScope();
 
         int slot = -1;
@@ -1293,22 +1314,25 @@ void PluginProcessor::updateParameterValue(int idx, int paramIdx, float val, boo
         {
             std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
             if (idx < 0 || idx >= (int)m_loadedPlugins.size()) {
-                logln("updateParameterValue failed: idx out of range");
+                logln("updateParameterValue failed: idx " << idx << " out of range");
                 return;
             }
-            if (paramIdx < 0 || paramIdx >= m_loadedPlugins[(size_t)idx].params.size()) {
-                logln("updateParameterValue failed: paramIdx out of range");
+            if (channel < 0 || channel >= (int)m_loadedPlugins[(size_t)idx].params.size()) {
+                logln("updateParameterValue failed: channel " << channel << " out of range");
                 return;
             }
-            auto& param = m_loadedPlugins[(size_t)idx].params.getReference(paramIdx);
-
+            if (paramIdx < 0 || paramIdx >= (int)m_loadedPlugins[(size_t)idx].params[(size_t)channel].size()) {
+                logln("updateParameterValue failed: paramIdx " << paramIdx << " out of range");
+                return;
+            }
+            auto& param = m_loadedPlugins[(size_t)idx].params[(size_t)channel][(size_t)paramIdx];
             param.currentValue = val;
             slot = param.automationSlot;
         }
 
-        logln("parameter update (slot=" << slot << ", index=" << idx << ", param index=" << paramIdx
-                                        << ") new value is " << val << " [" << (updateServer && slot < 0 ? "" : "NOT ")
-                                        << "updating server]");
+        logln("parameter update (slot=" << slot << ", index=" << idx << ", channel=" << channel
+                                        << ", param index=" << paramIdx << ") new value is " << val << " ["
+                                        << (updateServer && slot < 0 ? "" : "NOT ") << "updating server]");
 
         if (slot > -1) {
             auto* pparam = dynamic_cast<Parameter*>(getParameters()[slot]);
@@ -1323,14 +1347,14 @@ void PluginProcessor::updateParameterValue(int idx, int paramIdx, float val, boo
         }
 
         if (updateServer) {
-            m_client->setParameterValue(idx, paramIdx, val);
+            m_client->setParameterValue(idx, channel, paramIdx, val);
         }
     });
 }
 
-void PluginProcessor::updateParameterGestureTracking(int idx, int paramIdx, bool starting) {
+void PluginProcessor::updateParameterGestureTracking(int idx, int channel, int paramIdx, bool starting) {
     traceScope();
-    runOnMsgThreadAsync([this, idx, paramIdx, starting] {
+    runOnMsgThreadAsync([this, idx, channel, paramIdx, starting] {
         traceScope();
 
         int slot = -1;
@@ -1338,22 +1362,27 @@ void PluginProcessor::updateParameterGestureTracking(int idx, int paramIdx, bool
         {
             std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
             if (idx < 0 || idx >= (int)m_loadedPlugins.size()) {
-                logln("updateParameterGestureTracking failed: idx out of range");
+                logln("updateParameterGestureTracking failed: idx " << idx << " out of range");
                 return;
             }
-            if (paramIdx < 0 || paramIdx >= m_loadedPlugins[(size_t)idx].params.size()) {
-                logln("updateParameterGestureTracking failed: paramIdx out of range");
+            if (channel < 0 || channel >= (int)m_loadedPlugins[(size_t)idx].params.size()) {
+                logln("updateParameterGestureTracking failed: channel " << channel << " out of range");
                 return;
             }
-            auto& param = m_loadedPlugins[(size_t)idx].params.getReference(paramIdx);
+            if (paramIdx < 0 || paramIdx >= (int)m_loadedPlugins[(size_t)idx].params[(size_t)channel].size()) {
+                logln("updateParameterGestureTracking failed: paramIdx " << paramIdx << " out of range");
+                return;
+            }
+            auto& param = m_loadedPlugins[(size_t)idx].params[(size_t)channel][(size_t)paramIdx];
             slot = param.automationSlot;
         }
 
         if (slot > -1) {
             auto* pparam = dynamic_cast<Parameter*>(getParameters()[slot]);
             if (nullptr != pparam) {
-                logln("parameter (slot=" << pparam->m_slotId << ", index=" << pparam->m_idx << ", param index="
-                                         << pparam->m_paramIdx << ") " << (starting ? "begin" : "end") << " gesture");
+                logln("parameter (slot=" << pparam->m_slotId << ", index=" << pparam->m_idx
+                                         << ", channel=" << pparam->m_channel << ", param index=" << pparam->m_paramIdx
+                                         << ") " << (starting ? "begin" : "end") << " gesture");
                 // need to call this on the message thread or automation recording does not work for VST3
                 if (starting) {
                     pparam->beginChangeGesture();
@@ -1391,8 +1420,9 @@ void PluginProcessor::parameterValueChanged(int parameterIndex, float newValue) 
     // update generic editor
     if (auto* e = dynamic_cast<PluginEditor*>(getActiveEditor())) {
         auto* pparam = dynamic_cast<Parameter*>(getParameters()[parameterIndex]);
-        if (nullptr != pparam && m_activePlugin == pparam->m_idx) {
-            auto& param = getLoadedPlugin(pparam->m_idx).params.getReference(pparam->m_paramIdx);
+        if (nullptr != pparam && m_activePlugin == pparam->m_idx &&
+            getLoadedPlugin(m_activePlugin).activeChannel == pparam->m_channel) {
+            auto& param = pparam->getParam();
             param.currentValue = newValue;
             e->updateParamValue(pparam->m_paramIdx);
         }
@@ -1436,8 +1466,10 @@ void PluginProcessor::storeSettingsA() {
     if (!m_client->isReadyLockFree()) {
         logln("error in storeSettingsA: getPluginSettings for idx " << m_activePlugin << " failed");
     }
-    if (settings.getSize() > 0) {
-        m_settingsA = settings.toBase64Encoding();
+    if (settings.length() > 0) {
+        m_settingsA = std::move(settings);
+    } else {
+        logln("warning: empty settings A");
     }
 }
 
@@ -1450,8 +1482,10 @@ void PluginProcessor::storeSettingsB() {
     if (!m_client->isReadyLockFree()) {
         logln("error in storeSettingsB: getPluginSettings for idx " << m_activePlugin << " failed");
     }
-    if (settings.getSize() > 0) {
-        m_settingsB = settings.toBase64Encoding();
+    if (settings.length() > 0) {
+        m_settingsB = std::move(settings);
+    } else {
+        logln("warning: empty settings B");
     }
 }
 
@@ -1530,7 +1564,7 @@ void PluginProcessor::setCPULoad(float load) {
 float PluginProcessor::Parameter::getValue() const {
     traceScope();
     if (m_idx > -1 && m_paramIdx > -1) {
-        return m_proc.getClient().getParameterValue(m_idx, m_paramIdx);
+        return m_proc.getClient().getParameterValue(m_idx, m_channel, m_paramIdx);
     }
     return 0;
 }
@@ -1540,7 +1574,7 @@ void PluginProcessor::Parameter::setValue(float newValue) {
     if (m_idx > -1 && m_idx < m_proc.getNumOfLoadedPlugins() && m_paramIdx > -1) {
         runOnMsgThreadAsync([this, newValue] {
             traceScope();
-            m_proc.getClient().setParameterValue(m_idx, m_paramIdx, newValue);
+            m_proc.getClient().setParameterValue(m_idx, m_channel, m_paramIdx, newValue);
         });
     }
 }

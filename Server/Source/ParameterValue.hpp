@@ -14,6 +14,7 @@ namespace Srv {
 struct ParameterValue {
     int paramIdx;
     float value;
+    int channel = 0;
 };
 
 }  // namespace Srv

@@ -58,8 +58,7 @@ class AudioWorker : public Thread, public LogTagDelegate {
     int getChannelsOut() const { return m_channelsOut; }
     int getChannelsSC() const { return m_channelsSC; }
 
-    bool addPlugin(const String& id, const String& settings, const String& layout, bool multiMono, uint64 monoChannels,
-                   String& err);
+    bool addPlugin(const String& id, const String& settings, const String& layout, uint64 monoChannels, String& err);
     void delPlugin(int idx);
     void exchangePlugins(int idxA, int idxB);
     std::shared_ptr<Processor> getProcessor(int idx) const { return m_chain->getProcessor(idx); }
@@ -68,7 +67,9 @@ class AudioWorker : public Thread, public LogTagDelegate {
     void update() { m_chain->update(); }
     bool isSidechainDisabled() const { return m_chain->isSidechainDisabled(); }
 
-    float getParameterValue(int idx, int paramIdx) { return m_chain->getParameterValue(idx, paramIdx); }
+    float getParameterValue(int idx, int channel, int paramIdx) {
+        return m_chain->getParameterValue(idx, channel, paramIdx);
+    }
 
     struct ComparablePluginDescription : PluginDescription {
         ComparablePluginDescription(const PluginDescription& other) : PluginDescription(other) {}

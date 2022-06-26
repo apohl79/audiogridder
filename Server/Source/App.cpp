@@ -409,7 +409,7 @@ void App::hideEditor(Thread::ThreadID tid, bool updateMacOSDock) {
             // hide all windows
             for (auto it = m_processors.begin(); it != m_processors.end(); it++) {
                 if (auto window = it->second->getEditorWindow()) {
-                    if (window->isVisible()) {
+                    if (window->isShowingPlugin()) {
                         window->setVisible(false);
                     }
                 }
@@ -419,8 +419,10 @@ void App::hideEditor(Thread::ThreadID tid, bool updateMacOSDock) {
         logln("hiding editor: tid=0x" << String::toHexString((uint64)tid));
 
         if (auto window = getCurrentWindow(tid)) {
-            if (window->isVisible()) {
+            if (window->isShowingPlugin()) {
                 window->setVisible(false);
+            } else {
+                logln("window not visible");
             }
         } else {
             logln("failed to hide editor: tid does not match a window owner");
@@ -433,7 +435,7 @@ void App::hideEditor(Thread::ThreadID tid, bool updateMacOSDock) {
         bool windowVisible = false;
         for (auto& pair : m_processors) {
             if (auto window = pair.second->getEditorWindow()) {
-                if (window->isVisible()) {
+                if (window->isShowingPlugin()) {
                     windowVisible = true;
                     break;
                 }

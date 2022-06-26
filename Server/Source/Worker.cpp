@@ -203,6 +203,9 @@ void Worker::run() {
                 case Clipboard::Type:
                     handleMessage(Message<Any>::convert<Clipboard>(msg));
                     break;
+                case SetMonoChannels::Type:
+                    handleMessage(Message<Any>::convert<SetMonoChannels>(msg));
+                    break;
                 default:
                     logln("unknown message type " << msg->getType());
             }
@@ -247,14 +250,13 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     auto id = jsonGetValue(jmsg, "id", String());
     auto settings = jsonGetValue(jmsg, "settings", String());
     auto layout = jsonGetValue(jmsg, "layout", String());
-    auto multiMono = jsonGetValue(jmsg, "multiMono", false);
     auto monoChannels = jsonGetValue(jmsg, "monoChannels", 0ull);
 
     logln("adding plugin " << id << "...");
 
     String err;
     bool wasSidechainDisabled = m_audio->isSidechainDisabled();
-    bool success = m_audio->addPlugin(id, settings, layout, multiMono, monoChannels, err);
+    bool success = m_audio->addPlugin(id, settings, layout, monoChannels, err);
     if (!success) {
         logln("error: " << err);
     }
@@ -269,21 +271,31 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
         jresult["name"] = proc->getName().toStdString();
         jresult["hasEditor"] = proc->hasEditor();
         jresult["supportsDoublePrecision"] = proc->supportsDoublePrecisionProcessing();
+        jresult["channelInstances"] = proc->getChannelInstances();
         auto ts = proc->getTailLengthSeconds();
         if (ts == std::numeric_limits<double>::infinity()) {
             ts = 0.0;
         }
         jresult["tailSeconds"] = ts;
         jresult["numOutputChannels"] = proc->getTotalNumOutputChannels();
-        proc->setCallbacks([this](int idx, int paramIdx, float val) { sendParamValueChange(idx, paramIdx, val); },
-                           [this](int idx, int paramIdx, bool gestureIsStarting) {
-                               sendParamGestureChange(idx, paramIdx, gestureIsStarting);
-                           },
-                           [this](Message<Key>& m) {
-                               std::lock_guard<std::mutex> lock(m_cmdOutMtx);
-                               m.send(m_cmdOut.get());
-                           },
-                           [this](int idx, bool ok, const String& procErr) { sendStatusChange(idx, ok, procErr); });
+        proc->setCallbacks(
+            [this, ctx = getAsyncContext()](int idx, int channel, int paramIdx, float val) mutable {
+                ctx.execute([this, idx, channel, paramIdx, val] { sendParamValueChange(idx, channel, paramIdx, val); });
+            },
+            [this, ctx = getAsyncContext()](int idx, int channel, int paramIdx, bool gestureIsStarting) mutable {
+                ctx.execute([this, idx, channel, paramIdx, gestureIsStarting] {
+                    sendParamGestureChange(idx, channel, paramIdx, gestureIsStarting);
+                });
+            },
+            [this, ctx = getAsyncContext()](Message<Key>& m) mutable {
+                ctx.execute([this, &m] {
+                    std::lock_guard<std::mutex> lock(m_cmdOutMtx);
+                    m.send(m_cmdOut.get());
+                });
+            },
+            [this, ctx = getAsyncContext()](int idx, bool ok, const String& procErr) mutable {
+                ctx.execute([this, idx, ok, &procErr] { sendStatusChange(idx, ok, procErr); });
+            });
     }
     Message<AddPluginResult> msgResult(this);
     PLD(msgResult).setJson(jresult);
@@ -346,7 +358,8 @@ void Worker::handleMessage(std::shared_ptr<Message<EditPlugin>> msg) {
     int idx = pDATA(msg)->index;
     if (auto proc = m_audio->getProcessor(idx)) {
         getApp()->getServer()->sandboxShowEditor();
-        m_screen->showEditor(getThreadId(), proc, pDATA(msg)->x, pDATA(msg)->y, [this, idx] { sendHideEditor(idx); });
+        m_screen->showEditor(getThreadId(), proc, pDATA(msg)->channel, pDATA(msg)->x, pDATA(msg)->y,
+                             [this, idx] { sendHideEditor(idx); });
         m_activeEditorIdx = idx;
         if (getApp()->getServer()->getScreenLocalMode()) {
             runOnMsgThreadAsync([this] { getApp()->addKeyListener(getThreadId(), m_keyWatcher.get()); });
@@ -431,17 +444,15 @@ void Worker::handleMessage(std::shared_ptr<Message<Key>> msg) {
 
 void Worker::handleMessage(std::shared_ptr<Message<GetPluginSettings>> msg) {
     traceScope();
-    MemoryBlock block;
+    String settings;
     if (auto proc = m_audio->getProcessor(pPLD(msg).getNumber())) {
         // Load plugin state on the message thread
-        proc->getStateInformation(block);
+        proc->getStateInformation(settings);
     } else {
         logln("error: failed to read plugin settings: invalid index " << pPLD(msg).getNumber());
     }
     Message<PluginSettings> ret(this);
-    if (!block.isEmpty()) {
-        ret.payload.setData(block.begin(), static_cast<int>(block.getSize()));
-    }
+    PLD(ret).setString(settings);
     ret.send(m_cmdIn.get());
 }
 
@@ -454,10 +465,11 @@ void Worker::handleMessage(std::shared_ptr<Message<SetPluginSettings>> msg) {
             m_cmdIn->close();
             return;
         }
-        if (*msgSettings.payload.size > 0) {
-            MemoryBlock block;
-            block.append(msgSettings.payload.data, (size_t)*msgSettings.payload.size);
-            proc->setStateInformation(block.getData(), static_cast<int>(block.getSize()));
+        auto settings = PLD(msgSettings).getString();
+        if (settings.length() > 0) {
+            proc->setStateInformation(settings);
+        } else {
+            logln("warning: empty settings message");
         }
     }
 }
@@ -491,14 +503,14 @@ void Worker::handleMessage(std::shared_ptr<Message<RecentsList>> msg) {
 void Worker::handleMessage(std::shared_ptr<Message<Preset>> msg) {
     traceScope();
     if (auto proc = m_audio->getProcessor(pDATA(msg)->idx)) {
-        proc->setCurrentProgram(pDATA(msg)->preset);
+        proc->setCurrentProgram(pDATA(msg)->channel, pDATA(msg)->preset);
     }
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<ParameterValue>> msg) {
     traceScope();
     if (auto proc = m_audio->getProcessor(pDATA(msg)->idx)) {
-        proc->setParameterValue(pDATA(msg)->paramIdx, pDATA(msg)->value);
+        proc->setParameterValue(pDATA(msg)->channel, pDATA(msg)->paramIdx, pDATA(msg)->value);
     }
 }
 
@@ -507,7 +519,7 @@ void Worker::handleMessage(std::shared_ptr<Message<GetParameterValue>> msg) {
     Message<ParameterValue> ret(this);
     DATA(ret)->idx = pDATA(msg)->idx;
     DATA(ret)->paramIdx = pDATA(msg)->paramIdx;
-    DATA(ret)->value = m_audio->getParameterValue(pDATA(msg)->idx, pDATA(msg)->paramIdx);
+    DATA(ret)->value = m_audio->getParameterValue(pDATA(msg)->channel, pDATA(msg)->idx, pDATA(msg)->paramIdx);
     ret.send(m_cmdIn.get());
 }
 
@@ -519,6 +531,7 @@ void Worker::handleMessage(std::shared_ptr<Message<GetAllParameterValues>> msg) 
             DATA(ret)->idx = pPLD(msg).getNumber();
             DATA(ret)->paramIdx = param.paramIdx;
             DATA(ret)->value = param.value;
+            DATA(ret)->channel = param.channel;
             ret.send(m_cmdIn.get());
         }
     }
@@ -566,8 +579,12 @@ void Worker::handleMessage(std::shared_ptr<Message<PluginList>> msg) {
         bool hasMono = false;
 
         // add layouts, that match the number of output channels
+        auto& layouts = getApp()->getServer()->getPluginLayouts(pluginId);
+        if (layouts.isEmpty()) {
+            logln("warning: no known layouts for '" << plugin.name << "' (" << pluginId << ")");
+        }
         StringArray slayouts;
-        for (auto& l : getApp()->getServer()->getPluginLayouts(pluginId)) {
+        for (auto& l : layouts) {
             int chIn = getLayoutNumChannels(l, true);
             int chOut = getLayoutNumChannels(l, false);
 
@@ -577,15 +594,17 @@ void Worker::handleMessage(std::shared_ptr<Message<PluginList>> msg) {
             bool isFxChain = m_cfg.channelsIn > 0;
             bool match = false;
 
+            if (plugin.name == "LoudMax") {
+                logln("-- " << describeLayout(l));
+            }
+
             if (isFxChain) {
                 if (l.inputBuses == l.outputBuses /* same inputs and outputs */ ||
                     (l.inputBuses.size() == 2 /* main input bus and sidechain  */ &&
                      l.outputBuses.size() == 1 /* single main output bus */ &&
                      l.inputBuses[0] == l.outputBuses[0] /* main in and out buses are the same */)) {
-                    // if we have more than 2 outs, the layout should match the outs exactly
-                    match = match || (m_cfg.channelsOut > 2 && m_cfg.channelsOut == chOut);
-                    // if we have 1 or 2 outs, the layout should have equal or less the outputs
-                    match = match || (m_cfg.channelsOut <= 2 && m_cfg.channelsOut >= chOut);
+                    // the layout should match the outs exactly
+                    match = m_cfg.channelsOut == chOut;
                 }
                 if (chOut == 1) {
                     hasMono = true;
@@ -662,6 +681,13 @@ void Worker::handleMessage(std::shared_ptr<Message<GetScreenBounds>> /*msg*/) {
 void Worker::handleMessage(std::shared_ptr<Message<Clipboard>> msg) {
     traceScope();
     SystemClipboard::copyTextToClipboard(pPLD(msg).getString());
+}
+
+void Worker::handleMessage(std::shared_ptr<Message<SetMonoChannels>> msg) {
+    traceScope();
+    if (auto proc = m_audio->getProcessor(pDATA(msg)->idx)) {
+        proc->setMonoChannels(pDATA(msg)->channels);
+    }
 }
 
 void Worker::sendKeys(const std::vector<uint16_t>& keysToPress) {
@@ -814,23 +840,26 @@ bool Worker::KeyWatcher::keyPressed(const KeyPress& kp, Component*) {
     return true;
 }
 
-void Worker::sendParamValueChange(int idx, int paramIdx, float val) {
-    logln("sending parameter update (index=" << idx << ", parame index=" << paramIdx << ") new value is " << val);
+void Worker::sendParamValueChange(int idx, int channel, int paramIdx, float val) {
+    logln("sending parameter update (index=" << idx << ", channel=" << channel << ", param index=" << paramIdx
+                                             << ") new value is " << val);
     Message<ParameterValue> msg(this);
     DATA(msg)->idx = idx;
     DATA(msg)->paramIdx = paramIdx;
     DATA(msg)->value = val;
+    DATA(msg)->channel = channel;
     std::lock_guard<std::mutex> lock(m_cmdOutMtx);
     msg.send(m_cmdOut.get());
 }
 
-void Worker::sendParamGestureChange(int idx, int paramIdx, bool guestureIsStarting) {
-    logln("sending gesture change (index=" << idx << ", parame index=" << paramIdx << ") "
+void Worker::sendParamGestureChange(int idx, int channel, int paramIdx, bool guestureIsStarting) {
+    logln("sending gesture change (index=" << idx << ", channel=" << channel << ", param index=" << paramIdx << ") "
                                            << (guestureIsStarting ? "starting" : "end"));
     Message<ParameterGesture> msg(this);
     DATA(msg)->idx = idx;
     DATA(msg)->paramIdx = paramIdx;
     DATA(msg)->gestureIsStarting = guestureIsStarting;
+    DATA(msg)->channel = channel;
     std::lock_guard<std::mutex> lock(m_cmdOutMtx);
     msg.send(m_cmdOut.get());
 }

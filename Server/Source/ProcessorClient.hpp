@@ -40,35 +40,26 @@ class ProcessorClient : public Thread, public LogTag {
 
     void run() override;
 
-    std::function<void(int paramIdx, float val)> onParamValueChange;
-    std::function<void(int paramIdx, bool gestureIsStarting)> onParamGestureChange;
+    std::function<void(int channel, int paramIdx, float val)> onParamValueChange;
+    std::function<void(int channel, int paramIdx, bool gestureIsStarting)> onParamGestureChange;
     std::function<void(Message<Key>&)> onKeysFromSandbox;
     std::function<void(bool ok, const String& err)> onStatusChange;
 
-    bool load(const String& settings, const String& layout, bool multiMono, uint64 monoChannels, String& err);
+    bool load(const String& settings, const String& layout, uint64 monoChannels, String& err);
     void unload();
 
     bool isLoaded() const { return m_loaded; }
 
     const String getName();
     bool hasEditor();
-    void showEditor(int x, int y);
+    void showEditor(int channel, int x, int y);
     void hideEditor();
     bool supportsDoublePrecisionProcessing();
     bool isSuspended();
     double getTailLengthSeconds();
-    void getStateInformation(juce::MemoryBlock&);
-    void setStateInformation(const void*, int);
-    bool checkBusesLayoutSupported(const AudioProcessor::BusesLayout&) { return true; }
-    bool setBusesLayout(const AudioProcessor::BusesLayout&) { return true; }
-    AudioProcessor::BusesLayout getBusesLayout() { return {}; }
-    int getBusCount(bool) { return 0; }
-    bool canAddBus(bool) { return false; }
-    bool canRemoveBus(bool) { return false; }
-    bool addBus(bool) { return false; }
-    bool removeBus(bool) { return false; }
+    void getStateInformation(String&);
+    void setStateInformation(const String&);
     void setPlayHead(AudioPlayHead*);
-    void enableAllBuses();
     const json& getParameters();
     int getNumPrograms();
     const String getProgramName(int);
@@ -80,9 +71,11 @@ class ProcessorClient : public Thread, public LogTag {
     void processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMessages);
     void processBlock(AudioBuffer<double>& buffer, MidiBuffer& midiMessages);
     juce::Rectangle<int> getScreenBounds();
-    void setParameterValue(int paramIdx, float value);
-    float getParameterValue(int paramIdx);
+    void setParameterValue(int channel, int paramIdx, float value);
+    float getParameterValue(int channel, int paramIdx);
     std::vector<Srv::ParameterValue> getAllParameterValues();
+    void setMonoChannels(uint64 channels);
+    int getChannelInstances() const { return m_lastChannelInstances; }
 
   private:
     int m_port;
@@ -108,9 +101,9 @@ class ProcessorClient : public Thread, public LogTag {
     std::atomic_bool m_suspended{false};
     String m_lastSettings;
     String m_lastLayout;
-    bool m_lastMultiMono;
     uint64 m_lastMonoChannels;
     juce::Rectangle<int> m_lastScreenBounds;
+    int m_lastChannelInstances = 0;
 
     ChannelSet m_activeChannels;
     ChannelMapper m_channelMapper;

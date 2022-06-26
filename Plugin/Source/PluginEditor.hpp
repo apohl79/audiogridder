@@ -46,6 +46,7 @@ class PluginEditor : public AudioProcessorEditor,
     const int SCREENTOOLS_HEIGHT = 17;
     const int SCREENTOOLS_MARGIN = 3;
     const int SCREENTOOLS_AB_WIDTH = 12;
+    const int SCREENTOOLS_CHANNEL_WIDTH = 35;
 
     const int PLUGINSCREEN_DEFAULT_W = 250;
     const int PLUGINSCREEN_DEFAULT_H = 100;
@@ -67,11 +68,11 @@ class PluginEditor : public AudioProcessorEditor,
         void paintButton(Graphics& g, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override;
     };
 
-    // screen tools
-    ToolsButton m_stPlus, m_stMinus, m_stFullscreen;
-    TextButton m_stA, m_stB;
+    // tools
+    ToolsButton m_toolsButtonPlus, m_toolsButtonMinus, m_toolsButtonFullscreen, m_toolsButtonOnOff;
+    TextButton m_toolsButtonA, m_toolsButtonB, m_toolsButtonChannel;
     int m_currentActiveAB = -1;
-    TextButton* m_hilightedStButton = nullptr;
+    std::set<TextButton*> m_hilightedToolsButtons;
 
     void createPluginButtons();
     PluginButton* addPluginButton(const String& id, const String& name);
@@ -80,13 +81,15 @@ class PluginEditor : public AudioProcessorEditor,
 
     void getPresetsMenu(PopupMenu& menu, const File& dir);
 
-    void initStButtons();
-    void enableStButton(TextButton* b);
-    void disableStButton(TextButton* b);
-    void hilightStButton(TextButton* b);
-    bool isHilightedStButton(TextButton* b);
+    void initToolsButtons();
+    void enableToolsButton(TextButton* b);
+    void disableToolsButton(TextButton* b);
+    void hilightToolsButton(TextButton* b);
+    void unhilightToolsButton(TextButton* b);
+    bool isHilightedToolsButton(TextButton* b);
+    void updateToolsOnOffButton();
 
-    void editPlugin(int idx = -1);
+    void editPlugin(int idx = -1, int channel = -1);
     void hidePlugin(int idx = -1);
 
     void resetPluginScreen();
@@ -120,7 +123,7 @@ class PluginEditor : public AudioProcessorEditor,
                 r = bounds;
                 auto p = e->getLocalModePosition(r);
                 logln("updating editor position to " << p.x << "x" << p.y);
-                e->m_processor.editPlugin(active, p.x, p.y);
+                e->m_processor.editPlugin(active, e->m_processor.getActivePluginChannel(), p.x, p.y);
             }
         }
     };

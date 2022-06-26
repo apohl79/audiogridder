@@ -44,7 +44,8 @@ class ScreenWorker : public Thread, public LogTagDelegate {
     void runFFmpeg();
     void shutdown();
 
-    void showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> proc, int x, int y, std::function<void()> onHide);
+    void showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> proc, int channel, int x, int y,
+                    std::function<void()> onHide);
     void hideEditor();
 
   private:
@@ -69,6 +70,7 @@ class ScreenWorker : public Thread, public LogTagDelegate {
     std::atomic_bool m_visible{false};
     Processor* m_currentProc;
     Thread::ThreadID m_currentTid = nullptr;
+    int m_currentChannel = 0;
 
     ENABLE_ASYNC_FUNCTORS();
 };

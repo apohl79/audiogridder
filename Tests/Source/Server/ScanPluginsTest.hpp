@@ -45,6 +45,7 @@ class ScanPluginsTest : UnitTest {
                                   .getFullPathName());
 #endif
         vst3plugins.push_back(datadir.getChildFile("2RuleSynth.vst3").getFullPathName());
+        vst3plugins.push_back(datadir.getChildFile("LoudMax.vst3").getFullPathName());
 
         for (auto& p : vst2plugins) {
             expect(Server::scanPlugin(p, "VST", 999));

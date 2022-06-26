@@ -387,7 +387,6 @@ bool ScreenRecorder::prepareOutput() {
     }
 
     if (nullptr == m_outputFrame) {
-        logError("prepareOutput: allocating new output frame");
         m_outputFrame = av_frame_alloc();
         if (nullptr == m_outputFrame) {
             logError("prepareOutput: unable to allocate AVFrame");

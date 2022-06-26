@@ -267,7 +267,27 @@ inline bool msgThreadExistsAndNotLocked() {
             }                                                                                                \
         };                                                                                                   \
     }                                                                                                        \
+                                                                                                             \
     inline void runOnMsgThreadAsync(std::function<void()> fn) { MessageManager::callAsync(safeLambda(fn)); } \
+                                                                                                             \
+    struct __AsyncContext {                                                                                  \
+        std::shared_ptr<std::atomic_bool> shouldExec;                                                        \
+        std::shared_ptr<std::atomic_uint32_t> execCnt;                                                       \
+                                                                                                             \
+        void execute(std::function<void()> fn) {                                                             \
+            if (shouldExec->load()) {                                                                        \
+                execCnt->fetch_add(1, std::memory_order_relaxed);                                            \
+                fn();                                                                                        \
+                execCnt->fetch_sub(1, std::memory_order_relaxed);                                            \
+            }                                                                                                \
+        }                                                                                                    \
+    };                                                                                                       \
+                                                                                                             \
+    inline __AsyncContext getAsyncContext() {                                                                \
+        jassert(nullptr == __m_asyncExecFlag);                                                               \
+        return {__m_asyncExecFlag, __m_asyncExecCnt};                                                        \
+    }                                                                                                        \
+                                                                                                             \
     std::shared_ptr<std::atomic_bool> __m_asyncExecFlag;                                                     \
     std::shared_ptr<std::atomic_uint32_t> __m_asyncExecCnt
 
@@ -576,10 +596,10 @@ inline String serializeChannelSets(const Array<AudioChannelSet>& a) { return aud
 inline String serializeLayout(const AudioProcessor::BusesLayout& l, bool withInputs = true, bool withOutputs = true) {
     json j = json::object();
     if (withInputs) {
-        j["inputBuses"] = serializeChannelSets(l.inputBuses).toStdString();
+        j["inputBuses"] = audioChannelSetsToJson(l.inputBuses);
     }
     if (withOutputs) {
-        j["outputBuses"] = serializeChannelSets(l.outputBuses).toStdString();
+        j["outputBuses"] = audioChannelSetsToJson(l.outputBuses);
     }
     return j.dump();
 }
@@ -588,6 +608,7 @@ inline AudioProcessor::BusesLayout deserializeLayout(const String& s) {
     AudioProcessor::BusesLayout ret;
     try {
         json j = json::parse(s.toStdString());
+
         for (auto& jbus : j["inputBuses"]) {
             ret.inputBuses.add(AudioChannelSet::fromAbbreviatedString(jbus.get<std::string>()));
         }

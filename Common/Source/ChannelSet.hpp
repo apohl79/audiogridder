@@ -32,6 +32,12 @@ class ChannelSet {
         : m_channels(i), m_outputOffset(withInput ? Defaults::PLUGIN_CHANNELS_MAX / 2 : 0) {}
 #endif
 
+    ChannelSet(uint64 channels, int numInputs, int numOutputs)
+        : m_channels(channels),
+          m_outputOffset(numInputs > 0 ? (size_t)jmin(numInputs, Defaults::PLUGIN_CHANNELS_MAX) : 0),
+          m_numInputs(jmin(numInputs, Defaults::PLUGIN_CHANNELS_MAX)),
+          m_numOutputs(jmin(numOutputs, Defaults::PLUGIN_CHANNELS_MAX)) {}
+
     ChannelSet& operator=(uint64 i) {
         m_channels = i;
         return *this;
@@ -42,6 +48,11 @@ class ChannelSet {
     void setNumChannels(int numInputs, int numOutputs) {
         m_numInputs = jmin(numInputs, Defaults::PLUGIN_CHANNELS_MAX);
         m_numOutputs = jmin(numOutputs, Defaults::PLUGIN_CHANNELS_MAX);
+    }
+
+    void setNumChannels(int numInputs, int numOutputs, size_t outputOffset) {
+        setNumChannels(numInputs, numOutputs);
+        m_outputOffset = outputOffset;
     }
 
     void setWithInput(bool withInput) { m_outputOffset = withInput ? Defaults::PLUGIN_CHANNELS_MAX / 2 : 0; }
@@ -97,6 +108,30 @@ class ChannelSet {
             }
         }
         return ret;
+    }
+
+    String toString() const {
+        String out;
+        StringArray inputs;
+        for (auto ch : getActiveChannels(true)) {
+            inputs.add(String(ch));
+        }
+        StringArray outputs;
+        for (auto ch : getActiveChannels(false)) {
+            outputs.add(String(ch));
+        }
+        if (!inputs.isEmpty()) {
+            out << "inputs: " << inputs.joinIntoString(",");
+        }
+        if (!outputs.isEmpty()) {
+            out << "outputs: " << outputs.joinIntoString(",");
+        }
+        return out;
+    }
+
+    static String toString(uint64 c, int numInputs, int numOutputs) {
+        ChannelSet cs(c, numInputs, numOutputs);
+        return cs.toString();
     }
 
   private:

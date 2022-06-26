@@ -126,6 +126,9 @@ bool ProcessorChain::setProcessorBusesLayout(Processor* proc, const String& targ
                 }
             }
         }
+        if (found) {
+            found = proc->setBusesLayout(targetLayout);
+        }
     } else {
         if (procLayouts.contains(layout)) {
             targetLayout = layout;
@@ -163,6 +166,7 @@ bool ProcessorChain::setProcessorBusesLayout(Processor* proc, const String& targ
             targetLayout = proc->getBusesLayout();
             targetChIn = getLayoutNumChannels(targetLayout, true);
             targetChOut = getLayoutNumChannels(targetLayout, false);
+            found = true;
         }
     }
 
@@ -217,19 +221,15 @@ bool ProcessorChain::initPluginInstance(Processor* proc, const String& layout, S
     return true;
 }
 
-bool ProcessorChain::addPluginProcessor(const String& id, const String& settings, const String& layout, bool multiMono,
+bool ProcessorChain::addPluginProcessor(const String& id, const String& settings, const String& layout,
                                         uint64 monoChannels, String& err) {
     traceScope();
 
     bool success = false;
 
-    if (multiMono) {
-        err = "Multi-Mono layout not yet implemented";
-    } else {
-        auto proc = std::make_shared<Processor>(*this, id, getSampleRate(), getBlockSize());
-        success = proc->load(settings, layout, multiMono, monoChannels, err);
-        addProcessor(std::move(proc));
-    }
+    auto proc = std::make_shared<Processor>(*this, id, getSampleRate(), getBlockSize());
+    success = proc->load(settings, layout, monoChannels, err);
+    addProcessor(std::move(proc));
 
     return success;
 }
@@ -313,12 +313,12 @@ void ProcessorChain::exchangeProcessors(int idxA, int idxB) {
     }
 }
 
-float ProcessorChain::getParameterValue(int idx, int paramIdx) {
+float ProcessorChain::getParameterValue(int idx, int channel, int paramIdx) {
     traceScope();
     std::lock_guard<std::mutex> lock(m_processorsMtx);
     if (idx > -1 && (size_t)idx < m_processors.size()) {
         if (auto p = m_processors[(size_t)idx]) {
-            return p->getParameterValue(paramIdx);
+            return p->getParameterValue(channel, paramIdx);
         }
     }
     return 0.0f;

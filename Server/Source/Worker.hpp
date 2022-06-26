@@ -56,6 +56,7 @@ class Worker : public Thread, public LogTag {
     void handleMessage(std::shared_ptr<Message<PluginList>> msg);
     void handleMessage(std::shared_ptr<Message<GetScreenBounds>> msg);
     void handleMessage(std::shared_ptr<Message<Clipboard>> msg);
+    void handleMessage(std::shared_ptr<Message<SetMonoChannels>> msg);
 
   private:
     std::shared_ptr<StreamingSocket> m_masterSocket;
@@ -100,8 +101,8 @@ class Worker : public Thread, public LogTag {
 
     void sendKeys(const std::vector<uint16_t>& keysToPress);
     void sendClipboard(const String& val);
-    void sendParamValueChange(int idx, int paramIdx, float val);
-    void sendParamGestureChange(int idx, int paramIdx, bool guestureIsStarting);
+    void sendParamValueChange(int idx, int channel, int paramIdx, float val);
+    void sendParamGestureChange(int idx, int channel, int paramIdx, bool guestureIsStarting);
     void sendStatusChange(int idx, bool ok, const String& err);
     void sendHideEditor(int idx);
     void sendError(const String& error);

@@ -137,6 +137,9 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
         void setValue(float val) { currentValue = (float)range.convertTo0to1(val); }
     };
 
+    using ParameterList = std::vector<Parameter>;
+    using ParameterByChannelList = std::vector<ParameterList>;
+
     std::atomic_int NUM_OF_BUFFERS{Defaults::DEFAULT_NUM_OF_BUFFERS};
     std::atomic_int LOAD_PLUGIN_TIMEOUT{Defaults::DEFAULT_LOAD_PLUGIN_TIMEOUT};
 
@@ -180,24 +183,27 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     using OnCloseCallback = std::function<void()>;
     void setOnCloseCallback(OnCloseCallback fn);
 
-    bool addPlugin(String id, StringArray& presets, Array<Parameter>& params, bool& hasEditor, bool& scDisabled,
-                   const String& settings, const String& layout, bool multiMono, uint64 monoChannels, String& err);
+    bool addPlugin(String id, StringArray& presets, ParameterByChannelList& params, bool& hasEditor, bool& scDisabled,
+                   const String& settings, const String& layout, uint64 monoChannels, String& err);
     void delPlugin(int idx);
-    void editPlugin(int idx, int x, int y);
+    void editPlugin(int idx, int channel, int x, int y);
     void hidePlugin();
-    MemoryBlock getPluginSettings(int idx);
+    String getPluginSettings(int idx);
     void setPluginSettings(int idx, String settings);
     void bypassPlugin(int idx);
     void unbypassPlugin(int idx);
     void exchangePlugins(int idxA, int idxB);
     Array<ServerPlugin> getRecents();
-    void setPreset(int idx, int preset);
+    void setPreset(int idx, int channel, int preset);
 
-    float getParameterValue(int idx, int paramIdx);
-    void setParameterValue(int idx, int paramIdx, float val);
+    void setMonoChannels(int idx, uint64 channels);
+
+    float getParameterValue(int idx, int channel, int paramIdx);
+    void setParameterValue(int idx, int channel, int paramIdx, float val);
 
     struct ParameterResult {
         int idx;
+        int channel;
         float value;
     };
 
@@ -288,7 +294,8 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
         UPDATECPULOAD1,
         UPDATECPULOAD2,
         GETLOADEDPLUGINSSTRING,
-        UPDATEPLUGINLIST
+        UPDATEPLUGINLIST,
+        SETMONOCHANNELS
     };
 
     struct LockByID : public LogTagDelegate {

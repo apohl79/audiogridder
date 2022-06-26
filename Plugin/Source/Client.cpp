@@ -219,11 +219,13 @@ void Client::handleMessage(std::shared_ptr<Message<Clipboard>> msg) {
 }
 
 void Client::handleMessage(std::shared_ptr<Message<ParameterValue>> msg) {
-    m_processor->updateParameterValue(pDATA(msg)->idx, pDATA(msg)->paramIdx, pDATA(msg)->value, false);
+    m_processor->updateParameterValue(pDATA(msg)->idx, pDATA(msg)->channel, pDATA(msg)->paramIdx, pDATA(msg)->value,
+                                      false);
 }
 
 void Client::handleMessage(std::shared_ptr<Message<ParameterGesture>> msg) {
-    m_processor->updateParameterGestureTracking(pDATA(msg)->idx, pDATA(msg)->paramIdx, pDATA(msg)->gestureIsStarting);
+    m_processor->updateParameterGestureTracking(pDATA(msg)->idx, pDATA(msg)->channel, pDATA(msg)->paramIdx,
+                                                pDATA(msg)->gestureIsStarting);
 }
 
 void Client::handleMessage(std::shared_ptr<Message<PluginStatus>> msg) {
@@ -527,8 +529,9 @@ void Client::quit() {
     msg.send(m_cmdOut.get());
 }
 
-bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params, bool& hasEditor, bool& scDisabled,
-                       const String& settings, const String& layout, bool multiMono, uint64 monoChannels, String& err) {
+bool Client::addPlugin(String id, StringArray& presets, ParameterByChannelList& params, bool& hasEditor,
+                       bool& scDisabled, const String& settings, const String& layout, uint64 monoChannels,
+                       String& err) {
     traceScope();
 
     if (!isReadyLockFree()) {
@@ -542,7 +545,6 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
     PLD(msg).setJson({{"id", id.toStdString()},
                       {"settings", settings.toStdString()},
                       {"layout", layout.toStdString()},
-                      {"multiMono", multiMono},
                       {"monoChannels", monoChannels}});
 
     LockByID lock(*this, ADDPLUGIN);
@@ -582,6 +584,9 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
             return false;
         }
 
+        // Number Multi-Mono instances
+        int pluginChannels = jresult["channelInstances"].get<int>();
+
         Message<Parameters> msgParams(this);
         if (!msgParams.read(m_cmdOut.get(), &e, timeout.getMillisecondsLeft())) {
             err = "failed to read parameters: " + e.toString();
@@ -589,16 +594,24 @@ bool Client::addPlugin(String id, StringArray& presets, Array<Parameter>& params
             return false;
         }
         auto jparams = msgParams.payload.getJson();
-        Array<Parameter> paramsBak(std::move(params));
+        ParameterByChannelList paramsBak(std::move(params));
+        params.resize((size_t)pluginChannels);
         for (auto& jparam : jparams) {
             auto newParam = Parameter::fromJson(jparam);
-            for (auto& oldParam : paramsBak) {
-                if (newParam.idx == oldParam.idx) {
-                    newParam.automationSlot = oldParam.automationSlot;
-                    break;
+
+            for (size_t ch = 0; ch < (size_t)pluginChannels; ch++) {
+                params[ch].push_back(newParam);
+                auto& newAddedParam = params[ch].back();
+
+                if (paramsBak.size() == (size_t)pluginChannels) {
+                    for (auto& oldParam : paramsBak[ch]) {
+                        if (newAddedParam.idx == oldParam.idx) {
+                            newAddedParam.automationSlot = oldParam.automationSlot;
+                            break;
+                        }
+                    }
                 }
             }
-            params.add(std::move(newParam));
         }
 
         m_latency = jresult["latency"].get<int>();
@@ -626,13 +639,14 @@ void Client::delPlugin(int idx) {
     }
 }
 
-void Client::editPlugin(int idx, int x, int y) {
+void Client::editPlugin(int idx, int channel, int x, int y) {
     traceScope();
     if (!isReadyLockFree()) {
         return;
     };
     Message<EditPlugin> msg(this);
     DATA(msg)->index = idx;
+    DATA(msg)->channel = channel;
     DATA(msg)->x = x;
     DATA(msg)->y = y;
     LockByID lock(*this, EDITPLUGIN);
@@ -649,11 +663,10 @@ void Client::hidePlugin() {
     msg.send(m_cmdOut.get());
 }
 
-MemoryBlock Client::getPluginSettings(int idx) {
+String Client::getPluginSettings(int idx) {
     traceScope();
-    MemoryBlock block;
     if (!isReadyLockFree()) {
-        return block;
+        return {};
     };
     Message<GetPluginSettings> msg(this);
     PLD(msg).setNumber(idx);
@@ -664,16 +677,14 @@ MemoryBlock Client::getPluginSettings(int idx) {
         Message<PluginSettings> res(this);
         MessageHelper::Error err;
         if (res.read(m_cmdOut.get(), &err, LOAD_PLUGIN_TIMEOUT)) {
-            if (*res.payload.size > 0) {
-                block.append(res.payload.data, (size_t)*res.payload.size);
-            }
+            return PLD(res).getString();
         } else {
             logln(getLoadedPluginsString()
                   << ": failed to read PluginSettings message for idx " << idx << ": " << err.toString());
             m_error = true;
         }
     }
-    return block;
+    return {};
 }
 
 void Client::setPluginSettings(int idx, String settings) {
@@ -685,11 +696,7 @@ void Client::setPluginSettings(int idx, String settings) {
         m_error = true;
     } else {
         Message<PluginSettings> msgSettings(this);
-        if (settings.isNotEmpty()) {
-            MemoryBlock block;
-            block.fromBase64Encoding(settings);
-            msgSettings.payload.setData(block.begin(), static_cast<int>(block.getSize()));
-        }
+        PLD(msgSettings).setString(settings);
         if (!msgSettings.send(m_cmdOut.get())) {
             logln("failed to send settings");
             m_error = true;
@@ -756,25 +763,40 @@ Array<ServerPlugin> Client::getRecents() {
     return recents;
 }
 
-void Client::setPreset(int idx, int preset) {
+void Client::setPreset(int idx, int channel, int preset) {
     traceScope();
     if (!isReadyLockFree()) {
         return;
     };
     Message<Preset> msg(this);
     DATA(msg)->idx = idx;
+    DATA(msg)->channel = channel;
     DATA(msg)->preset = preset;
     LockByID lock(*this, SETPRESET);
     msg.send(m_cmdOut.get());
 }
 
-float Client::getParameterValue(int idx, int paramIdx) {
+void Client::setMonoChannels(int idx, uint64 channels) {
+    traceScope();
+    if (!isReadyLockFree()) {
+        return;
+    };
+    logln("updating mono channels for plugin " << idx << ": " << ChannelSet::toString(channels, 0, m_channelsOut));
+    Message<SetMonoChannels> msg(this);
+    DATA(msg)->idx = idx;
+    DATA(msg)->channels = channels;
+    LockByID lock(*this, SETMONOCHANNELS);
+    msg.send(m_cmdOut.get());
+}
+
+float Client::getParameterValue(int idx, int channel, int paramIdx) {
     traceScope();
     if (!isReadyLockFree()) {
         return 0;
     };
     Message<GetParameterValue> msg(this);
     DATA(msg)->idx = idx;
+    DATA(msg)->channel = channel;
     DATA(msg)->paramIdx = paramIdx;
     LockByID lock(*this, GETPARAMETERVALUE);
     msg.send(m_cmdOut.get());
@@ -791,13 +813,14 @@ float Client::getParameterValue(int idx, int paramIdx) {
     return 0;
 }
 
-void Client::setParameterValue(int idx, int paramIdx, float val) {
+void Client::setParameterValue(int idx, int channel, int paramIdx, float val) {
     traceScope();
     if (!isReadyLockFree()) {
         return;
     };
     Message<ParameterValue> msg(this);
     DATA(msg)->idx = idx;
+    DATA(msg)->channel = channel;
     DATA(msg)->paramIdx = paramIdx;
     DATA(msg)->value = val;
     LockByID lock(*this, SETPARAMETERVALUE);
@@ -819,7 +842,7 @@ Array<Client::ParameterResult> Client::getAllParameterValues(int idx, int cnt) {
         MessageHelper::Error err;
         if (msgVal.read(m_cmdOut.get(), &err)) {
             if (idx == DATA(msgVal)->idx) {
-                ret.add({DATA(msgVal)->paramIdx, DATA(msgVal)->value});
+                ret.add({DATA(msgVal)->paramIdx, DATA(msgVal)->channel, DATA(msgVal)->value});
             }
         } else {
             break;

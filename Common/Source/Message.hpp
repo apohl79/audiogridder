@@ -89,7 +89,7 @@ StreamingSocket* accept(StreamingSocket*, int timeoutMs = 1000, std::function<bo
 /*
  * Client/Server handshake
  */
-static constexpr int AG_PROTOCOL_VERSION = 12;
+static constexpr int AG_PROTOCOL_VERSION = 13;
 
 struct HandshakeRequest {
     int version;
@@ -653,8 +653,20 @@ class PluginStatus : public JsonPayload {
     PluginStatus() : JsonPayload(Type) {}
 };
 
+struct setmonochannels_t {
+    int idx;
+    uint64 channels;
+};
+
+class SetMonoChannels : public DataPayload<setmonochannels_t> {
+  public:
+    static constexpr int Type = __COUNTER__;
+    SetMonoChannels() : DataPayload<setmonochannels_t>(Type) {}
+};
+
 struct editplugin_t {
     int index;
+    int channel;
     int x;
     int y;
 };
@@ -758,10 +770,10 @@ class SetPluginSettings : public NumberPayload {
     SetPluginSettings() : NumberPayload(Type) {}
 };
 
-class PluginSettings : public BinaryPayload {
+class PluginSettings : public StringPayload {
   public:
     static constexpr int Type = __COUNTER__;
-    PluginSettings() : BinaryPayload(Type) {}
+    PluginSettings() : StringPayload(Type) {}
 };
 
 class Key : public BinaryPayload {
@@ -818,6 +830,7 @@ struct parametervalue_t {
     int idx;
     int paramIdx;
     float value;
+    int channel = 0;
 };
 
 class ParameterValue : public DataPayload<parametervalue_t> {
@@ -829,6 +842,7 @@ class ParameterValue : public DataPayload<parametervalue_t> {
 struct getparametervalue_t {
     int idx;
     int paramIdx;
+    int channel = 0;
 };
 
 class GetParameterValue : public DataPayload<getparametervalue_t> {
@@ -847,6 +861,7 @@ struct parametergesture_t {
     int idx;
     int paramIdx;
     bool gestureIsStarting;
+    int channel = 0;
 };
 
 class ParameterGesture : public DataPayload<parametergesture_t> {
@@ -864,6 +879,7 @@ class Presets : public StringPayload {
 struct preset_t {
     int idx;
     int preset;
+    int channel = 0;
 };
 
 class Preset : public DataPayload<preset_t> {

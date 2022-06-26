@@ -86,46 +86,62 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     m_genericEditorView.setViewedComponent(&m_genericEditor, false);
     m_genericEditorView.setVisible(false);
 
-    m_stFullscreen.setButtonText("fs");
-    m_stFullscreen.setBounds(201, 1, 1, 1);
-    m_stFullscreen.setColour(ComboBox::outlineColourId, Colour(Defaults::BUTTON_COLOR));
-    m_stFullscreen.setConnectedEdges(Button::ConnectedOnLeft | Button::ConnectedOnRight | Button::ConnectedOnTop |
+    m_toolsButtonFullscreen.setButtonText("fs");
+    m_toolsButtonFullscreen.setBounds(201, 1, 1, 1);
+    m_toolsButtonFullscreen.setColour(ComboBox::outlineColourId, Colour(Defaults::BUTTON_COLOR));
+    m_toolsButtonFullscreen.setConnectedEdges(Button::ConnectedOnLeft | Button::ConnectedOnRight |
+                                              Button::ConnectedOnTop | Button::ConnectedOnBottom);
+    m_toolsButtonFullscreen.addListener(this);
+    addAndMakeVisible(&m_toolsButtonFullscreen);
+
+    m_toolsButtonPlus.setButtonText("+");
+    m_toolsButtonPlus.setBounds(201, 1, 1, 1);
+    m_toolsButtonPlus.setColour(ComboBox::outlineColourId, Colour(Defaults::BUTTON_COLOR));
+    m_toolsButtonPlus.setConnectedEdges(Button::ConnectedOnLeft | Button::ConnectedOnRight | Button::ConnectedOnTop |
+                                        Button::ConnectedOnBottom);
+    m_toolsButtonPlus.addListener(this);
+    addAndMakeVisible(&m_toolsButtonPlus);
+
+    m_toolsButtonMinus.setButtonText("-");
+    m_toolsButtonMinus.setBounds(201, 1, 1, 1);
+    m_toolsButtonMinus.setColour(ComboBox::outlineColourId, Colour(Defaults::BUTTON_COLOR));
+    m_toolsButtonMinus.setConnectedEdges(Button::ConnectedOnLeft | Button::ConnectedOnRight | Button::ConnectedOnTop |
+                                         Button::ConnectedOnBottom);
+    m_toolsButtonMinus.addListener(this);
+    addAndMakeVisible(&m_toolsButtonMinus);
+
+    m_toolsButtonA.setButtonText("A");
+    m_toolsButtonA.setBounds(201, 1, 1, 1);
+    m_toolsButtonA.setConnectedEdges(Button::ConnectedOnLeft | Button::ConnectedOnRight | Button::ConnectedOnTop |
                                      Button::ConnectedOnBottom);
-    m_stFullscreen.addListener(this);
-    addAndMakeVisible(&m_stFullscreen);
+    m_toolsButtonA.addListener(this);
+    addAndMakeVisible(&m_toolsButtonA);
 
-    m_stPlus.setButtonText("+");
-    m_stPlus.setBounds(201, 1, 1, 1);
-    m_stPlus.setColour(ComboBox::outlineColourId, Colour(Defaults::BUTTON_COLOR));
-    m_stPlus.setConnectedEdges(Button::ConnectedOnLeft | Button::ConnectedOnRight | Button::ConnectedOnTop |
-                               Button::ConnectedOnBottom);
-    m_stPlus.addListener(this);
-    addAndMakeVisible(&m_stPlus);
+    m_toolsButtonB.setButtonText("B");
+    m_toolsButtonB.setBounds(201, 1, 1, 1);
+    m_toolsButtonB.setConnectedEdges(Button::ConnectedOnLeft | Button::ConnectedOnRight | Button::ConnectedOnTop |
+                                     Button::ConnectedOnBottom);
+    m_toolsButtonB.addListener(this);
+    addAndMakeVisible(&m_toolsButtonB);
 
-    m_stMinus.setButtonText("-");
-    m_stMinus.setBounds(201, 1, 1, 1);
-    m_stMinus.setColour(ComboBox::outlineColourId, Colour(Defaults::BUTTON_COLOR));
-    m_stMinus.setConnectedEdges(Button::ConnectedOnLeft | Button::ConnectedOnRight | Button::ConnectedOnTop |
-                                Button::ConnectedOnBottom);
-    m_stMinus.addListener(this);
-    addAndMakeVisible(&m_stMinus);
+    m_toolsButtonOnOff.setButtonText("onoff");
+    m_toolsButtonOnOff.setBounds(201, 1, 1, 1);
+    m_toolsButtonOnOff.setColour(ComboBox::outlineColourId, Colour(Defaults::BUTTON_COLOR));
+    m_toolsButtonOnOff.setConnectedEdges(Button::ConnectedOnLeft | Button::ConnectedOnRight | Button::ConnectedOnTop |
+                                         Button::ConnectedOnBottom);
+    m_toolsButtonOnOff.addListener(this);
+    addAndMakeVisible(&m_toolsButtonOnOff);
 
-    m_stA.setButtonText("A");
-    m_stA.setBounds(201, 1, 1, 1);
-    m_stA.setConnectedEdges(Button::ConnectedOnLeft | Button::ConnectedOnRight | Button::ConnectedOnTop |
-                            Button::ConnectedOnBottom);
-    m_stA.addListener(this);
-    addAndMakeVisible(&m_stA);
-
-    m_stB.setButtonText("B");
-    m_stB.setBounds(201, 1, 1, 1);
-    m_stB.setConnectedEdges(Button::ConnectedOnLeft | Button::ConnectedOnRight | Button::ConnectedOnTop |
-                            Button::ConnectedOnBottom);
-    m_stB.addListener(this);
-    addAndMakeVisible(&m_stB);
+    m_toolsButtonChannel.setButtonText("Channel");
+    m_toolsButtonChannel.setBounds(201, 1, 1, 1);
+    m_toolsButtonChannel.setColour(ComboBox::outlineColourId, Colour(Defaults::BUTTON_COLOR));
+    m_toolsButtonChannel.setConnectedEdges(Button::ConnectedOnLeft | Button::ConnectedOnRight | Button::ConnectedOnTop |
+                                           Button::ConnectedOnBottom);
+    m_toolsButtonChannel.addListener(this);
+    addAndMakeVisible(&m_toolsButtonChannel);
 
     createPluginButtons();
-    initStButtons();
+    initToolsButtons();
 
     setSize(200, 100);
 
@@ -175,12 +191,15 @@ void PluginEditor::ToolsButton::paintButton(Graphics& g, bool shouldDrawButtonAs
     auto& lf = getLookAndFeel();
     lf.drawButtonBackground(g, *this, findColour(getToggleState() ? buttonOnColourId : buttonColourId),
                             shouldDrawButtonAsHighlighted, shouldDrawButtonAsDown);
+    bool fill = false, stroke = false;
     Path p;
     if (getButtonText() == "+") {
         p.addLineSegment(Line<int>(3, getHeight() / 2 + 1, getWidth() - 2, getHeight() / 2 + 1).toFloat(), 1.5f);
         p.addLineSegment(Line<int>(getWidth() / 2 + 1, 3, getWidth() / 2 + 1, getHeight() - 2).toFloat(), 1.5f);
+        fill = true;
     } else if (getButtonText() == "-") {
         p.addLineSegment(Line<int>(2, getHeight() / 2 + 1, getWidth() - 2, getHeight() / 2 + 1).toFloat(), 1.5f);
+        fill = true;
     } else if (getButtonText() == "fs") {
         p.addLineSegment(Line<int>(2, 2, 6, 2).toFloat(), 1.5f);
         p.addLineSegment(Line<int>(2, 2, 2, 6).toFloat(), 1.5f);
@@ -190,9 +209,21 @@ void PluginEditor::ToolsButton::paintButton(Graphics& g, bool shouldDrawButtonAs
         p.addLineSegment(Line<int>(2, getHeight() - 2, 2, getHeight() - 6).toFloat(), 1.5f);
         p.addLineSegment(Line<int>(getWidth() - 2, getHeight() - 2, getWidth() - 6, getHeight() - 2).toFloat(), 1.5f);
         p.addLineSegment(Line<int>(getWidth() - 2, getHeight() - 2, getWidth() - 2, getHeight() - 6).toFloat(), 1.5f);
+        fill = true;
+    } else if (getButtonText() == "onoff") {
+        auto r = juce::Rectangle<float>(4, 4, getWidth() - 8, getHeight() - 8);
+        p.addEllipse(r);
+        p.startNewSubPath(r.getCentreX(), r.getY());
+        p.lineTo(r.getCentreX(), r.getY() + 4);
+        stroke = true;
     }
-    g.setColour(Colours::white.withAlpha(0.8f));
-    g.fillPath(p);
+    g.setColour(findColour(textColourOffId).withAlpha(0.8f));
+    if (fill) {
+        g.fillPath(p);
+    }
+    if (stroke) {
+        g.strokePath(p, PathStrokeType(1.0f));
+    }
 }
 
 void PluginEditor::resized() {
@@ -213,24 +244,36 @@ void PluginEditor::resized() {
     int leftBarWidth = 200;
     int windowWidth = leftBarWidth;
 
-    if (m_processor.getActivePlugin() > -1) {
+    int active = m_processor.getActivePlugin();
+    if (active > -1) {
         if (!genericEditorEnabled() && !m_pluginScreenEmpty) {
-            m_stMinus.setVisible(true);
-            m_stPlus.setVisible(true);
-            m_stFullscreen.setVisible(true);
+            m_toolsButtonMinus.setVisible(true);
+            m_toolsButtonPlus.setVisible(true);
+            m_toolsButtonFullscreen.setVisible(true);
         } else {
-            m_stMinus.setVisible(false);
-            m_stPlus.setVisible(false);
-            m_stFullscreen.setVisible(false);
+            m_toolsButtonMinus.setVisible(false);
+            m_toolsButtonPlus.setVisible(false);
+            m_toolsButtonFullscreen.setVisible(false);
         }
-        m_stA.setVisible(true);
-        m_stB.setVisible(true);
+        m_toolsButtonA.setVisible(true);
+        m_toolsButtonB.setVisible(true);
+
+        auto loadedPlug = m_processor.getLoadedPlugin(active);
+        if (loadedPlug.layout == "Multi-Mono") {
+            m_toolsButtonOnOff.setVisible(true);
+            m_toolsButtonChannel.setVisible(true);
+        } else {
+            m_toolsButtonOnOff.setVisible(false);
+            m_toolsButtonChannel.setVisible(false);
+        }
     } else {
-        m_stMinus.setVisible(false);
-        m_stPlus.setVisible(false);
-        m_stFullscreen.setVisible(false);
-        m_stA.setVisible(false);
-        m_stB.setVisible(false);
+        m_toolsButtonMinus.setVisible(false);
+        m_toolsButtonPlus.setVisible(false);
+        m_toolsButtonFullscreen.setVisible(false);
+        m_toolsButtonA.setVisible(false);
+        m_toolsButtonB.setVisible(false);
+        m_toolsButtonOnOff.setVisible(false);
+        m_toolsButtonChannel.setVisible(false);
     }
     if (genericEditorEnabled() && m_processor.getActivePlugin() > -1) {
         m_genericEditorView.setVisible(true);
@@ -251,18 +294,24 @@ void PluginEditor::resized() {
         int screenHeight = m_pluginScreen.getHeight() + SCREENTOOLS_HEIGHT + 5;
         windowHeight = jmax(windowHeight, screenHeight);
         windowWidth += m_pluginScreen.getWidth();
-        m_stMinus.setBounds(windowWidth - SCREENTOOLS_HEIGHT - SCREENTOOLS_MARGIN * 2, SCREENTOOLS_MARGIN,
-                            SCREENTOOLS_HEIGHT, SCREENTOOLS_HEIGHT);
-        m_stPlus.setBounds(windowWidth - SCREENTOOLS_HEIGHT * 2 - SCREENTOOLS_MARGIN * 3, SCREENTOOLS_MARGIN,
-                           SCREENTOOLS_HEIGHT, SCREENTOOLS_HEIGHT);
-        m_stFullscreen.setBounds(windowWidth - SCREENTOOLS_HEIGHT * 3 - SCREENTOOLS_MARGIN * 4, SCREENTOOLS_MARGIN,
-                                 SCREENTOOLS_HEIGHT, SCREENTOOLS_HEIGHT);
+        m_toolsButtonMinus.setBounds(windowWidth - SCREENTOOLS_HEIGHT - SCREENTOOLS_MARGIN * 2, SCREENTOOLS_MARGIN,
+                                     SCREENTOOLS_HEIGHT, SCREENTOOLS_HEIGHT);
+        m_toolsButtonPlus.setBounds(windowWidth - SCREENTOOLS_HEIGHT * 2 - SCREENTOOLS_MARGIN * 3, SCREENTOOLS_MARGIN,
+                                    SCREENTOOLS_HEIGHT, SCREENTOOLS_HEIGHT);
+        m_toolsButtonFullscreen.setBounds(windowWidth - SCREENTOOLS_HEIGHT * 3 - SCREENTOOLS_MARGIN * 4,
+                                          SCREENTOOLS_MARGIN, SCREENTOOLS_HEIGHT, SCREENTOOLS_HEIGHT);
     }
-    m_stA.setBounds(leftBarWidth + SCREENTOOLS_MARGIN, SCREENTOOLS_MARGIN, SCREENTOOLS_AB_WIDTH, SCREENTOOLS_HEIGHT);
-    m_stB.setBounds(leftBarWidth + SCREENTOOLS_MARGIN + SCREENTOOLS_AB_WIDTH, SCREENTOOLS_MARGIN, SCREENTOOLS_AB_WIDTH,
-                    SCREENTOOLS_HEIGHT);
+    m_toolsButtonA.setBounds(leftBarWidth + SCREENTOOLS_MARGIN, SCREENTOOLS_MARGIN, SCREENTOOLS_AB_WIDTH,
+                             SCREENTOOLS_HEIGHT);
+    m_toolsButtonB.setBounds(leftBarWidth + SCREENTOOLS_MARGIN + SCREENTOOLS_AB_WIDTH, SCREENTOOLS_MARGIN,
+                             SCREENTOOLS_AB_WIDTH, SCREENTOOLS_HEIGHT);
+    m_toolsButtonOnOff.setBounds(leftBarWidth + SCREENTOOLS_MARGIN * 2 + SCREENTOOLS_AB_WIDTH * 2, SCREENTOOLS_MARGIN,
+                                 SCREENTOOLS_HEIGHT, SCREENTOOLS_HEIGHT);
+    m_toolsButtonChannel.setBounds(
+        leftBarWidth + SCREENTOOLS_MARGIN * 3 + SCREENTOOLS_AB_WIDTH * 2 + SCREENTOOLS_HEIGHT, SCREENTOOLS_MARGIN,
+        SCREENTOOLS_CHANNEL_WIDTH, SCREENTOOLS_HEIGHT);
     if (m_currentActiveAB != m_processor.getActivePlugin()) {
-        initStButtons();
+        initToolsButtons();
     }
     if (getWidth() != windowWidth || getHeight() != windowHeight) {
         setSize(windowWidth, windowHeight);
@@ -278,9 +327,8 @@ void PluginEditor::buttonClicked(Button* button, const ModifierKeys& modifiers, 
     if (!button->getName().compare("newPlug")) {
         auto addFn = [this](const ServerPlugin& plug, const String& layout) {
             traceScope();
-            bool multiMono = layout == "Multi-Mono";
             String err;
-            bool success = m_processor.loadPlugin(plug, multiMono ? "Mono" : layout, multiMono, 0, err);
+            bool success = m_processor.loadPlugin(plug, layout, 0, err);
             if (!success) {
                 AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "Error",
                                                  "Failed to add " + plug.getName() + " plugin!\n\nError: " + err, "OK");
@@ -410,54 +458,59 @@ void PluginEditor::buttonClicked(Button* button, const ModifierKeys& modifiers, 
                     break;
             }
         } else {
+            auto& loadedPlug = m_processor.getLoadedPlugin(idx);
+            auto& params = loadedPlug.getActiveParams();
+            int channel = loadedPlug.activeChannel;
+
             PopupMenu m;
-            PopupMenu presets;
+            PopupMenu mPresets;
             int preset = 0;
-            for (auto& p : m_processor.getLoadedPlugin(idx).presets) {
-                presets.addItem(p, [this, idx, preset] {
+            for (auto& p : loadedPlug.presets) {
+                mPresets.addItem(p, [this, idx, channel, preset] {
                     traceScope();
-                    m_processor.getClient().setPreset(idx, preset);
+                    m_processor.getClient().setPreset(idx, channel, preset);
                 });
                 preset++;
             }
-            m.addSubMenu("Presets", presets);
+            m.addSubMenu("Presets", mPresets);
             m.addSeparator();
-            PopupMenu params;
-            params.addItem("Assign all", [this, idx] {
-                for (auto& p : m_processor.getLoadedPlugin(idx).params) {
+
+            PopupMenu mParams;
+            mParams.addItem("Assign all", [this, idx, channel, &params] {
+                for (auto& p : params) {
                     if (p.automationSlot == -1) {
-                        if (!m_processor.enableParamAutomation(idx, p.idx)) {
+                        if (!m_processor.enableParamAutomation(idx, channel, p.idx)) {
                             break;
                         }
                     }
                 }
             });
-            params.addItem("Unassign all", [this, idx] {
-                for (auto& p : m_processor.getLoadedPlugin(idx).params) {
+            mParams.addItem("Unassign all", [this, idx, channel, &params] {
+                for (auto& p : params) {
                     if (p.automationSlot > -1) {
-                        m_processor.disableParamAutomation(idx, p.idx);
+                        m_processor.disableParamAutomation(idx, channel, p.idx);
                     }
                 }
             });
-            params.addSeparator();
-            for (auto& p : m_processor.getLoadedPlugin(idx).params) {
-                int paramIdx = p.idx;
+            mParams.addSeparator();
+
+            for (auto& p : params) {
                 String name = p.name;
                 bool enabled = false;
                 if (p.automationSlot > -1) {
                     name << " -> [" << p.automationSlot << "]";
                     enabled = true;
                 }
-                params.addItem(name, true, enabled, [this, idx, paramIdx, enabled] {
+                mParams.addItem(name, true, enabled, [this, idx, channel, paramIdx = p.idx, enabled] {
                     traceScope();
                     if (enabled) {
-                        m_processor.disableParamAutomation(idx, paramIdx);
+                        m_processor.disableParamAutomation(idx, channel, paramIdx);
                     } else {
-                        m_processor.enableParamAutomation(idx, paramIdx);
+                        m_processor.enableParamAutomation(idx, channel, paramIdx);
                     }
                 });
             }
-            m.addSubMenu("Automation", params);
+            m.addSubMenu("Automation", mParams);
             m.showAt(button);
         }
     }
@@ -466,24 +519,48 @@ void PluginEditor::buttonClicked(Button* button, const ModifierKeys& modifiers, 
 void PluginEditor::buttonClicked(Button* button) {
     traceScope();
     TextButton* tb = reinterpret_cast<TextButton*>(button);
-    if (tb == &m_stPlus) {
+    if (tb == &m_toolsButtonPlus) {
         m_processor.increaseSCArea();
-    } else if (tb == &m_stMinus) {
+    } else if (tb == &m_toolsButtonMinus) {
         m_processor.decreaseSCArea();
-    } else if (tb == &m_stFullscreen) {
+    } else if (tb == &m_toolsButtonFullscreen) {
         m_processor.toggleFullscreenSCArea();
-    } else if (tb == &m_stA || tb == &m_stB) {
+    } else if (tb == &m_toolsButtonA || tb == &m_toolsButtonB) {
         m_currentActiveAB = m_processor.getActivePlugin();
-        if (isHilightedStButton(&m_stB)) {
+        if (isHilightedToolsButton(&m_toolsButtonB)) {
             m_processor.storeSettingsB();
             m_processor.restoreSettingsA();
-            hilightStButton(&m_stA);
-            enableStButton(&m_stB);
+            hilightToolsButton(&m_toolsButtonA);
+            unhilightToolsButton(&m_toolsButtonB);
+            enableToolsButton(&m_toolsButtonB);
         } else {
             m_processor.storeSettingsA();
             m_processor.restoreSettingsB();
-            hilightStButton(&m_stB);
-            enableStButton(&m_stA);
+            hilightToolsButton(&m_toolsButtonB);
+            unhilightToolsButton(&m_toolsButtonA);
+            enableToolsButton(&m_toolsButtonA);
+        }
+    } else if (tb == &m_toolsButtonChannel) {
+        auto current = m_processor.getActivePluginChannelName();
+        auto names = m_processor.getOutputChannelNames();
+        int ch = 0;
+        PopupMenu m;
+        for (auto& name : names) {
+            if (name == current) {
+                m.addItem(name, false, true, [] {});
+            } else {
+                m.addItem(name, [this, ch] { editPlugin(-1, ch); });
+            }
+            ch++;
+        }
+        m.showAt(tb);
+    } else if (tb == &m_toolsButtonOnOff) {
+        if (isHilightedToolsButton(tb)) {
+            m_processor.disableMonoChannel(m_processor.getActivePlugin(), m_processor.getActivePluginChannel());
+            unhilightToolsButton(tb);
+        } else {
+            m_processor.enableMonoChannel(m_processor.getActivePlugin(), m_processor.getActivePluginChannel());
+            hilightToolsButton(tb);
         }
     }
 }
@@ -565,7 +642,7 @@ void PluginEditor::focusOfChildComponentChanged(FocusChangeType cause) {
         if (active > -1) {
             auto p = getLocalModePosition();
             logln("focus change: cause is " << cause);
-            m_processor.editPlugin(active, p.x, p.y);
+            m_processor.editPlugin(active, m_processor.getActivePluginChannel(), p.x, p.y);
         }
     }
 }
@@ -1128,52 +1205,88 @@ void PluginEditor::showSettingsMenu() {
     m.showAt(&m_settingsIcon);
 }
 
-void PluginEditor::initStButtons() {
+void PluginEditor::initToolsButtons() {
     traceScope();
-    enableStButton(&m_stA);
-    disableStButton(&m_stB);
+    enableToolsButton(&m_toolsButtonA);
+    disableToolsButton(&m_toolsButtonB);
     m_processor.resetSettingsAB();
-    m_hilightedStButton = nullptr;
+    m_hilightedToolsButtons.clear();
+    updateToolsOnOffButton();
 }
 
-void PluginEditor::enableStButton(TextButton* b) {
+void PluginEditor::enableToolsButton(TextButton* b) {
     traceScope();
     b->setColour(PluginButton::textColourOffId, Colours::white);
     b->setColour(ComboBox::outlineColourId, Colour(Defaults::BUTTON_COLOR));
 }
 
-void PluginEditor::disableStButton(TextButton* b) {
+void PluginEditor::disableToolsButton(TextButton* b) {
     traceScope();
     b->setColour(PluginButton::textColourOffId, Colours::grey);
     b->setColour(ComboBox::outlineColourId, Colour(Defaults::BUTTON_COLOR));
 }
 
-void PluginEditor::hilightStButton(TextButton* b) {
+void PluginEditor::hilightToolsButton(TextButton* b) {
     traceScope();
     b->setColour(PluginButton::textColourOffId, Colour(Defaults::ACTIVE_COLOR));
     b->setColour(ComboBox::outlineColourId, Colour(Defaults::ACTIVE_COLOR));
-    m_hilightedStButton = b;
+    m_hilightedToolsButtons.insert(b);
 }
 
-bool PluginEditor::isHilightedStButton(TextButton* b) {
+void PluginEditor::unhilightToolsButton(TextButton* b) {
     traceScope();
-    return b == m_hilightedStButton;
+    b->setColour(PluginButton::textColourOffId, Colour(Colours::white));
+    b->setColour(ComboBox::outlineColourId, Colour(Defaults::BUTTON_COLOR));
+    m_hilightedToolsButtons.erase(b);
 }
 
-void PluginEditor::editPlugin(int idx) {
+bool PluginEditor::isHilightedToolsButton(TextButton* b) {
+    traceScope();
+    return m_hilightedToolsButtons.count(b) > 0;
+}
+
+void PluginEditor::updateToolsOnOffButton() {
+    int active = m_processor.getActivePlugin();
+    if (active > -1) {
+        auto& loadedPlug = m_processor.getLoadedPlugin(active);
+        if (loadedPlug.monoChannels.isOutputActive(loadedPlug.activeChannel)) {
+            hilightToolsButton(&m_toolsButtonOnOff);
+        } else {
+            unhilightToolsButton(&m_toolsButtonOnOff);
+        }
+    }
+}
+
+void PluginEditor::editPlugin(int idx, int channel) {
     traceScope();
     int active = m_processor.getActivePlugin();
+
     if (idx == -1) {
         idx = active;
     }
     if (idx < 0 || (size_t)idx >= m_pluginButtons.size() || m_processor.isBypassed(idx)) {
         return;
     }
+
+    if (channel < 0) {
+        channel = m_processor.getLoadedPlugin(idx).activeChannel;
+    }
+
     highlightPluginButton(idx);
-    m_stA.setVisible(true);
-    m_stB.setVisible(true);
+    m_toolsButtonA.setVisible(true);
+    m_toolsButtonB.setVisible(true);
+
     auto pos = getLocalModePosition();
-    m_processor.editPlugin(idx, pos.x, pos.y);
+    m_processor.editPlugin(idx, channel, pos.x, pos.y);
+
+    auto& loadedPlug = m_processor.getLoadedPlugin(idx);
+    if (loadedPlug.layout == "Multi-Mono") {
+        updateToolsOnOffButton();
+        m_toolsButtonOnOff.setVisible(true);
+        m_toolsButtonChannel.setButtonText(m_processor.getPluginChannelName(channel));
+        m_toolsButtonChannel.setVisible(true);
+    }
+
     if (genericEditorEnabled()) {
         m_wantsScreenUpdates = false;
         m_processor.getClient().setPluginScreenUpdateCallback(nullptr);
@@ -1212,6 +1325,7 @@ void PluginEditor::editPlugin(int idx) {
                 }
             });
     }
+
     if (active > -1 && idx != active && (size_t)active < m_pluginButtons.size()) {
         unhighlightPluginButton(active);
         resized();

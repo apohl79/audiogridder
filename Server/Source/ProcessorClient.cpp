@@ -275,7 +275,7 @@ void ProcessorClient::run() {
             }
             if (m_loaded) {
                 String err;
-                if (!load(m_lastSettings, m_lastLayout, m_lastMultiMono, m_lastMonoChannels, err)) {
+                if (!load(m_lastSettings, m_lastLayout, m_lastMonoChannels, err)) {
                     setAndLogError("reload failed: " + err);
                 }
             }
@@ -324,14 +324,14 @@ void ProcessorClient::handleMessage(std::shared_ptr<Message<Key>> msg) {
 void ProcessorClient::handleMessage(std::shared_ptr<Message<ParameterValue>> msg) {
     traceScope();
     if (nullptr != onParamValueChange) {
-        onParamValueChange(pDATA(msg)->paramIdx, pDATA(msg)->value);
+        onParamValueChange(pDATA(msg)->channel, pDATA(msg)->paramIdx, pDATA(msg)->value);
     }
 }
 
 void ProcessorClient::handleMessage(std::shared_ptr<Message<ParameterGesture>> msg) {
     traceScope();
     if (nullptr != onParamGestureChange) {
-        onParamGestureChange(pDATA(msg)->paramIdx, pDATA(msg)->gestureIsStarting);
+        onParamGestureChange(pDATA(msg)->channel, pDATA(msg)->paramIdx, pDATA(msg)->gestureIsStarting);
     }
 }
 
@@ -340,8 +340,7 @@ void ProcessorClient::handleMessage(std::shared_ptr<Message<ScreenBounds>> msg) 
     m_lastScreenBounds = {pDATA(msg)->x, pDATA(msg)->y, pDATA(msg)->w, pDATA(msg)->h};
 }
 
-bool ProcessorClient::load(const String& settings, const String& layout, bool multiMono, uint64 monoChannels,
-                           String& err) {
+bool ProcessorClient::load(const String& settings, const String& layout, uint64 monoChannels, String& err) {
     traceScope();
 
     if (!isOk()) {
@@ -361,7 +360,6 @@ bool ProcessorClient::load(const String& settings, const String& layout, bool mu
         .setJson({{"id", m_id.toStdString()},
                   {"settings", settings.toStdString()},
                   {"layout", layout.toStdString()},
-                  {"multiMono", multiMono},
                   {"monoChannels", monoChannels}});
 
     if (msgAddPlugin.send(m_sockCmdOut.get())) {
@@ -429,6 +427,7 @@ bool ProcessorClient::load(const String& settings, const String& layout, bool mu
             m_supportsDoublePrecision = jresult["supportsDoublePrecision"].get<bool>();
             m_tailSeconds = jresult["tailSeconds"].get<double>();
             m_numOutputChannels = jresult["numOutputChannels"].get<int>();
+            m_lastChannelInstances = jresult["channelInstances"].get<int>();
         } catch (const json::parse_error& e) {
             err = "json error when reading result: " + String(e.what());
             setAndLogError(err);
@@ -441,7 +440,6 @@ bool ProcessorClient::load(const String& settings, const String& layout, bool mu
 
         m_lastSettings = settings;
         m_lastLayout = layout;
-        m_lastMultiMono = multiMono;
         m_lastMonoChannels = monoChannels;
         m_lastScreenBounds = {};
         m_loaded = true;
@@ -481,13 +479,14 @@ const String ProcessorClient::getName() { return m_name; }
 
 bool ProcessorClient::hasEditor() { return m_hasEditor; }
 
-void ProcessorClient::showEditor(int x, int y) {
+void ProcessorClient::showEditor(int channel, int x, int y) {
     traceScope();
 
     std::lock_guard<std::mutex> lock(m_cmdMtx);
 
     Message<EditPlugin> msg(this);
     DATA(msg)->index = 0;
+    DATA(msg)->channel = channel;
     DATA(msg)->x = x;
     DATA(msg)->y = y;
     msg.send(m_sockCmdOut.get());
@@ -510,7 +509,7 @@ bool ProcessorClient::isSuspended() { return m_suspended; }
 
 double ProcessorClient::getTailLengthSeconds() { return m_tailSeconds; }
 
-void ProcessorClient::getStateInformation(juce::MemoryBlock& block) {
+void ProcessorClient::getStateInformation(String& settings) {
     traceScope();
 
     std::lock_guard<std::mutex> lock(m_cmdMtx);
@@ -525,10 +524,8 @@ void ProcessorClient::getStateInformation(juce::MemoryBlock& block) {
     Message<PluginSettings> res(this);
     MessageHelper::Error err;
     if (res.read(m_sockCmdOut.get(), &err, 5000)) {
-        if (*res.payload.size > 0) {
-            block.append(res.payload.data, (size_t)*res.payload.size);
-            m_lastSettings = block.toBase64Encoding();
-        }
+        m_lastSettings = PLD(res).getString();
+        settings = m_lastSettings;
     } else {
         logln("getStateInformation failed: failed to read PluginSettings message: " << err.toString());
         m_sockCmdOut->close();
@@ -536,7 +533,7 @@ void ProcessorClient::getStateInformation(juce::MemoryBlock& block) {
     }
 }
 
-void ProcessorClient::setStateInformation(const void* data, int size) {
+void ProcessorClient::setStateInformation(const String& settings) {
     traceScope();
 
     std::lock_guard<std::mutex> lock(m_cmdMtx);
@@ -549,7 +546,7 @@ void ProcessorClient::setStateInformation(const void* data, int size) {
     }
 
     Message<PluginSettings> msgSettings(this);
-    msgSettings.payload.setData((const char*)data, size);
+    PLD(msgSettings).setString(settings);
     if (!msgSettings.send(m_sockCmdOut.get())) {
         logln("setStateInformation failed: can't send payload message");
         return;
@@ -696,25 +693,27 @@ juce::Rectangle<int> ProcessorClient::getScreenBounds() {
     return m_lastScreenBounds;
 }
 
-void ProcessorClient::setParameterValue(int paramIdx, float value) {
+void ProcessorClient::setParameterValue(int channel, int paramIdx, float value) {
     traceScope();
 
     std::lock_guard<std::mutex> lock(m_cmdMtx);
 
     Message<ParameterValue> msg(this);
     DATA(msg)->idx = 0;
+    DATA(msg)->channel = channel;
     DATA(msg)->paramIdx = paramIdx;
     DATA(msg)->value = value;
     msg.send(m_sockCmdOut.get());
 }
 
-float ProcessorClient::getParameterValue(int paramIdx) {
+float ProcessorClient::getParameterValue(int channel, int paramIdx) {
     traceScope();
 
     std::lock_guard<std::mutex> lock(m_cmdMtx);
 
     Message<GetParameterValue> msg(this);
     DATA(msg)->idx = 0;
+    DATA(msg)->channel = channel;
     DATA(msg)->paramIdx = paramIdx;
     msg.send(m_sockCmdOut.get());
 
@@ -759,6 +758,15 @@ std::vector<Srv::ParameterValue> ProcessorClient::getAllParameterValues() {
         }
     }
     return ret;
+}
+
+void ProcessorClient::setMonoChannels(uint64 channels) {
+    std::lock_guard<std::mutex> lock(m_cmdMtx);
+
+    Message<SetMonoChannels> msg(this);
+    DATA(msg)->idx = 0;
+    DATA(msg)->channels = channels;
+    msg.send(m_sockCmdOut.get());
 }
 
 }  // namespace e47

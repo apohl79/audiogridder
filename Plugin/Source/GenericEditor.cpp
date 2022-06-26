@@ -41,8 +41,9 @@ void GenericEditor::resized() {
     int row = 0;
 
     auto& plugin = m_processor.getLoadedPlugin(active);
-    for (int i = 0; i < plugin.params.size(); i++) {
-        auto& param = plugin.params.getReference(i);
+    auto& params = plugin.getActiveParams();
+    for (int i = 0; i < (int)params.size(); i++) {
+        auto& param = params[(size_t)i];
         if (param.category > AudioProcessorParameter::genericParameter) {
             continue;  // Parameters like meters are not supported for now.
         }
@@ -58,14 +59,14 @@ void GenericEditor::resized() {
             }
             c->setSelectedId((int)param.getValue() + 1, NotificationType::dontSendNotification);
             c->setBounds(leftIndent + labelWidth, topIndent + (rowHeight + rowSpace) * row, componentWidth, rowHeight);
-            c->onChange = [this, active, i] {
+            c->onChange = [this, active, channel = plugin.activeChannel, i] {
                 auto* locComp = dynamic_cast<ComboBox*>(getComponent(i));
                 auto& locParam = getParameter(i);
                 locParam.setValue((float)locComp->getSelectedItemIndex());
-                m_processor.updateParameterValue(active, i, locParam.currentValue);
+                m_processor.updateParameterValue(active, channel, i, locParam.currentValue);
             };
 
-            auto tracker = std::make_unique<GestureTracker>(this, i);
+            auto tracker = std::make_unique<GestureTracker>(this, i, plugin.activeChannel);
             c->addMouseListener(tracker.get(), true);
             m_gestureTrackers.add(std::move(tracker));
 
@@ -90,14 +91,14 @@ void GenericEditor::resized() {
             }
             c->setBounds(leftIndent + labelWidth, topIndent + (rowHeight + rowSpace) * row, componentWidth, rowHeight);
             c->setValue(param.getValue(), NotificationType::dontSendNotification);
-            c->onValueChange = [this, active, i] {
+            c->onValueChange = [this, active, channel = plugin.activeChannel, i] {
                 auto* locComp = dynamic_cast<Slider*>(getComponent(i));
                 auto& locParam = getParameter(i);
                 locParam.setValue((float)locComp->getValue());
-                m_processor.updateParameterValue(active, i, locParam.currentValue);
+                m_processor.updateParameterValue(active, channel, i, locParam.currentValue);
             };
 
-            auto tracker = std::make_unique<GestureTracker>(this, i);
+            auto tracker = std::make_unique<GestureTracker>(this, i, plugin.activeChannel);
             c->addMouseListener(tracker.get(), true);
             m_gestureTrackers.add(std::move(tracker));
 
@@ -127,7 +128,7 @@ void GenericEditor::resized() {
 
 Client::Parameter& GenericEditor::getParameter(int paramIdx) {
     traceScope();
-    return m_processor.getLoadedPlugin(m_processor.getActivePlugin()).params.getReference(paramIdx);
+    return m_processor.getLoadedPlugin(m_processor.getActivePlugin()).getActiveParams()[(size_t)paramIdx];
 }
 
 Component* GenericEditor::getComponent(int paramIdx) {
@@ -143,7 +144,7 @@ void GenericEditor::updateParamValue(int paramIdx) {
     if (auto* comp = getComponent(paramIdx)) {
         if (!m_gestureTrackers.getReference(paramIdx)->isTracking) {
             auto& plugin = m_processor.getLoadedPlugin(m_processor.getActivePlugin());
-            auto& param = plugin.params.getReference(paramIdx);
+            auto& param = plugin.getActiveParams()[(size_t)paramIdx];
             if (param.allValues.size() > 2) {
                 if (auto* combo = dynamic_cast<ComboBox*>(comp)) {
                     combo->setSelectedId((int)param.getValue() + 1, NotificationType::dontSendNotification);

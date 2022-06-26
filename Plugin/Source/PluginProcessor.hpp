@@ -61,14 +61,16 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     bool canRemoveBus(bool /*isInput*/) const override { return true; }
     void numChannelsChanged() override;
 
-    template <typename T>
-    void processBlockInternal(AudioBuffer<T>& buf, MidiBuffer& midi);
-
     void processBlock(AudioBuffer<float>& buf, MidiBuffer& midi) override { processBlockInternal(buf, midi); }
     void processBlock(AudioBuffer<double>& buf, MidiBuffer& midi) override { processBlockInternal(buf, midi); }
 
-    void processBlockBypassed(AudioBuffer<float>& buf, MidiBuffer& midi) override;
-    void processBlockBypassed(AudioBuffer<double>& buf, MidiBuffer& midi) override;
+    void processBlockBypassed(AudioBuffer<float>& buf, MidiBuffer& /*midi*/) override {
+        processBlockBypassedInternal(buf, m_bypassBufferF);
+    }
+
+    void processBlockBypassed(AudioBuffer<double>& buf, MidiBuffer& /*midi*/) override {
+        processBlockBypassedInternal(buf, m_bypassBufferD);
+    }
 
     void updateLatency(int samples);
 
@@ -129,19 +131,19 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
             BYPASSED,
             ID,
             LAYOUT,
-            MULTI_MONO,
-            MONO_CHANNELS
+            MONO_CHANNELS,
+            ACTIVE_CHANNEL
         };
         enum Indexes_v1 : uint8 { BYPASSED_V1 = 3 };
 
         String idDeprecated;
         String name;
         String layout;
-        bool multiMono = false;
-        uint64 monoChannels = 0;
+        ChannelSet monoChannels = 0;
+        int activeChannel = 0;
         String settings;
         StringArray presets;
-        Array<Client::Parameter> params;
+        Client::ParameterByChannelList params;
         bool bypassed = false;
         String id;
 
@@ -155,8 +157,11 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
                 jpresets.push_back(p.toStdString());
             }
             auto jparams = json::array();
-            for (auto& p : params) {
-                jparams.push_back(p.toJson());
+            for (size_t ch = 0; ch < params.size(); ch++) {
+                jparams.push_back(json::array());
+                for (auto& p : params[ch]) {
+                    jparams[ch].push_back(p.toJson());
+                }
             }
             return {idDeprecated.toStdString(),
                     name.toStdString(),
@@ -166,50 +171,66 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
                     bypassed,
                     id.toStdString(),
                     layout.toStdString(),
-                    multiMono,
-                    monoChannels};
+                    monoChannels.toInt(),
+                    activeChannel};
         }
 
         LoadedPlugin() {}
 
-        LoadedPlugin(const json& j, int version) {
-            idDeprecated = j[ID_DEPRECATED].get<std::string>();
-            name = j[NAME].get<std::string>();
-            settings = j[SETTINGS].get<std::string>();
-            if (version == 1) {
-                bypassed = j[BYPASSED_V1].get<bool>();
-            } else if (version > 1) {
-                bypassed = j[BYPASSED].get<bool>();
-            }
-            if (version >= 2) {
-                for (auto& p : j[PRESETS]) {
-                    presets.add(p.get<std::string>());
+        LoadedPlugin(const json& j, int version) : monoChannels(0, 0, Defaults::PLUGIN_CHANNELS_MAX) {
+            try {
+                idDeprecated = j[ID_DEPRECATED].get<std::string>();
+                name = j[NAME].get<std::string>();
+                settings = j[SETTINGS].get<std::string>();
+                if (version == 1) {
+                    bypassed = j[BYPASSED_V1].get<bool>();
+                } else if (version > 1) {
+                    bypassed = j[BYPASSED].get<bool>();
                 }
-                for (auto& p : j[PARAMS]) {
-                    params.add(Client::Parameter::fromJson(p));
+                if (version >= 2) {
+                    for (auto& p : j[PRESETS]) {
+                        presets.add(p.get<std::string>());
+                    }
+                    if (version < 5) {
+                        params.resize(1);
+                        for (auto& p : j[PARAMS]) {
+                            params[0].push_back(Client::Parameter::fromJson(p));
+                        }
+                    }
                 }
-            }
-            if (version >= 3) {
-                id = j[ID].get<std::string>();
-            } else {
-                id = idDeprecated;
-            }
-            if (version >= 4) {
-                layout = j[LAYOUT].get<std::string>();
-                multiMono = j[MULTI_MONO].get<bool>();
-                monoChannels = j[MONO_CHANNELS].get<uint64>();
+                if (version >= 3) {
+                    id = j[ID].get<std::string>();
+                } else {
+                    id = idDeprecated;
+                }
+                if (version >= 4) {
+                    layout = j[LAYOUT].get<std::string>();
+                    monoChannels = j[MONO_CHANNELS].get<uint64>();
+                }
+                if (version >= 5) {
+                    params.resize(j[PARAMS].size());
+                    for (size_t ch = 0; ch < j[PARAMS].size(); ch++) {
+                        for (auto& p : j[PARAMS][ch]) {
+                            params[ch].push_back(Client::Parameter::fromJson(p));
+                        }
+                    }
+                    activeChannel = j[ACTIVE_CHANNEL].get<int>();
+                }
+            } catch (const json::exception& e) {
+                setLogTagStatic("loadedplugin");
+                logln("failed to deserialize loaded plugin: " << e.what());
             }
         }
 
         LoadedPlugin(const String& id_, const String& idDeprecated_, const String& name_, const String& layout_,
-                     bool multiMono_, uint64 monoChannels_, const String& settings_, const StringArray& presets_,
-                     const Array<Client::Parameter>& params_, bool bypassed_, bool hasEditor_, bool ok_,
-                     const String& error_)
+                     const ChannelSet& monoChannels_, int activeChannel_, const String& settings_,
+                     const StringArray& presets_, const Client::ParameterByChannelList& params_, bool bypassed_,
+                     bool hasEditor_, bool ok_, const String& error_)
             : idDeprecated(idDeprecated_),
               name(name_),
               layout(layout_),
-              multiMono(multiMono_),
               monoChannels(monoChannels_),
+              activeChannel(activeChannel_),
               settings(settings_),
               presets(presets_),
               params(params_),
@@ -218,6 +239,9 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
               hasEditor(hasEditor_),
               ok(ok_),
               error(error_) {}
+
+        const Client::ParameterList& getActiveParams() const { return params[(size_t)activeChannel]; }
+        Client::ParameterList& getActiveParams() { return params[(size_t)activeChannel]; }
     };
 
     // Called by the client to trigger resyncing the remote plugin settings
@@ -244,13 +268,19 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
         return idx > -1 && idx < (int)m_loadedPlugins.size() ? m_loadedPlugins[(size_t)idx] : m_unusedDummyPlugin;
     }
 
-    bool loadPlugin(const ServerPlugin& plugin, const String& layout, bool multiMono, uint64 monoChannels, String& err);
+    bool loadPlugin(const ServerPlugin& plugin, const String& layout, uint64 monoChannels, String& err);
     void unloadPlugin(int idx);
     String getLoadedPluginsString() const;
-    void editPlugin(int idx, int x, int y);
+    void editPlugin(int idx, int channel, int x, int y);
     void hidePlugin(bool updateServer = true);
     void hidePluginFromServer(int idx);
+    void enableMonoChannel(int idx, int channel);
+    void disableMonoChannel(int idx, int channel);
     int getActivePlugin() const { return m_activePlugin; }
+    int getActivePluginChannel() { return getLoadedPlugin(m_activePlugin).activeChannel; }
+    StringArray getOutputChannelNames() const;
+    String getPluginChannelName(int ch);
+    String getActivePluginChannelName() { return getPluginChannelName(getActivePluginChannel()); }
     int getLastActivePlugin() const { return m_lastActivePlugin; }
     bool isEditAlways() const { return m_editAlways; }
     void setEditAlways(bool b) { m_editAlways = b; }
@@ -258,11 +288,11 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     void bypassPlugin(int idx);
     void unbypassPlugin(int idx);
     void exchangePlugins(int idxA, int idxB);
-    bool enableParamAutomation(int idx, int paramIdx, int slot = -1);
-    void disableParamAutomation(int idx, int paramIdx);
+    bool enableParamAutomation(int idx, int channel, int paramIdx, int slot = -1);
+    void disableParamAutomation(int idx, int channel, int paramIdx);
     void getAllParameterValues(int idx);
-    void updateParameterValue(int idx, int paramIdx, float val, bool updateServer = true);
-    void updateParameterGestureTracking(int idx, int paramIdx, bool starting);
+    void updateParameterValue(int idx, int channel, int paramIdx, float val, bool updateServer = true);
+    void updateParameterGestureTracking(int idx, int channel, int paramIdx, bool starting);
     void updatePluginStatus(int idx, bool ok, const String& err);
     void increaseSCArea();
     void decreaseSCArea();
@@ -381,14 +411,18 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
         friend PluginProcessor;
         PluginProcessor& m_proc;
         int m_idx = -1;
+        int m_channel = 0;
         int m_paramIdx = 0;
         int m_slotId = 0;
 
         const LoadedPlugin& getPlugin() const { return m_proc.getLoadedPlugin(m_idx); }
-        const Client::Parameter& getParam() const { return getPlugin().params.getReference(m_paramIdx); }
+        LoadedPlugin& getPlugin() { return m_proc.getLoadedPlugin(m_idx); }
+        const Client::Parameter& getParam() const { return getPlugin().params[(size_t)m_channel][(size_t)m_paramIdx]; }
+        Client::Parameter& getParam() { return getPlugin().params[(size_t)m_channel][(size_t)m_paramIdx]; }
 
         void reset() {
             m_idx = -1;
+            m_channel = 0;
             m_paramIdx = 0;
         }
 
@@ -551,6 +585,12 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
 
         return bp;
     }
+
+    template <typename T>
+    void processBlockInternal(AudioBuffer<T>& buf, MidiBuffer& midi);
+
+    template <typename T>
+    void processBlockBypassedInternal(AudioBuffer<T>& buf, AudioRingBuffer<T>& bypassBuffer);
 
     ENABLE_ASYNC_FUNCTORS();
 

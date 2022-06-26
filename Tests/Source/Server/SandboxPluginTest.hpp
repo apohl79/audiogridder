@@ -59,7 +59,7 @@ class SandboxPluginTest : UnitTest {
             logMessage("Loading " + desc.descriptiveName + " with ID " + id);
             auto proc = std::make_shared<Processor>(*pc, id, sampleRate, blockSize, true);
             String err;
-            expect(proc->load({}, {}, false, 0, err, &desc), "Load failed: " + err);
+            expect(proc->load({}, {}, 0, err, &desc), "Load failed: " + err);
             expect(proc->isClient());
             expect(proc->isLoaded());
             pc->addProcessor(proc);

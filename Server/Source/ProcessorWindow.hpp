@@ -38,6 +38,7 @@ class ProcessorWindow : public DocumentWindow, private Timer, public LogTag {
     void stopCapturing();
     void resized() override;
     void setVisible(bool b) override;
+    bool isShowingPlugin() const { return m_isShowing; }
     bool hasEditor() const { return nullptr != m_editor; }
     void move(int x, int y);
     void toTop();
@@ -57,6 +58,7 @@ class ProcessorWindow : public DocumentWindow, private Timer, public LogTag {
     std::function<void()> m_onHide;
     juce::Rectangle<int> m_screenCaptureRect, m_totalRect;
     int m_startCapturingRetry;
+    bool m_isShowing = false;
 
     void createEditor();
     void captureWindow();

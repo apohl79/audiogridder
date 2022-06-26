@@ -170,10 +170,10 @@ void ScreenWorker::shutdown() {
     m_currentImageCv.notify_one();
 }
 
-void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> proc, int x, int y,
+void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> proc, int channel, int x, int y,
                               std::function<void()> onHide) {
     traceScope();
-    logln("showing editor for " << proc->getName() << " at " << x << "x" << y);
+    logln("showing editor for " << proc->getName() << " (channel=" << channel << ") at " << x << "x" << y);
 
     auto lastTid = m_currentTid;
     m_currentTid = tid;
@@ -186,7 +186,8 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
         }
     };
 
-    if (m_visible && proc.get() == m_currentProc && proc == getApp()->getCurrentWindowProc(m_currentTid)) {
+    if (m_visible && proc.get() == m_currentProc && proc == getApp()->getCurrentWindowProc(m_currentTid) &&
+        channel == m_currentChannel) {
         logln("already showing editor");
         runOnMsgThreadAsync([this, x, y] {
             traceScope();
@@ -209,15 +210,21 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
 
     if (getApp()->getServer()->getScreenCapturingOff()) {
         logln("showing editor with NO callback");
-        runOnMsgThreadSync([this, proc, x, y, onHide2] {
+        runOnMsgThreadSync([this, proc, channel, x, y, onHide2] {
             traceScope();
+
+            proc->setActiveWindowChannel(channel);
+
             getApp()->showEditor(
                 m_currentTid, proc, [](const uint8_t*, int, int, int, int, int, double) {}, onHide2, x, y);
         });
     } else if (getApp()->getServer()->getScreenCapturingFFmpeg()) {
         logln("showing editor with ffmpeg callback");
-        runOnMsgThreadSync([this, proc, onHide2] {
+        runOnMsgThreadSync([this, proc, channel, onHide2] {
             traceScope();
+
+            proc->setActiveWindowChannel(channel);
+
             getApp()->showEditor(
                 m_currentTid, proc,
                 [this, tid = m_currentTid](const uint8_t* data, int size, int w, int h, int wPadded, int hPadded,
@@ -248,12 +255,14 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
         });
     } else {
         logln("showing editor with legacy callback");
-        runOnMsgThreadSync([this, proc, onHide2] {
+        runOnMsgThreadSync([this, proc, channel, onHide2] {
             traceScope();
             m_currentImageLock.lock();
             m_currentImage.reset();
             m_lastImage.reset();
             m_currentImageLock.unlock();
+
+            proc->setActiveWindowChannel(channel);
 
             getApp()->showEditor(
                 m_currentTid, proc,
@@ -288,6 +297,7 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
 
     m_visible = true;
     m_currentProc = proc.get();
+    m_currentChannel = channel;
 }
 
 void ScreenWorker::hideEditor() {

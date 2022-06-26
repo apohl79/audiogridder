@@ -25,7 +25,8 @@ ProcessorWindow::ProcessorWindow(std::shared_ptr<Processor> proc, Thread::Thread
     traceScope();
     initAsyncFunctors();
     setBounds(x, y, 100, 100);
-    logln("creating processor window for " << m_processor->getName() << " at " << x << "x" << y);
+    logln("creating processor window for " << m_processor->getName() << "(channel=" << proc->getActiveWindowChannel()
+                                           << ") at " << x << "x" << y);
     if (m_processor->hasEditor()) {
         createEditor();
     }
@@ -43,7 +44,8 @@ ProcessorWindow::ProcessorWindow(std::shared_ptr<Processor> proc, Thread::Thread
     traceScope();
     initAsyncFunctors();
     setBounds(x, y, 100, 100);
-    logln("creating processor window for " << m_processor->getName() << " at " << x << "x" << y);
+    logln("creating processor window for " << m_processor->getName() << " (channel=" << proc->getActiveWindowChannel()
+                                           << ") at " << x << "x" << y);
     if (m_processor->hasEditor()) {
         createEditor();
     }
@@ -51,7 +53,8 @@ ProcessorWindow::ProcessorWindow(std::shared_ptr<Processor> proc, Thread::Thread
 
 ProcessorWindow::~ProcessorWindow() {
     traceScope();
-    logln("destroying processor window for " << m_processor->getName());
+    logln("destroying processor window for " << m_processor->getName()
+                                             << " (channel=" << m_processor->getActiveWindowChannel() << ")");
     stopAsyncFunctors();
     stopCapturing();
     if (m_editor != nullptr) {
@@ -172,6 +175,9 @@ void ProcessorWindow::setVisible(bool b) {
     traceScope();
     if (!b) {
         stopCapturing();
+        if (m_processor->isClient()) {
+            m_processor->hideEditor();
+        }
     }
     if (!m_processor->isClient()) {
         Component::setVisible(b);
@@ -185,6 +191,7 @@ void ProcessorWindow::setVisible(bool b) {
         m_startCapturingRetry = 0;
         startCapturing();
     }
+    m_isShowing = b;
 }
 
 void ProcessorWindow::move(int x, int y) {

@@ -58,6 +58,19 @@ struct TestPlayHead : AudioPlayHead {
         }                                                                                                          \
     } while (0)
 
+#define checkBufferSamples2(b, v, ch, numChannels, sample, numSamples)                                             \
+    do {                                                                                                           \
+        bool __fail = false;                                                                                       \
+        for (int __c = ch; __c < ch + numChannels && !__fail; __c++) {                                             \
+            for (int __s = sample; __s < sample + numSamples && !__fail; __s++) {                                  \
+                auto __x = b.getSample(0, __s);                                                                    \
+                __fail = abs(__x - v) > 0.1;                                                                       \
+                expect(!__fail, "sample at channel " + String(__c) + ", position " + String(__s) + " should be " + \
+                                    String(v) + " but is " + String(__x));                                         \
+            }                                                                                                      \
+        }                                                                                                          \
+    } while (0)
+
 }  // namespace TestsHelper
 }  // namespace e47
 
