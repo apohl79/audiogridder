@@ -71,6 +71,8 @@ class SandboxPluginTest : UnitTest {
 
         beginTest("Send audio");
 
+        int latency = pc->getLatencySamples();
+
         TestsHelper::TestPlayHead phead;
         pc->setPlayHead(&phead);
 
@@ -78,7 +80,13 @@ class SandboxPluginTest : UnitTest {
         setBufferSamples(buf, 0.5f);
         MidiBuffer midi;
         pc->processBlock(buf, midi);
-        checkBufferSamples(buf, 0.5f);
+
+        if (latency == 0) {
+            checkBufferSamples(buf, 0.5f);
+        } else {
+            checkBufferSamples2(buf, 0.0f, 0, buf.getNumChannels(), 0, latency);
+            checkBufferSamples2(buf, 0.5f, 0, buf.getNumChannels(), latency, buf.getNumSamples() - latency);
+        }
 
         beginTest("Unload plugins");
 

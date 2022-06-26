@@ -193,7 +193,7 @@ class AudioMessage : public LogTagDelegate {
 
     template <typename T>
     bool sendToServer(StreamingSocket* socket, AudioBuffer<T>& buffer, MidiBuffer& midi,
-                      AudioPlayHead::CurrentPositionInfo& posInfo, int channelsRequested, int samplesRequested,
+                      AudioPlayHead::PositionInfo& posInfo, int channelsRequested, int samplesRequested,
                       MessageHelper::Error* e, Meter& metric) {
         traceScope();
         m_reqHeader.channels = buffer.getNumChannels();
@@ -360,8 +360,8 @@ class AudioMessage : public LogTagDelegate {
     }
 
     bool readFromClient(StreamingSocket* socket, AudioBuffer<float>& bufferF, AudioBuffer<double>& bufferD,
-                        MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo, MessageHelper::Error* e,
-                        Meter& metric, Uuid& traceId) {
+                        MidiBuffer& midi, AudioPlayHead::PositionInfo& posInfo, MessageHelper::Error* e, Meter& metric,
+                        Uuid& traceId) {
         traceScope();
         if (socket->isConnected()) {
             if (!read(socket, &m_reqHeader, sizeof(m_reqHeader), 0, e, &metric)) {
@@ -578,24 +578,21 @@ class MsgPackPayload : public BinaryPayload {
     }
 };
 
-// Using the __COUNTER__ macro below, as it is implemented on all target compilers, even though not being part of the
-// standard.
-
 class Any : public Payload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 0;
     Any() : Payload(Type) {}
 };
 
 class Quit : public Payload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 1;
     Quit() : Payload(Type) {}
 };
 
 class Result : public Payload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 2;
 
     struct hdr_t {
         int rc;
@@ -625,31 +622,31 @@ class Result : public Payload {
 
 class PluginList : public MsgPackPayload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 10;
     PluginList() : MsgPackPayload(Type) {}
 };
 
 class AddPlugin : public JsonPayload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 20;
     AddPlugin() : JsonPayload(Type) {}
 };
 
 class AddPluginResult : public JsonPayload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 21;
     AddPluginResult() : JsonPayload(Type) {}
 };
 
 class DelPlugin : public NumberPayload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 30;
     DelPlugin() : NumberPayload(Type) {}
 };
 
 class PluginStatus : public JsonPayload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 40;
     PluginStatus() : JsonPayload(Type) {}
 };
 
@@ -660,7 +657,7 @@ struct setmonochannels_t {
 
 class SetMonoChannels : public DataPayload<setmonochannels_t> {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 50;
     SetMonoChannels() : DataPayload<setmonochannels_t>(Type) {}
 };
 
@@ -673,19 +670,19 @@ struct editplugin_t {
 
 class EditPlugin : public DataPayload<editplugin_t> {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 60;
     EditPlugin() : DataPayload<editplugin_t>(Type) {}
 };
 
 class HidePlugin : public NumberPayload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 61;
     HidePlugin() : NumberPayload(Type) {}
 };
 
 class GetScreenBounds : public NumberPayload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 62;
     GetScreenBounds() : NumberPayload(Type) {}
 };
 
@@ -698,13 +695,13 @@ struct screenbounds_t {
 
 class ScreenBounds : public DataPayload<screenbounds_t> {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 63;
     ScreenBounds() : DataPayload<screenbounds_t>(Type) {}
 };
 
 class ScreenCapture : public Payload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 64;
 
     struct hdr_t {
         int width;
@@ -739,6 +736,12 @@ class ScreenCapture : public Payload {
     }
 };
 
+class UpdateScreenCaptureArea : public NumberPayload {
+  public:
+    static constexpr int Type = 65;
+    UpdateScreenCaptureArea() : NumberPayload(Type) {}
+};
+
 struct mouseevent_t {
     MouseEvType type;
     float x;
@@ -754,31 +757,13 @@ struct mouseevent_t {
 
 class Mouse : public DataPayload<mouseevent_t> {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 66;
     Mouse() : DataPayload<mouseevent_t>(Type) {}
-};
-
-class GetPluginSettings : public NumberPayload {
-  public:
-    static constexpr int Type = __COUNTER__;
-    GetPluginSettings() : NumberPayload(Type) {}
-};
-
-class SetPluginSettings : public NumberPayload {
-  public:
-    static constexpr int Type = __COUNTER__;
-    SetPluginSettings() : NumberPayload(Type) {}
-};
-
-class PluginSettings : public StringPayload {
-  public:
-    static constexpr int Type = __COUNTER__;
-    PluginSettings() : StringPayload(Type) {}
 };
 
 class Key : public BinaryPayload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 67;
     Key() : BinaryPayload(Type) {}
 
     const uint16_t* getKeyCodes() const { return reinterpret_cast<const uint16_t*>(data); }
@@ -787,19 +772,37 @@ class Key : public BinaryPayload {
 
 class Clipboard : public StringPayload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 68;
     Clipboard() : StringPayload(Type) {}
+};
+
+class GetPluginSettings : public NumberPayload {
+  public:
+    static constexpr int Type = 70;
+    GetPluginSettings() : NumberPayload(Type) {}
+};
+
+class SetPluginSettings : public NumberPayload {
+  public:
+    static constexpr int Type = 71;
+    SetPluginSettings() : NumberPayload(Type) {}
+};
+
+class PluginSettings : public StringPayload {
+  public:
+    static constexpr int Type = 72;
+    PluginSettings() : StringPayload(Type) {}
 };
 
 class BypassPlugin : public NumberPayload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 73;
     BypassPlugin() : NumberPayload(Type) {}
 };
 
 class UnbypassPlugin : public NumberPayload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 74;
     UnbypassPlugin() : NumberPayload(Type) {}
 };
 
@@ -810,19 +813,19 @@ struct exchange_t {
 
 class ExchangePlugins : public DataPayload<exchange_t> {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 80;
     ExchangePlugins() : DataPayload<exchange_t>(Type) {}
 };
 
 class RecentsList : public StringPayload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 90;
     RecentsList() : StringPayload(Type) {}
 };
 
 class Parameters : public MsgPackPayload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 100;
     Parameters() : MsgPackPayload(Type) {}
 };
 
@@ -835,7 +838,7 @@ struct parametervalue_t {
 
 class ParameterValue : public DataPayload<parametervalue_t> {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 101;
     ParameterValue() : DataPayload<parametervalue_t>(Type) {}
 };
 
@@ -847,13 +850,13 @@ struct getparametervalue_t {
 
 class GetParameterValue : public DataPayload<getparametervalue_t> {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 102;
     GetParameterValue() : DataPayload<getparametervalue_t>(Type) {}
 };
 
 class GetAllParameterValues : public NumberPayload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 103;
     GetAllParameterValues() : NumberPayload(Type) {}
 };
 
@@ -866,13 +869,13 @@ struct parametergesture_t {
 
 class ParameterGesture : public DataPayload<parametergesture_t> {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 104;
     ParameterGesture() : DataPayload<parametergesture_t>(Type) {}
 };
 
 class Presets : public StringPayload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 110;
     Presets() : StringPayload(Type) {}
 };
 
@@ -884,37 +887,31 @@ struct preset_t {
 
 class Preset : public DataPayload<preset_t> {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 111;
     Preset() : DataPayload<preset_t>(Type) {}
-};
-
-class UpdateScreenCaptureArea : public NumberPayload {
-  public:
-    static constexpr int Type = __COUNTER__;
-    UpdateScreenCaptureArea() : NumberPayload(Type) {}
 };
 
 class Rescan : public NumberPayload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 120;
     Rescan() : NumberPayload(Type) {}
 };
 
 class Restart : public Payload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 121;
     Restart() : Payload(Type) {}
 };
 
 class CPULoad : public FloatPayload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 130;
     CPULoad() : FloatPayload(Type) {}
 };
 
 class ServerError : public StringPayload {
   public:
-    static constexpr int Type = __COUNTER__;
+    static constexpr int Type = 200;
     ServerError() : StringPayload(Type) {}
 };
 

@@ -22,14 +22,11 @@ class ProcessorChain : public AudioProcessor, public LogTagDelegate {
   public:
     class PlayHead : public AudioPlayHead {
       public:
-        PlayHead(AudioPlayHead::CurrentPositionInfo* posInfo) : m_posInfo(posInfo) {}
-        bool getCurrentPosition(CurrentPositionInfo& result) {
-            result = *m_posInfo;
-            return true;
-        }
+        PlayHead(AudioPlayHead::PositionInfo* posInfo) : m_posInfo(posInfo) {}
+        Optional<PositionInfo> getPosition() const override { return makeOptional(*m_posInfo); }
 
       private:
-        AudioPlayHead::CurrentPositionInfo* m_posInfo;
+        AudioPlayHead::PositionInfo* m_posInfo;
     };
 
     ProcessorChain(const LogTag* tag, const BusesProperties& props, const HandshakeRequest& cfg)

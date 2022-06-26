@@ -28,12 +28,9 @@ inline File getTestsDataDir() {
 }
 
 struct TestPlayHead : AudioPlayHead {
-    AudioPlayHead::CurrentPositionInfo posInfo;
-    TestPlayHead() { posInfo.resetToDefault(); }
-    bool getCurrentPosition(CurrentPositionInfo& result) {
-        result = posInfo;
-        return true;
-    }
+    AudioPlayHead::PositionInfo posInfo;
+    TestPlayHead() { posInfo.setTimeInSamples(makeOptional(0)); }
+    Optional<AudioPlayHead::PositionInfo> getPosition() const { return makeOptional(posInfo); }
 };
 
 #define setBufferSamples(b, v)                            \

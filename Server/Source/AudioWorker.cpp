@@ -68,7 +68,7 @@ void AudioWorker::run() {
     AudioBuffer<double> bufferD;
     MidiBuffer midi;
     AudioMessage msg(getLogTagSource());
-    AudioPlayHead::CurrentPositionInfo posInfo;
+    AudioPlayHead::PositionInfo posInfo;
     auto duration = TimeStatistic::getDuration("audio");
     auto bytesIn = Metrics::getStatistic<Meter>("NetBytesIn");
     auto bytesOut = Metrics::getStatistic<Meter>("NetBytesOut");

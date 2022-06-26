@@ -71,7 +71,7 @@ class AudioStreamerTest : public UnitTest {
                                     AudioBuffer<float> bufferF;
                                     AudioBuffer<double> bufferD;
                                     MidiBuffer midi;
-                                    AudioPlayHead::CurrentPositionInfo posInfo;
+                                    AudioPlayHead::PositionInfo posInfo;
                                     auto bytesIn = Metrics::getStatistic<Meter>("NetBytesIn");
                                     auto bytesOut = Metrics::getStatistic<Meter>("NetBytesOut");
                                     Uuid traceId = Uuid::null();

@@ -547,10 +547,12 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
         totalNumOutputChannels = buffer.getNumChannels();
     }
 
-    AudioPlayHead::CurrentPositionInfo posInfo;
+    AudioPlayHead::PositionInfo posInfo;
 
     if (auto* phead = getPlayHead()) {
-        phead->getCurrentPosition(posInfo);
+        if (auto optPosInfo = phead->getPosition()) {
+            posInfo = *optPosInfo;
+        }
     }
 
     // buffer to be send
@@ -567,7 +569,7 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
 
     auto transferMode = getTransferMode();
     bool transfer = transferMode == TM_ALWAYS;
-    transfer |= transferMode == TM_WHEN_PLAYING && (posInfo.isPlaying || posInfo.isRecording);
+    transfer |= transferMode == TM_WHEN_PLAYING && (posInfo.getIsPlaying() || posInfo.getIsRecording());
 
 #if JucePlugin_IsSynth || JucePlugin_IsMidiEffect
     buffer.clear();
@@ -615,17 +617,24 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
     }
 #endif
 
-    traceln("  position: sample=" << posInfo.timeInSamples << ", time=" << posInfo.timeInSeconds
-                                  << "s, ply=" << (int)posInfo.isPlaying << ", rec=" << (int)posInfo.isRecording);
-    traceln("  in/out buffer: channels=" << buffer.getNumChannels() << ", samples=" << buffer.getNumSamples()
-                                         << ", addr=0x" << String::toHexString((uint64)&buffer));
-    traceln("  send buffer: channels=" << sendBuffer->getNumChannels() << ", samples=" << sendBuffer->getNumSamples()
-                                       << ", addr=0x" << String::toHexString((uint64)sendBuffer));
+    if (Tracer::isEnabled()) {
+        auto timeInSamples = posInfo.getTimeInSamples();
+        auto timeInSeconds = posInfo.getTimeInSeconds();
+
+        traceln("  position: sample=" << (timeInSamples.hasValue() ? *timeInSamples : 0)
+                                      << ", time=" << (timeInSeconds.hasValue() ? *timeInSeconds : 0) << "s, ply="
+                                      << (int)posInfo.getIsPlaying() << ", rec=" << (int)posInfo.getIsRecording());
+        traceln("  in/out buffer: channels=" << buffer.getNumChannels() << ", samples=" << buffer.getNumSamples()
+                                             << ", addr=0x" << String::toHexString((uint64)&buffer));
+        traceln("  send buffer: channels=" << sendBuffer->getNumChannels()
+                                           << ", samples=" << sendBuffer->getNumSamples() << ", addr=0x"
+                                           << String::toHexString((uint64)sendBuffer));
 #if JucePlugin_IsSynth || JucePlugin_IsMidiEffect
-    traceln("  midi buffer: num events=" << midiMessages.getNumEvents() << ", ply=" << (int)m_midiIsPlaying
-                                         << ", crntly ply=" << (int)midiIsCurrentlyPlaying);
+        traceln("  midi buffer: num events=" << midiMessages.getNumEvents() << ", ply=" << (int)m_midiIsPlaying
+                                             << ", crntly ply=" << (int)midiIsCurrentlyPlaying);
 #endif
-    traceln("  transfer: " << (transfer ? "YES" : "NO"));
+        traceln("  transfer: " << (transfer ? "YES" : "NO"));
+    }
 
     traceCtx->add("pb_prep");
 

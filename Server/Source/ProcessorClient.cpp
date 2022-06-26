@@ -619,9 +619,11 @@ void ProcessorClient::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
         return;
     }
 
-    AudioPlayHead::CurrentPositionInfo posInfo;
+    AudioPlayHead::PositionInfo posInfo;
     if (nullptr != m_playhead) {
-        m_playhead->getCurrentPosition(posInfo);
+        if (auto optPosInfo = m_playhead->getPosition()) {
+            posInfo = *optPosInfo;
+        }
     }
 
     int sendBufChannels = m_activeChannels.getNumActiveChannelsCombined();

@@ -98,7 +98,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         logln("audio streamer terminated");
     }
 
-    void send(AudioBuffer<T>& buffer, MidiBuffer& midi, AudioPlayHead::CurrentPositionInfo& posInfo) {
+    void send(AudioBuffer<T>& buffer, MidiBuffer& midi, AudioPlayHead::PositionInfo& posInfo) {
         traceScope();
 
         if (m_error) {
@@ -252,7 +252,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         int workingSamples = 0;
         AudioBuffer<T> audio;
         MidiBuffer midi;
-        AudioPlayHead::CurrentPositionInfo posInfo;
+        AudioPlayHead::PositionInfo posInfo;
 
         void copyFrom(const AudioMidiBuffer& src, int numChannels = -1, int numSamples = -1) {
             copyFrom(src.audio, src.midi, numChannels, numSamples);

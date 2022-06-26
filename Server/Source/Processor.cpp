@@ -696,6 +696,7 @@ void Processor::prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBl
             }
             for (int ch = 0; ch < m_channels; ch++) {
                 if (m_channels == 1 || cs.isOutputActive(ch)) {
+                    logln("preparing '" << getName() << "' (channel=" << ch << ") for audio processing...");
                     if (m_fmt == VST3) {
                         runOnMsgThreadSync(
                             [&] { getPlugin(ch)->prepareToPlay(sampleRate, maximumExpectedSamplesPerBlock); });
@@ -703,6 +704,7 @@ void Processor::prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBl
                         getPlugin(ch)->prepareToPlay(sampleRate, maximumExpectedSamplesPerBlock);
                     }
                 } else {
+                    logln("suspending '" << getName() << "' (channel=" << ch << ")...");
                     getPlugin(ch)->suspendProcessing(true);
                 }
             }
@@ -733,6 +735,7 @@ void Processor::suspendProcessing(const bool shouldBeSuspended) {
                 for (int ch = 0; ch < m_channels; ch++) {
                     auto plugin = getPlugin(ch);
                     if (!plugin->isSuspended()) {
+                        logln("suspending '" << getName() << "' (channel=" << ch << ")...");
                         plugin->suspendProcessing(true);
                         plugin->releaseResources();
                     }
@@ -743,8 +746,9 @@ void Processor::suspendProcessing(const bool shouldBeSuspended) {
                 getClient()->suspendProcessing(false);
             } else {
                 for (int ch = 0; ch < m_channels; ch++) {
-                    if (m_channels > 1 && m_monoChannels.isOutputActive(ch)) {
+                    if (m_channels == 1 || m_monoChannels.isOutputActive(ch)) {
                         auto plugin = getPlugin(ch);
+                        logln("preparing '" << getName() << "' (channel=" << ch << ") for audio processing...");
                         if (m_fmt == VST3) {
                             runOnMsgThreadSync(
                                 [&] { plugin->prepareToPlay(m_chain.getSampleRate(), m_chain.getBlockSize()); });
