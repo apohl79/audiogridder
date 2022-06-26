@@ -67,50 +67,64 @@ class AudioRingBuffer {
         }
     }
 
-    void read(T** dst, int numSamples) {
+    int read(T** dst, int dstStartSample, int numSamples) {
         size_t samplesToRead = jmin(m_samples, (size_t)numSamples);
         if (m_readOffset + samplesToRead <= m_samples) {
             for (size_t c = 0; c < m_channels; c++) {
-                memcpy(dst[c], m_buffer[c].data() + m_readOffset, samplesToRead * sizeof(T));
+                memcpy(dst[c] + dstStartSample, m_buffer[c].data() + m_readOffset, samplesToRead * sizeof(T));
             }
             incReadOffset((int)samplesToRead);
         } else {
             // read until the end of the buffer
             size_t samplesToReadPart1 = m_samples - m_readOffset;
             for (size_t c = 0; c < m_channels; c++) {
-                memcpy(dst[c], m_buffer[c].data() + m_readOffset, samplesToReadPart1 * sizeof(T));
+                memcpy(dst[c] + dstStartSample, m_buffer[c].data() + m_readOffset, samplesToReadPart1 * sizeof(T));
             }
             incReadOffset((int)samplesToReadPart1);
             // read the remaining samples from the beginning
             size_t samplesToReadPart2 = samplesToRead - samplesToReadPart1;
             for (size_t c = 0; c < m_channels; c++) {
-                memcpy(dst[c] + samplesToReadPart1, m_buffer[c].data() + m_readOffset, samplesToReadPart2 * sizeof(T));
+                memcpy(dst[c] + dstStartSample + samplesToReadPart1, m_buffer[c].data() + m_readOffset,
+                       samplesToReadPart2 * sizeof(T));
             }
             incReadOffset((int)samplesToReadPart2);
         }
+        return (int)samplesToRead;
     }
 
-    void write(const T** src, int numSamples) {
+    int write(const T* const* src, int srcStartSample, int numSamples) {
         size_t samplesToWrite = jmin(m_samples, (size_t)numSamples);
         if (m_writeOffset + samplesToWrite <= m_samples) {
             for (size_t c = 0; c < m_channels; c++) {
-                memcpy(m_buffer[c].data() + m_writeOffset, src[c], samplesToWrite * sizeof(T));
+                memcpy(m_buffer[c].data() + m_writeOffset, src[c] + srcStartSample, samplesToWrite * sizeof(T));
             }
             incWriteOffset((int)samplesToWrite);
         } else {
             // write until the end of the buffer
             size_t samplesToWritePart1 = m_samples - m_writeOffset;
             for (size_t c = 0; c < m_channels; c++) {
-                memcpy(m_buffer[c].data() + m_writeOffset, src[c], samplesToWritePart1 * sizeof(T));
+                memcpy(m_buffer[c].data() + m_writeOffset, src[c] + srcStartSample, samplesToWritePart1 * sizeof(T));
             }
             incWriteOffset((int)samplesToWritePart1);
             // write the remaining samples from the beginning
             size_t samplesToWritePart2 = samplesToWrite - samplesToWritePart1;
             for (size_t c = 0; c < m_channels; c++) {
-                memcpy(m_buffer[c].data() + m_writeOffset, src[c] + samplesToWritePart1,
+                memcpy(m_buffer[c].data() + m_writeOffset, src[c] + srcStartSample + samplesToWritePart1,
                        samplesToWritePart2 * sizeof(T));
             }
             incWriteOffset((int)samplesToWritePart2);
+        }
+        return (int)samplesToWrite;
+    }
+
+    void process(T** src, int numSamples) {
+        int offset = 0;
+        while (numSamples > 0) {
+            int samples = jmin(numSamples, (int)m_samples / 2);
+            write(src, offset, samples);
+            read(src, offset, samples);
+            offset += samples;
+            numSamples -= samples;
         }
     }
 
