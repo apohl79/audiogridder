@@ -481,26 +481,48 @@ void PluginProcessor::releaseResources() {
 }
 
 bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
-    int numOfInputs = getLayoutNumChannels(layouts, true), numOfOutputs = getLayoutNumChannels(layouts, false);
+    int numInputs = getLayoutNumChannels(layouts, true);
+    int numOutputs = getLayoutNumChannels(layouts, false);
+    int maxInputs = Defaults::PLUGIN_CHANNELS_IN + Defaults::PLUGIN_CHANNELS_SC;
+    int maxOutputs = Defaults::PLUGIN_CHANNELS_OUT;
 
 #if !JucePlugin_IsSynth && !JucePlugin_IsMidiEffect
-    if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet() ||
-        layouts.getMainInputChannelSet().isDisabled()) {
+    if (numInputs > maxInputs) {
+        logln(describeLayout(layouts) << ": too many inputs: " << numInputs);
         return false;
     }
-    return numOfInputs <= Defaults::PLUGIN_CHANNELS_IN && numOfOutputs <= Defaults::PLUGIN_CHANNELS_OUT;
+    if (numOutputs > maxOutputs) {
+        logln(describeLayout(layouts) << ": too many outputs: " << numOutputs);
+        return false;
+    }
+    return numInputs <= maxInputs && numOutputs <= maxOutputs;
 #elif JucePlugin_IsSynth
     for (auto& outbus : layouts.outputBuses) {
         for (auto ct : outbus.getChannelTypes()) {
             // make sure JuceAU::busIgnoresLayout returns false (see juce_AU_Wrapper.mm)
             if (ct > 255) {
+                logln(describeLayout(layouts) << ": invalid channel type: " << ct);
                 return false;
             }
         }
     }
-    return numOfOutputs <= Defaults::PLUGIN_CHANNELS_OUT;
+    if (numOutputs > maxOutputs) {
+        logln(describeLayout(layouts) << ": too many outputs: " << numOutputs);
+        return false;
+    }
+    return numOutputs <= maxOutputs;
 #endif
     return true;
+}
+
+Array<std::pair<short, short>> PluginProcessor::getAUChannelInfo() const {
+#if JucePlugin_IsSynth
+    Array<std::pair<short, short>> info;
+    info.add({(short)Defaults::PLUGIN_CHANNELS_IN, -(short)Defaults::PLUGIN_CHANNELS_OUT});
+    return info;
+#else
+    return {};
+#endif
 }
 
 void PluginProcessor::numChannelsChanged() {
