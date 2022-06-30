@@ -235,7 +235,8 @@ def build(args):
         cmake_params.append('-j ' + str(args.jobs))
 
     if not args.target is None:
-        cmake_params.append('--target ' + args.target)
+        for t in args.target:
+            cmake_params.append('--target ' + t)
 
     if args.clean:
         cmake_params.append('--clean-first')
@@ -506,7 +507,7 @@ def main():
                               help='Processor architecture (default: %(default)s)')
     parser_build.add_argument('--macos-target', dest='macostarget', metavar='TRGT', type=str, default='10.8',
                               help='MacOS deplyoment target (default: %(default)s)')
-    parser_build.add_argument('--target', dest='target', type=str,
+    parser_build.add_argument('--target', dest='target', type=str, action='append',
                               help='Set a specific build target')
     parser_build.add_argument('-c', '--clean', dest='clean', action='store_true', default=False,
                               help='Run cleanup before building')
