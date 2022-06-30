@@ -291,11 +291,11 @@ void Client::init(int channelsIn, int channelsOut, int channelsSC, double rate, 
                               << " doublePrecission=" << (int)doublePrecission);
     LockByID lock(*this, INIT1);
     if (!m_ready || m_channelsIn != channelsIn || m_channelsOut != channelsOut || m_channelsSC != channelsSC ||
-        m_rate != rate || m_samplesPerBlock != samplesPerBlock || m_doublePrecission != doublePrecission) {
+        m_sampleRate != rate || m_samplesPerBlock != samplesPerBlock || m_doublePrecission != doublePrecission) {
         m_channelsIn = channelsIn;
         m_channelsOut = channelsOut;
         m_channelsSC = channelsSC;
-        m_rate = rate;
+        m_sampleRate = rate;
         m_samplesPerBlock = samplesPerBlock;
         m_doublePrecission = doublePrecission;
         m_needsReconnect = true;
@@ -313,7 +313,7 @@ void Client::init() {
     LockByID lock(*this, INIT2);
 
 #if !JucePlugin_IsMidiEffect
-    if (m_channelsOut == 0 || m_rate == 0.0 || m_samplesPerBlock == 0) {
+    if (m_channelsOut == 0 || m_sampleRate == 0.0 || m_samplesPerBlock == 0) {
         return;
     }
 #endif
@@ -340,7 +340,7 @@ void Client::init() {
                                 m_channelsIn,
                                 m_channelsOut,
                                 m_channelsSC,
-                                m_rate,
+                                m_sampleRate,
                                 m_samplesPerBlock,
                                 m_doublePrecission,
                                 getTagId(),

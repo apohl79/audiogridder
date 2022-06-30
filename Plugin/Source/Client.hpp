@@ -142,6 +142,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
 
     std::atomic_int NUM_OF_BUFFERS{Defaults::DEFAULT_NUM_OF_BUFFERS};
     std::atomic_int LOAD_PLUGIN_TIMEOUT{Defaults::DEFAULT_LOAD_PLUGIN_TIMEOUT};
+    std::atomic_bool FIXED_OUTBOUND_BUFFER{true};
 
     void run() override;
 
@@ -153,7 +154,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     int getChannelsSC() const { return m_channelsSC; }
     bool isFx() const { return m_channelsIn > 0; }
     int getNumActiveChannels() const;
-    double getSampleRate() const { return m_rate; }
+    double getSampleRate() const { return m_sampleRate; }
     int getSamplesPerBlock() const { return m_samplesPerBlock; }
     int getLatencySamples() const { return m_latency + NUM_OF_BUFFERS * m_samplesPerBlock; }
     double isUsingDoublePrecission() const { return m_doublePrecission; }
@@ -252,7 +253,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     bool m_srvLocalMode = false;
     int m_srvLoadLastUpdated = 0;
     bool m_needsReconnect = false;
-    double m_rate = 0;
+    double m_sampleRate = 0;
     bool m_doublePrecission = false;
 
     std::atomic_int m_channelsIn{0};

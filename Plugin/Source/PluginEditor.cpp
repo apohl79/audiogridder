@@ -722,11 +722,12 @@ void PluginEditor::showServerMenu() {
     }
 
     PopupMenu subm;
-    int rate = (int)lround(m_processor.getSampleRate());
+    double rate = m_processor.getSampleRate();
     int iobuf = m_processor.getBlockSize();
     auto getName = [rate, iobuf](int blocks) -> String {
         String n;
-        n << blocks << " Blocks (+" << blocks * iobuf * 1000 / rate << "ms)";
+        n << blocks << " Blocks (" << blocks * iobuf << " samples / +" << (int)lround(blocks * iobuf * 1000 / rate)
+          << "ms)";
         return n;
     };
 
@@ -734,6 +735,12 @@ void PluginEditor::showServerMenu() {
         traceScope();
         m_processor.setBufferSizeByPlugin(!m_processor.getBufferSizeByPlugin());
         m_processor.saveConfig();
+    });
+    subm.addItem("Use fixed size outbound buffers", true, m_processor.getFixedOutboundBuffer(), [this] {
+        traceScope();
+        m_processor.setFixedOutboundBuffer(!m_processor.getFixedOutboundBuffer());
+        m_processor.saveConfig();
+        m_processor.getClient().reconnect();
     });
 
     subm.addSeparator();

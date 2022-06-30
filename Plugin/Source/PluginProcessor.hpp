@@ -375,6 +375,8 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     void setBypassWhenNotConnected(bool b) { m_bypassWhenNotConnected = b; }
     bool getBufferSizeByPlugin() const { return m_bufferSizeByPlugin; }
     void setBufferSizeByPlugin(bool b) { m_bufferSizeByPlugin = b; }
+    bool getFixedOutboundBuffer() const { return m_client->FIXED_OUTBOUND_BUFFER; }
+    void setFixedOutboundBuffer(bool b) { m_client->FIXED_OUTBOUND_BUFFER = b; }
 
     int getNumBuffers() const { return m_client->NUM_OF_BUFFERS; }
     void setNumBuffers(int n);
@@ -507,6 +509,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     bool m_keepEditorOpen = false;
     std::atomic_bool m_bypassWhenNotConnected{false};
     bool m_bufferSizeByPlugin = false;
+    bool m_fixedOutboundBuffer = false;
 
     TrackProperties m_trackProperties;
     std::mutex m_trackPropertiesMtx;

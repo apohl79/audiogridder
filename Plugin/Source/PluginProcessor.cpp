@@ -282,6 +282,7 @@ void PluginProcessor::loadConfig(const json& j, bool isUpdate) {
     m_keepEditorOpen = jsonGetValue(j, "KeepEditorOpen", m_keepEditorOpen);
     m_bypassWhenNotConnected = jsonGetValue(j, "BypassWhenNotConnected", m_bypassWhenNotConnected.load());
     m_bufferSizeByPlugin = jsonGetValue(j, "BufferSettingByPlugin", m_bufferSizeByPlugin);
+    m_client->FIXED_OUTBOUND_BUFFER = jsonGetValue(j, "FixedOutboundBuffer", m_client->FIXED_OUTBOUND_BUFFER.load());
 }
 
 void PluginProcessor::saveConfig(int numOfBuffers) {
@@ -328,6 +329,7 @@ void PluginProcessor::saveConfig(int numOfBuffers) {
     jcfg["KeepEditorOpen"] = m_keepEditorOpen;
     jcfg["BypassWhenNotConnected"] = m_bypassWhenNotConnected.load();
     jcfg["BufferSettingByPlugin"] = m_bufferSizeByPlugin;
+    jcfg["FixedOutboundBuffer"] = m_client->FIXED_OUTBOUND_BUFFER.load();
 
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), jcfg);
 }
@@ -487,31 +489,19 @@ bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
     int maxOutputs = Defaults::PLUGIN_CHANNELS_OUT;
 
 #if !JucePlugin_IsSynth && !JucePlugin_IsMidiEffect
-    if (numInputs > maxInputs) {
-        logln(describeLayout(layouts) << ": too many inputs: " << numInputs);
-        return false;
-    }
-    if (numOutputs > maxOutputs) {
-        logln(describeLayout(layouts) << ": too many outputs: " << numOutputs);
-        return false;
-    }
     return numInputs <= maxInputs && numOutputs <= maxOutputs;
 #elif JucePlugin_IsSynth
     for (auto& outbus : layouts.outputBuses) {
         for (auto ct : outbus.getChannelTypes()) {
             // make sure JuceAU::busIgnoresLayout returns false (see juce_AU_Wrapper.mm)
             if (ct > 255) {
-                logln(describeLayout(layouts) << ": invalid channel type: " << ct);
                 return false;
             }
         }
     }
-    if (numOutputs > maxOutputs) {
-        logln(describeLayout(layouts) << ": too many outputs: " << numOutputs);
-        return false;
-    }
     return numOutputs <= maxOutputs;
 #endif
+
     return true;
 }
 
@@ -1341,6 +1331,7 @@ void PluginProcessor::updateParameterValue(int idx, int channel, int paramIdx, f
         traceScope();
 
         int slot = -1;
+        bool changed = false;
 
         {
             std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
@@ -1357,13 +1348,18 @@ void PluginProcessor::updateParameterValue(int idx, int channel, int paramIdx, f
                 return;
             }
             auto& param = m_loadedPlugins[(size_t)idx].params[(size_t)channel][(size_t)paramIdx];
-            param.currentValue = val;
+            if (param.currentValue != val) {
+                param.currentValue = val;
+                changed = true;
+            }
             slot = param.automationSlot;
         }
 
-        logln("parameter update (slot=" << slot << ", index=" << idx << ", channel=" << channel
-                                        << ", param index=" << paramIdx << ") new value is " << val << " ["
-                                        << (updateServer && slot < 0 ? "" : "NOT ") << "updating server]");
+        if (changed) {
+            logln("parameter update (slot=" << slot << ", index=" << idx << ", channel=" << channel
+                                            << ", param index=" << paramIdx << ") new value is " << val << " ["
+                                            << (updateServer && slot < 0 ? "" : "NOT ") << "updating server]");
+        }
 
         if (slot > -1) {
             auto* pparam = dynamic_cast<Parameter*>(getParameters()[slot]);
@@ -1374,7 +1370,9 @@ void PluginProcessor::updateParameterValue(int idx, int channel, int paramIdx, f
                 return;
             }
         } else {
-            logln("parameter update ignored: unassigned parameter");
+            if (changed) {
+                logln("parameter update ignored: unassigned parameter");
+            }
         }
 
         if (updateServer) {
