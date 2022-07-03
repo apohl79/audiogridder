@@ -230,7 +230,12 @@ bool ProcessorChain::addPluginProcessor(const String& id, const String& settings
     auto proc = std::make_shared<Processor>(*this, id, getSampleRate(), getBlockSize());
     success = proc->load(settings, layout, monoChannels, err);
 
-    logln("loading a plugin instance of '" << proc->getName() << "' " << (success ? "succeeded" : "failed"));
+    auto name = proc->getName();
+    if (name.isEmpty()) {
+        name = id;
+    }
+
+    logln("loading a plugin instance of '" << name << "' " << (success ? "succeeded" : "failed: " + err));
 
     addProcessor(std::move(proc));
 

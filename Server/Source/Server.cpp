@@ -1045,7 +1045,7 @@ void Server::runServer() {
                                     first = false;
                                 }
                             }
-                            active << " ";
+                            active << ", ";
                         }
                         active << "outputs: ";
                         if (activeChannels.isOutputRangeActive()) {

@@ -426,6 +426,7 @@ bool Processor::load(const String& settings, const String& layout, uint64 monoCh
                     client->startThread();
                     loadedCount++;
                     m_windows.resize(1);
+                    m_name = client->getName();
                 }
             } else {
                 err = "failed to initialize sandbox";
@@ -461,7 +462,8 @@ bool Processor::load(const String& settings, const String& layout, uint64 monoCh
 
         std::shared_ptr<AudioPluginInstance> p;
 
-        for (size_t ch = 0; ch < (size_t)m_channels; ch++) {
+        bool loadErr = false;
+        for (size_t ch = 0; ch < (size_t)m_channels && !loadErr; ch++) {
             if (nullptr != plugdesc) {
                 p = loadPlugin(*plugdesc, m_sampleRate, m_blockSize, err);
             } else {
@@ -470,13 +472,18 @@ bool Processor::load(const String& settings, const String& layout, uint64 monoCh
             if (nullptr != p) {
                 std::lock_guard<std::mutex> lock(m_pluginMtx);
                 m_plugins[ch] = p;
-                m_listners[ch] = std::make_unique<Listener>(this, ch);
+                m_listners[ch] = std::make_unique<Listener>(this, (int)ch);
                 m_multiMonoBypassBuffersF[ch] = std::make_unique<AudioRingBuffer<float>>();
                 m_multiMonoBypassBuffersD[ch] = std::make_unique<AudioRingBuffer<double>>();
+                if (m_name.isEmpty()) {
+                    m_name = p->getName();
+                }
+            } else {
+                loadErr = true;
             }
         }
 
-        if (m_chain.initPluginInstance(this, m_channels > 1 ? "Mono" : layout, err)) {
+        if (!loadErr && m_chain.initPluginInstance(this, m_channels > 1 ? "Mono" : layout, err)) {
             loaded = true;
             loadedCount++;
 
@@ -550,6 +557,7 @@ void Processor::unload() {
         }
         m_channels = 1;
     }
+    m_name.clear();
 }
 
 bool Processor::isLoaded() {
@@ -599,6 +607,7 @@ bool Processor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMes
                 } else {
                     processBlockBypassed(buffer);
                 }
+                TimeTrace::addTracePoint("proc_process_bp_" + String(ch));
             }
         }
     };
@@ -1094,10 +1103,7 @@ std::vector<Srv::ParameterValue> Processor::getAllParamaterValues() {
     return {};
 }
 
-const String Processor::getName() {
-    callBackendWithReturn(getName);
-    return {};
-}
+const String Processor::getName() { return m_name; }
 
 bool Processor::hasEditor() {
     if (isLoaded()) {

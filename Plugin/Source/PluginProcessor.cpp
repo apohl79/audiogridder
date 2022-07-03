@@ -121,13 +121,14 @@ PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
                     logln("...ok");
                     updLatency = true;
                     if (p.bypassed) {
+                        logln("bypassing plugin " << idx);
                         m_client->bypassPlugin(idx);
                     }
                     for (size_t ch = 0; ch < p.params.size(); ch++) {
                         for (auto& param : p.params[ch]) {
                             if (param.automationSlot > -1) {
                                 if (param.automationSlot < m_numberOfAutomationSlots) {
-                                    automationParams.push_back({idx, ch, param.idx, param.automationSlot});
+                                    automationParams.push_back({idx, (int)ch, param.idx, param.automationSlot});
                                 } else {
                                     param.automationSlot = -1;
                                 }
@@ -145,7 +146,7 @@ PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
         m_client->setLoadedPluginsString(getLoadedPluginsString());
 
         if (updLatency) {
-            updateLatency(m_client->getLatencySamples());
+            updateLatency();
         }
 
         runOnMsgThreadAsync([this, automationParams] {
@@ -473,7 +474,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
 
     m_prepared = true;
 
-    updateLatency(m_client->getLatencySamples());
+    updateLatency();
 }
 
 void PluginProcessor::releaseResources() {
@@ -491,6 +492,8 @@ bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
 #if !JucePlugin_IsSynth && !JucePlugin_IsMidiEffect
     return numInputs <= maxInputs && numOutputs <= maxOutputs;
 #elif JucePlugin_IsSynth
+    ignoreUnused(numInputs);
+    ignoreUnused(maxInputs);
     for (auto& outbus : layouts.outputBuses) {
         for (auto ct : outbus.getChannelTypes()) {
             // make sure JuceAU::busIgnoresLayout returns false (see juce_AU_Wrapper.mm)
@@ -500,9 +503,13 @@ bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
         }
     }
     return numOutputs <= maxOutputs;
-#endif
-
+#else
+    ignoreUnused(numInputs);
+    ignoreUnused(numOutputs);
+    ignoreUnused(maxInputs);
+    ignoreUnused(maxOutputs);
     return true;
+#endif
 }
 
 Array<std::pair<short, short>> PluginProcessor::getAUChannelInfo() const {
@@ -676,7 +683,7 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
                 traceCtx->add("pb_ch_map_reverse");
 
                 if (m_client->getLatencySamples() != getLatencySamples()) {
-                    runOnMsgThreadAsync([this] { updateLatency(m_client->getLatencySamples()); });
+                    runOnMsgThreadAsync([this] { updateLatency(); });
                     traceCtx->add("pb_update_latency");
                 }
             } else {
@@ -757,12 +764,13 @@ void PluginProcessor::processBlockBypassedInternal(AudioBuffer<T>& buffer, Audio
     bypassBuffer.process(buffer.getArrayOfWritePointers(), buffer.getNumSamples());
 }
 
-void PluginProcessor::updateLatency(int samples) {
+void PluginProcessor::updateLatency() {
     traceScope();
     if (!m_prepared) {
         return;
     }
 
+    int samples = jmax(0, m_client->getLatencySamples());
     logln("updating latency samples to " << samples);
     setLatencySamples(samples);
     int channels = getTotalNumOutputChannels();
@@ -1013,7 +1021,7 @@ bool PluginProcessor::loadPlugin(const ServerPlugin& plugin, const String& layou
     }
 
     if (success) {
-        updateLatency(m_client->getLatencySamples());
+        updateLatency();
         updateRecents(plugin);
         if (scDisabled && m_showSidechainDisabledInfo) {
             struct cb : ModalComponentManager::Callback {
@@ -1053,7 +1061,7 @@ void PluginProcessor::unloadPlugin(int idx) {
     suspendProcessing(true);
     m_client->delPlugin(idx);
     suspendProcessing(false);
-    updateLatency(m_client->getLatencySamples());
+    updateLatency();
 
     if (idx == m_activePlugin) {
         m_activePlugin = -1;
@@ -1644,6 +1652,8 @@ void PluginProcessor::TrayConnection::messageReceived(const MemoryBlock& message
         }
         std::lock_guard<std::mutex> lock(m_recentsMtx);
         m_recents.swapWith(recents);
+    } else if (msg.type == PluginTrayMessage::RELOAD) {
+        m_processor->getClient().close();
     }
 }
 

@@ -74,6 +74,7 @@ void App::getPopupMenu(PopupMenu& menu, bool withShowMonitorOption) {
     }
     menu.addSectionHeader("Connections");
     std::map<String, PopupMenu> serverMenus;
+    bool hasUnloaded = false;
     for (auto& c : m_srv.getConnections()) {
         String srv = getServerString(c);
         String name = c->status.name;
@@ -82,6 +83,9 @@ void App::getPopupMenu(PopupMenu& menu, bool withShowMonitorOption) {
         }
         if (!c->status.connected) {
             name = "[X] " + name;
+        }
+        if (c->status.connected && !c->status.loadedPluginsOk) {
+            hasUnloaded = true;
         }
         PopupMenu subRecon;
         for (auto& srvInfo : mdnsServers) {
@@ -135,6 +139,18 @@ void App::getPopupMenu(PopupMenu& menu, bool withShowMonitorOption) {
     }
 
     menu.addSeparator();
+
+    if (hasUnloaded) {
+        menu.addItem("Reload all \"not loaded\" chains", [this] {
+            for (auto& c : m_srv.getConnections()) {
+                if (c->status.connected && !c->status.loadedPluginsOk) {
+                    c->sendMessage(PluginTrayMessage(PluginTrayMessage::RELOAD, {}));
+                }
+            }
+        });
+
+        menu.addSeparator();
+    }
 
     PopupMenu subMon;
     if (withShowMonitorOption) {

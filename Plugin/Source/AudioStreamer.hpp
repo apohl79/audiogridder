@@ -278,8 +278,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
             traceln("  params: channels=" << numChannels << ", samples=" << numSamples);
             traceln("    src: channels=" << srcBuffer.getNumChannels() << ", samples=" << srcBuffer.getNumSamples());
             traceln("    midi: events=" << srcMidi.getNumEvents());
-            traceln("  this: working smpls=" << workingSamples << ", ch req=" << channelsRequested
-                                             << ", smpls req=" << samplesRequested << ",");
+            traceln("    this: working smpls=" << workingSamples << ", ch req=" << channelsRequested
+                                               << ", smpls req=" << samplesRequested << ",");
             traceln("    audio.ch=" << audio.getNumChannels() << ", audio.smpls=" << audio.getNumSamples()
                                     << ", midi.events=" << midi.getNumEvents());
 
@@ -296,6 +296,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         }
 
         void copyFromAndConsume(AudioMidiBuffer& src, int numSamples = -1) {
+            setLogTagByRef(tag);
+            traceScope();
             if (numSamples == -1) {
                 numSamples = src.audio.getNumSamples();
             }
@@ -310,8 +312,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
             traceln("  params: samples=" << numSamples);
             traceln("    src: channels=" << srcBuffer.getNumChannels() << ", samples=" << srcBuffer.getNumSamples());
             traceln("    midi: events=" << srcMidi.getNumEvents());
-            traceln("  this: working smpls=" << workingSamples << ", ch req=" << channelsRequested
-                                             << ", smpls req=" << samplesRequested << ",");
+            traceln("    this: working smpls=" << workingSamples << ", ch req=" << channelsRequested
+                                               << ", smpls req=" << samplesRequested << ",");
             traceln("    audio.ch=" << audio.getNumChannels() << ", audio.smpls=" << audio.getNumSamples()
                                     << ", midi.events=" << midi.getNumEvents());
 

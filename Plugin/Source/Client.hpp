@@ -152,12 +152,21 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     int getChannelsIn() const { return m_channelsIn; }
     int getChannelsOut() const { return m_channelsOut; }
     int getChannelsSC() const { return m_channelsSC; }
-    bool isFx() const { return m_channelsIn > 0; }
     int getNumActiveChannels() const;
     double getSampleRate() const { return m_sampleRate; }
     int getSamplesPerBlock() const { return m_samplesPerBlock; }
-    int getLatencySamples() const { return m_latency + NUM_OF_BUFFERS * m_samplesPerBlock; }
     double isUsingDoublePrecission() const { return m_doublePrecission; }
+    int getLatencySamples() const { return m_latency + NUM_OF_BUFFERS * m_samplesPerBlock + m_latencyManual; }
+    void setLatencySamplesManual(int s) { m_latencyManual = s; }
+    int getLatencySamplesManual() { return m_latencyManual; }
+
+    inline bool isFx() const noexcept {
+#if !JucePlugin_IsSynth && !JucePlugin_IsMidiEffect
+        return true;
+#else
+        return false;
+#endif
+    }
 
     void setLatency(int i) { m_latency = i; }
 
@@ -261,6 +270,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     std::atomic_int m_channelsSC{0};
     std::atomic_int m_samplesPerBlock{0};
     std::atomic_int m_latency{0};
+    std::atomic_int m_latencyManual{0};
 
     std::atomic_bool m_ready{false};
     std::atomic_bool m_error{false};

@@ -211,7 +211,7 @@ void PluginEditor::ToolsButton::paintButton(Graphics& g, bool shouldDrawButtonAs
         p.addLineSegment(Line<int>(getWidth() - 2, getHeight() - 2, getWidth() - 2, getHeight() - 6).toFloat(), 1.5f);
         fill = true;
     } else if (getButtonText() == "onoff") {
-        auto r = juce::Rectangle<float>(4, 4, getWidth() - 8, getHeight() - 8);
+        auto r = juce::Rectangle<float>(4, 4, (float)getWidth() - 8, (float)getHeight() - 8);
         p.addEllipse(r);
         p.startNewSubPath(r.getCentreX(), r.getY());
         p.lineTo(r.getCentreX(), r.getY() + 4);
@@ -409,7 +409,13 @@ void PluginEditor::buttonClicked(Button* button, const ModifierKeys& modifiers, 
                         newactive--;
                     }
                     if (newactive > -1) {
-                        editPlugin(newactive);
+                        if (m_processor.getLoadedPlugin(newactive).ok) {
+                            editPlugin(newactive);
+                        } else {
+                            m_wantsScreenUpdates = false;
+                            m_processor.getClient().setPluginScreenUpdateCallback(nullptr);
+                            resetPluginScreen();
+                        }
                     }
                 }
                 if (m_pluginButtons.size() == 0) {
@@ -722,12 +728,12 @@ void PluginEditor::showServerMenu() {
     }
 
     PopupMenu subm;
-    double rate = m_processor.getSampleRate();
+    double sampleRate = m_processor.getSampleRate();
     int iobuf = m_processor.getBlockSize();
-    auto getName = [rate, iobuf](int blocks) -> String {
+    auto getName = [sampleRate, iobuf](int blocks) -> String {
         String n;
-        n << blocks << " Blocks (" << blocks * iobuf << " samples / +" << (int)lround(blocks * iobuf * 1000 / rate)
-          << "ms)";
+        n << blocks << " Blocks (" << blocks * iobuf << " samples / +"
+          << (int)lround(blocks * iobuf * 1000 / sampleRate) << "ms)";
         return n;
     };
 
@@ -745,11 +751,11 @@ void PluginEditor::showServerMenu() {
 
     subm.addSeparator();
 
-    subm.addItem("Disabled (+0ms)", true, m_processor.getNumBuffers() == 0, [this] {
+    subm.addItem("Disabled", true, m_processor.getNumBuffers() == 0, [this] {
         traceScope();
         m_processor.setNumBuffers(0);
     });
-    if (rate > 0.0) {
+    if (sampleRate > 0.0) {
         subm.addItem(getName(1), true, m_processor.getNumBuffers() == 1, [this] {
             traceScope();
             m_processor.setNumBuffers(1);
@@ -1082,6 +1088,41 @@ void PluginEditor::showSettingsMenu() {
     });
 
     m.addSubMenu("Transfer Audio/MIDI", subm);
+    subm.clear();
+
+    int latencyManual = m_processor.getClient().getLatencySamplesManual();
+    int latency = m_processor.getClient().getLatencySamples() - latencyManual;
+    int blockSize = m_processor.getClient().getSamplesPerBlock();
+    double sampleRate = m_processor.getSampleRate();
+
+    auto addLatencyItem = [&](int l, bool withBlocks) {
+        if (l + latency >= 0) {
+            String name;
+            if (withBlocks) {
+                name = String(l / blockSize) + " blocks / ";
+            }
+            name << l << " samples / " << lround(l * 1000 / sampleRate) << "ms";
+
+            subsubm.addItem(name, latencyManual != l, latencyManual == l, [this, l] {
+                m_processor.getClient().setLatencySamplesManual(l);
+                m_processor.updateLatency();
+            });
+        }
+    };
+
+    for (int i = -40; i <= +40; i++) {
+        addLatencyItem(i * 256, false);
+    }
+    subm.addSubMenu("by Samples", subsubm);
+    subsubm.clear();
+
+    for (int i = -30; i <= +30; i++) {
+        addLatencyItem(i * blockSize, true);
+    }
+    subm.addSubMenu("by Blocks", subsubm);
+    subsubm.clear();
+
+    m.addSubMenu("Manual Delay", subm);
     subm.clear();
 
     m.addSeparator();

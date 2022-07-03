@@ -211,6 +211,7 @@ class Processor : public LogTagDelegate, public std::enable_shared_from_this<Pro
     int m_additionalScreenSpace = 0;
     bool m_fullscreen = false;
     bool m_prepared = false;
+    String m_name;
     String m_layout;
     ChannelSet m_monoChannels;
     std::mutex m_monoChannelsMtx;

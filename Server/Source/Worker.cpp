@@ -614,7 +614,8 @@ void Worker::handleMessage(std::shared_ptr<Message<PluginList>> msg) {
             }
 
             if (match) {
-                slayouts.add(LogTag::getStrWithLeadingZero(chOut) + ":" + describeLayout(l, false, true, true));
+                slayouts.addIfNotAlreadyThere(LogTag::getStrWithLeadingZero(chOut) + ":" +
+                                              describeLayout(l, false, true, true));
             }
         }
 
@@ -630,7 +631,9 @@ void Worker::handleMessage(std::shared_ptr<Message<PluginList>> msg) {
             slayouts.sort(false);
             for (auto& l : slayouts) {
                 auto parts = StringArray::fromTokens(l, ":", "");
-                jlayouts.push_back(parts[1].toStdString());
+                if (!jlayouts.contains(parts[1].toStdString())) {
+                    jlayouts.push_back(parts[1].toStdString());
+                }
             }
         }
 

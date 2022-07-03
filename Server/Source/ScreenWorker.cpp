@@ -175,7 +175,6 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
     traceScope();
     logln("showing editor for " << proc->getName() << " (channel=" << channel << ") at " << x << "x" << y);
 
-    auto lastTid = m_currentTid;
     m_currentTid = tid;
     m_imgCounter = 0;
 

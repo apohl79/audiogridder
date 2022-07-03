@@ -72,7 +72,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
         processBlockBypassedInternal(buf, m_bypassBufferD);
     }
 
-    void updateLatency(int samples);
+    void updateLatency();
 
     AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override;
