@@ -509,7 +509,6 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     bool m_keepEditorOpen = false;
     std::atomic_bool m_bypassWhenNotConnected{false};
     bool m_bufferSizeByPlugin = false;
-    bool m_fixedOutboundBuffer = false;
 
     TrackProperties m_trackProperties;
     std::mutex m_trackPropertiesMtx;
