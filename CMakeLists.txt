@@ -314,9 +314,10 @@ if((CMAKE_CXX_COMPILER_ID STREQUAL "Clang") OR (CMAKE_CXX_COMPILER_ID STREQUAL "
   target_compile_options(juce_recommended_warning_flags INTERFACE
     -Wno-unused-variable -Wno-unused-function -Wno-deprecated -Wno-switch-enum -Wno-missing-prototypes)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  target_compile_options(juce_recommended_warning_flags INTERFACE -Wno-unused-variable -Wno-unused-but-set-variable)
+  target_compile_options(juce_recommended_warning_flags INTERFACE
+    -Wno-unused-variable -Wno-unused-but-set-variable -Wno-switch-enum)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-  target_compile_options(juce_recommended_warning_flags INTERFACE -Wno-switch-enum)
+  target_compile_options(juce_recommended_warning_flags INTERFACE /wd4189 /wd4505)
 endif()
 
 if(AG_WITH_PLUGIN)

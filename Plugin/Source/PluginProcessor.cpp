@@ -515,7 +515,7 @@ bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
 Array<std::pair<short, short>> PluginProcessor::getAUChannelInfo() const {
 #if JucePlugin_IsSynth
     Array<std::pair<short, short>> info;
-    info.add({(short)Defaults::PLUGIN_CHANNELS_IN, -(short)Defaults::PLUGIN_CHANNELS_OUT});
+    info.add({(short)Defaults::PLUGIN_CHANNELS_IN, (short)-Defaults::PLUGIN_CHANNELS_OUT});
     return info;
 #else
     return {};
