@@ -825,6 +825,7 @@ json PluginProcessor::getState(bool withServers) {
 
     j["ActiveChannels"] = m_activeChannels.toInt();
     j["NumberOfBuffers"] = getNumBuffers();
+    j["LatencySamplesManual"] = m_client->getLatencySamplesManual();
 
     auto jplugs = json::array();
     {
@@ -879,6 +880,11 @@ bool PluginProcessor::setState(const json& j) {
 
     if (jsonHasValue(j, "NumberOfBuffers") && m_bufferSizeByPlugin) {
         setNumBuffers(jsonGetValue(j, "NumberOfBuffers", Defaults::DEFAULT_NUM_OF_BUFFERS));
+    }
+
+    if (jsonHasValue(j, "LatencySamplesManual")) {
+        m_client->setLatencySamplesManual(jsonGetValue(j, "LatencySamplesManual", m_client->getLatencySamplesManual()));
+        updateLatency();
     }
 
     {

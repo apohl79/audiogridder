@@ -315,6 +315,8 @@ if((CMAKE_CXX_COMPILER_ID STREQUAL "Clang") OR (CMAKE_CXX_COMPILER_ID STREQUAL "
     -Wno-unused-variable -Wno-unused-function -Wno-deprecated -Wno-switch-enum -Wno-missing-prototypes)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   target_compile_options(juce_recommended_warning_flags INTERFACE -Wno-unused-variable -Wno-unused-but-set-variable)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  target_compile_options(juce_recommended_warning_flags INTERFACE -Wno-switch-enum)
 endif()
 
 if(AG_WITH_PLUGIN)
