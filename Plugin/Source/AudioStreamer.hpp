@@ -221,7 +221,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                 buffer.clear(chan, 0, buffer.getNumSamples());
             }
 
-            m_readBuffer.copyToAndConsume(buffer, midi, buffer.getNumChannels(), buffer.getNumSamples());
+            m_readBuffer.copyToAndConsume(buffer, midi, maxCh, buffer.getNumSamples());
 
             traceln("  buffer (read, after consume): working samples=" << m_readBuffer.workingSamples << ",");
             traceln("    channels=" << m_readBuffer.audio.getNumChannels()
@@ -337,6 +337,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         }
 
         void copyToAndConsume(AudioBuffer<T>& dstBuffer, MidiBuffer& dstMidi, int numChannels, int numSamples) {
+            numChannels = jmin(audio.getNumChannels(), numChannels);
+            numSamples = jmin(audio.getNumSamples(), numSamples);
             if (numChannels > 0 && numSamples > 0 && audio.getNumChannels() > 0 && audio.getNumSamples() > 0) {
                 if (dstBuffer.getNumSamples() < numSamples || dstBuffer.getNumChannels() < numChannels) {
                     dstBuffer.setSize(numChannels, numSamples, true);
