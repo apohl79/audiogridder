@@ -20,6 +20,10 @@
 #include <sys/socket.h>
 #endif
 
+#ifdef JUCE_WINDOWS
+#include <signal.h>
+#endif
+
 #include <regex>
 
 namespace e47 {
@@ -534,9 +538,14 @@ bool Server::scanPlugin(const String& id, const String& format, int srvId, bool 
 
     File crashFile(Defaults::getConfigFileName(Defaults::ConfigDeadMan, {{"id", String(srvId)}}));
     File errFile(Defaults::getConfigFileName(Defaults::ScanError, {{"id", String(srvId)}}));
+    File errFileLayout(Defaults::getConfigFileName(Defaults::ScanLayoutError, {{"id", String(srvId)}}));
 
     if (crashFile.existsAsFile()) {
         crashFile.deleteFile();
+    }
+
+    if (errFileLayout.existsAsFile()) {
+        errFileLayout.deleteFile();
     }
 
     errFile.create();
@@ -584,12 +593,57 @@ bool Server::scanPlugin(const String& id, const String& format, int srvId, bool 
         logln("  output channels = " << t.numOutputChannels);
         plist.addType(t);
 
-        logln("testing I/O layouts...");
-        String err;
-        if (auto inst = Processor::loadPlugin(t, 48000, 512, err)) {
-            auto layouts = Processor::findSupportedLayouts(inst, secondRun, srvId);
+        if (!secondRun) {
+            // Create a timeout tread that kills the scanner in case loading the plugin does not return
+            std::atomic_bool timeoutActive{false};
+            auto timeoutThread = std::make_unique<FnThread>(
+                [&] {
+                    logln("timeout thread started");
+                    while (!Thread::currentThreadShouldExit()) {
+                        if (timeoutActive) {
+                            sleepExitAwareWithCondition(5000, [&] { return !timeoutActive.load(); });
+                            if (timeoutActive) {
+                                logln("timeout thread timed out");
+                                Thread::sleep(100);
+                                raise(SIGABRT);
+                            } else {
+                                logln(".");
+                            }
+                        }
+                        sleepExitAware(50);
+                    }
+                    logln("timeout thread finished");
+                },
+                "TimeoutThread", true);
 
-            for (auto& l : layouts) {
+            // Create an error file that we remove after testing, if we fail, the scanner will trigger a second
+            // run, that does not test I/O layouts
+            errFileLayout.create();
+
+            logln("testing I/O layouts...");
+
+            String err;
+            if (auto inst = Processor::loadPlugin(t, 48000, 512, err)) {
+                timeoutActive = false;
+                logln("plugin loaded");
+
+                auto layouts = Processor::findSupportedLayouts(inst);
+
+                for (auto& l : layouts) {
+                    json jlayout = {{"description", describeLayout(l).toStdString()},
+                                    {"layout", serializeLayout(l).toStdString()}};
+                    playouts[pluginId.toStdString()].push_back(jlayout);
+                }
+
+                errFileLayout.deleteFile();
+            }
+        } else {
+            // testing I/O layouts failed during the first run, now we check for a mono fx plugin to enable multi-mono
+            // support for it
+            if (t.numInputChannels == 1 && t.numOutputChannels == 1) {
+                AudioProcessor::BusesLayout l;
+                l.inputBuses.add(AudioChannelSet::mono());
+                l.outputBuses.add(AudioChannelSet::mono());
                 json jlayout = {{"description", describeLayout(l).toStdString()},
                                 {"layout", serializeLayout(l).toStdString()}};
                 playouts[pluginId.toStdString()].push_back(jlayout);
@@ -623,15 +677,20 @@ void Server::scanNextPlugin(const String& id, const String& name, const String& 
             proc.waitForProcessToFinish(30000);
             finished = true;
             if (proc.isRunning()) {
-                if (!AlertWindow::showOkCancelBox(
-                        AlertWindow::WarningIcon, "Timeout",
-                        "The plugin scan for '" + name + "' did not finish yet. Do you want to continue to wait?",
-                        "Wait", "Abort")) {
-                    logln("error: scan timeout of '" << name << "', killing scan process");
-                    proc.kill();
-                    blacklist = true;
+                if (secondRun) {
+                    if (!AlertWindow::showOkCancelBox(
+                            AlertWindow::WarningIcon, "Timeout",
+                            "The plugin scan for '" + name + "' did not finish yet. Do you want to continue to wait?",
+                            "Wait", "Abort")) {
+                        logln("error: scan timeout of '" << name << "', killing scan process");
+                        proc.kill();
+                        blacklist = true;
+                    } else {
+                        finished = false;
+                    }
                 } else {
-                    finished = false;
+                    proc.kill();
+                    scanNextPlugin(id, name, fmt, srvId, true);
                 }
             } else {
                 auto layoutErrFile =
@@ -647,9 +706,6 @@ void Server::scanNextPlugin(const String& id, const String& name, const String& 
                     if (errFile.existsAsFile()) {
                         logln("error: scan for '" << name << "' failed, as the plugin crashed the scanner probably");
                         errFile.deleteFile();
-                        blacklist = true;
-                    } else if (ec != 0) {
-                        logln("error: scan for '" << name << "' failed with exit code " << (int)ec);
                         blacklist = true;
                     }
                 }
@@ -698,8 +754,14 @@ void Server::scanForPlugins(const std::vector<String>& include) {
 #endif
 
     std::set<String> neverSeenList = m_pluginExclude;
+    std::set<String> newBlacklistedPlugins;
 
     loadKnownPluginList();
+
+    // check for scan results after a crash
+    for (int i = Defaults::SCAN_ID_START; i < Defaults::SCAN_ID_START + Defaults::SCAN_WORKERS; i++) {
+        processScanResults(i, newBlacklistedPlugins);
+    }
 
     struct ScanThread : FnThread {
         int id;
@@ -754,7 +816,8 @@ void Server::scanForPlugins(const std::vector<String>& include) {
         auto plugindesc = m_pluginList.getTypeForFile(fileOrId);
         bool excluded = shouldExclude(name, fileOrId, include);
         if ((nullptr == plugindesc || fmt->pluginNeedsRescanning(*plugindesc)) &&
-            !m_pluginList.getBlacklistedFiles().contains(fileOrId) && !excluded) {
+            !m_pluginList.getBlacklistedFiles().contains(fileOrId) && newBlacklistedPlugins.count(fileOrId) == 0 &&
+            !excluded) {
             ScanThread* scanThread = nullptr;
             String* inProgressName = nullptr;
             do {
@@ -802,53 +865,11 @@ void Server::scanForPlugins(const std::vector<String>& include) {
         neverSeenList.erase(fileOrId);
     }
 
-    std::set<String> newBlacklistedPlugins;
-
     for (auto& t : scanThreads) {
         while (t.isThreadRunning()) {
             sleep(50);
         }
-
-        File cacheFile(Defaults::getConfigFileName(Defaults::ConfigPluginCache, {{"id", String(t.id)}}));
-        File layoutsFile(Defaults::getConfigFileName(Defaults::PluginLayouts, {{"id", String(t.id)}}));
-        File deadmanFile(Defaults::getConfigFileName(Defaults::ConfigDeadMan, {{"id", String(t.id)}}));
-
-        if (cacheFile.existsAsFile()) {
-            KnownPluginList plist;
-            json playouts;
-            loadKnownPluginList(plist, playouts, t.id);
-
-            for (auto& p : plist.getBlacklistedFiles()) {
-                if (!m_pluginList.getBlacklistedFiles().contains(p)) {
-                    m_pluginList.addToBlacklist(p);
-                    newBlacklistedPlugins.insert(getPluginName(p));
-                }
-            }
-
-            for (auto p : plist.getTypes()) {
-                m_pluginList.addType(p);
-            }
-
-            for (auto it = playouts.begin(); it != playouts.end(); it++) {
-                m_jpluginLayouts[it.key()] = it.value();
-            }
-
-            cacheFile.deleteFile();
-            layoutsFile.deleteFile();
-        }
-
-        if (deadmanFile.existsAsFile()) {
-            logln("reading scan crash file " << deadmanFile.getFullPathName());
-
-            StringArray lines;
-            deadmanFile.readLines(lines);
-
-            for (auto& line : lines) {
-                newBlacklistedPlugins.insert(getPluginName(line));
-            }
-
-            deadmanFile.deleteFile();
-        }
+        processScanResults(t.id, newBlacklistedPlugins);
     }
 
     m_pluginList.sort(KnownPluginList::sortAlphabetically, true);
@@ -868,7 +889,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
                 break;
             }
         }
-        String msg = "The following plugins failed during the plaugin scan:";
+        String msg = "The following plugins failed during the plugin scan:";
         msg << newLine << newLine;
         msg << showList.joinIntoString(newLine);
         msg << newLine;
@@ -878,6 +899,49 @@ void Server::scanForPlugins(const std::vector<String>& include) {
         msg << newLine << newLine;
         msg << "You can force a rescan via Plugin Manager.";
         AlertWindow::showMessageBox(AlertWindow::WarningIcon, "Failed Plugins", msg, "OK");
+    }
+}
+
+void Server::processScanResults(int id, std::set<String>& newBlacklistedPlugins) {
+    File cacheFile(Defaults::getConfigFileName(Defaults::ConfigPluginCache, {{"id", String(id)}}));
+    File layoutsFile(Defaults::getConfigFileName(Defaults::PluginLayouts, {{"id", String(id)}}));
+    File deadmanFile(Defaults::getConfigFileName(Defaults::ConfigDeadMan, {{"id", String(id)}}));
+
+    if (cacheFile.existsAsFile()) {
+        KnownPluginList plist;
+        json playouts;
+        loadKnownPluginList(plist, playouts, id);
+
+        for (auto& p : plist.getBlacklistedFiles()) {
+            if (!m_pluginList.getBlacklistedFiles().contains(p)) {
+                m_pluginList.addToBlacklist(p);
+                newBlacklistedPlugins.insert(getPluginName(p));
+            }
+        }
+
+        for (auto p : plist.getTypes()) {
+            m_pluginList.addType(p);
+        }
+
+        for (auto it = playouts.begin(); it != playouts.end(); it++) {
+            m_jpluginLayouts[it.key()] = it.value();
+        }
+
+        cacheFile.deleteFile();
+        layoutsFile.deleteFile();
+    }
+
+    if (deadmanFile.existsAsFile()) {
+        logln("reading scan crash file " << deadmanFile.getFullPathName());
+
+        StringArray lines;
+        deadmanFile.readLines(lines);
+
+        for (auto& line : lines) {
+            newBlacklistedPlugins.insert(getPluginName(line));
+        }
+
+        deadmanFile.deleteFile();
     }
 }
 

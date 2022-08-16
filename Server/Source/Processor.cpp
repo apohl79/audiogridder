@@ -10,10 +10,6 @@
 #include "App.hpp"
 #include "Server.hpp"
 
-#if JUCE_WINDOWS
-#include <signal.h>
-#endif
-
 namespace e47 {
 
 #define callBackendWithReturn(method)          \
@@ -159,8 +155,7 @@ std::unique_ptr<PluginDescription> Processor::findPluginDescritpion(const String
     return plugdesc;
 }
 
-Array<AudioProcessor::BusesLayout> Processor::findSupportedLayouts(std::shared_ptr<AudioPluginInstance> proc,
-                                                                   bool checkOnly, int srvId) {
+Array<AudioProcessor::BusesLayout> Processor::findSupportedLayouts(std::shared_ptr<AudioPluginInstance> proc) {
     setLogTagStatic("processor");
 
     int busesIn = proc->getBusCount(true);
@@ -270,62 +265,20 @@ Array<AudioProcessor::BusesLayout> Processor::findSupportedLayouts(std::shared_p
         addLayouts(channelsOutWorking, channelsIn);
     }
 
-    logln("trying " << layouts.size() << " layouts (checkOnly=" << (int)checkOnly << ")...");
-
-    // checkBusesLayoutSupported() returns false in many cases where a layout still works, so we prefer
-    // setBusesLayout(). This - on the other hand - might "hang" for some apple AUs for some specific layouts, so we
-    // give it 2 seconds and kill the process, as this should only be called with checkOnly=false from the
-    // scanner. If we kill the process, we will launch the scanner again and pass checkOnly=true the second time.
-    std::unique_ptr<FnThread> timeoutThread;
-    std::atomic_bool timeoutActive{false};
-
-    if (!checkOnly) {
-        timeoutThread = std::make_unique<FnThread>(
-            [&] {
-                while (!Thread::currentThreadShouldExit()) {
-                    if (timeoutActive) {
-                        sleepExitAwareWithCondition(2000, [&] { return !timeoutActive.load(); });
-                        if (timeoutActive) {
-                            raise(SIGABRT);
-                        }
-                    }
-                    sleepExitAware(50);
-                }
-            },
-            "TimeoutThread", true);
-    }
-
-    // Create an error file that we remove after testing, if we fail, the scanner will trigger a second run
-    auto errFile = File(Defaults::getConfigFileName(Defaults::ScanLayoutError, {{"id", String(srvId)}}));
-    errFile.create();
+    logln("trying " << layouts.size() << " layouts...");
 
     for (auto& l : layouts) {
-        if (!checkOnly) {
-            timeoutActive = true;
-        }
-
-        bool supported = checkOnly ? proc->checkBusesLayoutSupported(l) : proc->setBusesLayout(l);
-
-        if (!checkOnly) {
-            timeoutActive = false;
-        }
-
-        if (supported) {
+        if (proc->checkBusesLayoutSupported(l)) {
             logln("  " << describeLayout(l) << ": OK");
-        }
-
-        if (supported) {
             ret.add(l);
         }
     }
 
-    errFile.deleteFile();
-
     return ret;
 }
 
-Array<AudioProcessor::BusesLayout> Processor::findSupportedLayouts(Processor* proc, bool checkOnly, int srvId) {
-    return findSupportedLayouts(proc->getPlugin(0), checkOnly, srvId);
+Array<AudioProcessor::BusesLayout> Processor::findSupportedLayouts(Processor* proc) {
+    return findSupportedLayouts(proc->getPlugin(0));
 }
 
 const Array<AudioProcessor::BusesLayout>& Processor::getSupportedBusLayouts() const {

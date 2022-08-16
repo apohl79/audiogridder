@@ -51,10 +51,8 @@ class Processor : public LogTagDelegate, public std::enable_shared_from_this<Pro
     static std::unique_ptr<PluginDescription> findPluginDescritpion(const String& id, const KnownPluginList& pluglist,
                                                                     String* idNormalized = nullptr);
 
-    static Array<AudioProcessor::BusesLayout> findSupportedLayouts(std::shared_ptr<AudioPluginInstance> proc,
-                                                                   bool checkOnly = true, int srvId = 0);
-    static Array<AudioProcessor::BusesLayout> findSupportedLayouts(Processor* proc, bool checkOnly = true,
-                                                                   int srvId = 0);
+    static Array<AudioProcessor::BusesLayout> findSupportedLayouts(std::shared_ptr<AudioPluginInstance> proc);
+    static Array<AudioProcessor::BusesLayout> findSupportedLayouts(Processor* proc);
 
     const Array<AudioProcessor::BusesLayout>& getSupportedBusLayouts() const;
 

@@ -213,6 +213,8 @@ class Server : public Thread, public LogTag {
     void scanForPlugins();
     void scanForPlugins(const std::vector<String>& include);
 
+    void processScanResults(int id, std::set<String>& newBlacklistedPlugins);
+
     void loadKnownPluginList();
     bool parsePluginLayouts(const String& id = {});
 
