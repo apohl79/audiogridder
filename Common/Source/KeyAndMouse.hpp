@@ -8,7 +8,6 @@
 #ifndef KeyAndMouse_hpp
 #define KeyAndMouse_hpp
 
-#if defined(JUCE_MAC) || defined(JUCE_WINDOWS)
 
 #include <stdint.h>
 #include <string>
@@ -41,6 +40,5 @@ void keyEventUp(uint16_t keyCode, uint64_t flags = 0, bool currentProcessOnly = 
 
 }  // namespace e47
 
-#endif
 
 #endif /* KeyAndMouse_hpp */

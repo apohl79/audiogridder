@@ -157,7 +157,7 @@ else()
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  set(AG_WITH_SERVER off)
+  set(AG_WITH_SERVER on)
 endif()
 
 macro(ag_strip target_name target_dir)

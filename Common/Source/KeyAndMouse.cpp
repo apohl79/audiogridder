@@ -19,7 +19,6 @@
 #include "KeyAndMouse.hpp"
 #include "Utils.hpp"
 
-#if defined(JUCE_MAC) || defined(JUCE_WINDOWS)
 
 namespace e47 {
 
@@ -540,4 +539,3 @@ void keyEventUp(uint16_t keyCode, uint64_t flags, bool currentProcessOnly, void*
 
 }  // namespace e47
 
-#endif

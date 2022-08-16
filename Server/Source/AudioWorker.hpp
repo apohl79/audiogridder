@@ -103,8 +103,14 @@ class AudioWorker : public Thread, public LogTagDelegate {
     bool waitForData();
 
     template <typename T>
-    AudioBuffer<T>* getProcBuffer();
-
+    AudioBuffer<T>* getProcBuffer()
+    {
+ 		if constexpr (std::is_same<T, float>::value) 
+    		return &m_procBufferF;
+ 		else if constexpr (std::is_same<T, double>::value) 
+    		return &m_procBufferD;
+	}
+/*
     template <>
     AudioBuffer<float>* getProcBuffer() {
         return &m_procBufferF;
@@ -114,6 +120,7 @@ class AudioWorker : public Thread, public LogTagDelegate {
     AudioBuffer<double>* getProcBuffer() {
         return &m_procBufferD;
     }
+*/
 
     template <typename T>
     void processBlock(AudioBuffer<T>& buffer, MidiBuffer& midi);

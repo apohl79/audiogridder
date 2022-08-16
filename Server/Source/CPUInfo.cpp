@@ -141,6 +141,8 @@ void CPUInfo::run() {
         }
         auto usageTime = (float)totalTime - idleTime;
         float usage = usageTime / totalTime * 100;
+#elif defined(JUCE_LINUX)
+		float usage = 0.5;
 #endif
         lastValues[valueIdx++ % lastValues.size()] = usage;
         usage = 0;
