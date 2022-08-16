@@ -100,28 +100,46 @@ bool ProcessorChain::setProcessorBusesLayout(Processor* proc, const String& targ
     int targetChIn = 0, targetChOut = 0, extraInChannels = 0, extraOutChannels = 0;
     bool found = false;
 
+    auto setTargetLayout = [&](const BusesLayout& l, int in, int out) {
+        targetLayout = l;
+        targetChIn = in;
+        targetChOut = out;
+        found = true;
+    };
+
     if (procLayouts.isEmpty()) {
         logln("no processor layouts cached, checking now...");
         procLayouts = Processor::findSupportedLayouts(proc);
     }
 
+    if (targetOutputLayout.isNotEmpty()) {
+        logln("requested target output layout: " << targetOutputLayout);
+    }
+
     if (targetOutputLayout.isNotEmpty() && targetOutputLayout != "Default") {
         for (auto& l : procLayouts) {
             int checkChIn = getLayoutNumChannels(l, true), checkChOut = getLayoutNumChannels(l, false);
-            auto soutputs = describeLayout(l, false, true, true);
+            String sinputs = describeLayout(l, true, false, true), soutputs = describeLayout(l, false, true, true);
             if (soutputs == targetOutputLayout) {
                 if (chIn == 0 || checkChIn == checkChOut) {
-                    targetLayout = l;
-                    targetChIn = checkChIn;
-                    targetChOut = checkChOut;
-                    found = true;
-                    break;
+                    setTargetLayout(l, checkChIn, checkChOut);
+                    if (chIn == 0 || sinputs == soutputs) {
+                        break;
+                    }
+                } else if (l.inputBuses.size() == 2 && l.outputBuses.size() == 1) {
+                    // inputs with sidechain?
+                    auto lNoSC = l;
+                    lNoSC.inputBuses.remove(1);
+                    if (describeLayout(lNoSC, true, false, true) == soutputs) {
+                        setTargetLayout(l, checkChIn, checkChOut);
+                        break;
+                    }
                 } else {
+                    if (found) {
+                        break;
+                    }
                     if (checkChIn > targetChIn) {
-                        targetLayout = l;
-                        targetChIn = checkChIn;
-                        targetChOut = checkChOut;
-                        found = true;
+                        setTargetLayout(l, checkChIn, checkChOut);
                     }
                 }
             }
@@ -131,19 +149,18 @@ bool ProcessorChain::setProcessorBusesLayout(Processor* proc, const String& targ
         }
     } else {
         if (procLayouts.contains(layout)) {
-            targetLayout = layout;
-            targetChIn = chIn;
-            targetChOut = chOut;
-            found = true;
+            setTargetLayout(layout, chIn, chOut);
         } else {
             // try to find a layout with a matching number of out/in channels
             for (auto& l : procLayouts) {
                 int checkChIn = getLayoutNumChannels(l, true), checkChOut = getLayoutNumChannels(l, false);
                 if (checkChOut == chOut && (chIn == 0 || checkChIn > targetChIn)) {
-                    targetLayout = l;
-                    targetChIn = checkChIn;
-                    targetChOut = checkChOut;
-                    found = true;
+                    setTargetLayout(l, checkChIn, checkChOut);
+                    String sinputs = describeLayout(l, true, false, true),
+                           soutputs = describeLayout(l, false, true, true);
+                    if (sinputs == soutputs) {
+                        break;
+                    }
                 }
             }
 
@@ -152,10 +169,7 @@ bool ProcessorChain::setProcessorBusesLayout(Processor* proc, const String& targ
                 for (auto& l : procLayouts) {
                     int checkChIn = getLayoutNumChannels(l, true), checkChOut = getLayoutNumChannels(l, false);
                     if (checkChOut > targetChOut || (checkChOut == targetChOut && checkChIn > targetChIn)) {
-                        targetLayout = l;
-                        targetChIn = checkChIn;
-                        targetChOut = checkChOut;
-                        found = true;
+                        setTargetLayout(l, checkChIn, checkChOut);
                     }
                 }
             }
@@ -163,10 +177,8 @@ bool ProcessorChain::setProcessorBusesLayout(Processor* proc, const String& targ
 
         if (!found || !proc->setBusesLayout(targetLayout)) {
             logln("failed to set target layout, falling back to the current processors layout");
-            targetLayout = proc->getBusesLayout();
-            targetChIn = getLayoutNumChannels(targetLayout, true);
-            targetChOut = getLayoutNumChannels(targetLayout, false);
-            found = true;
+            setTargetLayout(proc->getBusesLayout(), getLayoutNumChannels(targetLayout, true),
+                            getLayoutNumChannels(targetLayout, false));
         }
     }
 
