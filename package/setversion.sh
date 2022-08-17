@@ -15,6 +15,12 @@ else
     DATE=$(date)
 fi
 
+if [ "$1" == "-setdate" ]; then
+    shift
+    echo -n "Please set the build date [$DATE]: "
+    read DATE
+fi
+
 TAG_BUILD=0
 
 if [ "$1" == "-tag" ]; then
