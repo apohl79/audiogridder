@@ -23,8 +23,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
           LogTagDelegate(clnt),
           m_client(clnt),
           m_socket(std::unique_ptr<StreamingSocket>(sock)),
-          m_writeQ((size_t)clnt->NUM_OF_BUFFERS * 2),
-          m_readQ((size_t)clnt->NUM_OF_BUFFERS * 2),
+          m_writeQ((size_t)clnt->NUM_OF_BUFFERS * 4),
+          m_readQ((size_t)clnt->NUM_OF_BUFFERS * 4),
           m_durationGlobal(TimeStatistic::getDuration("audio")),
           m_durationLocal(TimeStatistic::getDuration(String("audio.") + String(getTagId()), false)) {
         traceScope();
@@ -291,6 +291,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                     audio.copyFrom(chan, workingSamples, srcBuffer, chan, 0, numSamples);
                 }
             }
+
             midi.addEvents(srcMidi, 0, numSamples, workingSamples);
             workingSamples += numSamples;
         }
@@ -338,7 +339,6 @@ class AudioStreamer : public Thread, public LogTagDelegate {
 
         void copyToAndConsume(AudioBuffer<T>& dstBuffer, MidiBuffer& dstMidi, int numChannels, int numSamples) {
             numChannels = jmin(audio.getNumChannels(), numChannels);
-            numSamples = jmin(audio.getNumSamples(), numSamples);
             if (numChannels > 0 && numSamples > 0 && audio.getNumChannels() > 0 && audio.getNumSamples() > 0) {
                 if (dstBuffer.getNumSamples() < numSamples || dstBuffer.getNumChannels() < numChannels) {
                     dstBuffer.setSize(numChannels, numSamples, true);
@@ -378,9 +378,11 @@ class AudioStreamer : public Thread, public LogTagDelegate {
 
         void shiftAndResize(int samples) {
             if (workingSamples > 0) {
-                for (int chan = 0; chan < audio.getNumChannels(); chan++) {
-                    for (int s = 0; s < workingSamples; s++) {
-                        audio.setSample(chan, s, audio.getSample(chan, samples + s));
+                if (audio.getNumSamples() == workingSamples) {
+                    for (int chan = 0; chan < audio.getNumChannels(); chan++) {
+                        for (int s = 0; s < workingSamples; s++) {
+                            audio.setSample(chan, s, audio.getSample(chan, samples + s));
+                        }
                     }
                 }
                 if (midi.getNumEvents() > 0) {
