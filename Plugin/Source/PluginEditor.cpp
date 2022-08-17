@@ -1110,8 +1110,8 @@ void PluginEditor::showSettingsMenu() {
         }
     };
 
-    for (int i = -40; i <= +40; i++) {
-        addLatencyItem(i * 256, false);
+    for (int i = -80; i <= +80; i++) {
+        addLatencyItem(i * 128, false);
     }
     subm.addSubMenu("by Samples", subsubm);
     subsubm.clear();
