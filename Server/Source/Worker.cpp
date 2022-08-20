@@ -580,9 +580,6 @@ void Worker::handleMessage(std::shared_ptr<Message<PluginList>> msg) {
 
         // add layouts, that match the number of output channels
         auto& layouts = getApp()->getServer()->getPluginLayouts(pluginId);
-        if (layouts.isEmpty()) {
-            logln("warning: no known layouts for '" << plugin.name << "' (" << pluginId << ")");
-        }
         StringArray slayouts;
         for (auto& l : layouts) {
             int chIn = getLayoutNumChannels(l, true);
