@@ -258,7 +258,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     String m_loadedPluginsString;
     std::mutex m_srvMtx;
     ServerInfo m_srvInfo;
-    float m_srvLoad;
+    float m_srvLoad = 0.0f;
     bool m_srvLocalMode = false;
     int m_srvLoadLastUpdated = 0;
     bool m_needsReconnect = false;
