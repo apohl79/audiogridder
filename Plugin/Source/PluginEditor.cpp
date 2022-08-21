@@ -1096,7 +1096,7 @@ void PluginEditor::showSettingsMenu() {
     double sampleRate = m_processor.getSampleRate();
 
     auto addLatencyItem = [&](int l, bool withBlocks) {
-        if (l + latency >= 0) {
+        if (l + latency >= 0 && blockSize > 0 && sampleRate > 0.0) {
             String name;
             if (withBlocks) {
                 name = String(l / blockSize) + " blocks / ";
