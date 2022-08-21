@@ -281,6 +281,11 @@ void App::prepareShutdown(uint32 exitCode) {
         traceScope();
 
         if (m_server != nullptr) {
+            runOnMsgThreadSync([this] {
+                hideEditor();
+                hidePluginList();
+                hideServerSettings();
+            });
             m_server->shutdown();
             m_server->waitForThreadToExit(-1);
             m_server.reset();
@@ -302,6 +307,10 @@ void App::shutdown() {
     }
 
     if (m_server != nullptr) {
+        hideEditor();
+        hidePluginList();
+        hideServerSettings();
+
         m_server->shutdown();
         m_server->waitForThreadToExit(-1);
         m_server.reset();
