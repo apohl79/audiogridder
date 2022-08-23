@@ -82,23 +82,18 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     row++;
 
     label = std::make_unique<Label>();
-    label->setText("Server ID (0-31):", NotificationType::dontSendNotification);
+    label->setText("Server ID:", NotificationType::dontSendNotification);
     label->setBounds(getLabelBounds(row));
     addChildAndSetID(label.get(), "lbl");
     m_components.push_back(std::move(label));
 
-    int idConfig = m_app->getServer()->getId();
-    String id;
-    id << idConfig;
-    m_idText.setText(id);
-    m_idText.setInputFilter(new TextEditor::LengthAndCharacterRestriction(2, "0123456789"), true);
-    m_idText.onTextChange = [this] {
-        if (m_idText.getText().getIntValue() > 31) {
-            m_idText.setText("31", false);
-        }
-    };
-    m_idText.setBounds(getFieldBounds(row));
-    addChildAndSetID(&m_idText, "id");
+    String id(m_app->getServer()->getId());
+    label = std::make_unique<Label>();
+    label->setText(id, NotificationType::dontSendNotification);
+    label->setBounds(getFieldBounds(row));
+    label->setJustificationType(Justification::right);
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
 
     row++;
 
@@ -432,6 +427,28 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 
     row++;
 
+    tooltip << "Enter the IDs of servers that you want to start automatically. An ID must be a number in the range of "
+               "0-31. Example: 0,1,4-8"
+            << newLine << newLine << "Note: You have to restart manually for taking changes into effect.";
+
+    label = std::make_unique<Label>();
+    label->setText("Autostart servers with IDs:", NotificationType::dontSendNotification);
+    label->setTooltip(tooltip);
+    label->setBounds(getLabelBounds(row));
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
+
+    auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigServerStartup));
+    if (jsonHasValue(cfg, "IDs")) {
+        m_idText.setText(jsonGetValue(cfg, "IDs", String()));
+    }
+    m_idText.setInputFilter(new TextEditor::LengthAndCharacterRestriction(103, "0123456789-,"), true);
+    m_idText.setBounds(getWideFieldBounds(row));
+    m_idText.setTooltip(tooltip);
+    addChildAndSetID(&m_idText, "id");
+    tooltip.clear();
+    row++;
+
     label = std::make_unique<Label>();
     label->setText("Scan for Plugins at Startup:", NotificationType::dontSendNotification);
     label->setBounds(getLabelBounds(row));
@@ -506,7 +523,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
         auto appCpy = app;
 
         if (auto srv = appCpy->getServer()) {
-            srv->setOpt("ID", m_idText.getText().getIntValue());
+            //srv->setOpt("ID", m_idText.getText().getIntValue());
             srv->setName(m_nameText.getText());
             srv->setEnableAU(m_auSupport.getToggleState());
             srv->setEnableVST3(m_vst3Support.getToggleState());
@@ -571,6 +588,34 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
             srv->setVSTNoStandardFolders(m_vstNoStandardFolders.getToggleState());
 
             srv->saveConfig();
+
+            // startup servers
+            auto ranges = StringArray::fromTokens(m_idText.getText(), ",", "");
+            String valid;
+            for (auto& r : ranges) {
+                String start, end;
+                auto parts = StringArray::fromTokens(r, "-", "");
+                for (auto& p : parts) {
+                    if (p.isNotEmpty()) {
+                        if (start.isEmpty()) {
+                            start = p;
+                        } else if (end.isEmpty()) {
+                            end = p;
+                            break;
+                        }
+                    }
+                }
+                if (start.isNotEmpty()) {
+                    if (valid.isNotEmpty()) {
+                        valid << ",";
+                    }
+                    valid << start;
+                    if (end.isNotEmpty()) {
+                        valid << "-" << end;
+                    }
+                }
+            }
+            configWriteFile(Defaults::getConfigFileName(Defaults::ConfigServerStartup), {{"IDs", valid.toStdString()}});
         }
 
         appCpy->hideServerSettings();

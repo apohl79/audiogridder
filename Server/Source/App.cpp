@@ -204,7 +204,7 @@ void App::initialise(const String& commandLineParameters) {
             m_server->startThread();
             break;
         }
-        case MASTER:
+        case MASTER: {
 #ifdef JUCE_MAC
             Process::setDockIconVisible(false);
             File appState("~/Library/Saved Application State/com.e47.AudioGridderServer.savedState");
@@ -212,59 +212,104 @@ void App::initialise(const String& commandLineParameters) {
                 appState.deleteRecursively();
             }
 #endif
-            m_child = std::make_unique<std::thread>([this, srvId] {
-                ChildProcess proc;
-                StringArray proc_args;
-                proc_args.add(File::getSpecialLocation(File::currentExecutableFile).getFullPathName());
-                proc_args.add("-server");
-                if (srvId > -1) {
-                    proc_args.add("-id");
-                    proc_args.add(String(srvId));
-                }
-                uint32 ec = 0;
-                bool done = false;
-                do {
-                    if (proc.start(proc_args)) {
-                        while (proc.isRunning()) {
-                            Thread::sleep(100);
-                            if (m_stopChild) {
-                                logln("killing child process");
-                                proc.kill();
-                                proc.waitForProcessToFinish(-1);
-                                File serverRunFile(Defaults::getConfigFileName(
-                                    Defaults::ConfigServerRun, {{"id", String(srvId > -1 ? srvId : 0)}}));
-                                if (serverRunFile.exists()) {
-                                    serverRunFile.deleteFile();
+            Array<int> ids;
+
+            if (srvId < 0) {
+                auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigServerStartup));
+                if (jsonHasValue(cfg, "IDs")) {
+                    for (auto& range : StringArray::fromTokens(jsonGetValue(cfg, "IDs", String()), ",", "")) {
+                        if (range.containsChar('-')) {
+                            auto parts = StringArray::fromTokens(range, "-", "");
+                            if (parts.size() == 2) {
+                                int start = parts[0].getIntValue();
+                                int end = parts[1].getIntValue();
+                                for (int i = start; i <= end; i++) {
+                                    ids.add(i);
                                 }
-                                done = true;
-                                break;
                             }
-                        }
-                        ec = proc.getExitCode();
-                        if (ec == EXIT_RESTART) {
-                            logln("restarting server");
-                            continue;
-                        } else if (ec != 0) {
-                            logln("error: server failed with exit code " << (int)ec);
-                        }
-                        File serverRunFile(Defaults::getConfigFileName(Defaults::ConfigServerRun,
-                                                                       {{"id", String(srvId > -1 ? srvId : 0)}}));
-                        if (serverRunFile.exists()) {
-                            logln("error: server did non shutdown properly");
-                            serverRunFile.deleteFile();
                         } else {
+                            ids.add(range.getIntValue());
+                        }
+                    }
+                }
+            }
+
+            if (ids.isEmpty()) {
+                m_child = std::make_unique<std::thread>([this, srvId] {
+                    ChildProcess proc;
+                    StringArray procArgs;
+                    procArgs.add(File::getSpecialLocation(File::currentExecutableFile).getFullPathName());
+                    procArgs.add("-server");
+                    if (srvId > -1) {
+                        procArgs.add("-id");
+                        procArgs.add(String(srvId));
+                    }
+                    uint32 ec = 0;
+                    bool done = false;
+                    do {
+                        if (proc.start(procArgs)) {
+                            while (proc.isRunning()) {
+                                Thread::sleep(100);
+                                if (m_stopChild) {
+                                    logln("killing child process");
+                                    proc.kill();
+                                    proc.waitForProcessToFinish(-1);
+                                    File serverRunFile(Defaults::getConfigFileName(
+                                        Defaults::ConfigServerRun, {{"id", String(srvId > -1 ? srvId : 0)}}));
+                                    if (serverRunFile.exists()) {
+                                        serverRunFile.deleteFile();
+                                    }
+                                    done = true;
+                                    break;
+                                }
+                            }
+                            ec = proc.getExitCode();
+                            if (ec == EXIT_RESTART) {
+                                logln("restarting server");
+                                continue;
+                            } else if (ec != 0) {
+                                logln("error: server failed with exit code " << (int)ec);
+                            }
+                            File serverRunFile(Defaults::getConfigFileName(Defaults::ConfigServerRun,
+                                                                           {{"id", String(srvId > -1 ? srvId : 0)}}));
+                            if (serverRunFile.exists()) {
+                                logln("error: server did non shutdown properly");
+                                serverRunFile.deleteFile();
+                            } else {
+                                done = true;
+                            }
+                        } else {
+                            logln("error: failed to start server process");
+                            setApplicationReturnValue(1);
+                            quit();
                             done = true;
                         }
-                    } else {
-                        logln("error: failed to start server process");
-                        setApplicationReturnValue(1);
-                        quit();
-                        done = true;
+                    } while (!done);
+                    quit();
+                });
+            } else {
+                Tracer::cleanup();
+                Logger::cleanup();
+                m_child = std::make_unique<std::thread>([ids, args] {
+                    std::vector<ChildProcess> masters((size_t)ids.size());
+                    for (int i = 0; i < ids.size(); i++) {
+                        int id = ids[i];
+                        auto& proc = masters[(size_t)i];
+                        StringArray procArgs;
+                        procArgs.add(File::getSpecialLocation(File::currentExecutableFile).getFullPathName());
+                        procArgs.addArray(args);
+                        procArgs.addArray({"-id", String(id)});
+                        proc.start(procArgs);
                     }
-                } while (!done);
-                quit();
-            });
+                    for (int i = 0; i < ids.size(); i++) {
+                        auto& proc = masters[(size_t)i];
+                        proc.waitForProcessToFinish(-1);
+                    }
+                    quit();
+                });
+            }
             break;
+        }
     }
     logln("initialise complete");
 }
@@ -609,6 +654,15 @@ void App::setWorkerErrorCallback(Thread::ThreadID tid, ErrorCallback fn) {
 PopupMenu App::getMenuForIndex(int topLevelMenuIndex, const String& /* menuName */) {
     PopupMenu menu;
     if (topLevelMenuIndex == 0) {  // Settings
+        if (auto srv = getApp()->getServer()) {
+            String n = srv->getName();
+            int id = srv->getId();
+            if (id > 0) {
+                n << ":" << id;
+            }
+            menu.addItem(n, false, false, nullptr);
+            menu.addSeparator();
+        }
         menu.addItem("Settings", [this] {
             if (nullptr == m_srvSettingsWindow) {
                 m_srvSettingsWindow = std::make_unique<ServerSettingsWindow>(this);

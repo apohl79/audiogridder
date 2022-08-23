@@ -64,6 +64,7 @@ static const String PLUGIN_CONFIG_FILE_OLD = "~/.audiogridder";
 static const String KNOWN_PLUGINS_FILE_OLD = "~/.audiogridderserver.cache";
 
 static const String SERVER_CONFIG_FILE = "~/.audiogridder/audiogridderserver{id}.cfg";
+static const String SERVERS_STARTUP_FILE = "~/.audiogridder/serverstartup.cfg";
 static const String PLUGIN_CONFIG_FILE = "~/.audiogridder/audiogridderplugin.cfg";
 static const String PLUGIN_TRAY_CONFIG_FILE = "~/.audiogridder/audiogridderplugintray.cfg";
 static const String KNOWN_PLUGINS_FILE = "~/.audiogridder/audiogridderserver{id}.cache";
@@ -90,6 +91,9 @@ static const String KNOWN_PLUGINS_FILE_OLD =
 static const String SERVER_CONFIG_FILE =
     File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
     "\\AudioGridder\\audiogridderserver{id}.cfg";
+static const String SERVERS_STARTUP_FILE =
+    File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
+    "\\AudioGridder\\serverstartup.cfg";
 static const String PLUGIN_CONFIG_FILE =
     File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
     "\\AudioGridder\\audiogridderplugin.cfg";
@@ -126,6 +130,7 @@ static const String DOMAIN_SOCKETS_DIR =
 
 enum ConfigFileType {
     ConfigServer,
+    ConfigServerStartup,
     ConfigServerRun,
     ConfigPlugin,
     ConfigPluginCache,
@@ -220,6 +225,9 @@ inline String getConfigFileName(ConfigFileType type, const std::unordered_map<St
         case ConfigServer:
             file = SERVER_CONFIG_FILE;
             fileOld = SERVER_CONFIG_FILE_OLD;
+            break;
+        case ConfigServerStartup:
+            file = SERVERS_STARTUP_FILE;
             break;
         case ConfigPlugin:
             file = PLUGIN_CONFIG_FILE;
