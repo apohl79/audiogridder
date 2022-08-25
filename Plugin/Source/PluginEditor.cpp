@@ -707,6 +707,13 @@ void PluginEditor::setCPULoad(float load) {
     m_cpuLabel.setColour(Label::textColourId, Colour(col));
 }
 
+void PluginEditor::updateState() {
+    createPluginButtons();
+    initToolsButtons();
+    resetPluginScreen();
+    resized();
+}
+
 void PluginEditor::mouseUp(const MouseEvent& event) {
     traceScope();
     if (event.eventComponent == &m_srvIcon) {
@@ -1424,12 +1431,7 @@ void PluginEditor::getPresetsMenu(PopupMenu& menu, const File& dir) {
             }
             menu.addItem(file.getFileNameWithoutExtension(), [this, file] {
                 traceScope();
-                if (m_processor.loadPreset(file)) {
-                    createPluginButtons();
-                    resetPluginScreen();
-                    resized();
-                    m_processor.getClient().reconnect();
-                }
+                m_processor.loadPreset(file);
             });
         }
     }

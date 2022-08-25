@@ -907,7 +907,15 @@ bool PluginProcessor::setState(const json& j) {
     } else if (activeServer > -1 && activeServer < m_servers.size()) {
         m_client->setServer(m_servers[activeServer]);
         m_client->reconnect();
+    } else if (m_client->isReadyLockFree()) {
+        m_client->reconnect();
     }
+
+    runOnMsgThreadAsync([this] {
+        if (auto* e = dynamic_cast<PluginEditor*>(getActiveEditor())) {
+            e->updateState();
+        }
+    });
 
     return true;
 }
