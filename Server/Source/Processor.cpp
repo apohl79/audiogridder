@@ -850,6 +850,8 @@ template <typename T>
 std::shared_ptr<ProcessorWindow> Processor::getOrCreateEditorWindowInternal(Thread::ThreadID tid, T func,
                                                                             std::function<void()> onHide, int x,
                                                                             int y) {
+    traceScope();
+
     if (auto& w = m_windows[getWindowIndex()]) {
         return w;
     }
@@ -861,6 +863,8 @@ std::shared_ptr<ProcessorWindow> Processor::getOrCreateEditorWindowInternal(Thre
 }
 
 std::shared_ptr<ProcessorWindow> Processor::recreateEditorWindow() {
+    traceScope();
+
     if (auto& w = m_windows[getWindowIndex()]) {
         auto pos = w->getPosition();
         auto tid = w->getTid();
