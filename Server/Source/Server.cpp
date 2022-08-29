@@ -348,8 +348,11 @@ void Server::loadKnownPluginList(KnownPluginList& plist, json& playouts, int srv
 
     if (cacheFile.existsAsFile()) {
         logln("loading plugins cache from " << cacheFile.getFullPathName());
-        auto xml = XmlDocument::parse(cacheFile);
-        plist.recreateFromXml(*xml);
+        if (auto xml = XmlDocument::parse(cacheFile)) {
+            plist.recreateFromXml(*xml);
+        } else {
+            logln("failed to parse plugins cache " << cacheFile.getFullPathName());
+        }
     } else {
         logln("no plugins cache found");
     }
