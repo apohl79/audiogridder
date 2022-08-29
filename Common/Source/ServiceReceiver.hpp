@@ -21,7 +21,7 @@ class ServiceReceiver : public Thread, public LogTag {
     ServiceReceiver() : Thread("ServiceReceiver"), LogTag("mdns") { startThread(); }
     ~ServiceReceiver() override {
         logln("stopping receiver");
-        stopThread(1000);
+        stopThread(1500);
     }
 
     void run() override;
