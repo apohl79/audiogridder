@@ -654,6 +654,7 @@ void App::setWorkerErrorCallback(Thread::ThreadID tid, ErrorCallback fn) {
 PopupMenu App::getMenuForIndex(int topLevelMenuIndex, const String& /* menuName */) {
     PopupMenu menu;
     if (topLevelMenuIndex == 0) {  // Settings
+        bool enabled = m_splashWindow == nullptr;
         if (auto srv = getApp()->getServer()) {
             String n = srv->getName();
             int id = srv->getId();
@@ -663,7 +664,7 @@ PopupMenu App::getMenuForIndex(int topLevelMenuIndex, const String& /* menuName 
             menu.addItem(n, false, false, nullptr);
             menu.addSeparator();
         }
-        menu.addItem("Settings", [this] {
+        menu.addItem("Settings", enabled, false, [this] {
             if (nullptr == m_srvSettingsWindow) {
                 m_srvSettingsWindow = std::make_unique<ServerSettingsWindow>(this);
                 updateDockIcon();
@@ -671,7 +672,7 @@ PopupMenu App::getMenuForIndex(int topLevelMenuIndex, const String& /* menuName 
                 windowToFront(m_srvSettingsWindow.get());
             }
         });
-        menu.addItem("Plugins", [this] {
+        menu.addItem("Plugins", enabled, false, [this] {
             if (nullptr == m_pluginListWindow) {
                 m_pluginListWindow = std::make_unique<PluginListWindow>(
                     this, m_server->getPluginList(), Defaults::getConfigFileName(Defaults::ConfigDeadMan));
@@ -681,7 +682,7 @@ PopupMenu App::getMenuForIndex(int topLevelMenuIndex, const String& /* menuName 
             }
         });
         menu.addSeparator();
-        menu.addItem("Statistics", [this] {
+        menu.addItem("Statistics", enabled, false, [this] {
             if (nullptr == m_statsWindow) {
                 m_statsWindow = std::make_unique<StatisticsWindow>(this);
                 updateDockIcon();
@@ -690,8 +691,8 @@ PopupMenu App::getMenuForIndex(int topLevelMenuIndex, const String& /* menuName 
             }
         });
         menu.addSeparator();
-        menu.addItem("Rescan", [this] { restartServer(true); });
-        menu.addItem("Wipe Cache & Rescan", [this] {
+        menu.addItem("Rescan", enabled, false, [this] { restartServer(true); });
+        menu.addItem("Wipe Cache & Rescan", enabled, false, [this] {
             m_server->saveKnownPluginList(true);
             restartServer(true);
         });
