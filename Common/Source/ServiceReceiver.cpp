@@ -132,6 +132,9 @@ bool ServiceReceiver::updateServers() {
     // reachable checks of existing servers
     int idx = 0;
     for (auto& srv : getServersInternal()) {
+        if (threadShouldExit()) {
+            return false;
+        }
         if (!isReachable(srv)) {
             std::lock_guard<std::mutex> lock(m_serversMtx);
             m_servers.remove(idx);
@@ -142,6 +145,9 @@ bool ServiceReceiver::updateServers() {
     }
     // reachable checks of new servers
     for (auto& srv : newServers) {
+        if (threadShouldExit()) {
+            return false;
+        }
         if (isReachable(srv)) {
             std::lock_guard<std::mutex> lock(m_serversMtx);
             m_servers.add(srv);
