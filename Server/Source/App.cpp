@@ -316,28 +316,34 @@ void App::initialise(const String& commandLineParameters) {
 
 void App::prepareShutdown(uint32 exitCode) {
     traceScope();
-    logln("preparing shutdown");
 
     m_exitCode = exitCode;
 
-    std::thread([this] {
-        Thread::setCurrentThreadName("ShutdownThread");
+    if (!m_preparingShutdown.exchange(true)) {
+        logln("preparing shutdown");
 
-        traceScope();
+        std::thread([this] {
+            Thread::setCurrentThreadName("ShutdownThread");
 
-        if (m_server != nullptr) {
-            runOnMsgThreadSync([this] {
-                hideEditor();
-                hidePluginList();
-                hideServerSettings();
-            });
-            m_server->shutdown();
-            m_server->waitForThreadToExit(-1);
-            m_server.reset();
-        }
+            traceScope();
 
+            if (m_server != nullptr) {
+                runOnMsgThreadSync([this] {
+                    hideEditor();
+                    hidePluginList();
+                    hideServerSettings();
+                });
+                m_server->shutdown();
+                m_server->waitForThreadToExit(-1);
+                m_server.reset();
+            }
+
+            quit();
+        }).detach();
+    } else {
+        logln("shutdown initiated already, quitting immediately");
         quit();
-    }).detach();
+    }
 }
 
 void App::shutdown() {
@@ -361,9 +367,12 @@ void App::shutdown() {
         m_server.reset();
     }
 
+    logln("exit code = " << String(m_exitCode));
+
     Tracer::cleanup();
     Logger::cleanup();
     Sentry::cleanup();
+
     setApplicationReturnValue((int)m_exitCode);
 }
 

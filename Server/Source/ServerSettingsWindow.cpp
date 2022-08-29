@@ -523,7 +523,6 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
         auto appCpy = app;
 
         if (auto srv = appCpy->getServer()) {
-            //srv->setOpt("ID", m_idText.getText().getIntValue());
             srv->setName(m_nameText.getText());
             srv->setEnableAU(m_auSupport.getToggleState());
             srv->setEnableVST3(m_vst3Support.getToggleState());

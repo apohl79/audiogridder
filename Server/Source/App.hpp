@@ -94,6 +94,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     std::shared_ptr<Server> m_server;
     std::unique_ptr<std::thread> m_child;
     std::atomic_bool m_stopChild{false};
+    std::atomic_bool m_preparingShutdown{false};
 
     std::unordered_map<uint64, std::shared_ptr<Processor>> m_processors;
     std::mutex m_processorsMtx;
