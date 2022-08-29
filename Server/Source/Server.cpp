@@ -1056,9 +1056,19 @@ void Server::runServer() {
                    << " instrument=" << (int)desc.isInstrument);
     }
 
+    // some time could have passed by until we reach that point, lets check if the user decided to quit
+    if (threadShouldExit()) {
+        return;
+    }
+
     m_sandboxDeleter = std::make_unique<SandboxDeleter>();
 
     checkPort();
+
+    // some time could have passed by until we reach that point, lets check if the user decided to quit
+    if (threadShouldExit()) {
+        return;
+    }
 
     if (getScreenLocalMode() && Defaults::unixDomainSocketsSupported()) {
         auto socketPath = Defaults::getSocketPath(Defaults::SERVER_SOCK, {{"id", String(getId())}}, true);
