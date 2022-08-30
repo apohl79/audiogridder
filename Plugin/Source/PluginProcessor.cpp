@@ -256,6 +256,7 @@ void PluginProcessor::loadConfig(const json& j, bool isUpdate) {
     }
 
     m_numberOfAutomationSlots = jsonGetValue(j, "NumberOfAutomationSlots", m_numberOfAutomationSlots);
+    m_menuShowType = jsonGetValue(j, "MenuShowType", m_menuShowType);
     m_menuShowCategory = jsonGetValue(j, "MenuShowCategory", m_menuShowCategory);
     m_menuShowCompany = jsonGetValue(j, "MenuShowCompany", m_menuShowCompany);
     m_genericEditor = jsonGetValue(j, "GenericEditor", m_genericEditor);
@@ -309,6 +310,7 @@ void PluginProcessor::saveConfig(int numOfBuffers) {
     jcfg["NumberOfBuffers"] = numOfBuffers;
     jcfg["NumberOfAutomationSlots"] = m_numberOfAutomationSlots;
     jcfg["LoadPluginTimeoutMS"] = m_client->LOAD_PLUGIN_TIMEOUT.load();
+    jcfg["MenuShowType"] = m_menuShowType;
     jcfg["MenuShowCategory"] = m_menuShowCategory;
     jcfg["MenuShowCompany"] = m_menuShowCompany;
     jcfg["GenericEditor"] = m_genericEditor;

@@ -321,6 +321,7 @@ static constexpr int DEFAULT_NUM_RECENTS = 10;
 static constexpr int DEFAULT_LOAD_PLUGIN_TIMEOUT = 15000;
 
 static constexpr uint32 BG_COLOR = 0xff222222;
+static constexpr uint32 BG_ACTIVE_COLOR = 0xff323232;
 static constexpr uint32 TOOLTIP_BG_COLOR = 0xe0323232;
 static constexpr uint32 BUTTON_COLOR = 0xff333333;
 static constexpr uint32 SLIDERTRACK_COLOR = 0xffffc13b;

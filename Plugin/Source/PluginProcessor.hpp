@@ -304,6 +304,8 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     void restoreSettingsB();
     void resetSettingsAB();
 
+    bool getMenuShowType() const { return m_menuShowType; }
+    void setMenuShowType(bool b) { m_menuShowType = b; }
     bool getMenuShowCategory() const { return m_menuShowCategory; }
     void setMenuShowCategory(bool b) { m_menuShowCategory = b; }
     bool getMenuShowCompany() const { return m_menuShowCompany; }
@@ -492,6 +494,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
 
     String m_settingsA, m_settingsB;
 
+    bool m_menuShowType = true;
     bool m_menuShowCategory = true;
     bool m_menuShowCompany = true;
     bool m_genericEditor = false;

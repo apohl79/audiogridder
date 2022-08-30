@@ -127,6 +127,8 @@ class ServerPlugin {
 };
 
 struct MenuLevel {
+    enum Type { NONE, FORMAT, CATEGORY, COMPANY, PLUGIN };
+    Type type = NONE;
     std::unique_ptr<std::map<String, ServerPlugin>> entryMap;
     std::unique_ptr<std::map<String, MenuLevel>> subMap;
 };

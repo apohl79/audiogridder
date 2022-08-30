@@ -1134,6 +1134,11 @@ void PluginEditor::showSettingsMenu() {
 
     m.addSeparator();
 
+    subsubm.addItem("Show Plugin Format", true, m_processor.getMenuShowType(), [this] {
+        traceScope();
+        m_processor.setMenuShowType(!m_processor.getMenuShowType());
+        m_processor.saveConfig();
+    });
     subsubm.addItem("Show Category", true, m_processor.getMenuShowCategory(), [this] {
         traceScope();
         m_processor.setMenuShowCategory(!m_processor.getMenuShowCategory());

@@ -207,8 +207,8 @@ void PluginSearchWindow::updateTree(const String& filter) {
 
     auto filterParts = StringArray::fromTokens(filter, " ", "");
 
-    // ceate menu structure: type -> [category] -> [company] -> plugin
-    std::map<String, MenuLevel> menuMap;
+    // ceate menu structure: [type] -> [category] -> [company] -> plugin
+    MenuLevel menuRoot;
     for (const auto& type : m_processor.getPluginTypes()) {
         for (const auto& plug : m_processor.getPlugins(type)) {
             if (filterParts.size() > 0) {
@@ -223,45 +223,143 @@ void PluginSearchWindow::updateTree(const String& filter) {
                     continue;
                 }
             }
-            auto& typeEntry = menuMap[type];
-            if (nullptr == typeEntry.subMap) {
-                typeEntry.subMap = std::make_unique<std::map<String, MenuLevel>>();
+
+            auto* level = &menuRoot;
+
+            if (m_processor.getMenuShowType()) {
+                level = addTypeMenu(level, type);
             }
-            auto* level = &typeEntry;
+
             if (m_processor.getMenuShowCategory()) {
-                for (auto category : StringArray::fromTokens(plug.getCategory(), "|", "")) {
-                    if (nullptr == level->subMap) {
-                        level->subMap = std::make_unique<std::map<String, MenuLevel>>();
-                    }
-                    auto& entry = (*level->subMap)[category];
-                    level = &entry;
-                }
+                level = addCategoryMenu(level, plug.getCategory());
             }
+
             if (m_processor.getMenuShowCompany()) {
-                if (nullptr == level->subMap) {
-                    level->subMap = std::make_unique<std::map<String, MenuLevel>>();
-                }
-                auto& entry = (*level->subMap)[plug.getCompany()];
-                level = &entry;
+                level = addCompanyMenu(level, plug.getCompany());
             }
+
+            level = findPluginLevel(level);
+
             if (nullptr == level->entryMap) {
                 level->entryMap = std::make_unique<std::map<String, ServerPlugin>>();
             }
-            (*level->entryMap)[plug.getName()] = plug;
+
+            int num = 0;
+            String name;
+
+            do {
+                name = plug.getName();
+                if (num > 0) {
+                    name << " (" << num << ")";
+                }
+            } while (level->entryMap->find(name) != level->entryMap->end() && ++num > 0);
+
+            (*level->entryMap)[name] = plug;
         }
     }
-    if (menuMap.size() == 1) {
-        for (auto& type : menuMap) {
-            auto folder = createPluginMenu(type.first, type.second, addFn);
-            for (int i = 0; i < folder->getNumSubItems(); i++) {
-                root->addSubItem(folder->getSubItem(i));
-            }
-        }
-    } else {
-        for (auto& type : menuMap) {
+
+    if (nullptr != menuRoot.subMap) {
+        for (auto& type : *menuRoot.subMap) {
             root->addSubItem(createPluginMenu(type.first, type.second, addFn));
         }
     }
+}
+
+MenuLevel* PluginSearchWindow::addTypeMenu(MenuLevel* level, const String& type) {
+    if (nullptr == level->subMap) {
+        level->subMap = std::make_unique<std::map<String, MenuLevel>>();
+    }
+
+    if (level->type == MenuLevel::NONE) {
+        level->type = MenuLevel::FORMAT;
+    }
+
+    auto& entry = (*level->subMap)[type];
+
+    return &entry;
+}
+
+MenuLevel* PluginSearchWindow::addCategoryMenu(MenuLevel* level, const String& category) {
+    for (auto subCategory : StringArray::fromTokens(category, "|", "")) {
+        auto normalizedCategory = normalizeCategory(subCategory);
+        if (normalizedCategory.isNotEmpty()) {
+            if (nullptr == level->subMap) {
+                level->subMap = std::make_unique<std::map<String, MenuLevel>>();
+            }
+
+            if (level->type == MenuLevel::NONE) {
+                level->type = MenuLevel::CATEGORY;
+            } else if (level->type != MenuLevel::CATEGORY) {
+                // Plugin or company entries have already been added, but we have another sub category, so we
+                // migrate them to "Other"
+                auto& otherEntry = (*level->subMap)["Other"];
+
+                if (nullptr == otherEntry.subMap) {
+                    otherEntry.subMap = std::make_unique<std::map<String, MenuLevel>>();
+                }
+
+                for (auto it = level->subMap->begin(); it != level->subMap->end();) {
+                    if (it->first != "Other") {
+                        (*otherEntry.subMap)[it->first] = std::move(it->second);
+                        it = level->subMap->erase(it);
+                    } else {
+                        it++;
+                    }
+                }
+
+                if (nullptr != level->entryMap) {
+                    if (nullptr == otherEntry.entryMap) {
+                        otherEntry.entryMap = std::make_unique<std::map<String, ServerPlugin>>();
+                    }
+
+                    for (auto& kv : *level->entryMap) {
+                        (*otherEntry.entryMap)[kv.first] = std::move(kv.second);
+                    }
+
+                    level->entryMap->clear();
+                }
+
+                level->type = MenuLevel::CATEGORY;
+            }
+
+            auto& entry = (*level->subMap)[normalizedCategory];
+            level = &entry;
+        }
+    }
+    return level;
+}
+
+MenuLevel* PluginSearchWindow::addCompanyMenu(MenuLevel* level, const String& company) {
+    if (nullptr == level->subMap) {
+        level->subMap = std::make_unique<std::map<String, MenuLevel>>();
+    }
+
+    if (level->type == MenuLevel::NONE) {
+        level->type = MenuLevel::COMPANY;
+    } else if (level->type == MenuLevel::CATEGORY) {
+        // There are sub catories, but this plugin does not have one, so we move it to "Other"
+        auto& otherEntry = (*level->subMap)["Other"];
+        return addCompanyMenu(&otherEntry, company);
+    }
+
+    auto& entry = (*level->subMap)[normalizeCompany(company)];
+    return &entry;
+}
+
+MenuLevel* PluginSearchWindow::findPluginLevel(MenuLevel* level) {
+    if (level->type == MenuLevel::NONE) {
+        level->type = MenuLevel::PLUGIN;
+    }
+
+    if (level->type != MenuLevel::PLUGIN) {
+        if (nullptr == level->subMap) {
+            level->subMap = std::make_unique<std::map<String, MenuLevel>>();
+        }
+        auto& otherEntry = (*level->subMap)["Other"];
+        return findPluginLevel(&otherEntry);
+    }
+
+    return level;
 }
 
 TreeViewItem* PluginSearchWindow::createPluginMenu(const String& name, MenuLevel& level,
@@ -272,7 +370,7 @@ TreeViewItem* PluginSearchWindow::createPluginMenu(const String& name, MenuLevel
     if (nullptr != level.entryMap) {
         for (auto& pair : *level.entryMap) {
             auto& plug = pair.second;
-            auto* plugEntry = new TreePlugin(plug, onOpenClose, m_showType);
+            auto* plugEntry = new TreePlugin(plug, onOpenClose, /*m_showType*/ false, true);
             m->addSubItem(plugEntry);
             if (plug.getLayouts().isEmpty()) {
                 plugEntry->addSubItem(new TreeLayout(plug, "Default", addFn));
@@ -290,6 +388,29 @@ TreeViewItem* PluginSearchWindow::createPluginMenu(const String& name, MenuLevel
         }
     }
     return m;
+}
+
+const String& PluginSearchWindow::normalizeCategory(const String& category) {
+    static std::unordered_map<String, String> map = {{"Fx", "Effect"}, {"Synth", "Instrument"}, {"Waves", ""}};
+
+    auto it = map.find(category);
+    if (it != map.end()) {
+        return it->second;
+    }
+
+    return category;
+}
+
+const String& PluginSearchWindow::normalizeCompany(const String& company) {
+    static std::unordered_map<String, String> map = {{"iZotope, Inc.", "iZotope"},
+                                                     {"Native Instruments GmbH", "Native Instruments"}};
+
+    auto it = map.find(company);
+    if (it != map.end()) {
+        return it->second;
+    }
+
+    return company;
 }
 
 }  // namespace e47
