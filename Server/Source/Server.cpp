@@ -144,6 +144,7 @@ void Server::loadConfig() {
     m_pluginWindowsOnTop = jsonGetValue(cfg, "PluginWindowsOnTop", m_pluginWindowsOnTop);
     m_scanForPlugins = jsonGetValue(cfg, "ScanForPlugins", m_scanForPlugins);
     m_crashReporting = jsonGetValue(cfg, "CrashReporting", m_crashReporting);
+    m_processingTraceTresholdMs = jsonGetValue(cfg, "ProcessingTraceTresholdMs", m_processingTraceTresholdMs);
     logln("crash reporting is " << (m_crashReporting ? "enabled" : "disabled"));
     m_sandboxMode = (SandboxMode)jsonGetValue(cfg, "SandboxMode", m_sandboxMode);
     logln("sandbox mode is " << (m_sandboxMode == SANDBOX_CHAIN    ? "chain isolation"
@@ -204,6 +205,7 @@ void Server::saveConfig() {
     j["CrashReporting"] = m_crashReporting;
     j["SandboxMode"] = m_sandboxMode;
     j["SandboxLogAutoclean"] = m_sandboxLogAutoclean;
+    j["ProcessingTraceTresholdMs"] = m_processingTraceTresholdMs;
 
     File cfg(Defaults::getConfigFileName(Defaults::ConfigServer, {{"id", String(getId())}}));
     logln("saving config to " << cfg.getFullPathName());

@@ -119,6 +119,9 @@ class Server : public Thread, public LogTag {
     void updateSandboxNetworkStats(const String& key, uint32 loaded, double bytesIn, double bytesOut, double rps,
                                    const std::vector<TimeStatistic::Histogram>& audioHists);
 
+    double getProcessingTraceTresholdMs() const { return m_processingTraceTresholdMs; }
+    void setProcessingTraceTresholdMs(double d) { m_processingTraceTresholdMs = d; }
+
     template <typename T>
     inline T getOpt(const String& name, T def) const {
         return jsonGetValue(m_opts, name, def);
@@ -162,6 +165,7 @@ class Server : public Thread, public LogTag {
     bool m_crashReporting = true;
     SandboxMode m_sandboxMode = SANDBOX_CHAIN, m_sandboxModeRuntime = SANDBOX_NONE;
     bool m_sandboxLogAutoclean = true;
+    double m_processingTraceTresholdMs = 10.0;
 
     HashMap<String, std::shared_ptr<SandboxMaster>, DefaultHashFunctions, CriticalSection> m_sandboxes;
 

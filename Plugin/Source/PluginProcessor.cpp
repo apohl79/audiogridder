@@ -285,6 +285,7 @@ void PluginProcessor::loadConfig(const json& j, bool isUpdate) {
     m_bypassWhenNotConnected = jsonGetValue(j, "BypassWhenNotConnected", m_bypassWhenNotConnected.load());
     m_bufferSizeByPlugin = jsonGetValue(j, "BufferSettingByPlugin", m_bufferSizeByPlugin);
     m_client->FIXED_OUTBOUND_BUFFER = jsonGetValue(j, "FixedOutboundBuffer", m_client->FIXED_OUTBOUND_BUFFER.load());
+    m_processingTraceTresholdMs = jsonGetValue(j, "ProcessingTraceTresholdMs", m_processingTraceTresholdMs);
 }
 
 void PluginProcessor::saveConfig(int numOfBuffers) {
@@ -333,6 +334,7 @@ void PluginProcessor::saveConfig(int numOfBuffers) {
     jcfg["BypassWhenNotConnected"] = m_bypassWhenNotConnected.load();
     jcfg["BufferSettingByPlugin"] = m_bufferSizeByPlugin;
     jcfg["FixedOutboundBuffer"] = m_client->FIXED_OUTBOUND_BUFFER.load();
+    jcfg["ProcessingTraceTresholdMs"] = m_processingTraceTresholdMs;
 
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), jcfg);
 }
@@ -723,7 +725,7 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
     }
 
     traceCtx->add("pb_finish");
-    traceCtx->summary(getLogTagSource(), "process block", 15.0);
+    traceCtx->summary(getLogTagSource(), "process block", m_processingTraceTresholdMs);
 
     TimeTrace::deleteTraceContext();
 }

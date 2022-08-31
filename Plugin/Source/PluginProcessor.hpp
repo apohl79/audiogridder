@@ -525,6 +525,8 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     bool m_midiIsPlaying = false;
     int m_blocksWithoutMidi = 0;
 
+    double m_processingTraceTresholdMs = 15.0;
+
     static BusesProperties createBusesProperties(WrapperType wt) {
         int chIn = Defaults::PLUGIN_CHANNELS_IN;
         int chOut = Defaults::PLUGIN_CHANNELS_OUT;
