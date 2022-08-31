@@ -1174,7 +1174,9 @@ void Server::runServer() {
                             traceScope();
                             if (!sendHandshakeResponse(clnt, true, sandboxPort)) {
                                 logln("failed to send handshake response for sandbox " << id);
+                                auto deleter = m_sandboxes[id];
                                 m_sandboxes.remove(id);
+                                m_sandboxDeleter->add(std::move(deleter));
                             }
                             clnt->close();
                             delete clnt;
