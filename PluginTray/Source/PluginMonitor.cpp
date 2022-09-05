@@ -33,19 +33,14 @@ PluginMonitorWindow::PluginMonitorWindow(PluginMonitor* mon, App* app)
     m_title.addMouseListener(this, true);
     addAndMakeVisible(m_title);
 
-    int legendX = 260;
     font.setBold(false);
 
     auto addLegend = [&](Status& legend, Label& label, const String& text) {
-        legend.setBounds(legendX, 10, 6, 16);
-        legendX += 8;
         addAndMakeVisible(legend);
         label.setText(text, NotificationType::dontSendNotification);
         label.setFont(font);
         label.setAlpha(0.3f);
-        label.setBounds(legendX, 10, font.getStringWidth(text) + 18, 16);
         addAndMakeVisible(label);
-        legendX += label.getWidth();
     };
 
     m_legendOk.setColor(true, true);
@@ -92,24 +87,33 @@ void PluginMonitorWindow::update() {
     int borderTB = 0;   // top/bottom border
     int rowHeight = 19;
 
-    int colWidth[] = {m_channelColWidth, m_channelNameWidth, 190, 45, 30, 65, 10};
+    int colWidth[] = {m_channelColWidth, m_channelNameWidth, 190, 45, m_bufferWidth, m_bufferWidth,
+                      m_bufferWidth,     m_readErrWidth,     65,  10};
 
     if (!m_mon->showChannelColor) {
-        colWidth[0] = 0;
+        colWidth[m_channelColIdx] = 0;
     }
-
     if (!m_mon->showChannelName) {
-        colWidth[1] = 0;
+        colWidth[m_channelNameIdx] = 0;
+    }
+    if (!m_mon->showBufferAvg) {
+        colWidth[m_bufferAvgIdx] = 0;
+    }
+    if (!m_mon->showBuffer95th) {
+        colWidth[m_buffer95thIdx] = 0;
+    }
+    if (!m_mon->showReadErrors) {
+        colWidth[m_readErrIdx] = 0;
     }
 
     auto getLabelBounds = [&](int r, int c, int span = 1) {
         int left = borderLR;
         for (int i = 0; i < c; i++) {
-            left += colWidth[i];
+            left += colWidth[(size_t)i];
         }
         int width = 0;
         for (int i = c; i < c + span; i++) {
-            width += colWidth[i];
+            width += colWidth[(size_t)i];
         }
         return juce::Rectangle<int>(left, borderTB + r * rowHeight + 1, width, rowHeight - 1);
     };
@@ -121,14 +125,23 @@ void PluginMonitorWindow::update() {
     int row = 0;
 
     if (m_mon->showChannelName) {
-        addLabel("Channel", "", getLabelBounds(row, 0, 2), Justification::topLeft, 1.0f);
+        addLabel("Channel", "", getLabelBounds(row, 0, 2), Justification::topLeft, Colours::white, 1.0f);
     } else if (m_mon->showChannelColor) {
-        addLabel("Ch", "", getLabelBounds(row, 0, 2), Justification::topLeft, 1.0f);
+        addLabel("Ch", "", getLabelBounds(row, 0, 2), Justification::topLeft, Colours::white, 1.0f);
     }
-    addLabel("Inserts", "", getLabelBounds(row, 2), Justification::topLeft, 1.0f);
-    addLabel("I/O", "", getLabelBounds(row, 3), Justification::topRight, 1.0f);
-    addLabel("Buf", "", getLabelBounds(row, 4), Justification::topRight, 1.0f);
-    addLabel("Perf", "", getLabelBounds(row, 5), Justification::topRight, 1.0f);
+    addLabel("Inserts", "", getLabelBounds(row, 2), Justification::topLeft, Colours::white, 1.0f);
+    addLabel("I/O", "", getLabelBounds(row, 3), Justification::topRight, Colours::white, 1.0f);
+    addLabel("Buf", "", getLabelBounds(row, 4), Justification::topRight, Colours::white, 1.0f);
+    if (m_mon->showBufferAvg) {
+        addLabel("Bav", "", getLabelBounds(row, 5), Justification::topRight, Colours::white, 1.0f);
+    }
+    if (m_mon->showBuffer95th) {
+        addLabel("B95", "", getLabelBounds(row, 6), Justification::topRight, Colours::white, 1.0f);
+    }
+    if (m_mon->showReadErrors) {
+        addLabel("RdErr", "", getLabelBounds(row, 7), Justification::topRight, Colours::white, 1.0f);
+    }
+    addLabel("Perf", "", getLabelBounds(row, 8), Justification::topRight, Colours::white, 1.0f);
 
     row++;
 
@@ -153,8 +166,22 @@ void PluginMonitorWindow::update() {
         addLabel(s.loadedPlugins, s.loadedPluginsErr, getLabelBounds(row, 2));
         addLabel(io, s.loadedPluginsErr, getLabelBounds(row, 3), Justification::topRight);
         addLabel(String(s.blocks), s.loadedPluginsErr, getLabelBounds(row, 4), Justification::topRight);
-        addLabel(String(s.perf95th, 2) + " ms", s.loadedPluginsErr, getLabelBounds(row, 5), Justification::topRight);
-        auto led = std::make_unique<Status>(getLabelBounds(row, 6), s.connected, s.loadedPluginsOk);
+        if (m_mon->showBufferAvg) {
+            addLabel(String(s.rqAvg), s.loadedPluginsErr, getLabelBounds(row, 5), Justification::topRight);
+        }
+        if (m_mon->showBuffer95th) {
+            addLabel(String(s.rq95th), s.loadedPluginsErr, getLabelBounds(row, 6), Justification::topRight);
+        }
+        if (m_mon->showReadErrors) {
+            addLabel(String(s.readErrors), s.loadedPluginsErr, getLabelBounds(row, 7), Justification::topRight);
+        }
+        auto timeLevel = s.readTimeout > 0 ? s.perfMRA / s.readTimeout : 0.0;
+        addLabel(String(s.perfMRA, 2) + " ms", s.loadedPluginsErr, getLabelBounds(row, 8), Justification::topRight,
+                 timeLevel < 0.5   ? Colours::white
+                 : timeLevel < 0.7 ? Colours::yellow
+                 : timeLevel < 0.8 ? Colours::orange
+                                   : Colours::orangered);
+        auto led = std::make_unique<Status>(getLabelBounds(row, 9), s.connected, s.loadedPluginsOk);
         m_main.addChildAndSetID(led.get(), "led");
         m_components.push_back(std::move(led));
 
@@ -188,13 +215,14 @@ void PluginMonitorWindow::update() {
 }
 
 void PluginMonitorWindow::addLabel(const String& txt, const String& tooltip, juce::Rectangle<int> bounds,
-                                   Justification just, float alpha) {
+                                   Justification just, Colour col, float alpha) {
     auto label = std::make_unique<Label>();
     label->setText(txt, NotificationType::dontSendNotification);
     label->setTooltip(tooltip);
     auto f = label->getFont();
     f.setHeight(f.getHeight() - 2);
     label->setFont(f);
+    label->setColour(Label::textColourId, col);
     label->setAlpha(alpha);
     label->setBounds(bounds);
     label->setJustificationType(just);
@@ -210,6 +238,28 @@ void PluginMonitorWindow::updatePosition() {
     if (!m_mon->showChannelName) {
         width -= m_channelNameWidth;
     }
+    if (!m_mon->showBufferAvg) {
+        width -= m_bufferWidth;
+    }
+    if (!m_mon->showBuffer95th) {
+        width -= m_bufferWidth;
+    }
+    if (!m_mon->showReadErrors) {
+        width -= m_readErrWidth;
+    }
+
+    int legendX = width - m_legendWidth;
+
+    auto updateLegend = [&](Status& legend, Label& label) {
+        legend.setBounds(legendX, 10, 6, 16);
+        legendX += 8;
+        label.setBounds(legendX, 10, label.getFont().getStringWidth(label.getText()) + 18, 16);
+        legendX += label.getWidth();
+    };
+
+    updateLegend(m_legendOk, m_legendOkLbl);
+    updateLegend(m_legendNotLoaded, m_legendNotLoadedLbl);
+    updateLegend(m_legendNotConnected, m_legendNotConnectedLbl);
 
     auto disp = Desktop::getInstance().getDisplays().getPrimaryDisplay();
     if (nullptr == disp) {

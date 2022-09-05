@@ -25,6 +25,7 @@ class App : public JUCEApplication, public LogTag {
 #if !JUCE_LINUX
         m_tray = std::make_unique<Tray>(this);
 #endif
+        loadConfig();
     }
     ~App() override {}
 
@@ -97,6 +98,7 @@ class App : public JUCEApplication, public LogTag {
             uint32 colour;
             String loadedPlugins;
             double perf95th;
+            double perfMRA;
             int blocks;
             String serverNameId;
             String serverHost;
@@ -104,6 +106,10 @@ class App : public JUCEApplication, public LogTag {
             bool loadedPluginsOk;
             String loadedPluginsErr;
             int64 lastUpdated;
+            size_t rqAvg;
+            size_t rq95th;
+            int readTimeout;
+            uint64_t readErrors;
         };
 
         Status status;

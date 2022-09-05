@@ -1093,6 +1093,11 @@ void PluginEditor::showSettingsMenu() {
         m_processor.setBypassWhenNotConnected(!m_processor.getBypassWhenNotConnected());
         m_processor.saveConfig();
     });
+    subm.addItem("RealTime Mode", true, m_processor.getClient().LIVE_MODE, [this] {
+        traceScope();
+        m_processor.getClient().LIVE_MODE = !m_processor.getClient().LIVE_MODE;
+        m_processor.saveConfig();
+    });
 
     m.addSubMenu("Transfer Audio/MIDI", subm);
     subm.clear();

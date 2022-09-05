@@ -23,7 +23,9 @@
 namespace e47 {
 
 PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
-    : AudioProcessor(createBusesProperties(wt)), m_channelMapper(this) {
+    : AudioProcessor(createBusesProperties(wt)),
+      m_channelMapper(this),
+      m_processingDuration(TimeStatistic::getDuration("audio_process")) {
     initAsyncFunctors();
 
     Defaults::initPluginTheme();
@@ -286,6 +288,7 @@ void PluginProcessor::loadConfig(const json& j, bool isUpdate) {
     m_bufferSizeByPlugin = jsonGetValue(j, "BufferSettingByPlugin", m_bufferSizeByPlugin);
     m_client->FIXED_OUTBOUND_BUFFER = jsonGetValue(j, "FixedOutboundBuffer", m_client->FIXED_OUTBOUND_BUFFER.load());
     m_processingTraceTresholdMs = jsonGetValue(j, "ProcessingTraceTresholdMs", m_processingTraceTresholdMs);
+    m_client->LIVE_MODE = jsonGetValue(j, "LiveMode", m_client->LIVE_MODE.load());
 }
 
 void PluginProcessor::saveConfig(int numOfBuffers) {
@@ -335,6 +338,7 @@ void PluginProcessor::saveConfig(int numOfBuffers) {
     jcfg["BufferSettingByPlugin"] = m_bufferSizeByPlugin;
     jcfg["FixedOutboundBuffer"] = m_client->FIXED_OUTBOUND_BUFFER.load();
     jcfg["ProcessingTraceTresholdMs"] = m_processingTraceTresholdMs;
+    jcfg["LiveMode"] = m_client->LIVE_MODE.load();
 
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), jcfg);
 }
@@ -545,9 +549,11 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
     traceScope();
 
     auto traceCtx = TimeTrace::createTraceContext();
+    m_processingDuration.reset();
 
-    traceln("proc: m_bypassWhenNotConnected=" << (int)m_bypassWhenNotConnected.load()
-                                              << ", clientOk=" << (int)m_client->isReadyLockFree());
+    traceln("  proc: m_bypassWhenNotConnected=" << (int)m_bypassWhenNotConnected.load()
+                                                << ", clientOk=" << (int)m_client->isReadyLockFree()
+                                                << ", pluginsOk=" << (int)m_loadedPluginsOk);
 
     if (m_bypassWhenNotConnected &&
         (!m_client->isReadyLockFree() || !m_loadedPluginsOk || getNumOfLoadedPlugins() == 0)) {
@@ -661,6 +667,8 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
 
     traceCtx->add("pb_prep");
 
+    int readTimeoutMs = 0;
+
     if (transfer) {
         if ((buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) || midiMessages.getNumEvents() > 0) {
             auto streamer = m_client->getStreamer<T>();
@@ -668,17 +676,21 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
             traceCtx->add("pb_get_streamer");
 
             if (nullptr != streamer && m_loadedPluginsOk) {
+                readTimeoutMs = streamer->getReadTimeoutMs();
+
                 m_channelMapper.map(&buffer, sendBuffer);
 
                 traceCtx->add("pb_ch_map");
                 traceCtx->startGroup();
 
-                streamer->send(*sendBuffer, midiMessages, posInfo);
+                bool sendOk = streamer->send(*sendBuffer, midiMessages, posInfo);
 
                 traceCtx->finishGroup("pb_send");
                 traceCtx->startGroup();
 
-                streamer->read(*sendBuffer, midiMessages);
+                if (sendOk) {
+                    streamer->read(*sendBuffer, midiMessages);
+                }
 
                 traceCtx->finishGroup("pb_read");
 
@@ -691,6 +703,7 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
                     traceCtx->add("pb_update_latency");
                 }
             } else {
+                traceln("no streamer");
                 buffer.clear();
             }
         }
@@ -725,9 +738,11 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
     }
 
     traceCtx->add("pb_finish");
-    traceCtx->summary(getLogTagSource(), "process block", m_processingTraceTresholdMs);
 
-    TimeTrace::deleteTraceContext();
+    traceCtx->summary(getLogTagSource(), "process block",
+                      m_processingTraceTresholdMs > 0.0 ? m_processingTraceTresholdMs : readTimeoutMs);
+
+    m_processingDuration.update();
 }
 
 template <typename T>
@@ -1681,9 +1696,10 @@ void PluginProcessor::TrayConnection::sendStatus() {
     String statId = "audio.";
     statId << m_processor->getTagId();
     auto ts = Metrics::getStatistic<TimeStatistic>(statId);
+    bool isClientReady = client.isReadyLockFree();
 
     json j;
-    j["connected"] = client.isReadyLockFree();
+    j["connected"] = isClientReady;
     j["name"] = track.name.toStdString();
     j["channelsIn"] = m_processor->getMainBusNumInputChannels();
     j["channelsOut"] = m_processor->getTotalNumOutputChannels();
@@ -1697,6 +1713,7 @@ void PluginProcessor::TrayConnection::sendStatus() {
     j["loadedPlugins"] = client.getLoadedPluginsString().toStdString();
     j["loadedPluginsOk"] = m_processor->m_loadedPluginsOk.load();
     j["perf95th"] = ts->get1minHistogram().nintyFifth;
+    j["perfMRA"] = ts->getMostRecentAverage();
     j["blocks"] = client.NUM_OF_BUFFERS.load();
     j["serverNameId"] = m_processor->getActiveServerName().toStdString();
     j["serverHost"] = client.getServer().getHost().toStdString();
@@ -1713,6 +1730,27 @@ void PluginProcessor::TrayConnection::sendStatus() {
         }
         j["loadedPluginsErr"] = str.str();
     }
+
+    size_t rqAvg = 0, rqMin = 0, rqMax = 0, rq95th = 0;
+    int readTimeout = 0;
+    uint64_t readErrors = 0;
+    if (isClientReady) {
+        if (client.isUsingDoublePrecission()) {
+            auto streamer = client.getStreamer<double>();
+            streamer->getReadQueueMeter().aggregate(rqAvg, rqMin, rqMax, rq95th);
+            readTimeout = streamer->getReadTimeoutMs();
+            readErrors = streamer->getReadErrors();
+        } else {
+            auto streamer = client.getStreamer<float>();
+            streamer->getReadQueueMeter().aggregate(rqAvg, rqMin, rqMax, rq95th);
+            readTimeout = streamer->getReadTimeoutMs();
+            readErrors = streamer->getReadErrors();
+        }
+    }
+    j["rqAvg"] = rqAvg;
+    j["rq95th"] = rq95th;
+    j["readTimeout"] = readTimeout;
+    j["readErrors"] = readErrors;
 
     sendMessage(PluginTrayMessage(PluginTrayMessage::STATUS, j));
 }
