@@ -545,9 +545,11 @@ bool Processor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMes
         if (!p->isSuspended()) {
             if (isPlugin && m_channels > 1) {
                 // multi-mono
+                ScopedNoDenormals noDenormals;
                 AudioBuffer<T> chBuffer(buffer.getArrayOfWritePointers() + ch, 1, buffer.getNumSamples());
                 p->processBlock(chBuffer, midiMessages);
             } else {
+                ScopedNoDenormals noDenormals;
                 p->processBlock(buffer, midiMessages);
             }
             TimeTrace::addTracePoint("proc_process_" + String(ch));
