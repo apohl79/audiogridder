@@ -165,7 +165,7 @@ class Server : public Thread, public LogTag {
     bool m_crashReporting = true;
     SandboxMode m_sandboxMode = SANDBOX_CHAIN, m_sandboxModeRuntime = SANDBOX_NONE;
     bool m_sandboxLogAutoclean = true;
-    double m_processingTraceTresholdMs = 10.0;
+    double m_processingTraceTresholdMs = 0.0;
 
     HashMap<String, std::shared_ptr<SandboxMaster>, DefaultHashFunctions, CriticalSection> m_sandboxes;
 
