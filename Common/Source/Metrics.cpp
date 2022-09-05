@@ -19,8 +19,15 @@ thread_local std::shared_ptr<TimeTrace::TraceContext> t_traceCtx;
 
 void TimeStatistic::update(double t) {
     m_meter.increment();
-    std::lock_guard<std::mutex> lock(m_timesMtx);
-    m_times[m_timesIdx].push_back(t);
+    {
+        std::lock_guard<std::mutex> lock(m_timesMtx);
+        m_times[m_timesIdx].push_back(t);
+    }
+    {
+        std::lock_guard<std::mutex> lock(m_mostRecentMtx);
+        m_mostRecentTimes[m_mostRecentIdx++] = t;
+        m_mostRecentIdx %= m_mostRecentTimes.size();
+    }
 }
 
 void TimeStatistic::aggregate() {
@@ -118,6 +125,17 @@ TimeStatistic::Histogram TimeStatistic::get1minHistogram() {
     return aggregate;
 }
 
+double TimeStatistic::getMostRecentAverage() {
+    double total = 0.0;
+    {
+        std::lock_guard<std::mutex> lock(m_mostRecentMtx);
+        for (auto t : m_mostRecentTimes) {
+            total += t;
+        }
+    }
+    return total / m_mostRecentTimes.size();
+}
+
 void TimeStatistic::log(const String& name) {
     if (m_showLog) {
         auto hist = get1minHistogram();
@@ -200,7 +218,11 @@ Metrics::StatsMap Metrics::getStats() {
 void Metrics::cleanup() { SharedInstance::cleanup(); }
 
 std::shared_ptr<TimeTrace::TraceContext> TimeTrace::createTraceContext() {
-    t_traceCtx = std::make_shared<TimeTrace::TraceContext>();
+    if (nullptr == t_traceCtx) {
+        t_traceCtx = std::make_shared<TimeTrace::TraceContext>();
+    } else {
+        t_traceCtx->reset();
+    }
     return t_traceCtx;
 }
 
