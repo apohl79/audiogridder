@@ -36,7 +36,8 @@ class ServiceReceiver : public Thread, public LogTag {
 
     static Array<ServerInfo> getServers();
     static String hostToName(const String& host);
-    static ServerInfo hostToServerInfo(const String& host);
+    static ServerInfo lookupServerInfo(const String& host);
+    static ServerInfo lookupServerInfo(const Uuid& uuid);
 
   private:
     static std::shared_ptr<ServiceReceiver> m_inst;

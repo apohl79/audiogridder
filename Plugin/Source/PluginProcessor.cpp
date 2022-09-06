@@ -827,18 +827,13 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes) {
     }
 }
 
-json PluginProcessor::getState(bool withServers) {
+json PluginProcessor::getState(bool withActiveServer) {
     traceScope();
     json j;
     j["version"] = 5;
     j["Mode"] = m_mode.toStdString();
 
-    if (withServers) {
-        auto jservers = json::array();
-        for (auto& srv : m_servers) {
-            jservers.push_back(srv.toStdString());
-        }
-        j["servers"] = jservers;
+    if (withActiveServer) {
         j["activeServerStr"] = m_client->getServer().serialize().toStdString();
     }
 
@@ -879,13 +874,6 @@ bool PluginProcessor::setState(const json& j) {
             logln("error: mode mismatch, not setting state: cannot load  mode " << mode << " into " << m_mode
                                                                                 << " plugin");
             return false;
-        }
-    }
-
-    if (j.find("servers") != j.end()) {
-        m_servers.clear();
-        for (auto& srv : j["servers"]) {
-            m_servers.add(srv.get<std::string>());
         }
     }
 

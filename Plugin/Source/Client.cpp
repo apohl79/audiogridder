@@ -87,16 +87,26 @@ void Client::run() {
                 }
             }
             for (auto& si : servers) {
+                bool reconnect = false;
                 if (si.matches(srvInfo) && si != srvInfo &&
                     (!hostMatchExists || si.getHostAndID() == srvInfo.getHostAndID())) {
-                    bool reconnect = si.getHostAndID() != srvInfo.getHostAndID();
+                    // reconnect if the address of the same server has changed
+                    reconnect = si.getHostAndID() != srvInfo.getHostAndID();
                     srvInfo = si;
                     std::lock_guard<std::mutex> lock(m_srvMtx);
                     m_srvInfo = si;
-                    if (reconnect) {
-                        logln("server info changed, triggering reconnect");
-                        m_needsReconnect = true;
-                    }
+                } else if (srvInfo.getUUID() == Uuid::null() && srvInfo.getHostAndID() == si.getHostAndID()) {
+                    // reconnect to the MDNS info
+                    reconnect = true;
+                    srvInfo = si;
+                    std::lock_guard<std::mutex> lock(m_srvMtx);
+                    m_srvInfo = si;
+                }
+                if (reconnect) {
+                    logln("server info changed, triggering reconnect");
+                    std::lock_guard<std::mutex> lock(m_srvMtx);
+                    m_needsReconnect = true;
+                    break;
                 }
             }
         }
@@ -252,7 +262,18 @@ void Client::handleMessage(std::shared_ptr<Message<ServerError>> msg) {
 
 void Client::setServer(const ServerInfo& srv) {
     traceScope();
-    logln("setting server to " << srv.toString());
+
+    auto newSrv = srv;
+
+    if (srv.getUUID() == Uuid::null()) {
+        auto mdnsInfo = ServiceReceiver::lookupServerInfo(srv.getHostAndID());
+        if (mdnsInfo.isValid()) {
+            newSrv = mdnsInfo;
+        }
+    }
+
+    logln("setting server to " << newSrv.toString());
+
     std::lock_guard<std::mutex> lock(m_srvMtx);
     if (m_srvInfo != srv) {
         m_srvInfo = srv;
@@ -1181,7 +1202,7 @@ void Client::updatePluginList(bool sendRequest) {
 
 void Client::updateCPULoad() {
     traceScope();
-    auto srvInfo = ServiceReceiver::hostToServerInfo(getServer().getHost());
+    auto srvInfo = ServiceReceiver::lookupServerInfo(getServer().getHost());
     bool updated = false;
     int now = Time::getCurrentTime().getUTCOffsetSeconds();
     if (srvInfo.isValid()) {

@@ -807,44 +807,13 @@ void PluginEditor::showServerMenu() {
     m.addSubMenu("Buffer Size", subm);
     subm.clear();
 
-    auto& servers = m_processor.getServers();
     auto active = m_processor.getActiveServerHost();
-    for (auto s : servers) {
-        if (s == active) {
-            PopupMenu srvMenu;
-            srvMenu.addItem("Rescan", [this] {
-                traceScope();
-                m_processor.getClient().rescan();
-            });
-            srvMenu.addItem("Wipe Cache & Rescan", [this] {
-                traceScope();
-                m_processor.getClient().rescan(true);
-            });
-            srvMenu.addItem("Reconnect", [this] {
-                traceScope();
-                m_processor.getClient().close();
-            });
-            subm.addSubMenu(s, srvMenu, true, nullptr, true, 0);
-        } else {
-            PopupMenu srvMenu;
-            srvMenu.addItem("Connect", [this, s] {
-                traceScope();
-                m_processor.setActiveServer(s);
-                m_processor.saveConfig();
-            });
-            srvMenu.addItem("Remove", [this, s] {
-                traceScope();
-                m_processor.delServer(s);
-                m_processor.saveConfig();
-            });
-            subm.addSubMenu(s, srvMenu);
-        }
-    }
+
     auto serversMDNS = m_processor.getServersMDNS();
     if (serversMDNS.size() > 0) {
         bool showIp = false;
         std::set<String> names;
-        for (auto s : serversMDNS) {
+        for (auto& s : serversMDNS) {
             if (names.find(s.getNameAndID()) != names.end()) {
                 showIp = true;
                 break;
@@ -852,10 +821,7 @@ void PluginEditor::showServerMenu() {
                 names.insert(s.getNameAndID());
             }
         }
-        for (auto s : serversMDNS) {
-            if (servers.contains(s.getHostAndID())) {
-                continue;
-            }
+        for (auto& s : serversMDNS) {
             String name = s.getNameAndID();
             if (showIp) {
                 name << " (" << s.getHost() << ")";
@@ -885,6 +851,49 @@ void PluginEditor::showServerMenu() {
                 });
                 subm.addSubMenu(name, srvMenu);
             }
+        }
+    }
+
+    auto& servers = m_processor.getServers();
+    for (auto s : servers) {
+        bool skip = false;
+        for (auto& s2 : serversMDNS) {
+            if (s == s2.getNameAndID() || s == s2.getHostAndID()) {
+                skip = true;
+                break;
+            }
+        }
+        if (skip) {
+            continue;
+        }
+        if (s == active) {
+            PopupMenu srvMenu;
+            srvMenu.addItem("Rescan", [this] {
+                traceScope();
+                m_processor.getClient().rescan();
+            });
+            srvMenu.addItem("Wipe Cache & Rescan", [this] {
+                traceScope();
+                m_processor.getClient().rescan(true);
+            });
+            srvMenu.addItem("Reconnect", [this] {
+                traceScope();
+                m_processor.getClient().close();
+            });
+            subm.addSubMenu(s, srvMenu, true, nullptr, true, 0);
+        } else {
+            PopupMenu srvMenu;
+            srvMenu.addItem("Connect", [this, s] {
+                traceScope();
+                m_processor.setActiveServer(s);
+                m_processor.saveConfig();
+            });
+            srvMenu.addItem("Remove", [this, s] {
+                traceScope();
+                m_processor.delServer(s);
+                m_processor.saveConfig();
+            });
+            subm.addSubMenu(s, srvMenu);
         }
     }
 

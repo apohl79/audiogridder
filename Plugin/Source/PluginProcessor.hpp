@@ -95,7 +95,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     void getStateInformation(MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
-    json getState(bool withServers);
+    json getState(bool withActiveServer);
     bool setState(const json& j);
 
     const String& getMode() const { return m_mode; }

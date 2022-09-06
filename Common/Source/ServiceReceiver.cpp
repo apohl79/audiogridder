@@ -292,9 +292,24 @@ String ServiceReceiver::hostToName(const String& host) {
     return host;
 }
 
-ServerInfo ServiceReceiver::hostToServerInfo(const String& host) {
+ServerInfo ServiceReceiver::lookupServerInfo(const String& host) {
     for (auto& s : getServers()) {
         if (s.getHost() == host) {
+            return s;
+        } else if (s.getHostAndID() == host) {
+            return s;
+        } else if (s.getName() == host) {
+            return s;
+        } else if (s.getNameAndID() == host) {
+            return s;
+        }
+    }
+    return {};
+}
+
+ServerInfo ServiceReceiver::lookupServerInfo(const Uuid& uuid) {
+    for (auto& s : getServers()) {
+        if (s.getUUID() == uuid) {
             return s;
         }
     }

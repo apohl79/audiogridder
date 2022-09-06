@@ -222,7 +222,8 @@ class ServerInfo {
 
     String serialize() const {
         String ret = m_host;
-        ret << ":" << m_id << ":" << m_name << ":" << m_version << ":" << (int)m_isIpv6 << ":" << (int)m_localMode;
+        ret << ":" << m_id << ":" << m_name << ":" << m_version << ":" << (int)m_isIpv6 << ":" << (int)m_localMode
+            << ":" << m_uuid.toDashedString();
         return ret;
     }
 
