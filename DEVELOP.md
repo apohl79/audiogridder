@@ -22,9 +22,10 @@ python3 build.py build
 
 ## Coding conventions
 
-Please follow the existing coding style (*m_* notation for member variables or
-cammel case etc). Also before submitting a pull request, make sure
-you are running the code formater.
+Please follow the existing coding style (*m_* notation for class member
+variables, cammel case for class, member and variable names, curly braces for
+single statement control blocks, etc). Also before submitting a pull request,
+make sure you are running the code formater.
 
 ```
 package/format.sh
