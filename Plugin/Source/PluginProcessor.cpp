@@ -1787,11 +1787,11 @@ void PluginProcessor::TrayConnection::run() {
                     logln("no tray app available");
                     static std::once_flag once;
                     std::call_once(once, [] {
-                        AlertWindow::showMessageBoxAsync(
-                            AlertWindow::WarningIcon, "Error",
-                            "AudioGridder tray application not found! Please uninstall the "
-                            "AudioGridder plugin and reinstall it!",
-                            "OK");
+                        runOnMsgThreadSync([] {
+                            AlertWindow::showMessageBoxAsync(
+                                AlertWindow::WarningIcon, "Error",
+                                "AudioGridder tray application not found! Please reinstall AudioGridder!", "OK");
+                        });
                     });
                     return;
                 }
