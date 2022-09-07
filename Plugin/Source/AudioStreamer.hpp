@@ -28,7 +28,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
           m_writeQ(m_queueSize),
           m_readQ(m_queueSize),
           m_durationGlobal(TimeStatistic::getDuration("audio_stream")),
-          m_durationLocal(TimeStatistic::getDuration(String("audio.") + String(getTagId()), false)),
+          m_durationLocal(TimeStatistic::getDuration(String("audio_stream.") + String(getTagId()), false, false)),
           m_readQMeter((size_t)(clnt->getSampleRate() / clnt->getSamplesPerBlock()) + 1),
           m_readTimeoutMs((int)(clnt->getSamplesPerBlock() / clnt->getSampleRate() * 1000 - 1)) {
         traceScope();

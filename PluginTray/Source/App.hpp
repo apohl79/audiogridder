@@ -97,8 +97,8 @@ class App : public JUCEApplication, public LogTag {
             bool instrument;
             uint32 colour;
             String loadedPlugins;
-            double perf95th;
-            double perfMRA;
+            double perfProcess;
+            double perfStream;
             int blocks;
             String serverNameId;
             String serverHost;

@@ -86,9 +86,10 @@ void PluginMonitorWindow::update() {
     int borderLR = 15;  // left/right border
     int borderTB = 0;   // top/bottom border
     int rowHeight = 19;
+    int totalWidth = getConditionalWidth();
 
-    int colWidth[] = {m_channelColWidth, m_channelNameWidth, 190, 45, m_bufferWidth, m_bufferWidth,
-                      m_bufferWidth,     m_readErrWidth,     65,  10};
+    int colWidth[] = {m_channelColWidth, m_channelNameWidth, 190, 45, m_bufferWidth, m_bufferWidth, m_bufferWidth,
+                      m_readErrWidth,    m_perfProcessWidth, 65,  10};
 
     if (!m_mon->showChannelColor) {
         colWidth[m_channelColIdx] = 0;
@@ -105,6 +106,9 @@ void PluginMonitorWindow::update() {
     if (!m_mon->showReadErrors) {
         colWidth[m_readErrIdx] = 0;
     }
+    if (!m_mon->showPerfProcess) {
+        colWidth[m_perfProcessIdx] = 0;
+    }
 
     auto getLabelBounds = [&](int r, int c, int span = 1) {
         int left = borderLR;
@@ -119,7 +123,7 @@ void PluginMonitorWindow::update() {
     };
 
     auto getLineBounds = [&](int r) {
-        return juce::Rectangle<int>(borderLR + 2, borderTB + r * rowHeight - 1, getWidth() - borderLR * 2, 1);
+        return juce::Rectangle<int>(borderLR + 2, borderTB + r * rowHeight - 1, totalWidth - borderLR * 2, 1);
     };
 
     int row = 0;
@@ -141,7 +145,12 @@ void PluginMonitorWindow::update() {
     if (m_mon->showReadErrors) {
         addLabel("RdErr", "", getLabelBounds(row, 7), Justification::topRight, Colours::white, 1.0f);
     }
-    addLabel("Perf", "", getLabelBounds(row, 8), Justification::topRight, Colours::white, 1.0f);
+    if (m_mon->showPerfProcess) {
+        addLabel("Perf Proc", "", getLabelBounds(row, 8), Justification::topRight, Colours::white, 1.0f);
+        addLabel("Perf Net", "", getLabelBounds(row, 9), Justification::topRight, Colours::white, 1.0f);
+    } else {
+        addLabel("Perf", "", getLabelBounds(row, 9), Justification::topRight, Colours::white, 1.0f);
+    }
 
     row++;
 
@@ -175,13 +184,22 @@ void PluginMonitorWindow::update() {
         if (m_mon->showReadErrors) {
             addLabel(String(s.readErrors), s.loadedPluginsErr, getLabelBounds(row, 7), Justification::topRight);
         }
-        auto timeLevel = s.readTimeout > 0 ? s.perfMRA / s.readTimeout : 0.0;
-        addLabel(String(s.perfMRA, 2) + " ms", s.loadedPluginsErr, getLabelBounds(row, 8), Justification::topRight,
+        if (m_mon->showPerfProcess) {
+            auto timeLevel = s.readTimeout > 0 ? s.perfProcess / s.readTimeout : 0.0;
+            addLabel(String(s.perfProcess, 2) + " ms", s.loadedPluginsErr, getLabelBounds(row, 8),
+                     Justification::topRight,
+                     timeLevel < 0.6   ? Colours::white
+                     : timeLevel < 0.8 ? Colours::yellow
+                     : timeLevel < 0.9 ? Colours::orange
+                                       : Colours::orangered);
+        }
+        auto timeLevel = s.readTimeout > 0 ? s.perfStream / s.readTimeout : 0.0;
+        addLabel(String(s.perfStream, 2) + " ms", s.loadedPluginsErr, getLabelBounds(row, 9), Justification::topRight,
                  timeLevel < 0.5   ? Colours::white
                  : timeLevel < 0.7 ? Colours::yellow
                  : timeLevel < 0.8 ? Colours::orange
                                    : Colours::orangered);
-        auto led = std::make_unique<Status>(getLabelBounds(row, 9), s.connected, s.loadedPluginsOk);
+        auto led = std::make_unique<Status>(getLabelBounds(row, 10), s.connected, s.loadedPluginsOk);
         m_main.addChildAndSetID(led.get(), "led");
         m_components.push_back(std::move(led));
 
@@ -230,7 +248,7 @@ void PluginMonitorWindow::addLabel(const String& txt, const String& tooltip, juc
     m_components.push_back(std::move(label));
 }
 
-void PluginMonitorWindow::updatePosition() {
+int PluginMonitorWindow::getConditionalWidth() {
     int width = m_totalWidth;
     if (!m_mon->showChannelColor) {
         width -= m_channelColWidth;
@@ -247,7 +265,14 @@ void PluginMonitorWindow::updatePosition() {
     if (!m_mon->showReadErrors) {
         width -= m_readErrWidth;
     }
+    if (!m_mon->showPerfProcess) {
+        width -= m_perfProcessWidth;
+    }
+    return width;
+}
 
+void PluginMonitorWindow::updatePosition() {
+    int width = getConditionalWidth();
     int legendX = width - m_legendWidth;
 
     auto updateLegend = [&](Status& legend, Label& label) {

@@ -131,6 +131,8 @@ class TimeStatistic : public BasicStatistic, public LogTag {
             : m_timer(other.m_timer), m_start(other.m_start), m_finished(other.m_finished) {}
         ~Duration() { update(); }
 
+        void setTimeStatistic(std::shared_ptr<TimeStatistic> t) { m_timer = t; }
+
         void finish() {
             update();
             m_finished = true;
@@ -246,10 +248,12 @@ class TimeStatistic : public BasicStatistic, public LogTag {
     void run();
     void log(const String& name) override;
     void setShowLog(bool b) { m_showLog = b; }
+    void setAggregate(bool b) { m_aggregate = b; }
 
     Meter& getMeter() { return m_meter; }
 
-    static Duration getDuration(const String& name, bool show = true);
+    static Duration getDuration(const String& name);
+    static Duration getDuration(const String& name, bool show, bool aggregate);
 
     std::vector<Histogram> get1minValues();
 
@@ -278,6 +282,7 @@ class TimeStatistic : public BasicStatistic, public LogTag {
     double m_binSize;
     Meter m_meter;
     bool m_showLog = true;
+    bool m_aggregate = true;
 
     bool m_hasExtValues = false;
     std::unordered_map<String, std::vector<Histogram>> m_ext1minValues;

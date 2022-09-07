@@ -526,7 +526,8 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     int m_blocksWithoutMidi = 0;
 
     double m_processingTraceTresholdMs = 0.0;
-    TimeStatistic::Duration m_processingDuration;
+    TimeStatistic::Duration m_processingDurationGlobal;
+    TimeStatistic::Duration m_processingDurationLocal;
 
     static BusesProperties createBusesProperties(WrapperType wt) {
         int chIn = Defaults::PLUGIN_CHANNELS_IN;

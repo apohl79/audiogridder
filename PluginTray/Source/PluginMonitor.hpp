@@ -92,7 +92,7 @@ class PluginMonitorWindow : public TopLevelWindow, public LogTagDelegate {
     Label m_title;
     Status m_legendOk, m_legendNotConnected, m_legendNotLoaded;
     Label m_legendOkLbl, m_legendNotConnectedLbl, m_legendNotLoadedLbl;
-    int m_totalWidth = 600;
+    int m_totalWidth = 665;
     int m_totalHeight = 32;
     int m_legendWidth = 230;
     int m_channelColWidth = 20;
@@ -104,11 +104,14 @@ class PluginMonitorWindow : public TopLevelWindow, public LogTagDelegate {
     int m_buffer95thIdx = 6;
     int m_readErrWidth = 50;
     int m_readErrIdx = 7;
+    int m_perfProcessWidth = 65;
+    int m_perfProcessIdx = 8;
     std::vector<std::unique_ptr<Component>> m_components;
     TooltipWindow m_tooltipWindow;
 
     void addLabel(const String& txt, const String& tooltip, juce::Rectangle<int> bounds,
                   Justification just = Justification::topLeft, Colour col = Colours::white, float alpha = 0.6f);
+    int getConditionalWidth();
     void updatePosition();
 };
 
@@ -119,6 +122,7 @@ class PluginMonitor : public LogTag, public Timer {
     bool showBufferAvg = false;
     bool showBuffer95th = false;
     bool showReadErrors = true;
+    bool showPerfProcess = false;
     bool windowAutoShow = true;
     bool windowAlwaysShow = false;
     bool windowActive = false;

@@ -55,6 +55,7 @@ void App::loadConfig() {
     m_mon.showBufferAvg = jsonGetValue(cfg, "showBufferAvg", m_mon.showBufferAvg);
     m_mon.showBuffer95th = jsonGetValue(cfg, "showBuffer95th", m_mon.showBuffer95th);
     m_mon.showReadErrors = jsonGetValue(cfg, "showReadErrors", m_mon.showReadErrors);
+    m_mon.showPerfProcess = jsonGetValue(cfg, "showPerfProcess", m_mon.showPerfProcess);
     m_mon.windowAutoShow = jsonGetValue(cfg, "autoShow", m_mon.windowAutoShow);
 }
 
@@ -65,6 +66,7 @@ void App::saveConfig() {
     cfg["showBufferAvg"] = m_mon.showBufferAvg;
     cfg["showBuffer95th"] = m_mon.showBuffer95th;
     cfg["showReadErrors"] = m_mon.showReadErrors;
+    cfg["showPerfProcess"] = m_mon.showPerfProcess;
     cfg["autoShow"] = m_mon.windowAutoShow;
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPluginTray), cfg);
 }
@@ -185,13 +187,18 @@ void App::getPopupMenu(PopupMenu& menu, bool withShowMonitorOption) {
         m_mon.refresh();
         saveConfig();
     });
-    subMon.addItem("Show Read Buffer 9th", true, m_mon.showBuffer95th, [this] {
+    subMon.addItem("Show Read Buffer 95th", true, m_mon.showBuffer95th, [this] {
         m_mon.showBuffer95th = !m_mon.showBuffer95th;
         m_mon.refresh();
         saveConfig();
     });
     subMon.addItem("Show Read Errors", true, m_mon.showReadErrors, [this] {
         m_mon.showReadErrors = !m_mon.showReadErrors;
+        m_mon.refresh();
+        saveConfig();
+    });
+    subMon.addItem("Show Processing Performance", true, m_mon.showPerfProcess, [this] {
+        m_mon.showPerfProcess = !m_mon.showPerfProcess;
         m_mon.refresh();
         saveConfig();
     });
@@ -230,8 +237,8 @@ void App::Connection::messageReceived(const MemoryBlock& message) {
         updateValue(status.instrument, jsonGetValue(msg.data, "instrument", false));
         updateValue(status.colour, jsonGetValue(msg.data, "colour", 0u));
         updateValue(status.loadedPlugins, jsonGetValue(msg.data, "loadedPlugins", status.loadedPlugins));
-        updateValue(status.perf95th, jsonGetValue(msg.data, "perf95th", 0.0));
-        updateValue(status.perfMRA, jsonGetValue(msg.data, "perfMRA", 0.0));
+        updateValue(status.perfStream, jsonGetValue(msg.data, "perfStream", 0.0));
+        updateValue(status.perfProcess, jsonGetValue(msg.data, "perfProcess", 0.0));
         updateValue(status.blocks, jsonGetValue(msg.data, "blocks", 0));
         updateValue(status.serverNameId, jsonGetValue(msg.data, "serverNameId", status.serverNameId));
         updateValue(status.serverHost, jsonGetValue(msg.data, "serverHost", status.serverHost));

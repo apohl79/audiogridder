@@ -25,7 +25,7 @@ namespace e47 {
 PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
     : AudioProcessor(createBusesProperties(wt)),
       m_channelMapper(this),
-      m_processingDuration(TimeStatistic::getDuration("audio_process")) {
+      m_processingDurationGlobal(TimeStatistic::getDuration("audio_process")) {
     initAsyncFunctors();
 
     Defaults::initPluginTheme();
@@ -199,6 +199,11 @@ PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
     }
 
     memset(m_activeMidiNotes, 0, sizeof(m_activeMidiNotes));
+
+    auto localTimeStat = Metrics::getStatistic<TimeStatistic>(String("audio_process.") + String(getTagId()));
+    localTimeStat->setAggregate(false);
+    localTimeStat->setShowLog(false);
+    m_processingDurationLocal.setTimeStatistic(localTimeStat);
 }
 
 PluginProcessor::~PluginProcessor() {
@@ -549,7 +554,8 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
     traceScope();
 
     auto traceCtx = TimeTrace::createTraceContext();
-    m_processingDuration.reset();
+    m_processingDurationGlobal.reset();
+    m_processingDurationLocal.reset();
 
     traceln("  proc: m_bypassWhenNotConnected=" << (int)m_bypassWhenNotConnected.load()
                                                 << ", clientOk=" << (int)m_client->isReadyLockFree()
@@ -744,7 +750,8 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
                           m_processingTraceTresholdMs > 0.0 ? m_processingTraceTresholdMs : readTimeoutMs);
     }
 
-    m_processingDuration.update();
+    m_processingDurationGlobal.update();
+    m_processingDurationLocal.update();
 }
 
 template <typename T>
@@ -1683,9 +1690,12 @@ void PluginProcessor::TrayConnection::messageReceived(const MemoryBlock& message
 void PluginProcessor::TrayConnection::sendStatus() {
     auto& client = m_processor->getClient();
     auto track = m_processor->getTrackProperties();
-    String statId = "audio.";
-    statId << m_processor->getTagId();
-    auto ts = Metrics::getStatistic<TimeStatistic>(statId);
+    String streamStatId = "audio_stream.";
+    streamStatId << m_processor->getTagId();
+    String processStatId = "audio_process.";
+    processStatId << m_processor->getTagId();
+    auto tsStream = Metrics::getStatistic<TimeStatistic>(streamStatId);
+    auto tsProcess = Metrics::getStatistic<TimeStatistic>(processStatId);
     bool isClientReady = client.isReadyLockFree();
 
     json j;
@@ -1702,8 +1712,8 @@ void PluginProcessor::TrayConnection::sendStatus() {
     j["colour"] = track.colour.getARGB();
     j["loadedPlugins"] = client.getLoadedPluginsString().toStdString();
     j["loadedPluginsOk"] = m_processor->m_loadedPluginsOk.load();
-    j["perf95th"] = ts->get1minHistogram().nintyFifth;
-    j["perfMRA"] = ts->getMostRecentAverage();
+    j["perfStream"] = tsStream->getMostRecentAverage();
+    j["perfProcess"] = tsProcess->getMostRecentAverage();
     j["blocks"] = client.NUM_OF_BUFFERS.load();
     j["serverNameId"] = m_processor->getActiveServerName().toStdString();
     j["serverHost"] = client.getServer().getHost().toStdString();
