@@ -739,8 +739,10 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
 
     traceCtx->add("pb_finish");
 
-    traceCtx->summary(getLogTagSource(), "process block",
-                      m_processingTraceTresholdMs > 0.0 ? m_processingTraceTresholdMs : readTimeoutMs);
+    if (readTimeoutMs > 0) {
+        traceCtx->summary(getLogTagSource(), "process block",
+                          m_processingTraceTresholdMs > 0.0 ? m_processingTraceTresholdMs : readTimeoutMs);
+    }
 
     m_processingDuration.update();
 }
