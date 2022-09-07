@@ -839,7 +839,7 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes) {
 json PluginProcessor::getState(bool withActiveServer) {
     traceScope();
     json j;
-    j["version"] = 5;
+    j["version"] = 6;
     j["Mode"] = m_mode.toStdString();
 
     if (withActiveServer) {

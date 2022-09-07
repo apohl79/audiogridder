@@ -132,7 +132,8 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
             ID,
             LAYOUT,
             MONO_CHANNELS,
-            ACTIVE_CHANNEL
+            ACTIVE_CHANNEL,
+            PARAMSLIST
         };
         enum Indexes_v1 : uint8 { BYPASSED_V1 = 3 };
 
@@ -156,6 +157,13 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
             for (auto& p : presets) {
                 jpresets.push_back(p.toStdString());
             }
+            // for backwards compatibility
+            auto jparamsLegacy = json::array();
+            if (params.size() > 0) {
+                for (auto& p : params[0]) {
+                    jparamsLegacy.push_back(p.toJson());
+                }
+            }
             auto jparams = json::array();
             for (size_t ch = 0; ch < params.size(); ch++) {
                 jparams.push_back(json::array());
@@ -167,12 +175,13 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
                     name.toStdString(),
                     settings.toStdString(),
                     jpresets,
-                    jparams,
+                    jparamsLegacy,
                     bypassed,
                     id.toStdString(),
                     layout.toStdString(),
                     monoChannels.toInt(),
-                    activeChannel};
+                    activeChannel,
+                    jparams};
         }
 
         LoadedPlugin() {}
@@ -208,13 +217,15 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
                     monoChannels = j[MONO_CHANNELS].get<uint64>();
                 }
                 if (version >= 5) {
-                    params.resize(j[PARAMS].size());
-                    for (size_t ch = 0; ch < j[PARAMS].size(); ch++) {
-                        for (auto& p : j[PARAMS][ch]) {
+                    activeChannel = j[ACTIVE_CHANNEL].get<int>();
+                    // version 5 was broken, as the structure changed
+                    auto paramsListIdx = version == 5 ? PARAMS : PARAMSLIST;
+                    params.resize(j[paramsListIdx].size());
+                    for (size_t ch = 0; ch < j[paramsListIdx].size(); ch++) {
+                        for (auto& p : j[paramsListIdx][ch]) {
                             params[ch].push_back(Client::Parameter::fromJson(p));
                         }
                     }
-                    activeChannel = j[ACTIVE_CHANNEL].get<int>();
                 }
             } catch (const json::exception& e) {
                 setLogTagStatic("loadedplugin");
