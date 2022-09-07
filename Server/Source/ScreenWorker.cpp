@@ -56,7 +56,7 @@ void ScreenWorker::runFFmpeg() {
     Message<ScreenCapture> msg;
     while (!threadShouldExit() && isOk()) {
         std::unique_lock<std::mutex> lock(m_currentImageLock);
-        if (m_currentImageCv.wait_for(lock, 50ms, [this] { return m_updated; })) {
+        if (m_updated || m_currentImageCv.wait_for(lock, 30ms, [this] { return m_updated; })) {
             m_updated = false;
             if (m_imageBuf.size() > 0) {
                 if (m_imageBuf.size() <= Message<ScreenCapture>::MAX_SIZE) {
@@ -238,6 +238,9 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
                         runOnMsgThreadAsync([tid] { getApp()->updateScreenCaptureArea(tid); });
                     }
                     std::lock_guard<std::mutex> lock(m_currentImageLock);
+                    if (m_updated) {
+                        logln("warning: the previous image has not been sent");
+                    }
                     if (m_imageBuf.size() < (size_t)size) {
                         m_imageBuf.resize((size_t)size);
                     }
