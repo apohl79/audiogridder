@@ -24,6 +24,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
           m_client(clnt),
           m_socket(std::unique_ptr<StreamingSocket>(sock)),
           m_queueSize((size_t)clnt->NUM_OF_BUFFERS * 8),
+          m_queueHighWaterMark((size_t)clnt->NUM_OF_BUFFERS * 7),
           m_writeQ(m_queueSize),
           m_readQ(m_queueSize),
           m_durationGlobal(TimeStatistic::getDuration("audio_stream")),
@@ -153,7 +154,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         TimeTrace::addTracePoint("as_prep");
 
         if (m_client->NUM_OF_BUFFERS > 0) {
-            if (m_writeQ.read_available() > (size_t)m_client->NUM_OF_BUFFERS) {
+            if ((m_client->LIVE_MODE && m_writeQ.read_available() > (size_t)m_client->NUM_OF_BUFFERS) ||
+                m_writeQ.read_available() > m_queueHighWaterMark) {
                 logln("error: " << getInstanceString() << ": write queue full, dropping samples");
                 m_readErrors++;
                 // add a skip reqord to the queue
@@ -518,7 +520,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
 
     Client* m_client;
     std::unique_ptr<StreamingSocket> m_socket;
-    size_t m_queueSize;
+    size_t m_queueSize, m_queueHighWaterMark;
     boost::lockfree::spsc_queue<AudioMidiBuffer> m_writeQ, m_readQ;
     std::mutex m_writeMtx, m_readMtx, m_sockMtx;
     std::condition_variable m_writeCv, m_readCv;
