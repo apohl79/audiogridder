@@ -1070,7 +1070,13 @@ bool Processor::hasEditor() {
             return getClient()->hasEditor();
         } else {
             bool ret;
-            runOnMsgThreadSync([&] { ret = getPlugin(0)->hasEditor(); });
+            runOnMsgThreadSync([&] {
+                if (auto p = getPlugin(0)) {
+                    ret = p->hasEditor();
+                } else {
+                    ret = false;
+                }
+            });
             return ret;
         }
     }
