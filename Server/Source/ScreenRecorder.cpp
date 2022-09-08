@@ -89,6 +89,9 @@ ScreenRecorder::ScreenRecorder() : LogTag("screenrec") { traceScope(); }
 
 ScreenRecorder::~ScreenRecorder() {
     traceScope();
+    if (nullptr != m_thread) {
+        stop();
+    }
     cleanupInput();
     cleanupOutput();
 }
