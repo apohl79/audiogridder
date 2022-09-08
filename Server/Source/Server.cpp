@@ -580,10 +580,26 @@ bool Server::scanPlugin(const String& id, const String& format, int srvId, bool 
 
     logln("...ok");
 
-    for (auto& t : newlist.getTypes()) {
+    String pipeName = "audiogridderscan." + String(srvId);
+    NamedPipe pipe;
+    if (!pipe.openExisting(pipeName)) {
+        logln("warning: can't open pipe " << pipeName);
+    }
+
+    auto types = newlist.getTypes();
+    for (auto& t : types) {
         auto pluginId = Processor::createPluginID(t);
         auto pluginIdDeprecated = Processor::createPluginIDDepricated(t);
         auto pluginIdWithName = Processor::createPluginIDWithName(t);
+
+        // update the server process
+        if (types.size() > 1 && pipe.isOpen()) {
+            String out = t.descriptiveName;
+            out << " (" << format.toLowerCase() << ")";
+            int len = out.length();
+            pipe.write(&len, sizeof(int), 100);
+            pipe.write(out.toRawUTF8(), len, 100);
+        }
 
         logln("adding plugin description:");
         logln("  name            = " << t.name << " (" << t.descriptiveName << ")");
@@ -663,7 +679,8 @@ bool Server::scanPlugin(const String& id, const String& format, int srvId, bool 
     return success;
 }
 
-void Server::scanNextPlugin(const String& id, const String& name, const String& fmt, int srvId, bool secondRun) {
+void Server::scanNextPlugin(const String& id, const String& name, const String& fmt, int srvId,
+                            std::function<void(const String&)> onShellPlugin, bool secondRun) {
     traceScope();
     String fileFmt = id;
     fileFmt << "|" << fmt;
@@ -675,11 +692,42 @@ void Server::scanNextPlugin(const String& id, const String& name, const String& 
     if (secondRun) {
         args.add("-secondrun");
     }
+    String pipeName = "audiogridderscan." + String(srvId);
+    NamedPipe pipe;
+    if (!pipe.createNewPipe(pipeName)) {
+        logln("warning: can't open pipe " << pipeName);
+    }
     bool blacklist = false;
     if (proc.start(args)) {
         bool finished;
         do {
-            proc.waitForProcessToFinish(30000);
+            const int secondsPerPlugin = 30;
+            std::atomic_int secondsLeft{secondsPerPlugin};
+            FnThread outputReader(
+                [this, &pipe, &proc, &secondsLeft, secs = secondsPerPlugin, onShellPlugin] {
+                    std::vector<char> buf(256);
+                    while (proc.isRunning() && !currentThreadShouldExit()) {
+                        int len;
+                        if (pipe.read(&len, sizeof(int), 100) == sizeof(int)) {
+                            if (pipe.read(buf.data(), len, 1000) == len) {
+                                buf[(size_t)len] = 0;
+                                String msg = buf.data();
+                                // let the scanner know, that the current plugin is a shell and has plugins inside
+                                onShellPlugin(msg);
+                                // increase the timeout as there might be mutliple plugins per shell
+                                secondsLeft = secs;
+                                logln("    -> shell plugin: " << msg);
+                            }
+                        }
+                    }
+                },
+                "OutputReader", true);
+
+            while (secondsLeft > 0) {
+                proc.waitForProcessToFinish(1000);
+                secondsLeft--;
+            }
+
             finished = true;
             if (proc.isRunning()) {
                 if (secondRun) {
@@ -695,7 +743,7 @@ void Server::scanNextPlugin(const String& id, const String& name, const String& 
                     }
                 } else {
                     proc.kill();
-                    scanNextPlugin(id, name, fmt, srvId, true);
+                    scanNextPlugin(id, name, fmt, srvId, onShellPlugin, true);
                 }
             } else {
                 auto layoutErrFile =
@@ -706,7 +754,7 @@ void Server::scanNextPlugin(const String& id, const String& name, const String& 
                 if (!secondRun && layoutErrFile.existsAsFile()) {
                     logln("error: scan for '" << name << "' failed while testing layouts, starting second run");
                     layoutErrFile.deleteFile();
-                    scanNextPlugin(id, name, fmt, srvId, true);
+                    scanNextPlugin(id, name, fmt, srvId, onShellPlugin, true);
                 } else {
                     if (errFile.existsAsFile()) {
                         logln("error: scan for '" << name << "' failed, as the plugin crashed the scanner probably");
@@ -859,7 +907,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
 
             scanThread->fn = [this, fileOrId, pluginName = name, fmtName = fmt->getName(), srvId = scanThread->id,
                               updateSplash] {
-                scanNextPlugin(fileOrId, pluginName, fmtName, srvId);
+                scanNextPlugin(fileOrId, pluginName, fmtName, srvId, [&](const String& n) { updateSplash(n); });
                 updateSplash("");
             };
 

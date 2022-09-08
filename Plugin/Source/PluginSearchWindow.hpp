@@ -111,7 +111,7 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
         void paintItem(Graphics& g, int width, int height) override {
             if (isSelected()) {
                 g.setColour(Colour(Defaults::BG_ACTIVE_COLOR));
-                g.fillRect(g.getClipBounds().withTrimmedTop(5.0f));
+                g.fillRect(g.getClipBounds().withTrimmedTop(5));
                 g.setColour(Colour(Defaults::ACTIVE_COLOR).withAlpha(0.8f));
             } else {
                 g.setColour(Colours::white.withAlpha(0.8f));
@@ -122,7 +122,7 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
         void paintOpenCloseButton(Graphics& g, const Rectangle<float>& r, Colour, bool) override {
             if (isSelected()) {
                 g.setColour(Colour(Defaults::BG_ACTIVE_COLOR));
-                g.fillRect(r.withTrimmedTop(5.0f));
+                g.fillRect(r.withTrimmedTop(5));
             }
 
             auto rect = r.withTrimmedBottom(3.0f).withTrimmedRight(2.0f);
@@ -180,7 +180,7 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
             Colour col;
             if (isSelected()) {
                 g.setColour(Colour(Defaults::BG_ACTIVE_COLOR));
-                g.fillRect(g.getClipBounds().withTrimmedTop(5.0f));
+                g.fillRect(g.getClipBounds().withTrimmedTop(5));
                 col = Colour(Defaults::ACTIVE_COLOR);
             } else {
                 col = Colours::white;
@@ -264,7 +264,7 @@ class PluginSearchWindow : public TopLevelWindow, public KeyListener, public Log
             Colour col;
             if (isSelected()) {
                 g.setColour(Colour(Defaults::BG_ACTIVE_COLOR));
-                g.fillRect(g.getClipBounds().withTrimmedTop(5.0f));
+                g.fillRect(g.getClipBounds().withTrimmedTop(5));
                 col = Colour(Defaults::ACTIVE_COLOR);
             } else {
                 col = Colours::white;

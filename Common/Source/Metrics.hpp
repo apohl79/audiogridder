@@ -14,6 +14,12 @@
 #include "SharedInstance.hpp"
 #include "Utils.hpp"
 
+#if JUCE_WINDOWS
+#ifdef max
+#undef max
+#endif
+#endif
+
 namespace e47 {
 
 class BasicStatistic {

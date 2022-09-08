@@ -213,7 +213,8 @@ class Server : public Thread, public LogTag {
 
     std::unique_ptr<SandboxDeleter> m_sandboxDeleter;
 
-    void scanNextPlugin(const String& id, const String& name, const String& fmt, int srvId, bool secondRun = false);
+    void scanNextPlugin(const String& id, const String& name, const String& fmt, int srvId,
+                        std::function<void(const String&)> onShellPlugin, bool secondRun = false);
     void scanForPlugins();
     void scanForPlugins(const std::vector<String>& include);
 
