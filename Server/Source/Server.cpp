@@ -699,52 +699,42 @@ void Server::scanNextPlugin(const String& id, const String& name, const String& 
     }
     bool blacklist = false;
     if (proc.start(args)) {
-        bool finished;
-        do {
-            const int secondsPerPlugin = 30;
-            std::atomic_int secondsLeft{secondsPerPlugin};
-            FnThread outputReader(
-                [this, &pipe, &proc, &secondsLeft, secs = secondsPerPlugin, onShellPlugin] {
-                    std::vector<char> buf(256);
-                    while (proc.isRunning() && !currentThreadShouldExit()) {
-                        int len;
-                        if (pipe.read(&len, sizeof(int), 100) == sizeof(int)) {
-                            if (pipe.read(buf.data(), len, 1000) == len) {
-                                buf[(size_t)len] = 0;
-                                String msg = buf.data();
-                                // let the scanner know, that the current plugin is a shell and has plugins inside
-                                onShellPlugin(msg);
-                                // increase the timeout as there might be mutliple plugins per shell
-                                secondsLeft = secs;
-                                logln("    -> shell plugin: " << msg);
-                            }
+        const int secondsPerPlugin = 30;
+        std::atomic_int secondsLeft{secondsPerPlugin};
+
+        FnThread outputReader(
+            [this, &pipe, &proc, &secondsLeft, secs = secondsPerPlugin, onShellPlugin] {
+                std::vector<char> buf(256);
+                while (proc.isRunning() && !currentThreadShouldExit()) {
+                    int len;
+                    if (pipe.read(&len, sizeof(int), 100) == sizeof(int)) {
+                        if (pipe.read(buf.data(), len, 1000) == len) {
+                            buf[(size_t)len] = 0;
+                            String msg = buf.data();
+                            // let the scanner know, that the current plugin is a shell and has plugins inside
+                            onShellPlugin(msg);
+                            // increase the timeout as there might be mutliple plugins per shell
+                            secondsLeft = secs;
+                            logln("    -> shell plugin: " << msg);
                         }
                     }
-                },
-                "OutputReader", true);
+                }
+            },
+            "OutputReader", true);
+
+        bool finished;
+        do {
+            secondsLeft = secondsPerPlugin;
 
             while (secondsLeft > 0) {
                 proc.waitForProcessToFinish(1000);
                 secondsLeft--;
             }
 
-            finished = true;
-            if (proc.isRunning()) {
-                if (secondRun) {
-                    if (!AlertWindow::showOkCancelBox(
-                            AlertWindow::WarningIcon, "Timeout",
-                            "The plugin scan for '" + name + "' did not finish yet. Do you want to continue to wait?",
-                            "Wait", "Abort")) {
-                        logln("error: scan timeout of '" << name << "', killing scan process");
-                        proc.kill();
-                        blacklist = true;
-                    } else {
-                        finished = false;
-                    }
-                } else {
-                    proc.kill();
-                    scanNextPlugin(id, name, fmt, srvId, onShellPlugin, true);
-                }
+            finished = !proc.isRunning();
+
+            if (!finished) {
+                getApp()->enableCancelScan(srvId, [&proc] { proc.kill(); });
             } else {
                 auto layoutErrFile =
                     File(Defaults::getConfigFileName(Defaults::ScanLayoutError, {{"id", String(srvId)}}));
@@ -762,6 +752,8 @@ void Server::scanNextPlugin(const String& id, const String& name, const String& 
                         blacklist = true;
                     }
                 }
+
+                getApp()->disableCancelScan(srvId);
             }
         } while (!finished);
     } else {

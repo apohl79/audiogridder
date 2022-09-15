@@ -249,7 +249,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
                "mode. It positions the plugin windows next to the AG plugin window and allows you to open multiple "
                "plugin windows at the same time."
             << newLine << newLine;
-    tooltip << "Disabled: No screen caturing.";
+    tooltip << "Disabled: No screen capturing.";
     label = std::make_unique<Label>();
     label->setText("Screen Capturing Mode:", NotificationType::dontSendNotification);
     label->setBounds(getLabelBounds(row));

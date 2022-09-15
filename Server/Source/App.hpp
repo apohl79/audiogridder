@@ -81,6 +81,8 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     void showSplashWindow(std::function<void(bool)> onClick = nullptr);
     void hideSplashWindow(int wait = 0);
     void setSplashInfo(const String& txt);
+    void enableCancelScan(int srvId, std::function<void()> onCancel);
+    void disableCancelScan(int srvId);
 
     void updateDockIcon() {
 #ifdef JUCE_MAC

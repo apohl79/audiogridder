@@ -764,6 +764,24 @@ void App::setSplashInfo(const String& txt) {
     });
 }
 
+void App::enableCancelScan(int srvId, std::function<void()> onCancel) {
+    traceScope();
+    runOnMsgThreadAsync([this, srvId, onCancel] {
+        if (nullptr != m_splashWindow) {
+            m_splashWindow->setOnCancel(srvId, onCancel);
+        }
+    });
+}
+
+void App::disableCancelScan(int srvId) {
+    traceScope();
+    runOnMsgThreadAsync([this, srvId] {
+        if (nullptr != m_splashWindow) {
+            m_splashWindow->removeOnCancel(srvId);
+        }
+    });
+}
+
 }  // namespace e47
 
 #ifndef AG_UNIT_TESTS
