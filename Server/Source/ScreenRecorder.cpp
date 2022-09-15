@@ -259,9 +259,16 @@ bool ScreenRecorder::prepareInput() {
     av_dict_set(&opts, "video_size", vidSize.getCharPointer(), 0);
     av_dict_set(&opts, "offset_x", String(m_captureRect.getX()).getCharPointer(), 0);
     av_dict_set(&opts, "offset_y", String(m_captureRect.getY()).getCharPointer(), 0);
+
+    logln("setting input options:");
+    logln("  video_size=" << vidSize);
+    logln("  offset_x=" << m_captureRect.getX());
+    logln("  offset_y=" << m_captureRect.getY());
 #endif
 
     int ret;
+
+    logln("opening input format " << m_inputFmtName << ": " << m_inputStreamUrl);
 
     m_captureFmtCtx = avformat_alloc_context();
     ret = avformat_open_input(&m_captureFmtCtx, m_inputStreamUrl.getCharPointer(), m_inputFmt, &opts);
@@ -276,6 +283,9 @@ bool ScreenRecorder::prepareInput() {
         return false;
     }
 
+    logln("looking for video stream (input has " << String(m_captureFmtCtx->nb_streams) << " streams)");
+
+    m_captureStreamIndex = -1;
     for (uint16 i = 0; i < m_captureFmtCtx->nb_streams; i++) {
         m_captureStream = m_captureFmtCtx->streams[i];
         if (m_captureStream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
@@ -288,11 +298,24 @@ bool ScreenRecorder::prepareInput() {
         return false;
     }
 
+    logln("found video stream at index " << m_captureStreamIndex);
+    logln("  codec.codec_id=" << m_captureStream->codecpar->codec_id);
+    logln("  codec.codec_tag=" << String(m_captureStream->codecpar->codec_tag));
+    logln("  codec.format=" << String(m_captureStream->codecpar->format));
+    logln("  codec.bit_rate=" << String(m_captureStream->codecpar->bit_rate));
+    logln("  codec.color_range=" << m_captureStream->codecpar->color_range);
+    logln("  codec.color_space=" << m_captureStream->codecpar->color_space);
+    logln("  codec.width=" << String(m_captureStream->codecpar->width));
+    logln("  codec.height=" << String(m_captureStream->codecpar->height));
+
     m_captureCodec = avcodec_find_decoder(m_captureStream->codecpar->codec_id);
     if (nullptr == m_captureCodec) {
         logError("prepareInput: unable to find capture codec");
         return false;
     }
+
+    logln("found decoder " << m_captureCodec->name << " (" << m_captureCodec->long_name << ")");
+
     m_captureCodecCtx = avcodec_alloc_context3(m_captureCodec);
     if (nullptr == m_captureCodecCtx) {
         logError("prepareInput: unable to allocate codec context");
@@ -310,8 +333,19 @@ bool ScreenRecorder::prepareInput() {
     }
 
     if (m_captureCodecCtx->pix_fmt < 0 || m_captureCodecCtx->pix_fmt >= AV_PIX_FMT_NB) {
+#ifdef JUCE_WINDOWS
+        if (strncmp(m_captureCodec->name, "bmp", 3) == 0) {
+            logln("prepareInput: warning: invalid input pixel format: pix_fmt = " + String(m_captureCodecCtx->pix_fmt));
+            logln("prepareInput: setting pixel format to AV_PIX_FMT_BGRA");
+            m_captureCodecCtx->pix_fmt = AV_PIX_FMT_BGRA;
+        } else {
+            logError("prepareInput: invalid input pixel format: pix_fmt = " + String(m_captureCodecCtx->pix_fmt));
+            return false;
+        }
+#else
         logError("prepareInput: invalid input pixel format: pix_fmt = " + String(m_captureCodecCtx->pix_fmt));
         return false;
+#endif
     }
 
     logln("prepareInput: input pixel format is " << m_captureCodecCtx->pix_fmt);
