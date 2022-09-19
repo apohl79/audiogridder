@@ -1122,10 +1122,15 @@ struct JsonMessage {
     }
 
     void deserialize(const MemoryBlock& block) {
-        auto j = json::parse(block.begin(), block.end());
-        type = j["type"].get<Type>();
-        data = std::move(j["data"]);
-        id = j["uuid"].get<std::string>();
+        try {
+            auto j = json::parse(block.begin(), block.end());
+            type = j["type"].get<Type>();
+            data = std::move(j["data"]);
+            id = j["uuid"].get<std::string>();
+        } catch (const json::parse_error& e) {
+            setLogTagStatic("json");
+            logln("failed to deserialize json message: " << e.what());
+        }
     }
 };
 
