@@ -570,6 +570,8 @@ void Worker::handleMessage(std::shared_ptr<Message<CPULoad>> msg) {
 
 void Worker::handleMessage(std::shared_ptr<Message<PluginList>> msg) {
     traceScope();
+    bool isFxChain = m_cfg.channelsIn > 0;
+
     auto& pluginList = getApp()->getPluginList();
     json jlist = json::array();
     for (auto& plugin : pluginList.getTypes()) {
@@ -588,12 +590,7 @@ void Worker::handleMessage(std::shared_ptr<Message<PluginList>> msg) {
             pluginChIn = jmax(pluginChIn, chIn);
             pluginChOut = jmax(pluginChOut, chOut);
 
-            bool isFxChain = m_cfg.channelsIn > 0;
             bool match = false;
-
-            if (plugin.name == "LoudMax") {
-                logln("-- " << describeLayout(l));
-            }
 
             if (isFxChain) {
                 if (l.inputBuses == l.outputBuses /* same inputs and outputs */ ||
@@ -616,21 +613,22 @@ void Worker::handleMessage(std::shared_ptr<Message<PluginList>> msg) {
             }
         }
 
-        if (hasMono && m_cfg.channelsOut > 1) {
-            slayouts.add("01:Multi-Mono");
-        }
-
         auto jlayouts = json::array();
 
         if (slayouts.isEmpty()) {
             jlayouts.push_back("Default");
-        } else {
-            slayouts.sort(false);
-            for (auto& l : slayouts) {
-                auto parts = StringArray::fromTokens(l, ":", "");
-                if (!jlayouts.contains(parts[1].toStdString())) {
-                    jlayouts.push_back(parts[1].toStdString());
-                }
+        }
+
+        if (hasMono && m_cfg.channelsOut > 1) {
+            slayouts.add("01:Multi-Mono");
+        }
+
+        slayouts.sort(false);
+
+        for (auto& l : slayouts) {
+            auto parts = StringArray::fromTokens(l, ":", "");
+            if (!jlayouts.contains(parts[1].toStdString())) {
+                jlayouts.push_back(parts[1].toStdString());
             }
         }
 
