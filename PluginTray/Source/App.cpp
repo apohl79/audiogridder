@@ -227,7 +227,9 @@ void App::Connection::messageReceived(const MemoryBlock& message) {
             if (dst != src) {
                 dst = src;
                 changed = true;
+                return true;
             }
+            return false;
         };
 
         updateValue(status.name, jsonGetValue(msg.data, "name", status.name));
@@ -242,8 +244,16 @@ void App::Connection::messageReceived(const MemoryBlock& message) {
         updateValue(status.blocks, jsonGetValue(msg.data, "blocks", 0));
         updateValue(status.serverNameId, jsonGetValue(msg.data, "serverNameId", status.serverNameId));
         updateValue(status.serverHost, jsonGetValue(msg.data, "serverHost", status.serverHost));
-        updateValue(status.connected, jsonGetValue(msg.data, "connected", false));
-        updateValue(status.loadedPluginsOk, jsonGetValue(msg.data, "loadedPluginsOk", false));
+        if (updateValue(status.connected, jsonGetValue(msg.data, "connected", false))) {
+            if (status.connected) {
+                status.connectedMonTriggered = false;
+            }
+        }
+        if (updateValue(status.loadedPluginsOk, jsonGetValue(msg.data, "loadedPluginsOk", false))) {
+            if (status.loadedPluginsOk) {
+                status.loadedPluginsOkMonTriggered = false;
+            }
+        }
         updateValue(status.loadedPluginsErr, jsonGetValue(msg.data, "loadedPluginsErr", String()));
         updateValue(status.rqAvg, jsonGetValue(msg.data, "rqAvg", 0u));
         updateValue(status.rq95th, jsonGetValue(msg.data, "rq95th", 0u));

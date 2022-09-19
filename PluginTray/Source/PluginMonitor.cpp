@@ -351,9 +351,14 @@ void PluginMonitorWindow::HirozontalLine::paint(Graphics& g) {
 void PluginMonitor::update() {
     bool allOk = true;
     for (auto& c : m_app->getServer().getConnections()) {
-        allOk = allOk && c->status.connected && c->status.loadedPluginsOk;
-        if (!allOk) {
-            break;
+        allOk = allOk && (c->status.connected || c->status.connectedMonTriggered) &&
+                (c->status.loadedPluginsOk || c->status.loadedPluginsOkMonTriggered);
+        // ignore chains that have already triggered the mon to come up and did not change their status
+        if (!c->status.connected) {
+            c->status.connectedMonTriggered = true;
+        }
+        if (!c->status.loadedPluginsOk) {
+            c->status.loadedPluginsOkMonTriggered = true;
         }
     }
 
