@@ -321,7 +321,7 @@ void App::Server::checkConnections() {
 }
 
 void App::handleMessage(const PluginTrayMessage& msg, Connection& sender) {
-    if (msg.type == PluginTrayMessage::UPDATE_RECENTS) {
+    if (msg.type == PluginTrayMessage::UPDATE_RECENTS && jsonHasValue(msg.data, "plugin")) {
         auto srv = getServerString(&sender);
         auto plugin = ServerPlugin::fromString(msg.data["plugin"].get<std::string>());
         auto& recents = m_recents[srv];
