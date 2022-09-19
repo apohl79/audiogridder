@@ -843,13 +843,11 @@ void PluginEditor::showServerMenu() {
                 });
                 subm.addSubMenu(name, srvMenu, true, nullptr, true, 0);
             } else {
-                PopupMenu srvMenu;
-                srvMenu.addItem("Connect", [this, s] {
+                subm.addItem(name, [this, s] {
                     traceScope();
                     m_processor.setActiveServer(s);
                     m_processor.saveConfig();
                 });
-                subm.addSubMenu(name, srvMenu);
             }
         }
     }
