@@ -1061,15 +1061,39 @@ void PluginEditor::showSettingsMenu() {
     m.addSubMenu("Instrument Outputs...", subm);
 #else
     subm.addSectionHeader("Inputs");
+    subm.addItem("Enable all channels...", [this] {
+        m_processor.getActiveChannels().setInputRangeActive(true);
+        m_processor.updateChannelMapping();
+        m_processor.getClient().reconnect();
+    });
+    subm.addItem("Disable all channels...", [this] {
+        m_processor.getActiveChannels().setInputRangeActive(false);
+        m_processor.updateChannelMapping();
+        m_processor.getClient().reconnect();
+    });
+    subm.addSeparator();
     ch = 0;
     for (int busIdx = 0; busIdx < m_processor.getBusCount(true); busIdx++) {
         addBusChannelItems(m_processor.getBus(true, busIdx), ch);
     }
+
     subm.addSectionHeader("Outputs");
+    subm.addItem("Enable all channels...", [this] {
+        m_processor.getActiveChannels().setOutputRangeActive(true);
+        m_processor.updateChannelMapping();
+        m_processor.getClient().reconnect();
+    });
+    subm.addItem("Disable all channels...", [this] {
+        m_processor.getActiveChannels().setOutputRangeActive(false);
+        m_processor.updateChannelMapping();
+        m_processor.getClient().reconnect();
+    });
+    subm.addSeparator();
     ch = 0;
     for (int busIdx = 0; busIdx < m_processor.getBusCount(false); busIdx++) {
         addBusChannelItems(m_processor.getBus(false, busIdx), ch);
     }
+
     m.addSubMenu("Active Channels...", subm);
 #endif
     subm.clear();
