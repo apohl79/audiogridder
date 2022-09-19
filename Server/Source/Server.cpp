@@ -141,6 +141,8 @@ void Server::loadConfig() {
     }
     m_screenJpgQuality = jsonGetValue(cfg, "ScreenQuality", m_screenJpgQuality);
     m_screenLocalMode = jsonGetValue(cfg, "ScreenLocalMode", m_screenLocalMode);
+    m_screenMouseOffsetX = jsonGetValue(cfg, "ScreenMouseOffsetX", m_screenMouseOffsetX);
+    m_screenMouseOffsetY = jsonGetValue(cfg, "ScreenMouseOffsetY", m_screenMouseOffsetY);
     m_pluginWindowsOnTop = jsonGetValue(cfg, "PluginWindowsOnTop", m_pluginWindowsOnTop);
     m_scanForPlugins = jsonGetValue(cfg, "ScanForPlugins", m_scanForPlugins);
     m_crashReporting = jsonGetValue(cfg, "CrashReporting", m_crashReporting);
@@ -196,6 +198,8 @@ void Server::saveConfig() {
     j["ScreenQuality"] = m_screenJpgQuality;
     j["ScreenDiffDetection"] = m_screenDiffDetection;
     j["ScreenLocalMode"] = m_screenLocalMode;
+    j["ScreenMouseOffsetX"] = m_screenMouseOffsetX;
+    j["ScreenMouseOffsetY"] = m_screenMouseOffsetY;
     j["PluginWindowsOnTop"] = m_pluginWindowsOnTop;
     j["ExcludePlugins"] = json::array();
     for (auto& p : m_pluginExclude) {

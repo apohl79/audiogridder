@@ -628,6 +628,10 @@ Point<float> App::localPointToGlobal(Thread::ThreadID tid, Point<float> lp) {
                     ret.y -= disp->userArea.getY();
                 }
             }
+            if (auto srv = getApp()->getServer()) {
+                ret.x += srv->getScreenMouseOffsetX();
+                ret.y += srv->getScreenMouseOffsetY();
+            }
             return ret;
         } else {
             logln("failed to resolve local to global point: no active window");

@@ -416,6 +416,19 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     row++;
 
     label = std::make_unique<Label>();
+    label->setText("Mouse Offset Correction:", NotificationType::dontSendNotification);
+    label->setBounds(getLabelBounds(row));
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
+
+    m_screenMouseOffsetXY.setBounds(getWideFieldBounds(row));
+    m_screenMouseOffsetXY.setText(String(m_app->getServer()->getScreenMouseOffsetX()) + "x" +
+                                  String(m_app->getServer()->getScreenMouseOffsetY()));
+    m_screenMouseOffsetXY.setInputFilter(new TextEditor::LengthAndCharacterRestriction(11, "0123456789x-,"), true);
+    addChildAndSetID(&m_screenMouseOffsetXY, "offsetXY");
+    row++;
+
+    label = std::make_unique<Label>();
     label->setText("Startup", NotificationType::dontSendNotification);
     label->setJustificationType(Justification::centredTop);
     label->setBounds(getHeaderBounds(row));
@@ -585,6 +598,15 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
                 srv->setVST2Folders(StringArray::fromLines(m_vst2Folders.getText()));
             }
             srv->setVSTNoStandardFolders(m_vstNoStandardFolders.getToggleState());
+
+            auto offsetParts = StringArray::fromTokens(m_screenMouseOffsetXY.getText(), "x", "");
+            if (offsetParts.size() >= 2) {
+                srv->setScreenMouseOffsetX(offsetParts[0].getIntValue());
+                srv->setScreenMouseOffsetY(offsetParts[1].getIntValue());
+            } else {
+                srv->setScreenMouseOffsetX(0);
+                srv->setScreenMouseOffsetY(0);
+            }
 
             srv->saveConfig();
 
