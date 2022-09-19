@@ -70,6 +70,15 @@ void PluginMonitorWindow::mouseUp(const MouseEvent& event) {
     if (event.mods.isLeftButtonDown()) {
         setVisible(false);
         m_mon->hideWindow();
+        for (auto& c : m_app->getServer().getConnections()) {
+            // ignore chains that have already triggered the mon to come up and did not change their status
+            if (!c->status.connected) {
+                c->status.connectedMonTriggered = true;
+            }
+            if (!c->status.loadedPluginsOk) {
+                c->status.loadedPluginsOkMonTriggered = true;
+            }
+        }
     } else {
         PopupMenu menu;
         m_app->getPopupMenu(menu, false);
@@ -353,12 +362,8 @@ void PluginMonitor::update() {
     for (auto& c : m_app->getServer().getConnections()) {
         allOk = allOk && (c->status.connected || c->status.connectedMonTriggered) &&
                 (c->status.loadedPluginsOk || c->status.loadedPluginsOkMonTriggered);
-        // ignore chains that have already triggered the mon to come up and did not change their status
-        if (!c->status.connected) {
-            c->status.connectedMonTriggered = true;
-        }
-        if (!c->status.loadedPluginsOk) {
-            c->status.loadedPluginsOkMonTriggered = true;
+        if (!allOk) {
+            break;
         }
     }
 
