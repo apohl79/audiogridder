@@ -239,8 +239,8 @@ void App::Connection::messageReceived(const MemoryBlock& message) {
         updateValue(status.instrument, jsonGetValue(msg.data, "instrument", false));
         updateValue(status.colour, jsonGetValue(msg.data, "colour", 0u));
         updateValue(status.loadedPlugins, jsonGetValue(msg.data, "loadedPlugins", status.loadedPlugins));
-        updateValue(status.perfStream, jsonGetValue(msg.data, "perfStream", 0.0));
-        updateValue(status.perfProcess, jsonGetValue(msg.data, "perfProcess", 0.0));
+        status.perfStream = jsonGetValue(msg.data, "perfStream", 0.0);
+        status.perfProcess = jsonGetValue(msg.data, "perfProcess", 0.0);
         updateValue(status.blocks, jsonGetValue(msg.data, "blocks", 0));
         updateValue(status.serverNameId, jsonGetValue(msg.data, "serverNameId", status.serverNameId));
         updateValue(status.serverHost, jsonGetValue(msg.data, "serverHost", status.serverHost));

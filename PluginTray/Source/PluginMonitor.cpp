@@ -380,16 +380,15 @@ void PluginMonitor::update() {
     if (show && nullptr == m_window) {
         m_window = std::make_unique<PluginMonitorWindow>(this, m_app);
     }
-
-    if (nullptr != m_window) {
-        m_window->update();
-    }
 }
 
 void PluginMonitor::timerCallback() {
     if (m_needsUpdate) {
         update();
         m_needsUpdate = false;
+    }
+    if (nullptr != m_window) {
+        m_window->update();
     }
     if (m_hideCounter > 0) {
         m_hideCounter--;
