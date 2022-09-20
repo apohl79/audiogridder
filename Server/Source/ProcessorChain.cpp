@@ -389,8 +389,9 @@ void ProcessorChain::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& mi
         TimeTrace::addTracePoint("chain_lock");
         for (auto& proc : m_processors) {
             TimeTrace::startGroup();
-            if (proc->processBlock(buffer, midiMessages)) {
-                latency += proc->getLatencySamples();
+            int procLatency = 0;
+            if (proc->processBlock(buffer, midiMessages, procLatency)) {
+                latency += procLatency;
             }
             TimeTrace::finishGroup("chain_process: " + proc->getName());
         }
@@ -411,8 +412,9 @@ void ProcessorChain::preProcessBlocks(Processor* proc) {
     AudioBuffer<T> buf(channels, getBlockSize());
     buf.clear();
     int samplesProcessed = 0;
+    int latencyUnused = 0;
     do {
-        proc->processBlock(buf, midi);
+        proc->processBlock(buf, midi, latencyUnused);
         samplesProcessed += getBlockSize();
     } while (samplesProcessed < 16384);
 }

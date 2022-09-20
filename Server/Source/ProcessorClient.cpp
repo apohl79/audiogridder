@@ -615,10 +615,6 @@ template <typename T>
 void ProcessorClient::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
     traceScope();
 
-    if (!isOk()) {
-        return;
-    }
-
     AudioPlayHead::PositionInfo posInfo;
     if (nullptr != m_playhead) {
         if (auto optPosInfo = m_playhead->getPosition()) {

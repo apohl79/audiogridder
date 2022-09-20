@@ -14,24 +14,28 @@ namespace e47 {
 
 #define callBackendWithReturn(method)          \
     do {                                       \
-        if (isLoaded()) {                      \
-            if (m_isClient) {                  \
-                return getClient()->method();  \
-            } else {                           \
-                return getPlugin(0)->method(); \
+        if (m_isClient) {                      \
+            if (auto c = getClient()) {        \
+                return c->method();  \
+            }                                  \
+        } else {                               \
+            if (auto p = getPlugin(0)) {       \
+                return p->method(); \
             }                                  \
         }                                      \
     } while (0)
 
-#define callBackendWithArgs1Return(method, arg1)   \
-    do {                                           \
-        if (isLoaded()) {                          \
-            if (m_isClient) {                      \
-                return getClient()->method(arg1);  \
-            } else {                               \
-                return getPlugin(0)->method(arg1); \
-            }                                      \
-        }                                          \
+#define callBackendWithArgs1Return(method, arg1) \
+    do {                                         \
+        if (m_isClient) {                        \
+            if (auto c = getClient()) {          \
+                return c->method(arg1);          \
+            }                                    \
+        } else {                                 \
+            if (auto p = getPlugin(0)) {         \
+                return p->method(arg1);          \
+            }                                    \
+        }                                        \
     } while (0)
 
 std::atomic_uint32_t Processor::loadedCount{0};
@@ -532,7 +536,7 @@ bool Processor::isLoaded() {
 }
 
 template <typename T>
-bool Processor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
+bool Processor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages, int& latencySamples) {
     traceScope();
 
     traceln("  processor: isClient=" << (int)m_isClient << ", multiMono=" << (int)(m_channels > 1)
@@ -552,6 +556,10 @@ bool Processor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMes
                 ScopedNoDenormals noDenormals;
                 p->processBlock(buffer, midiMessages);
             }
+            if (ch == 0) {
+                latencySamples = p->getLatencySamples();
+                updateLatencyBuffers(latencySamples);
+            }
             TimeTrace::addTracePoint("proc_process_" + String(ch));
         } else {
             if (m_lastKnownLatency > 0) {
@@ -567,29 +575,33 @@ bool Processor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMes
         }
     };
 
-    if (isLoaded()) {
-        TimeTrace::addTracePoint("proc_loaded_ok");
-        if (m_isClient) {
-            fn(getClient(), 0, false);
+    if (m_isClient) {
+        if (auto c = getClient()) {
+            fn(c, 0, false);
         } else {
-            for (int ch = 0; ch < m_channels; ch++) {
-                fn(getPlugin(ch), ch, true);
+            TimeTrace::addTracePoint("proc_no_client");
+            return false;
+        }
+    } else {
+        for (int ch = 0; ch < m_channels; ch++) {
+            if (auto p = getPlugin(ch)) {
+                fn(p, ch, true);
+            } else {
+                TimeTrace::addTracePoint("proc_no_plugin");
+                return false;
             }
         }
-        return true;
     }
 
-    TimeTrace::addTracePoint("proc_loaded_not_ok");
-
-    return false;
+    return true;
 }
 
-bool Processor::processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMessages) {
-    return processBlockInternal(buffer, midiMessages);
+bool Processor::processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMessages, int& latencySamples) {
+    return processBlockInternal(buffer, midiMessages, latencySamples);
 }
 
-bool Processor::processBlock(AudioBuffer<double>& buffer, MidiBuffer& midiMessages) {
-    return processBlockInternal(buffer, midiMessages);
+bool Processor::processBlock(AudioBuffer<double>& buffer, MidiBuffer& midiMessages, int& latencySamples) {
+    return processBlockInternal(buffer, midiMessages, latencySamples);
 }
 
 template <typename T>
@@ -727,29 +739,33 @@ void Processor::suspendProcessing(const bool shouldBeSuspended) {
     }
 }
 
-void Processor::updateLatencyBuffers() {
+void Processor::updateLatencyBuffers(int newLatency) {
     traceScope();
-    int channels = getTotalNumOutputChannels();
-    logln("updating latency buffers of " << getName() << " to " << m_lastKnownLatency << " samples and " << channels
-                                         << " channels");
-    m_bypassBufferF.resize(channels, m_lastKnownLatency * 2);
-    m_bypassBufferF.clear();
-    m_bypassBufferF.setReadOffset(m_lastKnownLatency);
-    m_bypassBufferD.resize(channels, m_lastKnownLatency * 2);
-    m_bypassBufferD.clear();
-    m_bypassBufferD.setReadOffset(m_lastKnownLatency);
+    if (m_lastKnownLatency != newLatency) {
+        m_lastKnownLatency = newLatency;
 
-    if (m_channels > 1) {
-        for (int ch = 0; ch < m_channels; ch++) {
-            if (auto& b = m_multiMonoBypassBuffersF[(size_t)ch]) {
-                b->resize(1, m_lastKnownLatency * 2);
-                b->clear();
-                b->setReadOffset(m_lastKnownLatency);
-            }
-            if (auto& b = m_multiMonoBypassBuffersD[(size_t)ch]) {
-                b->resize(1, m_lastKnownLatency * 2);
-                b->clear();
-                b->setReadOffset(m_lastKnownLatency);
+        int channels = getTotalNumOutputChannels();
+        logln("updating latency buffers of " << getName() << " to " << m_lastKnownLatency << " samples and " << channels
+                                             << " channels");
+        m_bypassBufferF.resize(channels, m_lastKnownLatency * 2);
+        m_bypassBufferF.clear();
+        m_bypassBufferF.setReadOffset(m_lastKnownLatency);
+        m_bypassBufferD.resize(channels, m_lastKnownLatency * 2);
+        m_bypassBufferD.clear();
+        m_bypassBufferD.setReadOffset(m_lastKnownLatency);
+
+        if (m_channels > 1) {
+            for (int ch = 0; ch < m_channels; ch++) {
+                if (auto& b = m_multiMonoBypassBuffersF[(size_t)ch]) {
+                    b->resize(1, m_lastKnownLatency * 2);
+                    b->clear();
+                    b->setReadOffset(m_lastKnownLatency);
+                }
+                if (auto& b = m_multiMonoBypassBuffersD[(size_t)ch]) {
+                    b->resize(1, m_lastKnownLatency * 2);
+                    b->clear();
+                    b->setReadOffset(m_lastKnownLatency);
+                }
             }
         }
     }
@@ -939,19 +955,13 @@ juce::Rectangle<int> Processor::getScreenBounds() {
 
 int Processor::getLatencySamples() {
     traceScope();
-    if (isLoaded()) {
-        auto getLatency = [this] {
-            callBackendWithReturn(getLatencySamples);
-            return 0;
-        };
-        int latency = getLatency();
-        if (latency != m_lastKnownLatency) {
-            m_lastKnownLatency = latency;
-            updateLatencyBuffers();
-        }
-        return latency;
-    }
-    return 0;
+    auto getLatency = [this] {
+        callBackendWithReturn(getLatencySamples);
+        return 0;
+    };
+    int latency = getLatency();
+    updateLatencyBuffers(latency);
+    return latency;
 }
 
 void Processor::setExtraChannels(int in, int out) {

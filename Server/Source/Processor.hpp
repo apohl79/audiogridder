@@ -76,8 +76,8 @@ class Processor : public LogTagDelegate, public std::enable_shared_from_this<Pro
 
     const String& getPluginId() const { return m_id; }
 
-    bool processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMessages);
-    bool processBlock(AudioBuffer<double>& buffer, MidiBuffer& midiMessages);
+    bool processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMessages, int& latencySamples);
+    bool processBlock(AudioBuffer<double>& buffer, MidiBuffer& midiMessages, int& latencySamples);
 
     void processBlockBypassed(AudioBuffer<float>& buffer);
     void processBlockBypassed(AudioBuffer<double>& buffer);
@@ -86,7 +86,7 @@ class Processor : public LogTagDelegate, public std::enable_shared_from_this<Pro
     void releaseResources();
     int getLatencySamples();
     void suspendProcessing(const bool shouldBeSuspended);
-    void updateLatencyBuffers();
+    void updateLatencyBuffers(int newLatency);
     void enableAllBuses();
     void setProcessingPrecision(AudioProcessor::ProcessingPrecision p);
     void setMonoChannels(uint64 channels);
@@ -239,7 +239,7 @@ class Processor : public LogTagDelegate, public std::enable_shared_from_this<Pro
     }
 
     template <typename T>
-    bool processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages);
+    bool processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages, int& latencySamples);
 
     template <typename T>
     void processBlockBypassedInternal(AudioBuffer<T>& buffer, AudioRingBuffer<T>& bypassBuffer);
