@@ -62,9 +62,14 @@ void Server::loadConfig() {
     traceScope();
     auto file = Defaults::getConfigFileName(Defaults::ConfigServer, {{"id", String(getId())}});
 
+    bool loadUuid = true;
+
 #ifndef AG_UNIT_TESTS
+    // If a server with a new ID is started and has no config yet, fallback to the default config
     if (!File(file).exists()) {
         file = Defaults::getConfigFileName(Defaults::ConfigServer, {{"id", "0"}});
+        // But do not inherit the UUID of the default server
+        loadUuid = false;
     }
 #endif
 
@@ -74,7 +79,9 @@ void Server::loadConfig() {
     Logger::setEnabled(jsonGetValue(cfg, "Logger", Logger::isEnabled()));
     m_id = jsonGetValue(cfg, "ID", m_id);
     m_name = jsonGetValue(cfg, "NAME", m_name);
-    m_uuid = jsonGetValue(cfg, "UUID", m_uuid.toDashedString());
+    if (loadUuid) {
+        m_uuid = jsonGetValue(cfg, "UUID", m_uuid.toDashedString());
+    }
 #ifdef JUCE_MAC
     m_enableAU = jsonGetValue(cfg, "AU", m_enableAU);
     logln("AudioUnit support " << (m_enableAU ? "enabled" : "disabled"));
@@ -108,18 +115,6 @@ void Server::loadConfig() {
     m_screenCapturingFFmpeg = jsonGetValue(cfg, "ScreenCapturingFFmpeg", m_screenCapturingFFmpeg);
     String encoder = "webp";
     m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
-    // if (jsonHasValue(cfg, "ScreenCapturingFFmpegEncoder")) {
-    //    encoder = jsonGetValue(cfg, "ScreenCapturingFFmpegEncoder", encoder);
-    //    if (encoder == "webp") {
-    //        m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
-    //    } else if (encoder == "mjpeg") {
-    //        m_screenCapturingFFmpegEncMode = ScreenRecorder::MJPEG;
-    //    } else {
-    //        logln("unknown ffmpeg encoder mode " << encoder << "! falling back to webp.");
-    //        m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
-    //        encoder = "webp";
-    //    }
-    //}
     m_screenCapturingOff = jsonGetValue(cfg, "ScreenCapturingOff", m_screenCapturingOff);
     m_screenCapturingFFmpegQuality = jsonGetValue(cfg, "ScreenCapturingFFmpegQual", m_screenCapturingFFmpegQuality);
     String scmode;
