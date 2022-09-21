@@ -26,13 +26,28 @@ bool ScreenRecorder::m_downScale = false;
 int WEBP_QUALITY[3] = {4000, 8000, 16000};
 int MJPEG_QUALITY[3] = {9000000, 14000000, 20000000};
 
+void avLog(void* avcl, int level, const char* fmt, va_list vl) {
+    if (level > AV_LOG_ERROR) {
+        return;
+    }
+
+    static int printPrefix = 1;
+    static constexpr size_t lineSize = 1024;
+
+    char line[lineSize];
+    av_log_format_line2(avcl, level, fmt, vl, line, lineSize, &printPrefix);
+
+    setLogTagStatic("screnrec");
+    logln(line);
+}
+
 void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode, EncoderQuality quality) {
     setLogTagStatic("screenrec");
     traceScope();
 
     SharedInstance<ScreenRecorder>::initialize();
 
-    av_log_set_level(AV_LOG_QUIET);
+    av_log_set_callback(avLog);
 
     m_encMode = encMode;
     const char* encName = "unset";
@@ -52,6 +67,10 @@ void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode, EncoderQual
         return;
     }
 
+#ifdef JUCE_MAC
+    m_downScale = quality != ENC_QUALITY_HIGH;
+#endif
+
     if (m_initialized) {
         return;
     }
@@ -68,7 +87,6 @@ void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode, EncoderQual
     askForScreenRecordingPermission();
     m_inputFmtName = "avfoundation";
     m_inputStreamUrl = String(getCaptureDeviceIndex()) + ":none";
-    m_downScale = quality != ENC_QUALITY_HIGH;
 #else
     m_inputFmtName = "gdigrab";
     m_inputStreamUrl = "desktop";
@@ -402,8 +420,9 @@ bool ScreenRecorder::prepareOutput() {
 
     //avcodec_align_dimensions(m_outputCodecCtx, &m_outputCodecCtx->width, &m_outputCodecCtx->height);
 
-    logln("prepareOutput: setting output codec context dimensions to " << m_outputCodecCtx->width << "x"
-                                                                       << m_outputCodecCtx->height);
+    logln("prepareOutput: setting output codec context dimensions to "
+          << m_outputCodecCtx->width << "x" << m_outputCodecCtx->height << " (unalligned " << m_scaledWith << "x"
+          << m_scaledHeight << ")");
 
     AVDictionary* opts = nullptr;
     switch (m_encMode) {
