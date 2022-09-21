@@ -24,8 +24,7 @@ class Processor : public LogTagDelegate, public std::enable_shared_from_this<Pro
   public:
     static std::atomic_uint32_t loadedCount;
 
-    Processor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize);
-    Processor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize, bool isClient);
+    Processor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize, bool isClient = false);
     ~Processor() override;
 
     //

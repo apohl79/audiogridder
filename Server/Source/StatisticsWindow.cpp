@@ -21,10 +21,14 @@ StatisticsWindow::StatisticsWindow(App* app)
                      DocumentWindow::closeButton),
       LogTag("statistics"),
       m_app(app),
-      m_sandboxing(m_app->getServer()->getSandboxMode() == Server::SANDBOX_CHAIN),
+      m_sandboxing(false),
       m_updater(this) {
     traceScope();
     setUsingNativeTitleBar(true);
+
+    if (auto srv = m_app->getServer()) {
+        m_sandboxing = srv->getSandboxMode() == Server::SANDBOX_CHAIN;
+    }
 
     int totalWidth = 400;
     int totalHeight = 40;
@@ -161,8 +165,7 @@ StatisticsWindow::StatisticsWindow(App* app)
         traceScope();
         m_cpu.setText(String(CPUInfo::getUsage(), 2) + "%", NotificationType::dontSendNotification);
         if (m_sandboxing) {
-            auto srv = m_app->getServer();
-            if (nullptr != srv) {
+            if (auto srv = m_app->getServer()) {
                 m_totalWorkers.setText(String(srv->getNumSandboxes()), NotificationType::dontSendNotification);
                 m_plugins.setText(String(srv->getNumLoadedBySandboxes()), NotificationType::dontSendNotification);
             }

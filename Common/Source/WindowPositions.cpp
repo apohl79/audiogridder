@@ -15,15 +15,16 @@
 
 namespace e47 {
 
-WindowPositions::WindowPositions()
-    : LogTag("winpos"),
+WindowPositions::WindowPositions() : LogTag("winpos") {
 #if AG_SERVER
-      m_file(this,
-             Defaults::getConfigFileName(Defaults::WindowPositionsServer,
-                                         {{"id", String(getApp()->getServer()->getId())}}),
-             sizeof(WindowPositions::Positions)) {
+    if (auto srv = getApp()->getServer()) {
+        m_file = MemoryFile(
+            this, Defaults::getConfigFileName(Defaults::WindowPositionsServer, {{"id", String(srv->getId())}}),
+            sizeof(WindowPositions::Positions));
+    }
 #else
-      m_file(this, Defaults::getConfigFileName(Defaults::WindowPositionsPlugin), sizeof(WindowPositions::Positions)) {
+    m_file = MemoryFile(this, Defaults::getConfigFileName(Defaults::WindowPositionsPlugin),
+                        sizeof(WindowPositions::Positions));
 #endif
     m_file.open();
     if (m_file.isOpen()) {

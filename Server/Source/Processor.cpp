@@ -12,17 +12,17 @@
 
 namespace e47 {
 
-#define callBackendWithReturn(method)          \
-    do {                                       \
-        if (m_isClient) {                      \
-            if (auto c = getClient()) {        \
-                return c->method();  \
-            }                                  \
-        } else {                               \
-            if (auto p = getPlugin(0)) {       \
-                return p->method(); \
-            }                                  \
-        }                                      \
+#define callBackendWithReturn(method)    \
+    do {                                 \
+        if (m_isClient) {                \
+            if (auto c = getClient()) {  \
+                return c->method();      \
+            }                            \
+        } else {                         \
+            if (auto p = getPlugin(0)) { \
+                return p->method();      \
+            }                            \
+        }                                \
     } while (0)
 
 #define callBackendWithArgs1Return(method, arg1) \
@@ -51,12 +51,14 @@ Processor::Processor(ProcessorChain& chain, const String& id, double sampleRate,
             : id.startsWith("VST") ? VST
                                    : AU) {
     initAsyncFunctors();
-}
 
-Processor::Processor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize)
-    : Processor(chain, id, sampleRate, blockSize,
-                getApp()->getServer()->getSandboxMode() == Server::SANDBOX_PLUGIN &&
-                    getApp()->getServer()->getSandboxModeRuntime() == Server::SANDBOX_NONE) {}
+    if (auto app = getApp()) {
+        if (auto srv = app->getServer()) {
+            m_isClient =
+                srv->getSandboxMode() == Server::SANDBOX_PLUGIN && srv->getSandboxModeRuntime() == Server::SANDBOX_NONE;
+        }
+    }
+}
 
 Processor::~Processor() {
     unload();
@@ -287,11 +289,12 @@ Array<AudioProcessor::BusesLayout> Processor::findSupportedLayouts(Processor* pr
 
 const Array<AudioProcessor::BusesLayout>& Processor::getSupportedBusLayouts() const {
 #ifndef AG_UNIT_TESTS
-    return getApp()->getServer()->getPluginLayouts(m_idNormalized);
-#else
+    if (auto srv = getApp()->getServer()) {
+        return srv->getPluginLayouts(m_idNormalized);
+    }
+#endif
     static Array<AudioProcessor::BusesLayout> ret;
     return ret;
-#endif
 }
 
 std::shared_ptr<AudioPluginInstance> Processor::loadPlugin(const PluginDescription& plugdesc, double sampleRate,

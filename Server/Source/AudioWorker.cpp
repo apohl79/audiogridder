@@ -81,7 +81,10 @@ void AudioWorker::run() {
     auto traceCtx = TimeTrace::createTraceContext();
     Uuid traceId;
 
-    auto processingTresholMs = getApp()->getServer()->getProcessingTraceTresholdMs();
+    auto processingTresholMs = -1.0;
+    if (auto srv = getApp()->getServer()) {
+        processingTresholMs = srv->getProcessingTraceTresholdMs();
+    }
     if (processingTresholMs <= 0.0) {
         processingTresholMs = m_samplesPerBlock / m_sampleRate * 1000 - 1;
     }

@@ -440,9 +440,11 @@ void App::showEditorInternal(Thread::ThreadID tid, std::shared_ptr<Processor> pr
         }
 
 #ifdef JUCE_MAC
-        if (getServer()->getSandboxMode() != Server::SANDBOX_PLUGIN ||
-            getServer()->getSandboxModeRuntime() == Server::SANDBOX_PLUGIN) {
-            Process::setDockIconVisible(true);
+        if (auto srv = getServer()) {
+            if (srv->getSandboxMode() != Server::SANDBOX_PLUGIN ||
+                srv->getSandboxModeRuntime() == Server::SANDBOX_PLUGIN) {
+                Process::setDockIconVisible(true);
+            }
         }
 #endif
     } else {
@@ -493,8 +495,12 @@ void App::hideEditor(Thread::ThreadID tid, bool updateMacOSDock) {
     }
 
 #ifdef JUCE_MAC
-    if (updateMacOSDock && (getServer()->getSandboxMode() != Server::SANDBOX_PLUGIN ||
-                            getServer()->getSandboxModeRuntime() == Server::SANDBOX_PLUGIN)) {
+    bool isPluginRuntime = false;
+    if (auto srv = getServer()) {
+        isPluginRuntime =
+            srv->getSandboxMode() != Server::SANDBOX_PLUGIN || srv->getSandboxModeRuntime() == Server::SANDBOX_PLUGIN;
+    }
+    if (updateMacOSDock && isPluginRuntime) {
         bool windowVisible = false;
         for (auto& pair : m_processors) {
             if (auto window = pair.second->getEditorWindow()) {
@@ -550,16 +556,18 @@ std::shared_ptr<ProcessorWindow> App::getCurrentWindow(Thread::ThreadID tid) {
 void App::moveEditor(Thread::ThreadID tid, int x, int y) {
     traceScope();
 
-    if (getServer()->getScreenLocalMode()) {
-        logln("moving editor: tid=0x" << String::toHexString((uint64)tid));
+    if (auto srv = getServer()) {
+        if (srv->getScreenLocalMode()) {
+            logln("moving editor: tid=0x" << String::toHexString((uint64)tid));
 
-        std::lock_guard<std::mutex> lock(m_processorsMtx);
+            std::lock_guard<std::mutex> lock(m_processorsMtx);
 
-        if (auto window = getCurrentWindow(tid)) {
-            logln("moving editor window to " << x << "x" << y);
-            window->move(x, y);
-        } else {
-            logln("moveEditor failed: no window for tid");
+            if (auto window = getCurrentWindow(tid)) {
+                logln("moving editor window to " << x << "x" << y);
+                window->move(x, y);
+            } else {
+                logln("moveEditor failed: no window for tid");
+            }
         }
     }
 }

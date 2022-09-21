@@ -19,18 +19,19 @@ PluginListWindow::PluginListWindow(App* app, KnownPluginList& list, const String
       m_app(app),
       m_pluginlist(list),
       m_deadMansPedalFile(deadMansPedalFile) {
-    setUsingNativeTitleBar(true);
-    m_plugmgr.addDefaultFormats();
-    setContentOwned(
-        new PluginListComponent(m_plugmgr, m_pluginlist, m_app->getServer()->getExcludeList(), m_deadMansPedalFile),
-        true);
+    if (auto srv = m_app->getServer()) {
+        setUsingNativeTitleBar(true);
+        m_plugmgr.addDefaultFormats();
+        setContentOwned(new PluginListComponent(m_plugmgr, m_pluginlist, srv->getExcludeList(), m_deadMansPedalFile),
+                        true);
 
-    setResizable(true, false);
-    centreWithSize(700, 600);
-    setBounds(WindowPositions::get(WindowPositions::ServerPlugins, getBounds()));
+        setResizable(true, false);
+        centreWithSize(700, 600);
+        setBounds(WindowPositions::get(WindowPositions::ServerPlugins, getBounds()));
 
-    setVisible(true);
-    windowToFront(this);
+        setVisible(true);
+        windowToFront(this);
+    }
 }
 
 PluginListWindow::~PluginListWindow() {

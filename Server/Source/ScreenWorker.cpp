@@ -34,14 +34,18 @@ void ScreenWorker::run() {
     traceScope();
     logln("screen processor started");
 
-    if (getApp()->getServer()->getScreenCapturingFFmpeg()) {
-        runFFmpeg();
-    } else if (!getApp()->getServer()->getScreenCapturingOff()) {
-        runNative();
-    } else {
-        while (!threadShouldExit() && nullptr != m_socket && m_socket->isConnected()) {
-            sleepExitAware(100);
+    if (auto srv = getApp()->getServer()) {
+        if (srv->getScreenCapturingFFmpeg()) {
+            runFFmpeg();
+        } else if (!srv->getScreenCapturingOff()) {
+            runNative();
+        } else {
+            while (!threadShouldExit() && nullptr != m_socket && m_socket->isConnected()) {
+                sleepExitAware(100);
+            }
         }
+    } else {
+        m_error = "no server object";
     }
 
     if (m_error.isNotEmpty()) {
@@ -178,6 +182,12 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
     m_currentTid = tid;
     m_imgCounter = 0;
 
+    auto srv = getApp()->getServer();
+    if (nullptr == srv) {
+        logln("error: no server object");
+        return;
+    }
+
     auto onHide2 = [this, onHide] {
         m_visible = false;
         if (nullptr != onHide) {
@@ -196,10 +206,10 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
         return;
     }
 
-    runOnMsgThreadAsync([this] {
+    runOnMsgThreadAsync([this, srv] {
         traceScope();
         logln("trying to hide an existing editor");
-        if (getApp()->getServer()->getScreenCapturingOff()) {
+        if (srv->getScreenCapturingOff()) {
             getApp()->hideEditor(m_currentTid, false);
         } else {
             // we allow only one plugin UI at a time when capturing the screen, so we hide all
@@ -207,7 +217,7 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
         }
     });
 
-    if (getApp()->getServer()->getScreenCapturingOff()) {
+    if (srv->getScreenCapturingOff()) {
         logln("showing editor with NO callback");
         runOnMsgThreadSync([this, proc, channel, x, y, onHide2] {
             traceScope();
@@ -217,7 +227,7 @@ void ScreenWorker::showEditor(Thread::ThreadID tid, std::shared_ptr<Processor> p
             getApp()->showEditor(
                 m_currentTid, proc, [](const uint8_t*, int, int, int, int, int, double) {}, onHide2, x, y);
         });
-    } else if (getApp()->getServer()->getScreenCapturingFFmpeg()) {
+    } else if (srv->getScreenCapturingFFmpeg()) {
         logln("showing editor with ffmpeg callback");
         runOnMsgThreadSync([this, proc, channel, onHide2] {
             traceScope();

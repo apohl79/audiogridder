@@ -128,7 +128,11 @@ bool ProcessorClient::startSandbox() {
 
 #ifndef AG_UNIT_TESTS
         args.add(File::getSpecialLocation(File::currentExecutableFile).getFullPathName());
-        args.addArray({"-id", String(getApp()->getServer()->getId())});
+        if (auto srv = getApp()->getServer()) {
+            args.addArray({"-id", String(srv->getId())});
+        } else {
+            throw std::runtime_error("no server object");
+        }
 #else
         auto exe = File::getSpecialLocation(File::currentExecutableFile).getParentDirectory();
 #if JUCE_WINDOWS
