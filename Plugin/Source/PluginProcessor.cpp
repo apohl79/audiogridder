@@ -1348,18 +1348,22 @@ void PluginProcessor::getAllParameterValues(int idx) {
     traceScope();
     logln("reading all parameter values for plugin " << idx);
     std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
-    auto& params = m_loadedPlugins[(size_t)idx].params;
-    int count = (int)(params.size() * params[0].size());
-    for (auto& res : m_client->getAllParameterValues(idx, count)) {
-        if (res.channel > -1 && res.channel < (int)params.size() && res.idx > -1 &&
-            res.idx < (int)params[(size_t)res.channel].size()) {
-            auto& param = params[(size_t)res.channel][(size_t)res.idx];
-            if (param.idx == res.idx) {
-                param.currentValue = (float)res.value;
-            } else {
-                logln("error: index mismatch in getAllParameterValues");
+    if (idx > -1 && idx < (int)m_loadedPlugins.size()) {
+        auto& params = m_loadedPlugins[(size_t)idx].params;
+        int count = (int)(params.size() * params[0].size());
+        for (auto& res : m_client->getAllParameterValues(idx, count)) {
+            if (res.channel > -1 && res.channel < (int)params.size() && res.idx > -1 &&
+                res.idx < (int)params[(size_t)res.channel].size()) {
+                auto& param = params[(size_t)res.channel][(size_t)res.idx];
+                if (param.idx == res.idx) {
+                    param.currentValue = (float)res.value;
+                } else {
+                    logln("getAllParameterValues error: index mismatch in getAllParameterValues");
+                }
             }
         }
+    } else {
+        logln("getAllParameterValues failed: idx " << idx << " out of range");
     }
 }
 
