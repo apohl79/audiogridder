@@ -20,13 +20,15 @@
 #include <sys/socket.h>
 #endif
 
-#ifdef JUCE_WINDOWS
-#include <signal.h>
-#endif
-
 #include <regex>
 
 namespace e47 {
+
+struct ScanPipeHdr {
+    enum Type : uint8 { LOAD_START, LOAD_FINISHED, SHELL };
+    Type type;
+    int len;
+};
 
 Server::Server(const json& opts) : Thread("Server"), LogTag("server"), m_opts(opts) { initAsyncFunctors(); }
 
@@ -595,9 +597,11 @@ bool Server::scanPlugin(const String& id, const String& format, int srvId, bool 
         if (types.size() > 1 && pipe.isOpen()) {
             String out = t.descriptiveName;
             out << " (" << format.toLowerCase() << ")";
-            int len = out.length();
-            pipe.write(&len, sizeof(int), 100);
-            pipe.write(out.toRawUTF8(), len, 100);
+            ScanPipeHdr hdr;
+            hdr.type = ScanPipeHdr::SHELL;
+            hdr.len = out.length();
+            pipe.write(&hdr, sizeof(hdr), 100);
+            pipe.write(out.toRawUTF8(), hdr.len, 100);
         }
 
         logln("adding plugin description:");
@@ -614,38 +618,30 @@ bool Server::scanPlugin(const String& id, const String& format, int srvId, bool 
         plist.addType(t);
 
         if (!secondRun) {
-            // Create a timeout tread that kills the scanner in case loading the plugin does not return
-            std::atomic_bool timeoutActive{false};
-            auto timeoutThread = std::make_unique<FnThread>(
-                [&] {
-                    logln("timeout thread started");
-                    while (!Thread::currentThreadShouldExit()) {
-                        if (timeoutActive) {
-                            sleepExitAwareWithCondition(5000, [&] { return !timeoutActive.load(); });
-                            if (timeoutActive) {
-                                logln("timeout thread timed out");
-                                Thread::sleep(100);
-                                raise(SIGABRT);
-                            } else {
-                                logln(".");
-                            }
-                        }
-                        sleepExitAware(50);
-                    }
-                    logln("timeout thread finished");
-                },
-                "TimeoutThread", true);
-
             // Create an error file that we remove after testing, if we fail, the scanner will trigger a second
             // run, that does not test I/O layouts
             errFileLayout.create();
 
             logln("testing I/O layouts...");
 
+            // Let the scan master know, that we are loading a plugin now. This might hang, so the master can kill us.
+            if (pipe.isOpen()) {
+                ScanPipeHdr hdr;
+                hdr.type = ScanPipeHdr::LOAD_START;
+                hdr.len = 0;
+                pipe.write(&hdr, sizeof(hdr), 100);
+            }
+
             String err;
             if (auto inst = Processor::loadPlugin(t, 48000, 512, err)) {
-                timeoutActive = false;
                 logln("plugin loaded");
+
+                if (pipe.isOpen()) {
+                    ScanPipeHdr hdr;
+                    hdr.type = ScanPipeHdr::LOAD_FINISHED;
+                    hdr.len = 0;
+                    pipe.write(&hdr, sizeof(hdr), 100);
+                }
 
                 auto layouts = Processor::findSupportedLayouts(inst);
 
@@ -702,26 +698,45 @@ void Server::scanNextPlugin(const String& id, const String& name, const String& 
         std::atomic_int secondsLeft{secondsPerPlugin};
 
         FnThread outputReader(
-            [this, &pipe, &proc, &secondsLeft, secs = secondsPerPlugin, onShellPlugin] {
+            [this, &pipe, &proc, &secondsLeft, name, secs = secondsPerPlugin, onShellPlugin] {
                 std::vector<char> buf(256);
+                std::unique_ptr<TimeStatistic::Timeout> loadTimeout;
+                String lastShellName;
                 while (proc.isRunning() && !currentThreadShouldExit()) {
-                    int len;
-                    if (pipe.read(&len, sizeof(int), 100) == sizeof(int)) {
-                        if (pipe.read(buf.data(), len, 1000) == len) {
-                            buf[(size_t)len] = 0;
-                            String msg = buf.data();
-                            // let the scanner know, that the current plugin is a shell and has plugins inside
-                            onShellPlugin(msg);
-                            // increase the timeout as there might be mutliple plugins per shell
-                            secondsLeft = secs;
-                            logln("    -> shell plugin: " << msg);
+                    ScanPipeHdr hdr;
+                    if (pipe.read(&hdr, sizeof(hdr), 100) == sizeof(hdr)) {
+                        switch (hdr.type) {
+                            case ScanPipeHdr::LOAD_START:
+                                loadTimeout = std::make_unique<TimeStatistic::Timeout>(5000);
+                                break;
+                            case ScanPipeHdr::LOAD_FINISHED:
+                                loadTimeout.reset();
+                                break;
+                            case ScanPipeHdr::SHELL:
+                                if (pipe.read(buf.data(), hdr.len, 1000) == hdr.len) {
+                                    buf[(size_t)hdr.len] = 0;
+                                    lastShellName = buf.data();
+                                    // let the scanner know, that the current plugin is a shell and has plugins inside
+                                    onShellPlugin(lastShellName);
+                                    // increase the timeout as there might be mutliple plugins per shell
+                                    secondsLeft = secs;
+                                    logln("    -> shell plugin: " << lastShellName);
+                                }
+                                break;
                         }
+                    }
+                    if (nullptr != loadTimeout && loadTimeout->getMillisecondsLeft() <= 0) {
+                        logln("error: load timeout for '" << (lastShellName.isNotEmpty() ? lastShellName : name)
+                                                          << "', killing process");
+                        proc.kill();
+                        loadTimeout.reset();
                     }
                 }
             },
             "OutputReader", true);
 
         bool finished;
+        int numTimeouts = 0;
         do {
             secondsLeft = secondsPerPlugin;
 
@@ -734,11 +749,21 @@ void Server::scanNextPlugin(const String& id, const String& name, const String& 
 
             if (!finished) {
                 getApp()->enableCancelScan(srvId, [&proc] { proc.kill(); });
-            } else {
+
+                numTimeouts++;
+
+                if (!secondRun && numTimeouts > 9) {
+                    // In case the timeout thread is not able to kill the process (I've seen some waves shells on
+                    // Windows hanging the process) our last resort is killing it from here.
+                    proc.kill();
+                    finished = true;
+                }
+            }
+
+            if (finished) {
                 auto layoutErrFile =
                     File(Defaults::getConfigFileName(Defaults::ScanLayoutError, {{"id", String(srvId)}}));
                 auto errFile = File(Defaults::getConfigFileName(Defaults::ScanError, {{"id", String(srvId)}}));
-                auto ec = proc.getExitCode();
 
                 if (!secondRun && layoutErrFile.existsAsFile()) {
                     logln("error: scan for '" << name << "' failed while testing layouts, starting second run");
