@@ -418,7 +418,7 @@ bool ScreenRecorder::prepareOutput() {
     m_outputCodecCtx->width = m_scaledWith;
     m_outputCodecCtx->height = m_scaledHeight;
 
-    //avcodec_align_dimensions(m_outputCodecCtx, &m_outputCodecCtx->width, &m_outputCodecCtx->height);
+    // avcodec_align_dimensions(m_outputCodecCtx, &m_outputCodecCtx->width, &m_outputCodecCtx->height);
 
     logln("prepareOutput: setting output codec context dimensions to "
           << m_outputCodecCtx->width << "x" << m_outputCodecCtx->height << " (unalligned " << m_scaledWith << "x"
