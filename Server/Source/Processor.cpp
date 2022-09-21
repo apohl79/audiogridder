@@ -408,8 +408,11 @@ bool Processor::load(const String& settings, const String& layout, uint64 monoCh
             } else {
                 m_monoChannels.setOutputRangeActive();
             }
+
             settingsByChannel = StringArray::fromTokens(settings, "|", "");
-            jassert(settingsByChannel.size() == m_channels);
+            for (int i = settingsByChannel.size(); i < m_channels; i++) {
+                settingsByChannel.add("");
+            }
 
             logln("creating " << m_channels << " plugin instances for multi-mono layout");
         }
@@ -451,9 +454,12 @@ bool Processor::load(const String& settings, const String& layout, uint64 monoCh
                 for (auto* param : m_plugins[ch]->getParameters()) {
                     param->addListener(m_listners[ch].get());
                 }
-                if (settings.isNotEmpty()) {
+
+                auto& settingsRef = m_channels > 1 ? settingsByChannel.getReference((int)ch) : settings;
+
+                if (settingsRef.isNotEmpty()) {
                     MemoryBlock block;
-                    block.fromBase64Encoding(m_channels > 1 ? settingsByChannel.getReference((int)ch) : settings);
+                    block.fromBase64Encoding(settingsRef);
                     runOnMsgThreadSync(
                         [&] { m_plugins[ch]->setStateInformation(block.getData(), (int)(block.getSize())); });
                 }
