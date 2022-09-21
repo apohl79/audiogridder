@@ -369,19 +369,19 @@ inline void runOnMsgThreadSync(std::function<void()> fn) {
         logln("error: current thread has locked the message thread");
         return;
     }
-    std::mutex mtx;
-    std::condition_variable cv;
-    bool done = false;
-    MessageManager::callAsync([&] {
-        std::lock_guard<std::mutex> lock(mtx);
+    auto mtx = std::make_shared<std::mutex>();
+    auto cv = std::make_shared<std::condition_variable>();
+    auto done = std::make_shared<bool>(false);
+    MessageManager::callAsync([mtx, cv, done, fn] {
+        std::lock_guard<std::mutex> lock(*mtx);
         fn();
-        done = true;
-        cv.notify_one();
+        *done = true;
+        cv->notify_one();
     });
     bool finished = false;
     do {
-        std::unique_lock<std::mutex> lock(mtx);
-        finished = cv.wait_for(lock, 5ms, [&done, &mm] { return done || mm->hasStopMessageBeenSent(); });
+        std::unique_lock<std::mutex> lock(*mtx);
+        finished = cv->wait_for(lock, 5ms, [&done, &mm] { return *done || mm->hasStopMessageBeenSent(); });
     } while (!finished);
 }
 
