@@ -17,9 +17,15 @@ std::unordered_set<int> ProcessorClient::m_workerPorts;
 std::mutex ProcessorClient::m_workerPortsMtx;
 
 ProcessorClient::~ProcessorClient() {
-    m_sockCmdOut.reset();
-    m_sockCmdIn.reset();
-    m_sockAudio.reset();
+    {
+        std::lock_guard<std::mutex> lock(m_cmdMtx);
+        m_sockCmdOut.reset();
+        m_sockCmdIn.reset();
+    }
+    {
+        std::lock_guard<std::mutex> lock(m_audioMtx);
+        m_sockAudio.reset();
+    }
     removeWorkerPort(m_port);
 }
 
