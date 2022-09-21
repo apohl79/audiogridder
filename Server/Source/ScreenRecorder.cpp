@@ -400,11 +400,10 @@ bool ScreenRecorder::prepareOutput() {
     m_outputCodecCtx->width = m_scaledWith;
     m_outputCodecCtx->height = m_scaledHeight;
 
-    avcodec_align_dimensions(m_outputCodecCtx, &m_outputCodecCtx->width, &m_outputCodecCtx->height);
+    //avcodec_align_dimensions(m_outputCodecCtx, &m_outputCodecCtx->width, &m_outputCodecCtx->height);
 
-    logln("prepareOutput: setting output codec context dimensions to "
-          << m_outputCodecCtx->width << "x" << m_outputCodecCtx->height << " (unalligned " << m_scaledWith << "x"
-          << m_scaledHeight << ")");
+    logln("prepareOutput: setting output codec context dimensions to " << m_outputCodecCtx->width << "x"
+                                                                       << m_outputCodecCtx->height);
 
     AVDictionary* opts = nullptr;
     switch (m_encMode) {
@@ -436,8 +435,11 @@ bool ScreenRecorder::prepareOutput() {
     m_outputFrame->height = m_outputCodecCtx->height;
     m_outputFrame->format = m_outputCodecCtx->pix_fmt;
 
+    int widthAlligned = m_outputCodecCtx->width, heightAlligned = m_outputCodecCtx->height;
+    avcodec_align_dimensions(m_outputCodecCtx, &widthAlligned, &heightAlligned);
+
     auto outputFrameBufSize =
-        (size_t)av_image_get_buffer_size(m_outputCodecCtx->pix_fmt, m_outputFrame->width, m_outputFrame->height, 32) +
+        (size_t)av_image_get_buffer_size(m_outputCodecCtx->pix_fmt, widthAlligned, heightAlligned, 32) +
         AV_INPUT_BUFFER_PADDING_SIZE;
 
     logln("prepareOutput: allocating output frame buffer with " << outputFrameBufSize << " bytes");
@@ -457,8 +459,8 @@ bool ScreenRecorder::prepareOutput() {
     }
 
     m_swsCtx = sws_getContext(m_captureRect.getWidth(), m_captureRect.getHeight(), m_captureCodecCtx->pix_fmt,
-                              m_outputFrame->width, m_outputFrame->height, m_outputCodecCtx->pix_fmt, SWS_BICUBIC,
-                              nullptr, nullptr, nullptr);
+                              m_outputFrame->width, m_outputFrame->height, m_outputCodecCtx->pix_fmt,
+                              m_scale < 1.0 ? SWS_BICUBIC : SWS_FAST_BILINEAR, nullptr, nullptr, nullptr);
     if (nullptr == m_swsCtx) {
         logError("prepareOutput: sws_getContext failed");
         return false;
@@ -514,12 +516,21 @@ void ScreenRecorder::record() {
                         if (m_captureFrame->width != m_cropFrame->width ||
                             m_captureFrame->height != m_cropFrame->height) {
                             // crop the frame to the window dimension
+                            bool cropErr = false;
                             for (int y = m_captureRect.getY(); y < m_captureRect.getBottom(); y++) {
                                 auto* src = m_captureFrame->data[0] + m_captureFrame->linesize[0] * y +
                                             m_captureRect.getX() * m_pxSize;
                                 auto* dst =
                                     m_cropFrame->data[0] + m_cropFrame->linesize[0] * (y - m_captureRect.getY());
-                                memcpy(dst, src, (size_t)m_cropFrame->linesize[0]);
+                                if (nullptr != src && nullptr != dst) {
+                                    memcpy(dst, src, (size_t)m_cropFrame->linesize[0]);
+                                } else {
+                                    cropErr = true;
+                                    break;
+                                }
+                            }
+                            if (cropErr) {
+                                continue;
                             }
                             frame = m_cropFrame;
                         }
