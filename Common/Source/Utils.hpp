@@ -374,14 +374,22 @@ inline void runOnMsgThreadSync(std::function<void()> fn) {
     auto done = std::make_shared<bool>(false);
     MessageManager::callAsync([mtx, cv, done, fn] {
         std::lock_guard<std::mutex> lock(*mtx);
-        fn();
-        *done = true;
-        cv->notify_one();
+        if (!*done) {
+            fn();
+            *done = true;
+            cv->notify_one();
+        }
     });
     bool finished = false;
     do {
         std::unique_lock<std::mutex> lock(*mtx);
-        finished = cv->wait_for(lock, 5ms, [&done, &mm] { return *done || mm->hasStopMessageBeenSent(); });
+        finished = cv->wait_for(lock, 5ms, [&done, &mm] {
+            if (mm->hasStopMessageBeenSent()) {
+                // make sure we don't call the functor anymore
+                *done = true;
+            }
+            return *done;
+        });
     } while (!finished);
 }
 
