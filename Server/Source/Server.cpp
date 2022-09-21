@@ -1214,6 +1214,7 @@ void Server::runServer() {
                             if (!sendHandshakeResponse(clnt, true, sandboxPort)) {
                                 logln("failed to send handshake response for sandbox " << id);
                                 auto deleter = m_sandboxes[id];
+                                deleter->terminate();
                                 m_sandboxes.remove(id);
                                 m_sandboxDeleter->add(std::move(deleter));
                             }
@@ -1280,6 +1281,7 @@ void Server::runServer() {
 
         if (m_sandboxes.size() > 0) {
             for (auto sandbox : m_sandboxes) {
+                sandbox->terminate();
                 m_sandboxDeleter->add(sandbox);
             }
             m_sandboxes.clear();
@@ -1395,6 +1397,7 @@ void Server::runSandboxChain() {
     logln("terminating sandbox connection to master");
     if (nullptr != m_sandboxController) {
         auto* deleter = m_sandboxController.release();
+        deleter->terminate();
         std::thread([deleter] { delete deleter; }).detach();
     }
 
@@ -1545,6 +1548,7 @@ void Server::handleDisconnectFromSandbox(SandboxMaster& sandbox) {
         Metrics::getStatistic<Meter>("NetBytesOut")->removeExtRate1min(sandbox.id);
         Metrics::getStatistic<Meter>("NetBytesIn")->removeExtRate1min(sandbox.id);
         auto deleter = m_sandboxes[sandbox.id];
+        deleter->terminate();
         m_sandboxes.remove(sandbox.id);
         m_sandboxDeleter->add(std::move(deleter));
     }

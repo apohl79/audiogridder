@@ -37,7 +37,7 @@ void avLog(void* avcl, int level, const char* fmt, va_list vl) {
     char line[lineSize];
     av_log_format_line2(avcl, level, fmt, vl, line, lineSize, &printPrefix);
 
-    setLogTagStatic("screnrec");
+    setLogTagStatic("screenrec");
     logln(line);
 }
 
