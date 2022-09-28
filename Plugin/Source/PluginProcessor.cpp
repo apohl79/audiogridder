@@ -1740,15 +1740,17 @@ void PluginProcessor::TrayConnection::sendStatus() {
     uint64_t readErrors = 0;
     if (isClientReady) {
         if (client.isUsingDoublePrecission()) {
-            auto streamer = client.getStreamer<double>();
-            streamer->getReadQueueMeter().aggregate(rqAvg, rqMin, rqMax, rq95th);
-            readTimeout = streamer->getReadTimeoutMs();
-            readErrors = streamer->getReadErrors();
+            if (auto streamer = client.getStreamer<double>()) {
+                streamer->getReadQueueMeter().aggregate(rqAvg, rqMin, rqMax, rq95th);
+                readTimeout = streamer->getReadTimeoutMs();
+                readErrors = streamer->getReadErrors();
+            }
         } else {
-            auto streamer = client.getStreamer<float>();
-            streamer->getReadQueueMeter().aggregate(rqAvg, rqMin, rqMax, rq95th);
-            readTimeout = streamer->getReadTimeoutMs();
-            readErrors = streamer->getReadErrors();
+            if (auto streamer = client.getStreamer<float>()) {
+                streamer->getReadQueueMeter().aggregate(rqAvg, rqMin, rqMax, rq95th);
+                readTimeout = streamer->getReadTimeoutMs();
+                readErrors = streamer->getReadErrors();
+            }
         }
     }
     j["rqAvg"] = rqAvg;
