@@ -222,14 +222,20 @@ bool ProcessorChain::initPluginInstance(Processor* proc, const String& layout, S
         }
     }
     proc->setProcessingPrecision(prec);
-    proc->setPlayHead(getPlayHead());
     proc->prepareToPlay(getSampleRate(), getBlockSize());
     proc->enableAllBuses();
+    AudioPlayHead::PositionInfo posInfo;
+    ProcessorChain::PlayHead playHead(&posInfo);
+    // set a temporary playhead just for preProcessBlocks
+    proc->setPlayHead(&playHead);
+    // process some samples now, as some plugins might update their latency only then
     if (prec == AudioProcessor::doublePrecision) {
         preProcessBlocks<double>(proc);
     } else {
         preProcessBlocks<float>(proc);
     }
+    // set the audio workers playhead
+    proc->setPlayHead(getPlayHead());
     return true;
 }
 
