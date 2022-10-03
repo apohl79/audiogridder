@@ -993,9 +993,7 @@ int Processor::getLatencySamples() {
         callBackendWithReturn(getLatencySamples);
         return 0;
     };
-    int latency = getLatency();
-    updateLatencyBuffers(latency);
-    return latency;
+    return getLatency();
 }
 
 void Processor::setExtraChannels(int in, int out) {
