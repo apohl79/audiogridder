@@ -276,7 +276,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
 
     LoadedPlugin& getLoadedPlugin(int idx) {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
-        return idx > -1 && idx < (int)m_loadedPlugins.size() ? m_loadedPlugins[(size_t)idx] : m_unusedDummyPlugin;
+        return getLoadedPluginNoLock(idx);
     }
 
     bool loadPlugin(const ServerPlugin& plugin, const String& layout, uint64 monoChannels, String& err);
@@ -430,8 +430,8 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
         int m_paramIdx = 0;
         int m_slotId = 0;
 
-        const LoadedPlugin& getPlugin() const { return m_proc.getLoadedPlugin(m_idx); }
-        LoadedPlugin& getPlugin() { return m_proc.getLoadedPlugin(m_idx); }
+        const LoadedPlugin& getPlugin() const { return m_proc.getLoadedPluginNoLock(m_idx); }
+        LoadedPlugin& getPlugin() { return m_proc.getLoadedPluginNoLock(m_idx); }
         const Client::Parameter& getParam() const { return getPlugin().params[(size_t)m_channel][(size_t)m_paramIdx]; }
         Client::Parameter& getParam() { return getPlugin().params[(size_t)m_channel][(size_t)m_paramIdx]; }
 
@@ -607,6 +607,10 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
 
     template <typename T>
     void processBlockBypassedInternal(AudioBuffer<T>& buf, AudioRingBuffer<T>& bypassBuffer);
+
+    LoadedPlugin& getLoadedPluginNoLock(int idx) {
+        return idx > -1 && idx < (int)m_loadedPlugins.size() ? m_loadedPlugins[(size_t)idx] : m_unusedDummyPlugin;
+    }
 
     ENABLE_ASYNC_FUNCTORS();
 

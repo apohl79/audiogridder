@@ -1491,10 +1491,17 @@ void PluginProcessor::parameterValueChanged(int parameterIndex, float newValue) 
     // update generic editor
     if (auto* e = dynamic_cast<PluginEditor*>(getActiveEditor())) {
         auto* pparam = dynamic_cast<Parameter*>(getParameters()[parameterIndex]);
-        if (nullptr != pparam && m_activePlugin == pparam->m_idx &&
-            getLoadedPlugin(m_activePlugin).activeChannel == pparam->m_channel) {
-            auto& param = pparam->getParam();
-            param.currentValue = newValue;
+        bool updated = false;
+        {
+            std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+            auto& plugin = getLoadedPluginNoLock(m_activePlugin);
+            if (nullptr != pparam && m_activePlugin == pparam->m_idx && plugin.activeChannel == pparam->m_channel) {
+                auto& param = pparam->getParam();
+                param.currentValue = newValue;
+                updated = true;
+            }
+        }
+        if (updated) {
             e->updateParamValue(pparam->m_paramIdx);
         }
     }
@@ -1653,7 +1660,10 @@ void PluginProcessor::Parameter::setValue(float newValue) {
 String PluginProcessor::Parameter::getName(int maximumStringLength) const {
     traceScope();
     String name;
-    name << m_slotId << ":" << getPlugin().name << ":" << getParam().name;
+    {
+        std::lock_guard<std::mutex> lock(m_proc.m_loadedPluginsSyncMtx);
+        name << m_slotId << ":" << getPlugin().name << ":" << getParam().name;
+    }
     if (name.length() <= maximumStringLength) {
         return name;
     } else {
