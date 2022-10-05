@@ -457,7 +457,15 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         }
 
         void copyToAndConsume(AudioBuffer<T>& dstBuffer, MidiBuffer& dstMidi, int numChannels, int numSamples) {
+            setLogTagByRef(tag);
+            traceScope();
+
             numChannels = jmin(audio.getNumChannels(), numChannels);
+
+            traceln("  params: ch=" << numChannels << ", smpls=" << numSamples);
+            traceln("    audio.ch=" << audio.getNumChannels() << ", audio.smpls=" << audio.getNumSamples()
+                                    << ", midi.events=" << midi.getNumEvents());
+
             if (numChannels > 0 && numSamples > 0 && audio.getNumChannels() > 0 && audio.getNumSamples() > 0) {
                 if (dstBuffer.getNumSamples() < numSamples || dstBuffer.getNumChannels() < numChannels) {
                     dstBuffer.setSize(numChannels, numSamples, true);
@@ -498,7 +506,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         void shiftAndResize(int samples) {
             samples = jmin(samples, workingSamples);
             if (workingSamples > 0) {
-                if (audio.getNumSamples() == workingSamples) {
+                if (audio.getNumSamples() >= workingSamples) {
                     for (int chan = 0; chan < audio.getNumChannels(); chan++) {
                         for (int s = 0; s < workingSamples; s++) {
                             audio.setSample(chan, s, audio.getSample(chan, samples + s));
