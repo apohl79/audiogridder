@@ -225,7 +225,7 @@ void Client::handleMessage(std::shared_ptr<Message<Key>> msg) {
 }
 
 void Client::handleMessage(std::shared_ptr<Message<Clipboard>> msg) {
-    SystemClipboard::copyTextToClipboard(pPLD(msg).getString());
+    runOnMsgThreadAsync([str = pPLD(msg).getString()] { SystemClipboard::copyTextToClipboard(str); });
 }
 
 void Client::handleMessage(std::shared_ptr<Message<ParameterValue>> msg) {

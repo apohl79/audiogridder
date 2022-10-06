@@ -697,7 +697,7 @@ void Worker::handleMessage(std::shared_ptr<Message<GetScreenBounds>> /*msg*/) {
 
 void Worker::handleMessage(std::shared_ptr<Message<Clipboard>> msg) {
     traceScope();
-    SystemClipboard::copyTextToClipboard(pPLD(msg).getString());
+    runOnMsgThreadAsync([str = pPLD(msg).getString()] { SystemClipboard::copyTextToClipboard(str); });
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<SetMonoChannels>> msg) {
