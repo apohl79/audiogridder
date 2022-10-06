@@ -69,6 +69,10 @@ class Server : public Thread, public LogTag {
     void setScreenCapturingOff(bool b) { m_screenCapturingOff = b; }
     bool getScreenLocalMode() const { return m_screenLocalMode; }
     void setScreenLocalMode(bool b) { m_screenLocalMode = b; }
+    int getScreenMouseOffsetX() const { return m_screenMouseOffsetX; }
+    void setScreenMouseOffsetX(int i) { m_screenMouseOffsetX = i; }
+    int getScreenMouseOffsetY() const { return m_screenMouseOffsetY; }
+    void setScreenMouseOffsetY(int i) { m_screenMouseOffsetY = i; }
     bool getPluginWindowsOnTop() const { return m_pluginWindowsOnTop; }
     void setPluginWindowsOnTop(bool b) { m_pluginWindowsOnTop = b; }
     bool getScanForPlugins() const { return m_scanForPlugins; }
@@ -119,6 +123,9 @@ class Server : public Thread, public LogTag {
     void updateSandboxNetworkStats(const String& key, uint32 loaded, double bytesIn, double bytesOut, double rps,
                                    const std::vector<TimeStatistic::Histogram>& audioHists);
 
+    double getProcessingTraceTresholdMs() const { return m_processingTraceTresholdMs; }
+    void setProcessingTraceTresholdMs(double d) { m_processingTraceTresholdMs = d; }
+
     template <typename T>
     inline T getOpt(const String& name, T def) const {
         return jsonGetValue(m_opts, name, def);
@@ -152,6 +159,8 @@ class Server : public Thread, public LogTag {
     bool m_screenCapturingFFmpeg = true;
     bool m_screenCapturingOff = false;
     bool m_screenLocalMode = false;
+    int m_screenMouseOffsetX = 0;
+    int m_screenMouseOffsetY = 0;
     bool m_pluginWindowsOnTop = false;
     ScreenRecorder::EncoderMode m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
     ScreenRecorder::EncoderQuality m_screenCapturingFFmpegQuality = ScreenRecorder::ENC_QUALITY_MEDIUM;
@@ -162,6 +171,7 @@ class Server : public Thread, public LogTag {
     bool m_crashReporting = true;
     SandboxMode m_sandboxMode = SANDBOX_CHAIN, m_sandboxModeRuntime = SANDBOX_NONE;
     bool m_sandboxLogAutoclean = true;
+    double m_processingTraceTresholdMs = 0.0;
 
     HashMap<String, std::shared_ptr<SandboxMaster>, DefaultHashFunctions, CriticalSection> m_sandboxes;
 
@@ -209,9 +219,12 @@ class Server : public Thread, public LogTag {
 
     std::unique_ptr<SandboxDeleter> m_sandboxDeleter;
 
-    void scanNextPlugin(const String& id, const String& name, const String& fmt, int srvId, bool secondRun = false);
+    void scanNextPlugin(const String& id, const String& name, const String& fmt, int srvId,
+                        std::function<void(const String&)> onShellPlugin, bool secondRun = false);
     void scanForPlugins();
     void scanForPlugins(const std::vector<String>& include);
+
+    void processScanResults(int id, std::set<String>& newBlacklistedPlugins);
 
     void loadKnownPluginList();
     bool parsePluginLayouts(const String& id = {});

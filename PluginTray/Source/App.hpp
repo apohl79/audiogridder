@@ -25,6 +25,7 @@ class App : public JUCEApplication, public LogTag {
 #if !JUCE_LINUX
         m_tray = std::make_unique<Tray>(this);
 #endif
+        loadConfig();
     }
     ~App() override {}
 
@@ -90,20 +91,27 @@ class App : public JUCEApplication, public LogTag {
 
         struct Status {
             String name;
-            int channelsIn;
-            int channelsOut;
-            int channelsSC;
-            bool instrument;
-            uint32 colour;
+            int channelsIn = 0;
+            int channelsOut = 0;
+            int channelsSC = 0;
+            bool instrument = false;
+            uint32 colour = 0;
             String loadedPlugins;
-            double perf95th;
-            int blocks;
+            double perfProcess = 0.0;
+            double perfStream = 0.0;
+            int blocks = 0;
             String serverNameId;
             String serverHost;
-            bool connected;
-            bool loadedPluginsOk;
+            bool connected = false;
+            bool connectedMonTriggered = false;
+            bool loadedPluginsOk = false;
+            bool loadedPluginsOkMonTriggered = false;
             String loadedPluginsErr;
-            int64 lastUpdated;
+            int64 lastUpdated = 0;
+            size_t rqAvg = 0;
+            size_t rq95th = 0;
+            int readTimeout = 0;
+            uint64_t readErrors = 0;
         };
 
         Status status;

@@ -15,14 +15,14 @@ Source: "..\build-windows-x86_64\lib\VST\AudioGridder.dll"; DestDir: {code:GetVS
 Source: "..\build-windows-x86_64\lib\VST\AudioGridderInst.dll"; DestDir: {code:GetVST2Dir}; Flags: ignoreversion
 Source: "..\build-windows-x86_64\lib\VST\AudioGridderMidi.dll"; DestDir: {code:GetVST2Dir}; Flags: ignoreversion
 Source: "..\build-windows-x86_64\lib\AAX\signed\AudioGridder.aaxplugin"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins; Flags: ignoreversion recursesubdirs
-Source: "..\build-windows-x86_64\lib\AAX\signed\AudioGridder.aaxplugin\desktop.ini"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins\AudioGridder.aaxplugin; Flags: ignoreversion recursesubdirs; Attribs: hidden system readonly
-Source: "..\build-windows-x86_64\lib\AAX\signed\AudioGridder.aaxplugin\PlugIn.ico"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins\AudioGridder.aaxplugin; Flags: ignoreversion recursesubdirs; Attribs: hidden system readonly
+Source: "..\build-windows-x86_64\lib\AAX\signed\AudioGridder.aaxplugin\desktop.ini"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins\AudioGridder.aaxplugin; Flags: ignoreversion uninsremovereadonly overwritereadonly recursesubdirs; Attribs: hidden system readonly
+Source: "..\build-windows-x86_64\lib\AAX\signed\AudioGridder.aaxplugin\PlugIn.ico"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins\AudioGridder.aaxplugin; Flags: ignoreversion uninsremovereadonly overwritereadonly recursesubdirs; Attribs: hidden system readonly
 Source: "..\build-windows-x86_64\lib\AAX\signed\AudioGridderInst.aaxplugin"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins; Flags: ignoreversion recursesubdirs
-Source: "..\build-windows-x86_64\lib\AAX\signed\AudioGridderInst.aaxplugin\desktop.ini"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins\AudioGridderInst.aaxplugin; Flags: ignoreversion recursesubdirs; Attribs: hidden system readonly
-Source: "..\build-windows-x86_64\lib\AAX\signed\AudioGridderInst.aaxplugin\PlugIn.ico"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins\AudioGridderInst.aaxplugin; Flags: ignoreversion recursesubdirs; Attribs: hidden system readonly
+Source: "..\build-windows-x86_64\lib\AAX\signed\AudioGridderInst.aaxplugin\desktop.ini"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins\AudioGridderInst.aaxplugin; Flags: ignoreversion uninsremovereadonly overwritereadonly recursesubdirs; Attribs: hidden system readonly
+Source: "..\build-windows-x86_64\lib\AAX\signed\AudioGridderInst.aaxplugin\PlugIn.ico"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins\AudioGridderInst.aaxplugin; Flags: ignoreversion uninsremovereadonly overwritereadonly recursesubdirs; Attribs: hidden system readonly
 Source: "..\build-windows-x86_64\lib\AAX\signed\AudioGridderMidi.aaxplugin"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins; Flags: ignoreversion recursesubdirs
-Source: "..\build-windows-x86_64\lib\AAX\signed\AudioGridderMidi.aaxplugin\desktop.ini"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins\AudioGridderMidi.aaxplugin; Flags: ignoreversion recursesubdirs; Attribs: hidden system readonly
-Source: "..\build-windows-x86_64\lib\AAX\signed\AudioGridderMidi.aaxplugin\PlugIn.ico"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins\AudioGridderMidi.aaxplugin; Flags: ignoreversion recursesubdirs; Attribs: hidden system readonly
+Source: "..\build-windows-x86_64\lib\AAX\signed\AudioGridderMidi.aaxplugin\desktop.ini"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins\AudioGridderMidi.aaxplugin; Flags: ignoreversion uninsremovereadonly overwritereadonly recursesubdirs; Attribs: hidden system readonly
+Source: "..\build-windows-x86_64\lib\AAX\signed\AudioGridderMidi.aaxplugin\PlugIn.ico"; DestDir: {commoncf64}\Avid\Audio\Plug-Ins\AudioGridderMidi.aaxplugin; Flags: ignoreversion uninsremovereadonly overwritereadonly recursesubdirs; Attribs: hidden system readonly
 Source: "..\build-windows-x86_64\bin\AudioGridderPluginTray.exe"; DestDir: {commonpf64}\AudioGridderPluginTray; Flags: ignoreversion
 Source: "..\build-windows-x86_64\bin\crashpad_handler.exe"; DestDir: {commonpf64}\AudioGridderPluginTray; Flags: ignoreversion
 

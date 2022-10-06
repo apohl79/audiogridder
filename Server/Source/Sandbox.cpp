@@ -59,11 +59,17 @@ SandboxMaster::SandboxMaster(Server& server, const String& i) : SandboxPeer(serv
 
 void SandboxMaster::handleConnectionLost() {
     traceScope();
+    if (m_terminated) {
+        return;
+    }
     m_server.handleDisconnectFromSandbox(*this);
 }
 
 void SandboxMaster::handleMessage(const SandboxMessage& msg) {
     traceScope();
+    if (m_terminated) {
+        return;
+    }
     if (msg.type == SandboxMessage::SANDBOX_PORT) {
         int port = msg.data["port"].get<int>();
         logln("received port " << port << " from sandbox " << id);
@@ -77,10 +83,25 @@ void SandboxMaster::handleMessage(const SandboxMessage& msg) {
 
 SandboxSlave::SandboxSlave(Server& server) : SandboxPeer(server) {}
 
-void SandboxSlave::handleConnectionLost() { m_server.handleDisconnectedFromMaster(); }
+void SandboxSlave::handleConnectionLost() {
+    if (m_terminated) {
+        return;
+    }
+    m_server.handleDisconnectedFromMaster();
+}
 
-void SandboxSlave::handleConnectionMade() { m_server.handleConnectedToMaster(); }
+void SandboxSlave::handleConnectionMade() {
+    if (m_terminated) {
+        return;
+    }
+    m_server.handleConnectedToMaster();
+}
 
-void SandboxSlave::handleMessage(const SandboxMessage& msg) { m_server.handleMessageFromMaster(msg); }
+void SandboxSlave::handleMessage(const SandboxMessage& msg) {
+    if (m_terminated) {
+        return;
+    }
+    m_server.handleMessageFromMaster(msg);
+}
 
 }  // namespace e47

@@ -157,7 +157,7 @@ ag_add_plugin(Fx
   VST3_CATEGORY Fx
   VST_CATEGORY kPlugCategEffect
   AAX_CATEGORY AAX_EPlugInCategory_Effect
-  AU_TYPE kAudioUnitType_MusicEffect)
+  AU_TYPE kAudioUnitType_Effect)
 
 ag_add_plugin(Inst
   PLUGIN_CODE E402

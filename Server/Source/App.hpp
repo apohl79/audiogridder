@@ -49,11 +49,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     void menuItemSelected(int /* menuItemID */, int /* topLevelMenuIndex */) override {}
 
     // MenuBarModel
-    StringArray getMenuBarNames() override {
-        StringArray names;
-        names.add("Settings");
-        return names;
-    }
+    StringArray getMenuBarNames() override { return {"Settings"}; }
 
     void prepareShutdown(uint32 exitCode = 0);
     const KnownPluginList& getPluginList();
@@ -85,6 +81,8 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     void showSplashWindow(std::function<void(bool)> onClick = nullptr);
     void hideSplashWindow(int wait = 0);
     void setSplashInfo(const String& txt);
+    void enableCancelScan(int srvId, std::function<void()> onCancel);
+    void disableCancelScan(int srvId);
 
     void updateDockIcon() {
 #ifdef JUCE_MAC
@@ -98,6 +96,7 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     std::shared_ptr<Server> m_server;
     std::unique_ptr<std::thread> m_child;
     std::atomic_bool m_stopChild{false};
+    std::atomic_bool m_preparingShutdown{false};
 
     std::unordered_map<uint64, std::shared_ptr<Processor>> m_processors;
     std::mutex m_processorsMtx;

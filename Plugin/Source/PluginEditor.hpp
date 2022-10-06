@@ -35,6 +35,7 @@ class PluginEditor : public AudioProcessorEditor,
 
     void setConnected(bool connected);
     void setCPULoad(float load);
+    void updateState();
 
     void updateParamValue(int paramIdx);
     void updatePluginStatus(int idx, bool ok, const String& err);

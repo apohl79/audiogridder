@@ -61,6 +61,7 @@ void initialize(const String& appName, const String& filePrefix, bool linkLatest
         if (linkLatest) {
             // create a latest link
             auto latestLnk = File(Defaults::getLogFileName(appName, filePrefix, ".trace", true));
+            latestLnk.deleteFile();
             f.createSymbolicLink(latestLnk, true);
         }
         // cleanup

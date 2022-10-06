@@ -123,31 +123,34 @@ void ProcessorWindow::updateScreenCaptureArea() {
 
 void ProcessorWindow::startCapturing() {
     traceScope();
-    if (!getApp()->getServer()->getScreenCapturingOff()) {
-        if (m_callbackNative) {
-            startTimer(50);
-        } else {
-            m_screenCaptureRect = getScreenCaptureRect();
-            if (!m_screenCaptureRect.isEmpty()) {
-                if (auto rec = ScreenRecorder::getInstance()) {
-                    if (rec->isRecording()) {
-                        rec->stop();
-                    }
-                    rec->start(m_screenCaptureRect, m_callbackFFmpeg, [tid = m_tid](const String& err) {
-                        if (auto onErr = getApp()->getWorkerErrorCallback(tid)) {
-                            onErr("Screen capturing failed: " + err);
-                        }
-                    });
-                } else {
-                    logln("error: no screen recorder");
-                }
+    if (auto srv = getApp()->getServer()) {
+        if (!srv->getScreenCapturingOff()) {
+            if (m_callbackNative) {
+                startTimer(50);
             } else {
-                // when launching a plugin sandbox, it might take a little bit to ramp up the plugin editor, so we retry
-                bool retry = ++m_startCapturingRetry < 100;
-                logln("error: can't start screen capturing with empty rect ("
-                      << (retry ? "retrying in 100ms" : "giving up") << ")");
-                if (retry) {
-                    Timer::callAfterDelay(100, safeLambda([this] { startCapturing(); }));
+                m_screenCaptureRect = getScreenCaptureRect();
+                if (!m_screenCaptureRect.isEmpty()) {
+                    if (auto rec = ScreenRecorder::getInstance()) {
+                        if (rec->isRecording()) {
+                            rec->stop();
+                        }
+                        rec->start(m_screenCaptureRect, m_callbackFFmpeg, [tid = m_tid](const String& err) {
+                            if (auto onErr = getApp()->getWorkerErrorCallback(tid)) {
+                                onErr("Screen capturing failed: " + err);
+                            }
+                        });
+                    } else {
+                        logln("error: no screen recorder");
+                    }
+                } else {
+                    // when launching a plugin sandbox, it might take a little bit to ramp up the plugin editor, so we
+                    // retry
+                    bool retry = ++m_startCapturingRetry < 100;
+                    logln("error: can't start screen capturing with empty rect ("
+                          << (retry ? "retrying in 100ms" : "giving up") << ")");
+                    if (retry) {
+                        Timer::callAfterDelay(100, safeLambda([this] { startCapturing(); }));
+                    }
                 }
             }
         }
@@ -242,12 +245,18 @@ void ProcessorWindow::createEditor() {
         m_editor = m_processor->createEditorIfNeeded();
         if (nullptr != m_editor) {
             setContentNonOwned(m_editor, true);
-            if (getApp()->getServer()->getScreenLocalMode()) {
+            bool slm = false;
+            bool wot = false;
+            if (auto srv = getApp()->getServer()) {
+                slm = srv->getScreenLocalMode();
+                wot = srv->getPluginWindowsOnTop();
+            }
+            if (slm) {
                 setTopLeftPosition({getX(), getY()});
             } else {
                 setTopLeftPosition(userRect.getTopLeft());
             }
-            if (getApp()->getServer()->getPluginWindowsOnTop()) {
+            if (wot) {
                 setAlwaysOnTop(true);
             }
         } else {

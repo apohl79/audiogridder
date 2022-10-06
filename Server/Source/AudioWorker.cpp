@@ -10,6 +10,7 @@
 #include "Message.hpp"
 #include "Defaults.hpp"
 #include "App.hpp"
+#include "Server.hpp"
 #include "Metrics.hpp"
 #include "Processor.hpp"
 
@@ -80,6 +81,14 @@ void AudioWorker::run() {
     auto traceCtx = TimeTrace::createTraceContext();
     Uuid traceId;
 
+    auto processingTresholMs = -1.0;
+    if (auto srv = getApp()->getServer()) {
+        processingTresholMs = srv->getProcessingTraceTresholdMs();
+    }
+    if (processingTresholMs <= 0.0) {
+        processingTresholMs = m_samplesPerBlock / m_sampleRate * 1000 - 1;
+    }
+
     MessageHelper::Error e;
     while (!threadShouldExit() && isOk()) {
         // Read audio chunk
@@ -128,7 +137,7 @@ void AudioWorker::run() {
                     sendOk = msg.sendToClient(m_socket.get(), bufferF, midi, m_chain->getLatencySamples(),
                                               bufferF.getNumChannels(), &e, *bytesOut);
                 }
-                traceCtx->summary(getLogTagSource(), "process audio", 10.0);
+                traceCtx->summary(getLogTagSource(), "process audio", processingTresholMs);
                 if (!sendOk) {
                     logln("error: failed to send audio data to client: " << e.toString());
                     m_socket->close();

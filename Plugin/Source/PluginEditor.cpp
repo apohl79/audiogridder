@@ -707,6 +707,13 @@ void PluginEditor::setCPULoad(float load) {
     m_cpuLabel.setColour(Label::textColourId, Colour(col));
 }
 
+void PluginEditor::updateState() {
+    createPluginButtons();
+    initToolsButtons();
+    resetPluginScreen();
+    resized();
+}
+
 void PluginEditor::mouseUp(const MouseEvent& event) {
     traceScope();
     if (event.eventComponent == &m_srvIcon) {
@@ -800,9 +807,63 @@ void PluginEditor::showServerMenu() {
     m.addSubMenu("Buffer Size", subm);
     subm.clear();
 
-    auto& servers = m_processor.getServers();
     auto active = m_processor.getActiveServerHost();
+
+    auto serversMDNS = m_processor.getServersMDNS();
+    if (serversMDNS.size() > 0) {
+        bool showIp = false;
+        std::set<String> names;
+        for (auto& s : serversMDNS) {
+            if (names.find(s.getNameAndID()) != names.end()) {
+                showIp = true;
+                break;
+            } else {
+                names.insert(s.getNameAndID());
+            }
+        }
+        for (auto& s : serversMDNS) {
+            String name = s.getNameAndID();
+            if (showIp) {
+                name << " (" << s.getHost() << ")";
+            }
+            name << " [load: " << lround(s.getLoad()) << "%]";
+            if (s.getHostAndID() == active) {
+                PopupMenu srvMenu;
+                srvMenu.addItem("Rescan", [this] {
+                    traceScope();
+                    m_processor.getClient().rescan();
+                });
+                srvMenu.addItem("Wipe Cache & Rescan", [this] {
+                    traceScope();
+                    m_processor.getClient().rescan(true);
+                });
+                srvMenu.addItem("Reconnect", [this] {
+                    traceScope();
+                    m_processor.getClient().reconnect();
+                });
+                subm.addSubMenu(name, srvMenu, true, nullptr, true, 0);
+            } else {
+                subm.addItem(name, [this, s] {
+                    traceScope();
+                    m_processor.setActiveServer(s);
+                    m_processor.saveConfig();
+                });
+            }
+        }
+    }
+
+    auto& servers = m_processor.getServers();
     for (auto s : servers) {
+        bool skip = false;
+        for (auto& s2 : serversMDNS) {
+            if (s == s2.getNameAndID() || s == s2.getHostAndID()) {
+                skip = true;
+                break;
+            }
+        }
+        if (skip) {
+            continue;
+        }
         if (s == active) {
             PopupMenu srvMenu;
             srvMenu.addItem("Rescan", [this] {
@@ -831,53 +892,6 @@ void PluginEditor::showServerMenu() {
                 m_processor.saveConfig();
             });
             subm.addSubMenu(s, srvMenu);
-        }
-    }
-    auto serversMDNS = m_processor.getServersMDNS();
-    if (serversMDNS.size() > 0) {
-        bool showIp = false;
-        std::set<String> names;
-        for (auto s : serversMDNS) {
-            if (names.find(s.getNameAndID()) != names.end()) {
-                showIp = true;
-                break;
-            } else {
-                names.insert(s.getNameAndID());
-            }
-        }
-        for (auto s : serversMDNS) {
-            if (servers.contains(s.getHostAndID())) {
-                continue;
-            }
-            String name = s.getNameAndID();
-            if (showIp) {
-                name << " (" << s.getHost() << ")";
-            }
-            name << " [load: " << lround(s.getLoad()) << "%]";
-            if (s.getHostAndID() == active) {
-                PopupMenu srvMenu;
-                srvMenu.addItem("Rescan", [this] {
-                    traceScope();
-                    m_processor.getClient().rescan();
-                });
-                srvMenu.addItem("Wipe Cache & Rescan", [this] {
-                    traceScope();
-                    m_processor.getClient().rescan(true);
-                });
-                srvMenu.addItem("Reconnect", [this] {
-                    traceScope();
-                    m_processor.getClient().reconnect();
-                });
-                subm.addSubMenu(name, srvMenu, true, nullptr, true, 0);
-            } else {
-                PopupMenu srvMenu;
-                srvMenu.addItem("Connect", [this, s] {
-                    traceScope();
-                    m_processor.setActiveServer(s);
-                    m_processor.saveConfig();
-                });
-                subm.addSubMenu(name, srvMenu);
-            }
         }
     }
 
@@ -1045,15 +1059,39 @@ void PluginEditor::showSettingsMenu() {
     m.addSubMenu("Instrument Outputs...", subm);
 #else
     subm.addSectionHeader("Inputs");
+    subm.addItem("Enable all channels...", [this] {
+        m_processor.getActiveChannels().setInputRangeActive(true);
+        m_processor.updateChannelMapping();
+        m_processor.getClient().reconnect();
+    });
+    subm.addItem("Disable all channels...", [this] {
+        m_processor.getActiveChannels().setInputRangeActive(false);
+        m_processor.updateChannelMapping();
+        m_processor.getClient().reconnect();
+    });
+    subm.addSeparator();
     ch = 0;
     for (int busIdx = 0; busIdx < m_processor.getBusCount(true); busIdx++) {
         addBusChannelItems(m_processor.getBus(true, busIdx), ch);
     }
+
     subm.addSectionHeader("Outputs");
+    subm.addItem("Enable all channels...", [this] {
+        m_processor.getActiveChannels().setOutputRangeActive(true);
+        m_processor.updateChannelMapping();
+        m_processor.getClient().reconnect();
+    });
+    subm.addItem("Disable all channels...", [this] {
+        m_processor.getActiveChannels().setOutputRangeActive(false);
+        m_processor.updateChannelMapping();
+        m_processor.getClient().reconnect();
+    });
+    subm.addSeparator();
     ch = 0;
     for (int busIdx = 0; busIdx < m_processor.getBusCount(false); busIdx++) {
         addBusChannelItems(m_processor.getBus(false, busIdx), ch);
     }
+
     m.addSubMenu("Active Channels...", subm);
 #endif
     subm.clear();
@@ -1086,6 +1124,11 @@ void PluginEditor::showSettingsMenu() {
         m_processor.setBypassWhenNotConnected(!m_processor.getBypassWhenNotConnected());
         m_processor.saveConfig();
     });
+    subm.addItem("RealTime Mode", true, m_processor.getClient().LIVE_MODE, [this] {
+        traceScope();
+        m_processor.getClient().LIVE_MODE = !m_processor.getClient().LIVE_MODE;
+        m_processor.saveConfig();
+    });
 
     m.addSubMenu("Transfer Audio/MIDI", subm);
     subm.clear();
@@ -1096,7 +1139,7 @@ void PluginEditor::showSettingsMenu() {
     double sampleRate = m_processor.getSampleRate();
 
     auto addLatencyItem = [&](int l, bool withBlocks) {
-        if (l + latency >= 0) {
+        if (l + latency >= 0 && blockSize > 0 && sampleRate > 0.0) {
             String name;
             if (withBlocks) {
                 name = String(l / blockSize) + " blocks / ";
@@ -1110,8 +1153,8 @@ void PluginEditor::showSettingsMenu() {
         }
     };
 
-    for (int i = -40; i <= +40; i++) {
-        addLatencyItem(i * 256, false);
+    for (int i = -80; i <= +80; i++) {
+        addLatencyItem(i * 128, false);
     }
     subm.addSubMenu("by Samples", subsubm);
     subsubm.clear();
@@ -1127,6 +1170,11 @@ void PluginEditor::showSettingsMenu() {
 
     m.addSeparator();
 
+    subsubm.addItem("Show Plugin Format", true, m_processor.getMenuShowType(), [this] {
+        traceScope();
+        m_processor.setMenuShowType(!m_processor.getMenuShowType());
+        m_processor.saveConfig();
+    });
     subsubm.addItem("Show Category", true, m_processor.getMenuShowCategory(), [this] {
         traceScope();
         m_processor.setMenuShowCategory(!m_processor.getMenuShowCategory());
@@ -1424,12 +1472,7 @@ void PluginEditor::getPresetsMenu(PopupMenu& menu, const File& dir) {
             }
             menu.addItem(file.getFileNameWithoutExtension(), [this, file] {
                 traceScope();
-                if (m_processor.loadPreset(file)) {
-                    createPluginButtons();
-                    resetPluginScreen();
-                    resized();
-                    m_processor.getClient().reconnect();
-                }
+                m_processor.loadPreset(file);
             });
         }
     }

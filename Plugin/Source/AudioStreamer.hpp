@@ -23,10 +23,14 @@ class AudioStreamer : public Thread, public LogTagDelegate {
           LogTagDelegate(clnt),
           m_client(clnt),
           m_socket(std::unique_ptr<StreamingSocket>(sock)),
-          m_writeQ((size_t)clnt->NUM_OF_BUFFERS * 2),
-          m_readQ((size_t)clnt->NUM_OF_BUFFERS * 2),
-          m_durationGlobal(TimeStatistic::getDuration("audio")),
-          m_durationLocal(TimeStatistic::getDuration(String("audio.") + String(getTagId()), false)) {
+          m_queueSize((size_t)clnt->NUM_OF_BUFFERS * 8),
+          m_queueHighWaterMark((size_t)clnt->NUM_OF_BUFFERS * 7),
+          m_writeQ(m_queueSize),
+          m_readQ(m_queueSize),
+          m_durationGlobal(TimeStatistic::getDuration("audio_stream")),
+          m_durationLocal(TimeStatistic::getDuration(String("audio_stream.") + String(getTagId()), false, false)),
+          m_readQMeter((size_t)(clnt->getSampleRate() / clnt->getSamplesPerBlock()) + 1),
+          m_readTimeoutMs((int)(clnt->getSamplesPerBlock() / clnt->getSampleRate() * 1000 - 1)) {
         traceScope();
 
         for (int i = 0; i < clnt->NUM_OF_BUFFERS; i++) {
@@ -47,8 +51,10 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         traceScope();
         logln("audio streamer cleaning up");
         signalThreadShouldExit();
-        notifyWrite();
-        notifyRead();
+        if (m_queueSize > 0) {
+            notifyWrite();
+            notifyRead();
+        }
         waitForThreadAndLog(getLogTagSource(), this);
         logln("audio streamer cleanup done");
     }
@@ -61,44 +67,82 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         return false;
     }
 
+    const SizeMeter& getReadQueueMeter() const { return m_readQMeter; }
+    int getReadTimeoutMs() const { return m_readTimeoutMs; }
+    uint64_t getReadErrors() const { return m_readErrors; }
+
     void run() {
         traceScope();
         bool isDouble = std::is_same<T, double>::value;
         logln("audio streamer ready, isDouble = " << (int)isDouble);
         while (!threadShouldExit() && !m_error && m_socket->isConnected()) {
-            while (m_writeQ.read_available() > 0) {
-                AudioMidiBuffer buf;
-                m_writeQ.pop(buf);
-                m_durationLocal.reset();
-                m_durationGlobal.reset();
-                if (!sendInternal(buf)) {
-                    logln("error: " << getInstanceString() << ": send failed");
-                    setError();
-                    return;
+            if (m_queueSize > 0) {
+                while (m_writeQ.read_available() > 0) {
+                    AudioMidiBuffer buf;
+                    m_writeQ.pop(buf);
+                    if (!buf.skip) {
+                        m_durationLocal.reset();
+                        m_durationGlobal.reset();
+                        if (!sendInternal(buf)) {
+                            logln("error: " << getInstanceString() << ": send failed");
+                            setError();
+                            return;
+                        }
+                        MessageHelper::Error err;
+                        if (!readInternal(buf, &err)) {
+                            logln("error: " << getInstanceString() << ": read failed: " << err.toString());
+                            setError();
+                            return;
+                        }
+                        // drop samples in case we had read error(s)
+                        if (m_dropSamples > 0) {
+                            int samples = m_dropSamples.exchange(0);
+                            if (samples < buf.workingSamples) {
+                                buf.consume(samples);
+                            } else {
+                                m_dropSamples += samples - buf.workingSamples;
+                                buf.workingSamples = 0;
+                            }
+                        }
+                        m_durationLocal.update();
+                        m_durationGlobal.update();
+                    } else {
+                        // add silence
+                        buf.audio.setSize(buf.channelsRequested, buf.samplesRequested);
+                        buf.audio.clear();
+                        buf.workingSamples = buf.samplesRequested;
+                    }
+                    if (buf.workingSamples > 0) {
+                        m_readQ.push(std::move(buf));
+                        notifyRead();
+                    }
                 }
-                MessageHelper::Error err;
-                if (!readInternal(buf, &err)) {
-                    logln("error: " << getInstanceString() << ": read failed: " << err.toString());
-                    setError();
-                    return;
+                waitWrite();
+            } else {
+                if (waitRead()) {
+                    m_ioThreadBusy = true;
+                    MessageHelper::Error err;
+                    if (!readInternal(m_readBuffer, &err)) {
+                        logln("error: " << getInstanceString() << ": read failed: " << err.toString());
+                        if (err.code != MessageHelper::E_TIMEOUT) {
+                            setError();
+                        }
+                    }
+                    m_ioThreadBusy = false;
+                    m_ioDataReady.signal();
                 }
-                m_durationLocal.update();
-                m_durationGlobal.update();
-                m_readQ.push(std::move(buf));
-                notifyRead();
             }
-            waitWrite();
         }
         m_durationLocal.clear();
         m_durationGlobal.clear();
         logln("audio streamer terminated");
     }
 
-    void send(AudioBuffer<T>& buffer, MidiBuffer& midi, AudioPlayHead::PositionInfo& posInfo) {
+    bool send(AudioBuffer<T>& buffer, MidiBuffer& midi, AudioPlayHead::PositionInfo& posInfo) {
         traceScope();
 
         if (m_error) {
-            return;
+            return false;
         }
 
         traceln("  client: numBuffers=" << m_client->NUM_OF_BUFFERS << ", blockSize=" << m_client->getSamplesPerBlock()
@@ -110,13 +154,32 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         TimeTrace::addTracePoint("as_prep");
 
         if (m_client->NUM_OF_BUFFERS > 0) {
+            if ((m_client->LIVE_MODE && m_writeQ.read_available() > (size_t)m_client->NUM_OF_BUFFERS) ||
+                m_writeQ.read_available() > m_queueHighWaterMark) {
+                logln("error: " << getInstanceString() << ": write queue full, dropping samples");
+                m_readErrors++;
+                // add a skip reqord to the queue
+                AudioMidiBuffer buf;
+                buf.skip = true;
+                buf.channelsRequested = buffer.getNumChannels();
+                buf.samplesRequested = buffer.getNumSamples();
+                m_writeQ.push(std::move(buf));
+                notifyWrite();
+                TimeTrace::addTracePoint("as_skip");
+                return true;
+            }
+
             if (m_client->isFx()) {
                 m_writeBuffer.copyFrom(buffer, midi);
             } else {
                 m_writeBuffer.copyFrom({}, midi, 0, buffer.getNumSamples());
             }
 
+            TimeTrace::addTracePoint("as_copy_to_wbuf");
+
             m_writeBuffer.updatePosition(posInfo);
+
+            TimeTrace::addTracePoint("as_upd_pos");
 
             traceln("  buffer (write, after copy): working samples=" << m_writeBuffer.workingSamples);
 
@@ -130,6 +193,8 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                 buf.posInfo = m_writeBuffer.posInfo;
                 buf.copyFromAndConsume(m_writeBuffer, samples);
 
+                TimeTrace::addTracePoint("as_copy_from_wbuf");
+
                 if (!m_client->isFx()) {
                     buf.channelsRequested = buffer.getNumChannels();
                     buf.samplesRequested = samples;
@@ -141,13 +206,24 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                 traceln("  buffer (write, after send): working samples=" << m_writeBuffer.workingSamples);
 
                 m_writeQ.push(std::move(buf));
+
                 TimeTrace::addTracePoint("as_push");
+
                 notifyWrite();
+
                 TimeTrace::addTracePoint("as_notify");
             }
         } else {
+            if (m_client->LIVE_MODE && m_ioThreadBusy) {
+                logln("error: " << getInstanceString() << ": io thread busy, dropping samples");
+                m_readErrors++;
+                buffer.clear();
+                return false;
+            }
+
             AudioMidiBuffer buf;
             buf.posInfo = posInfo;
+
             if (m_client->isFx()) {
                 buf.copyFrom(buffer, midi);
             } else {
@@ -155,14 +231,23 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                 buf.samplesRequested = buffer.getNumSamples();
                 buf.copyFrom({}, midi, 0, buffer.getNumSamples());
             }
+
+            TimeTrace::addTracePoint("as_copy");
+
             m_durationLocal.reset();
             m_durationGlobal.reset();
+
             if (!sendInternal(buf)) {
                 logln("error: " << getInstanceString() << ": send failed");
                 setError();
+                buffer.clear();
+                return false;
             }
+
             TimeTrace::addTracePoint("as_send");
         }
+
+        return true;
     }
 
     void read(AudioBuffer<T>& buffer, MidiBuffer& midi) {
@@ -191,20 +276,28 @@ class AudioStreamer : public Thread, public LogTagDelegate {
             while (m_readBuffer.workingSamples < buffer.getNumSamples()) {
                 traceln("  waiting for data...");
                 if (!waitRead()) {
+                    m_dropSamples += buffer.getNumSamples();
+                    m_readErrors++;
                     logln("error: " << getInstanceString() << ": waitRead failed");
                     TimeTrace::finishGroup("as_wait_read_failed");
                     return;
                 }
+
                 TimeTrace::addTracePoint("as_wait_read");
+
                 if (m_readQ.pop(buf)) {
-                    traceln("  pop buffer: channels=" << buf.audio.getNumChannels()
-                                                      << ", samples=" << buf.audio.getNumSamples());
+                    TimeTrace::addTracePoint("as_pop");
+
+                    traceln("  pop buffer: channels=" << buf.audio.getNumChannels() << ", samples="
+                                                      << buf.audio.getNumSamples() << ", skip=" << (int)buf.skip);
+
                     m_readBuffer.copyFrom(buf);
+
+                    TimeTrace::addTracePoint("as_copy_to_rbuf");
                 } else {
                     logln("error: " << getInstanceString() << ": read queue empty");
                     return;
                 }
-                TimeTrace::addTracePoint("as_pop");
             }
 
             TimeTrace::finishGroup("as_get_buffer");
@@ -231,19 +324,44 @@ class AudioStreamer : public Thread, public LogTagDelegate {
 
             traceln("  consumed " << buffer.getNumSamples() << " samples");
         } else {
-            buf.channelsRequested = buffer.getNumChannels();
-            buf.samplesRequested = buffer.getNumSamples();
-            buf.audio.setSize(buffer.getNumChannels(), buffer.getNumSamples());
-            MessageHelper::Error err;
-            if (!readInternal(buf, &err)) {
-                logln("error: " << getInstanceString() << ": read failed: " << err.toString());
-                setError();
-                return;
+            m_readBuffer.channelsRequested = buffer.getNumChannels();
+            m_readBuffer.samplesRequested = buffer.getNumSamples();
+            m_readBuffer.audio.setSize(buffer.getNumChannels(), buffer.getNumSamples());
+            m_readBuffer.midi.clear();
+
+            if (m_client->LIVE_MODE) {
+                if (m_ioThreadBusy) {
+                    traceln("io thread busy");
+                    m_readErrors++;
+                    buffer.clear();
+                    TimeTrace::addTracePoint("as_io_busy");
+                    return;
+                } else {
+                    notifyRead();
+                    if (!m_ioDataReady.wait(m_readTimeoutMs)) {
+                        logln("error: " << getInstanceString() << ": read timeout, dropping samples");
+                        m_readErrors++;
+                        buffer.clear();
+                        TimeTrace::addTracePoint("as_io_timeout");
+                        return;
+                    }
+                }
+            } else {
+                MessageHelper::Error err;
+                if (!readInternal(m_readBuffer, &err)) {
+                    logln("error: " << getInstanceString() << ": read failed: " << err.toString());
+                    setError();
+                    return;
+                }
             }
+
             TimeTrace::addTracePoint("as_read");
+
             m_durationLocal.update();
             m_durationGlobal.update();
-            buf.copyToAndConsume(buffer, midi, buffer.getNumChannels(), buffer.getNumSamples());
+            m_readBuffer.copyToAndConsume(buffer, midi, buffer.getNumChannels(), buffer.getNumSamples());
+
+            TimeTrace::addTracePoint("as_consume");
         }
     }
 
@@ -256,6 +374,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         MidiBuffer midi;
         AudioPlayHead::PositionInfo posInfo;
         bool needsPositionUpdate = true;
+        bool skip = false;
 
         LogTag tag = LogTag("audiomidibuffer");
 
@@ -291,6 +410,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                     audio.copyFrom(chan, workingSamples, srcBuffer, chan, 0, numSamples);
                 }
             }
+
             midi.addEvents(srcMidi, 0, numSamples, workingSamples);
             workingSamples += numSamples;
         }
@@ -337,8 +457,15 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         }
 
         void copyToAndConsume(AudioBuffer<T>& dstBuffer, MidiBuffer& dstMidi, int numChannels, int numSamples) {
+            setLogTagByRef(tag);
+            traceScope();
+
             numChannels = jmin(audio.getNumChannels(), numChannels);
-            numSamples = jmin(audio.getNumSamples(), numSamples);
+
+            traceln("  params: ch=" << numChannels << ", smpls=" << numSamples);
+            traceln("    audio.ch=" << audio.getNumChannels() << ", audio.smpls=" << audio.getNumSamples()
+                                    << ", midi.events=" << midi.getNumEvents());
+
             if (numChannels > 0 && numSamples > 0 && audio.getNumChannels() > 0 && audio.getNumSamples() > 0) {
                 if (dstBuffer.getNumSamples() < numSamples || dstBuffer.getNumChannels() < numChannels) {
                     dstBuffer.setSize(numChannels, numSamples, true);
@@ -377,10 +504,13 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         }
 
         void shiftAndResize(int samples) {
+            samples = jmin(samples, workingSamples);
             if (workingSamples > 0) {
-                for (int chan = 0; chan < audio.getNumChannels(); chan++) {
-                    for (int s = 0; s < workingSamples; s++) {
-                        audio.setSample(chan, s, audio.getSample(chan, samples + s));
+                if (audio.getNumSamples() >= workingSamples) {
+                    for (int chan = 0; chan < audio.getNumChannels(); chan++) {
+                        for (int s = 0; s < workingSamples; s++) {
+                            audio.setSample(chan, s, audio.getSample(chan, samples + s));
+                        }
                     }
                 }
                 if (midi.getNumEvents() > 0) {
@@ -398,11 +528,19 @@ class AudioStreamer : public Thread, public LogTagDelegate {
 
     Client* m_client;
     std::unique_ptr<StreamingSocket> m_socket;
+    size_t m_queueSize, m_queueHighWaterMark;
     boost::lockfree::spsc_queue<AudioMidiBuffer> m_writeQ, m_readQ;
     std::mutex m_writeMtx, m_readMtx, m_sockMtx;
     std::condition_variable m_writeCv, m_readCv;
     TimeStatistic::Duration m_durationGlobal, m_durationLocal;
     std::shared_ptr<Meter> m_bytesOutMeter, m_bytesInMeter;
+    SizeMeter m_readQMeter;
+    const int m_readTimeoutMs;
+    std::atomic_int m_dropSamples{0};
+    std::atomic_uint64_t m_readErrors{0};
+
+    std::atomic_bool m_ioThreadBusy{false};
+    WaitableEvent m_ioDataReady;
 
     AudioMidiBuffer m_readBuffer, m_writeBuffer;
 
@@ -415,8 +553,10 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         m_sockMtx.unlock();
         m_error = true;
         m_client->setError();
-        notifyRead();
-        notifyWrite();
+        if (m_queueSize > 0) {
+            notifyRead();
+            notifyWrite();
+        }
     }
 
     String getInstanceString() const {
@@ -447,25 +587,37 @@ class AudioStreamer : public Thread, public LogTagDelegate {
 
     void notifyRead() {
         traceScope();
+        if (m_queueSize == 0) {
+            m_ioDataReady.reset();
+        }
         std::lock_guard<std::mutex> lock(m_readMtx);
         m_readCv.notify_one();
     }
 
     bool waitRead() {
         traceScope();
-        if (m_client->NUM_OF_BUFFERS > 1 && m_readQ.read_available() < (size_t)(m_client->NUM_OF_BUFFERS / 2) &&
-            m_readQ.read_available() > 0) {
-            logln("warning: " << getInstanceString() << ": input buffer below 50% (" << m_readQ.read_available() << "/"
-                              << m_client->NUM_OF_BUFFERS << ")");
-        } else if (m_readQ.read_available() == 0) {
-            if (m_client->NUM_OF_BUFFERS > 1) {
-                logln("warning: " << getInstanceString()
-                                  << ": read queue empty, waiting for data, try increasing the NumberOfBuffers value");
+        if (m_queueSize > 0) {
+            m_readQMeter.update(m_readQ.read_available());
+            if (m_client->NUM_OF_BUFFERS > 1 && m_readQ.read_available() < (size_t)(m_client->NUM_OF_BUFFERS / 2) &&
+                m_readQ.read_available() > 0) {
+                logln("warning: " << getInstanceString() << ": input buffer below 50% (" << m_readQ.read_available()
+                                  << "/" << m_client->NUM_OF_BUFFERS << ")");
+            } else if (m_readQ.read_available() == 0) {
+                if (m_client->NUM_OF_BUFFERS > 1) {
+                    logln("warning: " << getInstanceString()
+                                      << ": read queue empty, waiting for data, try to increase the buffer");
+                }
+                if (!m_error && !threadShouldExit()) {
+                    int timeout = m_client->LIVE_MODE ? m_readTimeoutMs : 1000;
+                    std::unique_lock<std::mutex> lock(m_readMtx);
+                    return m_readCv.wait_for(lock, std::chrono::milliseconds(timeout),
+                                             [this] { return m_readQ.read_available() > 0 || threadShouldExit(); });
+                }
             }
+        } else {
             if (!m_error && !threadShouldExit()) {
                 std::unique_lock<std::mutex> lock(m_readMtx);
-                return m_readCv.wait_for(lock, std::chrono::seconds(1),
-                                         [this] { return m_readQ.read_available() > 0 || threadShouldExit(); });
+                return m_readCv.wait_for(lock, std::chrono::milliseconds(100)) == std::cv_status::no_timeout;
             }
         }
         return true;
@@ -487,6 +639,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         }
         bool success = msg.readFromServer(m_socket.get(), buffer.audio, buffer.midi, e, *m_bytesInMeter);
         if (success) {
+            buffer.workingSamples = buffer.audio.getNumSamples();
             m_client->setLatency(msg.getLatencySamples());
         }
         return success;

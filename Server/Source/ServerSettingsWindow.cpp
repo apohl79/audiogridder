@@ -21,6 +21,12 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     traceScope();
     setUsingNativeTitleBar(true);
 
+    auto srv = m_app->getServer();
+    if (nullptr == srv) {
+        logln("error: no server object");
+        return;
+    }
+
     int totalWidth = 600;
     int totalHeight = 80;
     int borderLR = 15;  // left/right border
@@ -75,30 +81,25 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     addChildAndSetID(label.get(), "lbl");
     m_components.push_back(std::move(label));
 
-    m_nameText.setText(m_app->getServer()->getName());
+    m_nameText.setText(srv->getName());
     m_nameText.setBounds(getWideFieldBounds(row));
     addChildAndSetID(&m_nameText, "name");
 
     row++;
 
     label = std::make_unique<Label>();
-    label->setText("Server ID (0-31):", NotificationType::dontSendNotification);
+    label->setText("Server ID:", NotificationType::dontSendNotification);
     label->setBounds(getLabelBounds(row));
     addChildAndSetID(label.get(), "lbl");
     m_components.push_back(std::move(label));
 
-    int idConfig = m_app->getServer()->getId();
-    String id;
-    id << idConfig;
-    m_idText.setText(id);
-    m_idText.setInputFilter(new TextEditor::LengthAndCharacterRestriction(2, "0123456789"), true);
-    m_idText.onTextChange = [this] {
-        if (m_idText.getText().getIntValue() > 31) {
-            m_idText.setText("31", false);
-        }
-    };
-    m_idText.setBounds(getFieldBounds(row));
-    addChildAndSetID(&m_idText, "id");
+    String id(srv->getId());
+    label = std::make_unique<Label>();
+    label->setText(id, NotificationType::dontSendNotification);
+    label->setBounds(getFieldBounds(row));
+    label->setJustificationType(Justification::right);
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
 
     row++;
 
@@ -116,7 +117,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_sandboxMode.addItem("Disabled", 1);
     m_sandboxMode.addItem("Chain Isolation", 2);
     m_sandboxMode.addItem("Plugin Isolation", 3);
-    m_sandboxMode.setSelectedItemIndex(m_app->getServer()->getSandboxMode());
+    m_sandboxMode.setSelectedItemIndex(srv->getSandboxMode());
     m_sandboxMode.setTooltip(tooltip);
     addChildAndSetID(&m_sandboxMode, "sandbox");
 
@@ -143,7 +144,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_components.push_back(std::move(label));
 
     m_auSupport.setBounds(getCheckBoxBounds(row));
-    m_auSupport.setToggleState(m_app->getServer()->getEnableAU(), NotificationType::dontSendNotification);
+    m_auSupport.setToggleState(srv->getEnableAU(), NotificationType::dontSendNotification);
     addChildAndSetID(&m_auSupport, "au");
 
     row++;
@@ -156,7 +157,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_components.push_back(std::move(label));
 
     m_vst3Support.setBounds(getCheckBoxBounds(row));
-    m_vst3Support.setToggleState(m_app->getServer()->getEnableVST3(), NotificationType::dontSendNotification);
+    m_vst3Support.setToggleState(srv->getEnableVST3(), NotificationType::dontSendNotification);
     addChildAndSetID(&m_vst3Support, "vst");
 
     row++;
@@ -175,7 +176,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     addChildAndSetID(&m_vst3Folders, "vst3fold");
 
     tmpStr = "";
-    for (auto& folder : m_app->getServer()->getVST3Folders()) {
+    for (auto& folder : srv->getVST3Folders()) {
         tmpStr << folder << newLine;
     }
     m_vst3Folders.setText(tmpStr);
@@ -189,7 +190,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_components.push_back(std::move(label));
 
     m_vst2Support.setBounds(getCheckBoxBounds(row));
-    m_vst2Support.setToggleState(m_app->getServer()->getEnableVST2(), NotificationType::dontSendNotification);
+    m_vst2Support.setToggleState(srv->getEnableVST2(), NotificationType::dontSendNotification);
     addChildAndSetID(&m_vst2Support, "vst2");
 
     row++;
@@ -208,7 +209,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     addChildAndSetID(&m_vst2Folders, "vst2fold");
 
     tmpStr = "";
-    for (auto& folder : m_app->getServer()->getVST2Folders()) {
+    for (auto& folder : srv->getVST2Folders()) {
         tmpStr << folder << newLine;
     }
     m_vst2Folders.setText(tmpStr);
@@ -225,8 +226,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_components.push_back(std::move(label));
 
     m_vstNoStandardFolders.setBounds(getCheckBoxBounds(row));
-    m_vstNoStandardFolders.setToggleState(m_app->getServer()->getVSTNoStandardFolders(),
-                                          NotificationType::dontSendNotification);
+    m_vstNoStandardFolders.setToggleState(srv->getVSTNoStandardFolders(), NotificationType::dontSendNotification);
     m_vstNoStandardFolders.setTooltip(tooltip);
     addChildAndSetID(&m_vstNoStandardFolders, "vstnostandarddirs");
 
@@ -254,7 +254,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
                "mode. It positions the plugin windows next to the AG plugin window and allows you to open multiple "
                "plugin windows at the same time."
             << newLine << newLine;
-    tooltip << "Disabled: No screen caturing.";
+    tooltip << "Disabled: No screen capturing.";
     label = std::make_unique<Label>();
     label->setText("Screen Capturing Mode:", NotificationType::dontSendNotification);
     label->setBounds(getLabelBounds(row));
@@ -270,17 +270,17 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_screenCapturingMode.addItem("Disabled (Local Mode)", 4);
     m_screenCapturingMode.addItem("Disabled", 5);
     int mode = 1;
-    if (m_app->getServer()->getScreenCapturingOff()) {
-        if (m_app->getServer()->getScreenLocalMode()) {
+    if (srv->getScreenCapturingOff()) {
+        if (srv->getScreenLocalMode()) {
             mode = 4;
         } else {
             mode = 5;
         }
-    } else if (!m_app->getServer()->getScreenCapturingFFmpeg()) {
+    } else if (!srv->getScreenCapturingFFmpeg()) {
         mode = 3;
     }
     // else {
-    //    switch (m_app->getServer()->getScreenCapturingFFmpegEncoder()) {
+    //    switch (srv->getScreenCapturingFFmpegEncoder()) {
     //        case ScreenRecorder::WEBP:
     //            mode = 1;
     //            break;
@@ -366,7 +366,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_screenCapturingQuality.addItem("High", ScreenRecorder::ENC_QUALITY_HIGH + 1);
     m_screenCapturingQuality.addItem("Medium", ScreenRecorder::ENC_QUALITY_MEDIUM + 1);
     m_screenCapturingQuality.addItem("Low", ScreenRecorder::ENC_QUALITY_LOW + 1);
-    m_screenCapturingQuality.setSelectedId(m_app->getServer()->getScreenCapturingFFmpegQuality() + 1);
+    m_screenCapturingQuality.setSelectedId(srv->getScreenCapturingFFmpegQuality() + 1);
 
     addChildAndSetID(&m_screenCapturingQuality, "captqual");
 
@@ -377,8 +377,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     addChildAndSetID(&m_screenDiffDetectionLbl, "lbl");
 
     m_screenDiffDetection.setBounds(getCheckBoxBounds(row));
-    m_screenDiffDetection.setToggleState(m_app->getServer()->getScreenDiffDetection(),
-                                         NotificationType::dontSendNotification);
+    m_screenDiffDetection.setToggleState(srv->getScreenDiffDetection(), NotificationType::dontSendNotification);
     m_screenDiffDetection.onClick = [this] {
         if (m_screenCapturingMode.getSelectedId() == 2) {
             if (m_screenDiffDetection.getToggleState()) {
@@ -402,7 +401,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     addChildAndSetID(&m_screenJpgQualityLbl, "lbl");
 
     String q;
-    q << m_app->getServer()->getScreenQuality();
+    q << srv->getScreenQuality();
     m_screenJpgQuality.setText(q);
     m_screenJpgQuality.setBounds(getFieldBounds(row));
     addChildAndSetID(&m_screenJpgQuality, "qual");
@@ -413,11 +412,22 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_pluginWindowsOnTopLbl.setBounds(getLabelBounds(row));
     addChildAndSetID(&m_pluginWindowsOnTopLbl, "lbl");
 
-    m_pluginWindowsOnTop.setToggleState(m_app->getServer()->getPluginWindowsOnTop(),
-                                        NotificationType::dontSendNotification);
+    m_pluginWindowsOnTop.setToggleState(srv->getPluginWindowsOnTop(), NotificationType::dontSendNotification);
     m_pluginWindowsOnTop.setBounds(getCheckBoxBounds(row));
     addChildAndSetID(&m_pluginWindowsOnTop, "ontop");
 
+    row++;
+
+    label = std::make_unique<Label>();
+    label->setText("Mouse Offset Correction:", NotificationType::dontSendNotification);
+    label->setBounds(getLabelBounds(row));
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
+
+    m_screenMouseOffsetXY.setBounds(getWideFieldBounds(row));
+    m_screenMouseOffsetXY.setText(String(srv->getScreenMouseOffsetX()) + "x" + String(srv->getScreenMouseOffsetY()));
+    m_screenMouseOffsetXY.setInputFilter(new TextEditor::LengthAndCharacterRestriction(11, "0123456789x-,"), true);
+    addChildAndSetID(&m_screenMouseOffsetXY, "offsetXY");
     row++;
 
     label = std::make_unique<Label>();
@@ -432,6 +442,28 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 
     row++;
 
+    tooltip << "Enter the IDs of servers that you want to start automatically. An ID must be a number in the range of "
+               "0-31. Example: 0,1,4-8"
+            << newLine << newLine << "Note: You have to restart manually for taking changes into effect.";
+
+    label = std::make_unique<Label>();
+    label->setText("Autostart servers with IDs:", NotificationType::dontSendNotification);
+    label->setTooltip(tooltip);
+    label->setBounds(getLabelBounds(row));
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
+
+    auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigServerStartup));
+    if (jsonHasValue(cfg, "IDs")) {
+        m_idText.setText(jsonGetValue(cfg, "IDs", String()));
+    }
+    m_idText.setInputFilter(new TextEditor::LengthAndCharacterRestriction(103, "0123456789-,"), true);
+    m_idText.setBounds(getWideFieldBounds(row));
+    m_idText.setTooltip(tooltip);
+    addChildAndSetID(&m_idText, "id");
+    tooltip.clear();
+    row++;
+
     label = std::make_unique<Label>();
     label->setText("Scan for Plugins at Startup:", NotificationType::dontSendNotification);
     label->setBounds(getLabelBounds(row));
@@ -439,7 +471,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_components.push_back(std::move(label));
 
     m_scanForPlugins.setBounds(getCheckBoxBounds(row));
-    m_scanForPlugins.setToggleState(m_app->getServer()->getScanForPlugins(), NotificationType::dontSendNotification);
+    m_scanForPlugins.setToggleState(srv->getScanForPlugins(), NotificationType::dontSendNotification);
     addChildAndSetID(&m_scanForPlugins, "scan");
 
     row++;
@@ -487,7 +519,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_components.push_back(std::move(label));
 
     m_crashReporting.setBounds(getCheckBoxBounds(row));
-    m_crashReporting.setToggleState(m_app->getServer()->getCrashReporting(), NotificationType::dontSendNotification);
+    m_crashReporting.setToggleState(srv->getCrashReporting(), NotificationType::dontSendNotification);
     addChildAndSetID(&m_crashReporting, "dumps");
 
     row++;
@@ -505,54 +537,53 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 
         auto appCpy = app;
 
-        if (auto srv = appCpy->getServer()) {
-            srv->setOpt("ID", m_idText.getText().getIntValue());
-            srv->setName(m_nameText.getText());
-            srv->setEnableAU(m_auSupport.getToggleState());
-            srv->setEnableVST3(m_vst3Support.getToggleState());
-            srv->setEnableVST2(m_vst2Support.getToggleState());
-            srv->setScanForPlugins(m_scanForPlugins.getToggleState());
-            srv->setSandboxMode((Server::SandboxMode)m_sandboxMode.getSelectedItemIndex());
-            srv->setCrashReporting(m_crashReporting.getToggleState());
+        if (auto srv2 = appCpy->getServer()) {
+            srv2->setName(m_nameText.getText());
+            srv2->setEnableAU(m_auSupport.getToggleState());
+            srv2->setEnableVST3(m_vst3Support.getToggleState());
+            srv2->setEnableVST2(m_vst2Support.getToggleState());
+            srv2->setScanForPlugins(m_scanForPlugins.getToggleState());
+            srv2->setSandboxMode((Server::SandboxMode)m_sandboxMode.getSelectedItemIndex());
+            srv2->setCrashReporting(m_crashReporting.getToggleState());
 
             switch (m_screenCapturingMode.getSelectedId()) {
                 case 1:
-                    srv->setScreenCapturingFFmpeg(true);
-                    srv->setScreenCapturingFFmpegEncoder(ScreenRecorder::WEBP);
-                    srv->setScreenCapturingOff(false);
-                    srv->setScreenLocalMode(false);
-                    srv->setPluginWindowsOnTop(false);
+                    srv2->setScreenCapturingFFmpeg(true);
+                    srv2->setScreenCapturingFFmpegEncoder(ScreenRecorder::WEBP);
+                    srv2->setScreenCapturingOff(false);
+                    srv2->setScreenLocalMode(false);
+                    srv2->setPluginWindowsOnTop(false);
                     break;
                 case 2:
-                    srv->setScreenCapturingFFmpeg(true);
-                    srv->setScreenCapturingFFmpegEncoder(ScreenRecorder::MJPEG);
-                    srv->setScreenCapturingOff(false);
-                    srv->setScreenLocalMode(false);
-                    srv->setPluginWindowsOnTop(false);
+                    srv2->setScreenCapturingFFmpeg(true);
+                    srv2->setScreenCapturingFFmpegEncoder(ScreenRecorder::MJPEG);
+                    srv2->setScreenCapturingOff(false);
+                    srv2->setScreenLocalMode(false);
+                    srv2->setPluginWindowsOnTop(false);
                     break;
                 case 3:
-                    srv->setScreenCapturingFFmpeg(false);
-                    srv->setScreenCapturingOff(false);
-                    srv->setScreenLocalMode(false);
-                    srv->setPluginWindowsOnTop(false);
+                    srv2->setScreenCapturingFFmpeg(false);
+                    srv2->setScreenCapturingOff(false);
+                    srv2->setScreenLocalMode(false);
+                    srv2->setPluginWindowsOnTop(false);
                     break;
                 case 4:
-                    srv->setScreenCapturingFFmpeg(false);
-                    srv->setScreenCapturingOff(true);
-                    srv->setScreenLocalMode(true);
-                    srv->setPluginWindowsOnTop(m_pluginWindowsOnTop.getToggleState());
+                    srv2->setScreenCapturingFFmpeg(false);
+                    srv2->setScreenCapturingOff(true);
+                    srv2->setScreenLocalMode(true);
+                    srv2->setPluginWindowsOnTop(m_pluginWindowsOnTop.getToggleState());
                     break;
                 case 5:
-                    srv->setScreenCapturingFFmpeg(false);
-                    srv->setScreenCapturingOff(true);
-                    srv->setScreenLocalMode(false);
-                    srv->setPluginWindowsOnTop(m_pluginWindowsOnTop.getToggleState());
+                    srv2->setScreenCapturingFFmpeg(false);
+                    srv2->setScreenCapturingOff(true);
+                    srv2->setScreenLocalMode(false);
+                    srv2->setPluginWindowsOnTop(m_pluginWindowsOnTop.getToggleState());
                     break;
             }
 
-            srv->setScreenCapturingFFmpegQuality(
+            srv2->setScreenCapturingFFmpegQuality(
                 (ScreenRecorder::EncoderQuality)(m_screenCapturingQuality.getSelectedId() - 1));
-            srv->setScreenDiffDetection(m_screenDiffDetection.getToggleState());
+            srv2->setScreenDiffDetection(m_screenDiffDetection.getToggleState());
 
             float qual = m_screenJpgQuality.getText().getFloatValue();
             if (qual < 0.1) {
@@ -560,17 +591,54 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
             } else if (qual > 1) {
                 qual = 1.0f;
             }
-            srv->setScreenQuality(qual);
+            srv2->setScreenQuality(qual);
 
             if (m_vst3Folders.getText().length() > 0) {
-                srv->setVST3Folders(StringArray::fromLines(m_vst3Folders.getText()));
+                srv2->setVST3Folders(StringArray::fromLines(m_vst3Folders.getText()));
             }
             if (m_vst2Folders.getText().length() > 0) {
-                srv->setVST2Folders(StringArray::fromLines(m_vst2Folders.getText()));
+                srv2->setVST2Folders(StringArray::fromLines(m_vst2Folders.getText()));
             }
-            srv->setVSTNoStandardFolders(m_vstNoStandardFolders.getToggleState());
+            srv2->setVSTNoStandardFolders(m_vstNoStandardFolders.getToggleState());
 
-            srv->saveConfig();
+            auto offsetParts = StringArray::fromTokens(m_screenMouseOffsetXY.getText(), "x", "");
+            if (offsetParts.size() >= 2) {
+                srv2->setScreenMouseOffsetX(offsetParts[0].getIntValue());
+                srv2->setScreenMouseOffsetY(offsetParts[1].getIntValue());
+            } else {
+                srv2->setScreenMouseOffsetX(0);
+                srv2->setScreenMouseOffsetY(0);
+            }
+
+            srv2->saveConfig();
+
+            // startup servers
+            auto ranges = StringArray::fromTokens(m_idText.getText(), ",", "");
+            String valid;
+            for (auto& r : ranges) {
+                String start, end;
+                auto parts = StringArray::fromTokens(r, "-", "");
+                for (auto& p : parts) {
+                    if (p.isNotEmpty()) {
+                        if (start.isEmpty()) {
+                            start = p;
+                        } else if (end.isEmpty()) {
+                            end = p;
+                            break;
+                        }
+                    }
+                }
+                if (start.isNotEmpty()) {
+                    if (valid.isNotEmpty()) {
+                        valid << ",";
+                    }
+                    valid << start;
+                    if (end.isNotEmpty()) {
+                        valid << "-" << end;
+                    }
+                }
+            }
+            configWriteFile(Defaults::getConfigFileName(Defaults::ConfigServerStartup), {{"IDs", valid.toStdString()}});
         }
 
         appCpy->hideServerSettings();

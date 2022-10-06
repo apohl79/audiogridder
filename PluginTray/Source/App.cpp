@@ -52,6 +52,10 @@ void App::loadConfig() {
     auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigPluginTray));
     m_mon.showChannelColor = jsonGetValue(cfg, "showChannelColor", m_mon.showChannelColor);
     m_mon.showChannelName = jsonGetValue(cfg, "showChannelName", m_mon.showChannelName);
+    m_mon.showBufferAvg = jsonGetValue(cfg, "showBufferAvg", m_mon.showBufferAvg);
+    m_mon.showBuffer95th = jsonGetValue(cfg, "showBuffer95th", m_mon.showBuffer95th);
+    m_mon.showReadErrors = jsonGetValue(cfg, "showReadErrors", m_mon.showReadErrors);
+    m_mon.showPerfProcess = jsonGetValue(cfg, "showPerfProcess", m_mon.showPerfProcess);
     m_mon.windowAutoShow = jsonGetValue(cfg, "autoShow", m_mon.windowAutoShow);
 }
 
@@ -59,6 +63,10 @@ void App::saveConfig() {
     json cfg;
     cfg["showChannelColor"] = m_mon.showChannelColor;
     cfg["showChannelName"] = m_mon.showChannelName;
+    cfg["showBufferAvg"] = m_mon.showBufferAvg;
+    cfg["showBuffer95th"] = m_mon.showBuffer95th;
+    cfg["showReadErrors"] = m_mon.showReadErrors;
+    cfg["showPerfProcess"] = m_mon.showPerfProcess;
     cfg["autoShow"] = m_mon.windowAutoShow;
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPluginTray), cfg);
 }
@@ -174,6 +182,26 @@ void App::getPopupMenu(PopupMenu& menu, bool withShowMonitorOption) {
         m_mon.refresh();
         saveConfig();
     });
+    subMon.addItem("Show Read Buffer Avg", true, m_mon.showBufferAvg, [this] {
+        m_mon.showBufferAvg = !m_mon.showBufferAvg;
+        m_mon.refresh();
+        saveConfig();
+    });
+    subMon.addItem("Show Read Buffer 95th", true, m_mon.showBuffer95th, [this] {
+        m_mon.showBuffer95th = !m_mon.showBuffer95th;
+        m_mon.refresh();
+        saveConfig();
+    });
+    subMon.addItem("Show Read Errors", true, m_mon.showReadErrors, [this] {
+        m_mon.showReadErrors = !m_mon.showReadErrors;
+        m_mon.refresh();
+        saveConfig();
+    });
+    subMon.addItem("Show Processing Performance", true, m_mon.showPerfProcess, [this] {
+        m_mon.showPerfProcess = !m_mon.showPerfProcess;
+        m_mon.refresh();
+        saveConfig();
+    });
     menu.addSubMenu("Monitor", subMon);
 }
 
@@ -199,7 +227,9 @@ void App::Connection::messageReceived(const MemoryBlock& message) {
             if (dst != src) {
                 dst = src;
                 changed = true;
+                return true;
             }
+            return false;
         };
 
         updateValue(status.name, jsonGetValue(msg.data, "name", status.name));
@@ -209,13 +239,26 @@ void App::Connection::messageReceived(const MemoryBlock& message) {
         updateValue(status.instrument, jsonGetValue(msg.data, "instrument", false));
         updateValue(status.colour, jsonGetValue(msg.data, "colour", 0u));
         updateValue(status.loadedPlugins, jsonGetValue(msg.data, "loadedPlugins", status.loadedPlugins));
-        updateValue(status.perf95th, jsonGetValue(msg.data, "perf95th", 0.0));
+        status.perfStream = jsonGetValue(msg.data, "perfStream", 0.0);
+        status.perfProcess = jsonGetValue(msg.data, "perfProcess", 0.0);
         updateValue(status.blocks, jsonGetValue(msg.data, "blocks", 0));
         updateValue(status.serverNameId, jsonGetValue(msg.data, "serverNameId", status.serverNameId));
         updateValue(status.serverHost, jsonGetValue(msg.data, "serverHost", status.serverHost));
-        updateValue(status.connected, jsonGetValue(msg.data, "connected", false));
-        updateValue(status.loadedPluginsOk, jsonGetValue(msg.data, "loadedPluginsOk", false));
+        if (updateValue(status.connected, jsonGetValue(msg.data, "connected", false))) {
+            if (status.connected) {
+                status.connectedMonTriggered = false;
+            }
+        }
+        if (updateValue(status.loadedPluginsOk, jsonGetValue(msg.data, "loadedPluginsOk", false))) {
+            if (status.loadedPluginsOk) {
+                status.loadedPluginsOkMonTriggered = false;
+            }
+        }
         updateValue(status.loadedPluginsErr, jsonGetValue(msg.data, "loadedPluginsErr", String()));
+        updateValue(status.rqAvg, jsonGetValue(msg.data, "rqAvg", 0u));
+        updateValue(status.rq95th, jsonGetValue(msg.data, "rq95th", 0u));
+        updateValue(status.readTimeout, jsonGetValue(msg.data, "readTimeout", 0));
+        updateValue(status.readErrors, jsonGetValue(msg.data, "readErrors", 0u));
 
         status.lastUpdated = Time::currentTimeMillis();
 
@@ -278,7 +321,7 @@ void App::Server::checkConnections() {
 }
 
 void App::handleMessage(const PluginTrayMessage& msg, Connection& sender) {
-    if (msg.type == PluginTrayMessage::UPDATE_RECENTS) {
+    if (msg.type == PluginTrayMessage::UPDATE_RECENTS && jsonHasValue(msg.data, "plugin")) {
         auto srv = getServerString(&sender);
         auto plugin = ServerPlugin::fromString(msg.data["plugin"].get<std::string>());
         auto& recents = m_recents[srv];

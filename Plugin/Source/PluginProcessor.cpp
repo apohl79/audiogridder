@@ -23,7 +23,9 @@
 namespace e47 {
 
 PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
-    : AudioProcessor(createBusesProperties(wt)), m_channelMapper(this) {
+    : AudioProcessor(createBusesProperties(wt)),
+      m_channelMapper(this),
+      m_processingDurationGlobal(TimeStatistic::getDuration("audio_process")) {
     initAsyncFunctors();
 
     Defaults::initPluginTheme();
@@ -197,6 +199,11 @@ PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
     }
 
     memset(m_activeMidiNotes, 0, sizeof(m_activeMidiNotes));
+
+    auto localTimeStat = Metrics::getStatistic<TimeStatistic>(String("audio_process.") + String(getTagId()));
+    localTimeStat->setAggregate(false);
+    localTimeStat->setShowLog(false);
+    m_processingDurationLocal.setTimeStatistic(localTimeStat);
 }
 
 PluginProcessor::~PluginProcessor() {
@@ -256,6 +263,7 @@ void PluginProcessor::loadConfig(const json& j, bool isUpdate) {
     }
 
     m_numberOfAutomationSlots = jsonGetValue(j, "NumberOfAutomationSlots", m_numberOfAutomationSlots);
+    m_menuShowType = jsonGetValue(j, "MenuShowType", m_menuShowType);
     m_menuShowCategory = jsonGetValue(j, "MenuShowCategory", m_menuShowCategory);
     m_menuShowCompany = jsonGetValue(j, "MenuShowCompany", m_menuShowCompany);
     m_genericEditor = jsonGetValue(j, "GenericEditor", m_genericEditor);
@@ -284,6 +292,8 @@ void PluginProcessor::loadConfig(const json& j, bool isUpdate) {
     m_bypassWhenNotConnected = jsonGetValue(j, "BypassWhenNotConnected", m_bypassWhenNotConnected.load());
     m_bufferSizeByPlugin = jsonGetValue(j, "BufferSettingByPlugin", m_bufferSizeByPlugin);
     m_client->FIXED_OUTBOUND_BUFFER = jsonGetValue(j, "FixedOutboundBuffer", m_client->FIXED_OUTBOUND_BUFFER.load());
+    m_processingTraceTresholdMs = jsonGetValue(j, "ProcessingTraceTresholdMs", m_processingTraceTresholdMs);
+    m_client->LIVE_MODE = jsonGetValue(j, "LiveMode", m_client->LIVE_MODE.load());
 }
 
 void PluginProcessor::saveConfig(int numOfBuffers) {
@@ -309,6 +319,7 @@ void PluginProcessor::saveConfig(int numOfBuffers) {
     jcfg["NumberOfBuffers"] = numOfBuffers;
     jcfg["NumberOfAutomationSlots"] = m_numberOfAutomationSlots;
     jcfg["LoadPluginTimeoutMS"] = m_client->LOAD_PLUGIN_TIMEOUT.load();
+    jcfg["MenuShowType"] = m_menuShowType;
     jcfg["MenuShowCategory"] = m_menuShowCategory;
     jcfg["MenuShowCompany"] = m_menuShowCompany;
     jcfg["GenericEditor"] = m_genericEditor;
@@ -331,6 +342,8 @@ void PluginProcessor::saveConfig(int numOfBuffers) {
     jcfg["BypassWhenNotConnected"] = m_bypassWhenNotConnected.load();
     jcfg["BufferSettingByPlugin"] = m_bufferSizeByPlugin;
     jcfg["FixedOutboundBuffer"] = m_client->FIXED_OUTBOUND_BUFFER.load();
+    jcfg["ProcessingTraceTresholdMs"] = m_processingTraceTresholdMs;
+    jcfg["LiveMode"] = m_client->LIVE_MODE.load();
 
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), jcfg);
 }
@@ -541,9 +554,12 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
     traceScope();
 
     auto traceCtx = TimeTrace::createTraceContext();
+    m_processingDurationGlobal.reset();
+    m_processingDurationLocal.reset();
 
-    traceln("proc: m_bypassWhenNotConnected=" << (int)m_bypassWhenNotConnected.load()
-                                              << ", clientOk=" << (int)m_client->isReadyLockFree());
+    traceln("  proc: m_bypassWhenNotConnected=" << (int)m_bypassWhenNotConnected.load()
+                                                << ", clientOk=" << (int)m_client->isReadyLockFree()
+                                                << ", pluginsOk=" << (int)m_loadedPluginsOk);
 
     if (m_bypassWhenNotConnected &&
         (!m_client->isReadyLockFree() || !m_loadedPluginsOk || getNumOfLoadedPlugins() == 0)) {
@@ -657,6 +673,8 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
 
     traceCtx->add("pb_prep");
 
+    int readTimeoutMs = 0;
+
     if (transfer) {
         if ((buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) || midiMessages.getNumEvents() > 0) {
             auto streamer = m_client->getStreamer<T>();
@@ -664,17 +682,21 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
             traceCtx->add("pb_get_streamer");
 
             if (nullptr != streamer && m_loadedPluginsOk) {
+                readTimeoutMs = streamer->getReadTimeoutMs();
+
                 m_channelMapper.map(&buffer, sendBuffer);
 
                 traceCtx->add("pb_ch_map");
                 traceCtx->startGroup();
 
-                streamer->send(*sendBuffer, midiMessages, posInfo);
+                bool sendOk = streamer->send(*sendBuffer, midiMessages, posInfo);
 
                 traceCtx->finishGroup("pb_send");
                 traceCtx->startGroup();
 
-                streamer->read(*sendBuffer, midiMessages);
+                if (sendOk) {
+                    streamer->read(*sendBuffer, midiMessages);
+                }
 
                 traceCtx->finishGroup("pb_read");
 
@@ -687,6 +709,7 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
                     traceCtx->add("pb_update_latency");
                 }
             } else {
+                traceln("no streamer");
                 buffer.clear();
             }
         }
@@ -721,9 +744,14 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
     }
 
     traceCtx->add("pb_finish");
-    traceCtx->summary(getLogTagSource(), "process block", 15.0);
 
-    TimeTrace::deleteTraceContext();
+    if (readTimeoutMs > 0) {
+        traceCtx->summary(getLogTagSource(), "process block",
+                          m_processingTraceTresholdMs > 0.0 ? m_processingTraceTresholdMs : readTimeoutMs);
+    }
+
+    m_processingDurationGlobal.update();
+    m_processingDurationLocal.update();
 }
 
 template <typename T>
@@ -808,18 +836,13 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes) {
     }
 }
 
-json PluginProcessor::getState(bool withServers) {
+json PluginProcessor::getState(bool withActiveServer) {
     traceScope();
     json j;
-    j["version"] = 5;
+    j["version"] = 6;
     j["Mode"] = m_mode.toStdString();
 
-    if (withServers) {
-        auto jservers = json::array();
-        for (auto& srv : m_servers) {
-            jservers.push_back(srv.toStdString());
-        }
-        j["servers"] = jservers;
+    if (withActiveServer) {
         j["activeServerStr"] = m_client->getServer().serialize().toStdString();
     }
 
@@ -863,13 +886,6 @@ bool PluginProcessor::setState(const json& j) {
         }
     }
 
-    if (j.find("servers") != j.end()) {
-        m_servers.clear();
-        for (auto& srv : j["servers"]) {
-            m_servers.add(srv.get<std::string>());
-        }
-    }
-
     String activeServerStr = jsonGetValue(j, "activeServerStr", String());
     int activeServer = jsonGetValue(j, "activeServer", -1);
 
@@ -907,7 +923,15 @@ bool PluginProcessor::setState(const json& j) {
     } else if (activeServer > -1 && activeServer < m_servers.size()) {
         m_client->setServer(m_servers[activeServer]);
         m_client->reconnect();
+    } else if (m_client->isReadyLockFree()) {
+        m_client->reconnect();
     }
+
+    runOnMsgThreadAsync([this] {
+        if (auto* e = dynamic_cast<PluginEditor*>(getActiveEditor())) {
+            e->updateState();
+        }
+    });
 
     return true;
 }
@@ -1324,18 +1348,22 @@ void PluginProcessor::getAllParameterValues(int idx) {
     traceScope();
     logln("reading all parameter values for plugin " << idx);
     std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
-    auto& params = m_loadedPlugins[(size_t)idx].params;
-    int count = (int)(params.size() * params[0].size());
-    for (auto& res : m_client->getAllParameterValues(idx, count)) {
-        if (res.channel > -1 && res.channel < (int)params.size() && res.idx > -1 &&
-            res.idx < (int)params[(size_t)res.channel].size()) {
-            auto& param = params[(size_t)res.channel][(size_t)res.idx];
-            if (param.idx == res.idx) {
-                param.currentValue = (float)res.value;
-            } else {
-                logln("error: index mismatch in getAllParameterValues");
+    if (idx > -1 && idx < (int)m_loadedPlugins.size()) {
+        auto& params = m_loadedPlugins[(size_t)idx].params;
+        int count = (int)(params.size() * params[0].size());
+        for (auto& res : m_client->getAllParameterValues(idx, count)) {
+            if (res.channel > -1 && res.channel < (int)params.size() && res.idx > -1 &&
+                res.idx < (int)params[(size_t)res.channel].size()) {
+                auto& param = params[(size_t)res.channel][(size_t)res.idx];
+                if (param.idx == res.idx) {
+                    param.currentValue = (float)res.value;
+                } else {
+                    logln("getAllParameterValues error: index mismatch in getAllParameterValues");
+                }
             }
         }
+    } else {
+        logln("getAllParameterValues failed: idx " << idx << " out of range");
     }
 }
 
@@ -1666,12 +1694,16 @@ void PluginProcessor::TrayConnection::messageReceived(const MemoryBlock& message
 void PluginProcessor::TrayConnection::sendStatus() {
     auto& client = m_processor->getClient();
     auto track = m_processor->getTrackProperties();
-    String statId = "audio.";
-    statId << m_processor->getTagId();
-    auto ts = Metrics::getStatistic<TimeStatistic>(statId);
+    String streamStatId = "audio_stream.";
+    streamStatId << m_processor->getTagId();
+    String processStatId = "audio_process.";
+    processStatId << m_processor->getTagId();
+    auto tsStream = Metrics::getStatistic<TimeStatistic>(streamStatId);
+    auto tsProcess = Metrics::getStatistic<TimeStatistic>(processStatId);
+    bool isClientReady = client.isReadyLockFree();
 
     json j;
-    j["connected"] = client.isReadyLockFree();
+    j["connected"] = isClientReady;
     j["name"] = track.name.toStdString();
     j["channelsIn"] = m_processor->getMainBusNumInputChannels();
     j["channelsOut"] = m_processor->getTotalNumOutputChannels();
@@ -1684,7 +1716,8 @@ void PluginProcessor::TrayConnection::sendStatus() {
     j["colour"] = track.colour.getARGB();
     j["loadedPlugins"] = client.getLoadedPluginsString().toStdString();
     j["loadedPluginsOk"] = m_processor->m_loadedPluginsOk.load();
-    j["perf95th"] = ts->get1minHistogram().nintyFifth;
+    j["perfStream"] = tsStream->getMostRecentAverage();
+    j["perfProcess"] = tsProcess->getMostRecentAverage();
     j["blocks"] = client.NUM_OF_BUFFERS.load();
     j["serverNameId"] = m_processor->getActiveServerName().toStdString();
     j["serverHost"] = client.getServer().getHost().toStdString();
@@ -1701,6 +1734,29 @@ void PluginProcessor::TrayConnection::sendStatus() {
         }
         j["loadedPluginsErr"] = str.str();
     }
+
+    size_t rqAvg = 0, rqMin = 0, rqMax = 0, rq95th = 0;
+    int readTimeout = 0;
+    uint64_t readErrors = 0;
+    if (isClientReady) {
+        if (client.isUsingDoublePrecission()) {
+            if (auto streamer = client.getStreamer<double>()) {
+                streamer->getReadQueueMeter().aggregate(rqAvg, rqMin, rqMax, rq95th);
+                readTimeout = streamer->getReadTimeoutMs();
+                readErrors = streamer->getReadErrors();
+            }
+        } else {
+            if (auto streamer = client.getStreamer<float>()) {
+                streamer->getReadQueueMeter().aggregate(rqAvg, rqMin, rqMax, rq95th);
+                readTimeout = streamer->getReadTimeoutMs();
+                readErrors = streamer->getReadErrors();
+            }
+        }
+    }
+    j["rqAvg"] = rqAvg;
+    j["rq95th"] = rq95th;
+    j["readTimeout"] = readTimeout;
+    j["readErrors"] = readErrors;
 
     sendMessage(PluginTrayMessage(PluginTrayMessage::STATUS, j));
 }
@@ -1749,11 +1805,11 @@ void PluginProcessor::TrayConnection::run() {
                     logln("no tray app available");
                     static std::once_flag once;
                     std::call_once(once, [] {
-                        AlertWindow::showMessageBoxAsync(
-                            AlertWindow::WarningIcon, "Error",
-                            "AudioGridder tray application not found! Please uninstall the "
-                            "AudioGridder plugin and reinstall it!",
-                            "OK");
+                        runOnMsgThreadSync([] {
+                            AlertWindow::showMessageBoxAsync(
+                                AlertWindow::WarningIcon, "Error",
+                                "AudioGridder tray application not found! Please reinstall AudioGridder!", "OK");
+                        });
                     });
                     return;
                 }
