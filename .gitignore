@@ -18,3 +18,7 @@ compile_commands.json
 .dir-locals.el
 .cache
 TestsData
+
+.idea
+cmake-build-debug
+audiogridder-deps
