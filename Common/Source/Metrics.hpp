@@ -95,9 +95,10 @@ class SizeMeter : public BasicStatistic, public LogTag {
     }
 
     inline void aggregate(size_t& avg, size_t& min, size_t& max, size_t& nintyFifth) const {
-        std::vector<size_t> data(m_data.size());
+        std::vector<size_t> data;
         {
             std::lock_guard<std::mutex> lock(m_mtx);
+            data.resize(m_data.size());
             memcpy(data.data(), m_data.data(), sizeof(size_t) * m_data.size());
         }
         std::sort(data.begin(), data.end());
