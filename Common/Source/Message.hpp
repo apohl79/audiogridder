@@ -203,7 +203,7 @@ class AudioMessage : public LogTagDelegate {
         m_reqHeader.isDouble = std::is_same<T, double>::value;
         m_reqHeader.numMidiEvents = midi.getNumEvents();
         m_reqHeader.traceId = TimeTrace::getTraceId();
-        if (socket->isConnected()) {
+        if (nullptr != socket && socket->isConnected()) {
             if (!send(socket, reinterpret_cast<const char*>(&m_reqHeader), sizeof(m_reqHeader), e, &metric)) {
                 return false;
             }
@@ -239,7 +239,7 @@ class AudioMessage : public LogTagDelegate {
         m_resHeader.samples = buffer.getNumSamples();
         m_resHeader.latencySamples = latencySamples;
         m_resHeader.numMidiEvents = midi.getNumEvents();
-        if (socket->isConnected()) {
+        if (nullptr != socket && socket->isConnected()) {
             if (!send(socket, reinterpret_cast<const char*>(&m_resHeader), sizeof(m_resHeader), e, &metric)) {
                 return false;
             }
@@ -268,7 +268,7 @@ class AudioMessage : public LogTagDelegate {
     bool readFromServer(StreamingSocket* socket, AudioBuffer<T>& buffer, MidiBuffer& midi, MessageHelper::Error* e,
                         Meter& metric) {
         traceScope();
-        if (socket->isConnected()) {
+        if (nullptr != socket && socket->isConnected()) {
             if (!read(socket, &m_resHeader, sizeof(m_resHeader), 1000, e, &metric)) {
                 MessageHelper::seterrstr(e, "response header");
                 return false;
@@ -363,7 +363,7 @@ class AudioMessage : public LogTagDelegate {
                         MidiBuffer& midi, AudioPlayHead::PositionInfo& posInfo, MessageHelper::Error* e, Meter& metric,
                         Uuid& traceId) {
         traceScope();
-        if (socket->isConnected()) {
+        if (nullptr != socket && socket->isConnected()) {
             if (!read(socket, &m_reqHeader, sizeof(m_reqHeader), 0, e, &metric)) {
                 MessageHelper::seterrstr(e, "request header");
                 return false;
