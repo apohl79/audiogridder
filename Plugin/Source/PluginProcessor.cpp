@@ -976,7 +976,7 @@ void PluginProcessor::autoRetry() {
                         if (plug.error.startsWith("failed to initialize sandbox") ||
                             plug.error.startsWith("failed loading plugin") ||
                             plug.error.startsWith("failed to finish load: timeout before") ||
-                            plug.error.startsWith("seems like the plugin did not load or crash") ||
+                            plug.error.startsWith("seems like the plugin") ||
                             plug.error == "failed to get result: E_TIMEOUT") {
                             reconnect = true;
                         } else {
