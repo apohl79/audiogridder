@@ -225,6 +225,9 @@ bool ProcessorChain::initPluginInstance(Processor* proc, const String& layout, S
     proc->prepareToPlay(getSampleRate(), getBlockSize());
     proc->enableAllBuses();
     AudioPlayHead::PositionInfo posInfo;
+    posInfo.setTimeInSamples(makeOptional(0));
+    posInfo.setTimeInSeconds(makeOptional(0.0));
+    posInfo.setBpm(makeOptional(120.0));
     ProcessorChain::PlayHead playHead(&posInfo);
     // set a temporary playhead just for preProcessBlocks
     proc->setPlayHead(&playHead);
