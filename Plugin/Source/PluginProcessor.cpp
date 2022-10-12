@@ -677,39 +677,44 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
 
     if (transfer) {
         if ((buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) || midiMessages.getNumEvents() > 0) {
-            auto streamer = m_client->getStreamer<T>();
+            if (m_client->isReadyLockFree()) {
+                auto streamer = m_client->getStreamer<T>();
 
-            traceCtx->add("pb_get_streamer");
+                traceCtx->add("pb_get_streamer");
 
-            if (nullptr != streamer && m_loadedPluginsOk) {
-                readTimeoutMs = streamer->getReadTimeoutMs();
+                if (nullptr != streamer && m_loadedPluginsOk) {
+                    readTimeoutMs = streamer->getReadTimeoutMs();
 
-                m_channelMapper.map(&buffer, sendBuffer);
+                    m_channelMapper.map(&buffer, sendBuffer);
 
-                traceCtx->add("pb_ch_map");
-                traceCtx->startGroup();
+                    traceCtx->add("pb_ch_map");
+                    traceCtx->startGroup();
 
-                bool sendOk = streamer->send(*sendBuffer, midiMessages, posInfo);
+                    bool sendOk = streamer->send(*sendBuffer, midiMessages, posInfo);
 
-                traceCtx->finishGroup("pb_send");
-                traceCtx->startGroup();
+                    traceCtx->finishGroup("pb_send");
+                    traceCtx->startGroup();
 
-                if (sendOk) {
-                    streamer->read(*sendBuffer, midiMessages);
-                }
+                    if (sendOk) {
+                        streamer->read(*sendBuffer, midiMessages);
+                    }
 
-                traceCtx->finishGroup("pb_read");
+                    traceCtx->finishGroup("pb_read");
 
-                m_channelMapper.mapReverse(sendBuffer, &buffer);
+                    m_channelMapper.mapReverse(sendBuffer, &buffer);
 
-                traceCtx->add("pb_ch_map_reverse");
+                    traceCtx->add("pb_ch_map_reverse");
 
-                if (m_client->getLatencySamples() != getLatencySamples()) {
-                    runOnMsgThreadAsync([this] { updateLatency(); });
-                    traceCtx->add("pb_update_latency");
+                    if (m_client->getLatencySamples() != getLatencySamples()) {
+                        runOnMsgThreadAsync([this] { updateLatency(); });
+                        traceCtx->add("pb_update_latency");
+                    }
+                } else {
+                    traceln("no streamer");
+                    buffer.clear();
                 }
             } else {
-                traceln("no streamer");
+                traceln("client not ready");
                 buffer.clear();
             }
         }
