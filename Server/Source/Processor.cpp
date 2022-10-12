@@ -562,6 +562,10 @@ bool Processor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMes
     auto fn = [&](auto p, int ch, bool isPlugin) {
         TimeTrace::addTracePoint("proc_got_backend");
         traceln("  processing ch " << ch << ": suspended=" << (int)p->isSuspended());
+        if (ch == 0) {
+            latencySamples = p->getLatencySamples();
+            updateLatencyBuffers(latencySamples);
+        }
         if (!p->isSuspended()) {
             if (isPlugin && m_channels > 1) {
                 // multi-mono
@@ -571,10 +575,6 @@ bool Processor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMes
             } else {
                 ScopedNoDenormals noDenormals;
                 p->processBlock(buffer, midiMessages);
-            }
-            if (ch == 0) {
-                latencySamples = p->getLatencySamples();
-                updateLatencyBuffers(latencySamples);
             }
             TimeTrace::addTracePoint("proc_process_" + String(ch));
         } else {
