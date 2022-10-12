@@ -1350,7 +1350,7 @@ void PluginProcessor::getAllParameterValues(int idx) {
     std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
     if (idx > -1 && idx < (int)m_loadedPlugins.size()) {
         auto& params = m_loadedPlugins[(size_t)idx].params;
-        int count = (int)(params.size() * params[0].size());
+        int count = params.size() > 0 ? (int)(params.size() * params[0].size()) : 0;
         for (auto& res : m_client->getAllParameterValues(idx, count)) {
             if (res.channel > -1 && res.channel < (int)params.size() && res.idx > -1 &&
                 res.idx < (int)params[(size_t)res.channel].size()) {

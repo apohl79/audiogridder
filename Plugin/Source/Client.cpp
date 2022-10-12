@@ -850,7 +850,7 @@ void Client::setParameterValue(int idx, int channel, int paramIdx, float val) {
 
 Array<Client::ParameterResult> Client::getAllParameterValues(int idx, int cnt) {
     traceScope();
-    if (!isReadyLockFree()) {
+    if (cnt <= 0 || !isReadyLockFree()) {
         return {};
     };
     Message<GetAllParameterValues> msg(this);
