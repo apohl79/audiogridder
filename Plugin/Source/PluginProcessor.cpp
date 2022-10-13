@@ -294,6 +294,14 @@ void PluginProcessor::loadConfig(const json& j, bool isUpdate) {
     m_client->FIXED_OUTBOUND_BUFFER = jsonGetValue(j, "FixedOutboundBuffer", m_client->FIXED_OUTBOUND_BUFFER.load());
     m_processingTraceTresholdMs = jsonGetValue(j, "ProcessingTraceTresholdMs", m_processingTraceTresholdMs);
     m_client->LIVE_MODE = jsonGetValue(j, "LiveMode", m_client->LIVE_MODE.load());
+
+    int newBlockSize = jsonGetValue(j, "CustomBlockSize", m_customBlockSize);
+    if (newBlockSize != m_customBlockSize) {
+        m_customBlockSize = newBlockSize;
+        if (isUpdate) {
+            m_client->reconnect();
+        }
+    }
 }
 
 void PluginProcessor::saveConfig(int numOfBuffers) {
@@ -341,11 +349,22 @@ void PluginProcessor::saveConfig(int numOfBuffers) {
     jcfg["KeepEditorOpen"] = m_keepEditorOpen;
     jcfg["BypassWhenNotConnected"] = m_bypassWhenNotConnected.load();
     jcfg["BufferSettingByPlugin"] = m_bufferSizeByPlugin;
-    jcfg["FixedOutboundBuffer"] = m_client->FIXED_OUTBOUND_BUFFER.load();
+    if (!m_bufferSizeByPlugin) {
+        jcfg["FixedOutboundBuffer"] = m_client->FIXED_OUTBOUND_BUFFER.load();
+        jcfg["CustomBlockSize"] = m_customBlockSize;
+    }
     jcfg["ProcessingTraceTresholdMs"] = m_processingTraceTresholdMs;
     jcfg["LiveMode"] = m_client->LIVE_MODE.load();
 
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), jcfg);
+}
+
+void PluginProcessor::setFixedOutboundBuffer(bool b) {
+    m_client->FIXED_OUTBOUND_BUFFER = b;
+    if (!m_bufferSizeByPlugin) {
+        saveConfig();
+    }
+    m_client->reconnect();
 }
 
 void PluginProcessor::setNumBuffers(int n) {
@@ -438,9 +457,18 @@ const String PluginProcessor::getProgramName(int /* index */) { return {}; }
 
 void PluginProcessor::changeProgramName(int /* index */, const String& /* newName */) {}
 
-void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
+void PluginProcessor::prepareToPlay(double sampleRate, int blockSize) {
     traceScope();
-    logln("prepareToPlay: sampleRate = " << sampleRate << ", samplesPerBlock = " << samplesPerBlock);
+
+    int clientBlockSize = blockSize;
+
+    if (m_customBlockSize > blockSize) {
+        clientBlockSize = (int)std::ceil((float)m_customBlockSize / blockSize) * blockSize;
+    }
+
+    logln("prepareToPlay: sampleRate = " << sampleRate << ", blockSize = " << clientBlockSize
+                                         << (clientBlockSize != blockSize ? ", dawBlockSize = " + String(blockSize)
+                                                                          : ""));
     logln("I/O layout: " << describeLayout(getBusesLayout()));
 
     if (!m_client->isThreadRunning()) {
@@ -483,7 +511,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
     m_activeChannels.setNumChannels(channelsIn + channelsSC, channelsOut);
     updateChannelMapping();
 
-    m_client->init(channelsIn, channelsOut, channelsSC, sampleRate, samplesPerBlock, isUsingDoublePrecision());
+    m_client->init(channelsIn, channelsOut, channelsSC, sampleRate, clientBlockSize, isUsingDoublePrecision());
 
     m_prepared = true;
 
@@ -547,6 +575,22 @@ void PluginProcessor::numChannelsChanged() {
     // activate all input/output channels per default
     m_activeChannels.setRangeActive();
 #endif
+}
+
+int PluginProcessor::getCustomBlockSize() const {
+    int blockSize = getBlockSize();
+    if (m_customBlockSize > blockSize) {
+        blockSize = (int)std::ceil((float)m_customBlockSize / blockSize) * blockSize;
+    }
+    return blockSize;
+}
+
+void PluginProcessor::setCustomBlockSize(int b) {
+    m_customBlockSize = b;
+    if (!m_bufferSizeByPlugin) {
+        saveConfig();
+    }
+    prepareToPlay(getSampleRate(), getCustomBlockSize());
 }
 
 template <typename T>
@@ -855,6 +899,10 @@ json PluginProcessor::getState(bool withActiveServer) {
     j["NumberOfBuffers"] = getNumBuffers();
     j["LatencySamplesManual"] = m_client->getLatencySamplesManual();
 
+    if (m_customBlockSize > 0) {
+        j["CustomBlockSize"] = m_customBlockSize;
+    }
+
     auto jplugs = json::array();
     {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
@@ -907,6 +955,8 @@ bool PluginProcessor::setState(const json& j) {
         m_client->setLatencySamplesManual(jsonGetValue(j, "LatencySamplesManual", m_client->getLatencySamplesManual()));
         updateLatency();
     }
+
+    m_customBlockSize = jsonGetValue(j, "CustomBlockSize", m_customBlockSize);
 
     {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);

@@ -736,11 +736,11 @@ void PluginEditor::showServerMenu() {
 
     PopupMenu subm;
     double sampleRate = m_processor.getSampleRate();
-    int iobuf = m_processor.getBlockSize();
-    auto getName = [sampleRate, iobuf](int blocks) -> String {
+    int customBlockSize = m_processor.getCustomBlockSize();
+    auto getName = [sampleRate, customBlockSize](int blocks) -> String {
         String n;
-        n << blocks << " Blocks (" << blocks * iobuf << " samples / +"
-          << (int)lround(blocks * iobuf * 1000 / sampleRate) << "ms)";
+        n << blocks << " Blocks (" << blocks * customBlockSize << " samples / +"
+          << (int)lround(blocks * customBlockSize * 1000 / sampleRate) << "ms)";
         return n;
     };
 
@@ -752,9 +752,26 @@ void PluginEditor::showServerMenu() {
     subm.addItem("Use fixed size outbound buffers", true, m_processor.getFixedOutboundBuffer(), [this] {
         traceScope();
         m_processor.setFixedOutboundBuffer(!m_processor.getFixedOutboundBuffer());
-        m_processor.saveConfig();
-        m_processor.getClient().reconnect();
     });
+
+    subm.addSeparator();
+
+    PopupMenu subsubm;
+    int hostBlockSize = m_processor.getBlockSize();
+    int blockSize = 0;
+    int step = 1;
+    do {
+        blockSize = step * hostBlockSize;
+        subsubm.addItem(String(blockSize) + " samples" + (step == 1 ? String(" (Host)") : String()),
+                        blockSize != customBlockSize, blockSize == customBlockSize, [this, blockSize] {
+                            traceScope();
+                            m_processor.setCustomBlockSize(blockSize);
+                        });
+        step++;
+    } while (blockSize < 4096);
+
+    subm.addSubMenu("Block Size", subsubm);
+    subsubm.clear();
 
     subm.addSeparator();
 
