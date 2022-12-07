@@ -306,23 +306,33 @@ bool Server::parsePluginLayouts(const String& id) {
             }
         }
     } else {
-        logln("parsing plugin layouts...");
+        auto readLayouts = [this](const std::string& key, const auto& jlayouts) {
+            if (jlayouts.is_array()) {
+                for (auto& jlayout : jlayouts) {
+                    auto layout = deserializeLayout(jsonGetValue(jlayout, "layout", String()));
+                    m_pluginLayouts[key].add(layout);
+                }
+            }
+        };
 
-        if (id.isNotEmpty()) {
-            auto it = m_jpluginLayouts.find(id.toStdString());
-            if (it != m_jpluginLayouts.end()) {
-                for (auto& jlayout : it.value()) {
-                    auto layout = deserializeLayout(jsonGetValue(jlayout, "layout", String()));
-                    m_pluginLayouts[it.key()].add(layout);
+        try {
+            logln("parsing " << m_jpluginLayouts.size() << " plugin layouts..."
+                             << (id.isNotEmpty() ? " (id=" + id + ")" : String()));
+
+            if (id.isNotEmpty()) {
+                auto it = m_jpluginLayouts.find(id.toStdString());
+                if (it != m_jpluginLayouts.end()) {
+                    readLayouts(it.key(), it.value());
+                }
+            } else {
+                for (auto it = m_jpluginLayouts.begin(); it != m_jpluginLayouts.end(); it++) {
+                    readLayouts(it.key(), it.value());
                 }
             }
-        } else {
-            for (auto it = m_jpluginLayouts.begin(); it != m_jpluginLayouts.end(); it++) {
-                for (auto& jlayout : it.value()) {
-                    auto layout = deserializeLayout(jsonGetValue(jlayout, "layout", String()));
-                    m_pluginLayouts[it.key()].add(layout);
-                }
-            }
+
+            logln("...ok");
+        } catch (const json::exception& e) {
+            logln("parsing plugin layouts failed: " << e.what());
         }
     }
     return true;

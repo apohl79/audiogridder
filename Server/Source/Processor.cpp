@@ -515,7 +515,11 @@ void Processor::unload() {
                 listener = std::move(m_listners[ch]);
             }
             if (m_prepared) {
-                plugin->releaseResources();
+                if (m_fmt == VST3) {
+                    runOnMsgThreadSync([&] { plugin->releaseResources(); });
+                } else {
+                    plugin->releaseResources();
+                }
             }
             for (auto* param : plugin->getParameters()) {
                 param->removeListener(listener.get());
@@ -558,6 +562,10 @@ bool Processor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMes
     auto fn = [&](auto p, int ch, bool isPlugin) {
         TimeTrace::addTracePoint("proc_got_backend");
         traceln("  processing ch " << ch << ": suspended=" << (int)p->isSuspended());
+        if (ch == 0) {
+            latencySamples = p->getLatencySamples();
+            updateLatencyBuffers(latencySamples);
+        }
         if (!p->isSuspended()) {
             if (isPlugin && m_channels > 1) {
                 // multi-mono
@@ -567,10 +575,6 @@ bool Processor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMes
             } else {
                 ScopedNoDenormals noDenormals;
                 p->processBlock(buffer, midiMessages);
-            }
-            if (ch == 0) {
-                latencySamples = p->getLatencySamples();
-                updateLatencyBuffers(latencySamples);
             }
             TimeTrace::addTracePoint("proc_process_" + String(ch));
         } else {
@@ -714,7 +718,11 @@ void Processor::releaseResources() {
         if (!m_isClient) {
             for (int ch = 0; ch < m_channels; ch++) {
                 if (auto p = getPlugin(ch)) {
-                    p->releaseResources();
+                    if (m_fmt == VST3) {
+                        runOnMsgThreadSync([&] { p->releaseResources(); });
+                    } else {
+                        p->releaseResources();
+                    }
                 }
             }
         }
@@ -736,7 +744,11 @@ void Processor::suspendProcessing(const bool shouldBeSuspended) {
                         if (!p->isSuspended()) {
                             logln("suspending '" << getName() << "' (channel=" << ch << ")...");
                             p->suspendProcessing(true);
-                            p->releaseResources();
+                            if (m_fmt == VST3) {
+                                runOnMsgThreadSync([&] { p->releaseResources(); });
+                            } else {
+                                p->releaseResources();
+                            }
                         }
                     }
                 }
@@ -803,7 +815,11 @@ void Processor::enableAllBuses() {
     if (isLoaded()) {
         for (int ch = 0; ch < m_channels; ch++) {
             if (auto p = getPlugin(ch)) {
-                p->enableAllBuses();
+                if (m_fmt == VST3) {
+                    runOnMsgThreadSync([&] { p->enableAllBuses(); });
+                } else {
+                    p->enableAllBuses();
+                }
             }
         }
     }
@@ -842,7 +858,11 @@ void Processor::setMonoChannels(uint64 channels) {
                         } else {
                             if (!p->isSuspended()) {
                                 p->suspendProcessing(true);
-                                p->releaseResources();
+                                if (m_fmt == VST3) {
+                                    runOnMsgThreadSync([&] { p->releaseResources(); });
+                                } else {
+                                    p->releaseResources();
+                                }
                             }
                         }
                     }

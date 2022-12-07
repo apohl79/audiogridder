@@ -12,6 +12,7 @@
 
 #include "TestsHelper.hpp"
 #include "Server.hpp"
+#include "Utils.hpp"
 
 namespace e47 {
 
@@ -48,11 +49,11 @@ class ScanPluginsTest : UnitTest {
         vst3plugins.push_back(datadir.getChildFile("LoudMax.vst3").getFullPathName());
 
         for (auto& p : vst2plugins) {
-            expect(Server::scanPlugin(p, "VST", 999));
+            runOnMsgThreadSync([&] { expect(Server::scanPlugin(p, "VST", 999)); });
         }
 
         for (auto& p : vst3plugins) {
-            expect(Server::scanPlugin(p, "VST3", 999));
+            runOnMsgThreadSync([&] { expect(Server::scanPlugin(p, "VST3", 999)); });
         }
     }
 };

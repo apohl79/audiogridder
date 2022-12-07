@@ -166,11 +166,11 @@ class ChannelMapper : public LogTagDelegate {
         traceScope();
         traceln("copying channel " << chSrc << " to " << chDst);
         if (chSrc < 0 || chSrc >= src->getNumChannels()) {
-            logln("channel mapper can't copy ch " << chSrc << " to " << chDst << ": src channel out of range");
+            traceln("channel mapper can't copy ch " << chSrc << " to " << chDst << ": src channel out of range");
             return;
         }
         if (chDst < 0 || chDst >= dst->getNumChannels()) {
-            logln("channel mapper can't copy ch " << chSrc << " to " << chDst << ": dst channel out of range");
+            traceln("channel mapper can't copy ch " << chSrc << " to " << chDst << ": dst channel out of range");
             return;
         }
         if (src->getNumSamples() != dst->getNumSamples()) {

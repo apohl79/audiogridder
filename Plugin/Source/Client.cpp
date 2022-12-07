@@ -225,7 +225,7 @@ void Client::handleMessage(std::shared_ptr<Message<Key>> msg) {
 }
 
 void Client::handleMessage(std::shared_ptr<Message<Clipboard>> msg) {
-    SystemClipboard::copyTextToClipboard(pPLD(msg).getString());
+    runOnMsgThreadAsync([str = pPLD(msg).getString()] { SystemClipboard::copyTextToClipboard(str); });
 }
 
 void Client::handleMessage(std::shared_ptr<Message<ParameterValue>> msg) {
@@ -850,7 +850,7 @@ void Client::setParameterValue(int idx, int channel, int paramIdx, float val) {
 
 Array<Client::ParameterResult> Client::getAllParameterValues(int idx, int cnt) {
     traceScope();
-    if (!isReadyLockFree()) {
+    if (cnt <= 0 || !isReadyLockFree()) {
         return {};
     };
     Message<GetAllParameterValues> msg(this);

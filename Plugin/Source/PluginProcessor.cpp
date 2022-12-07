@@ -294,6 +294,14 @@ void PluginProcessor::loadConfig(const json& j, bool isUpdate) {
     m_client->FIXED_OUTBOUND_BUFFER = jsonGetValue(j, "FixedOutboundBuffer", m_client->FIXED_OUTBOUND_BUFFER.load());
     m_processingTraceTresholdMs = jsonGetValue(j, "ProcessingTraceTresholdMs", m_processingTraceTresholdMs);
     m_client->LIVE_MODE = jsonGetValue(j, "LiveMode", m_client->LIVE_MODE.load());
+
+    int newBlockSize = jsonGetValue(j, "CustomBlockSize", m_customBlockSize);
+    if (newBlockSize != m_customBlockSize) {
+        m_customBlockSize = newBlockSize;
+        if (isUpdate) {
+            m_client->reconnect();
+        }
+    }
 }
 
 void PluginProcessor::saveConfig(int numOfBuffers) {
@@ -341,11 +349,22 @@ void PluginProcessor::saveConfig(int numOfBuffers) {
     jcfg["KeepEditorOpen"] = m_keepEditorOpen;
     jcfg["BypassWhenNotConnected"] = m_bypassWhenNotConnected.load();
     jcfg["BufferSettingByPlugin"] = m_bufferSizeByPlugin;
-    jcfg["FixedOutboundBuffer"] = m_client->FIXED_OUTBOUND_BUFFER.load();
+    if (!m_bufferSizeByPlugin) {
+        jcfg["FixedOutboundBuffer"] = m_client->FIXED_OUTBOUND_BUFFER.load();
+        jcfg["CustomBlockSize"] = m_customBlockSize;
+    }
     jcfg["ProcessingTraceTresholdMs"] = m_processingTraceTresholdMs;
     jcfg["LiveMode"] = m_client->LIVE_MODE.load();
 
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), jcfg);
+}
+
+void PluginProcessor::setFixedOutboundBuffer(bool b) {
+    m_client->FIXED_OUTBOUND_BUFFER = b;
+    if (!m_bufferSizeByPlugin) {
+        saveConfig();
+    }
+    m_client->reconnect();
 }
 
 void PluginProcessor::setNumBuffers(int n) {
@@ -438,9 +457,18 @@ const String PluginProcessor::getProgramName(int /* index */) { return {}; }
 
 void PluginProcessor::changeProgramName(int /* index */, const String& /* newName */) {}
 
-void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
+void PluginProcessor::prepareToPlay(double sampleRate, int blockSize) {
     traceScope();
-    logln("prepareToPlay: sampleRate = " << sampleRate << ", samplesPerBlock = " << samplesPerBlock);
+
+    int clientBlockSize = blockSize;
+
+    if (m_customBlockSize > blockSize) {
+        clientBlockSize = (int)std::ceil((float)m_customBlockSize / blockSize) * blockSize;
+    }
+
+    logln("prepareToPlay: sampleRate = " << sampleRate << ", blockSize = " << clientBlockSize
+                                         << (clientBlockSize != blockSize ? ", dawBlockSize = " + String(blockSize)
+                                                                          : ""));
     logln("I/O layout: " << describeLayout(getBusesLayout()));
 
     if (!m_client->isThreadRunning()) {
@@ -483,7 +511,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
     m_activeChannels.setNumChannels(channelsIn + channelsSC, channelsOut);
     updateChannelMapping();
 
-    m_client->init(channelsIn, channelsOut, channelsSC, sampleRate, samplesPerBlock, isUsingDoublePrecision());
+    m_client->init(channelsIn, channelsOut, channelsSC, sampleRate, clientBlockSize, isUsingDoublePrecision());
 
     m_prepared = true;
 
@@ -547,6 +575,22 @@ void PluginProcessor::numChannelsChanged() {
     // activate all input/output channels per default
     m_activeChannels.setRangeActive();
 #endif
+}
+
+int PluginProcessor::getCustomBlockSize() const {
+    int blockSize = getBlockSize();
+    if (m_customBlockSize > blockSize) {
+        blockSize = (int)std::ceil((float)m_customBlockSize / blockSize) * blockSize;
+    }
+    return blockSize;
+}
+
+void PluginProcessor::setCustomBlockSize(int b) {
+    m_customBlockSize = b;
+    if (!m_bufferSizeByPlugin) {
+        saveConfig();
+    }
+    prepareToPlay(getSampleRate(), getCustomBlockSize());
 }
 
 template <typename T>
@@ -677,39 +721,44 @@ void PluginProcessor::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
 
     if (transfer) {
         if ((buffer.getNumChannels() > 0 && buffer.getNumSamples() > 0) || midiMessages.getNumEvents() > 0) {
-            auto streamer = m_client->getStreamer<T>();
+            if (m_client->isReadyLockFree()) {
+                auto streamer = m_client->getStreamer<T>();
 
-            traceCtx->add("pb_get_streamer");
+                traceCtx->add("pb_get_streamer");
 
-            if (nullptr != streamer && m_loadedPluginsOk) {
-                readTimeoutMs = streamer->getReadTimeoutMs();
+                if (nullptr != streamer && m_loadedPluginsOk) {
+                    readTimeoutMs = streamer->getReadTimeoutMs();
 
-                m_channelMapper.map(&buffer, sendBuffer);
+                    m_channelMapper.map(&buffer, sendBuffer);
 
-                traceCtx->add("pb_ch_map");
-                traceCtx->startGroup();
+                    traceCtx->add("pb_ch_map");
+                    traceCtx->startGroup();
 
-                bool sendOk = streamer->send(*sendBuffer, midiMessages, posInfo);
+                    bool sendOk = streamer->send(*sendBuffer, midiMessages, posInfo);
 
-                traceCtx->finishGroup("pb_send");
-                traceCtx->startGroup();
+                    traceCtx->finishGroup("pb_send");
+                    traceCtx->startGroup();
 
-                if (sendOk) {
-                    streamer->read(*sendBuffer, midiMessages);
-                }
+                    if (sendOk) {
+                        streamer->read(*sendBuffer, midiMessages);
+                    }
 
-                traceCtx->finishGroup("pb_read");
+                    traceCtx->finishGroup("pb_read");
 
-                m_channelMapper.mapReverse(sendBuffer, &buffer);
+                    m_channelMapper.mapReverse(sendBuffer, &buffer);
 
-                traceCtx->add("pb_ch_map_reverse");
+                    traceCtx->add("pb_ch_map_reverse");
 
-                if (m_client->getLatencySamples() != getLatencySamples()) {
-                    runOnMsgThreadAsync([this] { updateLatency(); });
-                    traceCtx->add("pb_update_latency");
+                    if (m_client->getLatencySamples() != getLatencySamples()) {
+                        runOnMsgThreadAsync([this] { updateLatency(); });
+                        traceCtx->add("pb_update_latency");
+                    }
+                } else {
+                    traceln("no streamer");
+                    buffer.clear();
                 }
             } else {
-                traceln("no streamer");
+                traceln("client not ready");
                 buffer.clear();
             }
         }
@@ -850,6 +899,10 @@ json PluginProcessor::getState(bool withActiveServer) {
     j["NumberOfBuffers"] = getNumBuffers();
     j["LatencySamplesManual"] = m_client->getLatencySamplesManual();
 
+    if (m_customBlockSize > 0) {
+        j["CustomBlockSize"] = m_customBlockSize;
+    }
+
     auto jplugs = json::array();
     {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
@@ -902,6 +955,8 @@ bool PluginProcessor::setState(const json& j) {
         m_client->setLatencySamplesManual(jsonGetValue(j, "LatencySamplesManual", m_client->getLatencySamplesManual()));
         updateLatency();
     }
+
+    m_customBlockSize = jsonGetValue(j, "CustomBlockSize", m_customBlockSize);
 
     {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
@@ -976,7 +1031,7 @@ void PluginProcessor::autoRetry() {
                         if (plug.error.startsWith("failed to initialize sandbox") ||
                             plug.error.startsWith("failed loading plugin") ||
                             plug.error.startsWith("failed to finish load: timeout before") ||
-                            plug.error.startsWith("seems like the plugin did not load or crash") ||
+                            plug.error.startsWith("seems like the plugin") ||
                             plug.error == "failed to get result: E_TIMEOUT") {
                             reconnect = true;
                         } else {
@@ -1350,7 +1405,7 @@ void PluginProcessor::getAllParameterValues(int idx) {
     std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
     if (idx > -1 && idx < (int)m_loadedPlugins.size()) {
         auto& params = m_loadedPlugins[(size_t)idx].params;
-        int count = (int)(params.size() * params[0].size());
+        int count = params.size() > 0 ? (int)(params.size() * params[0].size()) : 0;
         for (auto& res : m_client->getAllParameterValues(idx, count)) {
             if (res.channel > -1 && res.channel < (int)params.size() && res.idx > -1 &&
                 res.idx < (int)params[(size_t)res.channel].size()) {
@@ -1491,10 +1546,17 @@ void PluginProcessor::parameterValueChanged(int parameterIndex, float newValue) 
     // update generic editor
     if (auto* e = dynamic_cast<PluginEditor*>(getActiveEditor())) {
         auto* pparam = dynamic_cast<Parameter*>(getParameters()[parameterIndex]);
-        if (nullptr != pparam && m_activePlugin == pparam->m_idx &&
-            getLoadedPlugin(m_activePlugin).activeChannel == pparam->m_channel) {
-            auto& param = pparam->getParam();
-            param.currentValue = newValue;
+        bool updated = false;
+        {
+            std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
+            auto& plugin = getLoadedPluginNoLock(m_activePlugin);
+            if (nullptr != pparam && m_activePlugin == pparam->m_idx && plugin.activeChannel == pparam->m_channel) {
+                auto& param = pparam->getParam();
+                param.currentValue = newValue;
+                updated = true;
+            }
+        }
+        if (updated) {
             e->updateParamValue(pparam->m_paramIdx);
         }
     }
@@ -1653,7 +1715,10 @@ void PluginProcessor::Parameter::setValue(float newValue) {
 String PluginProcessor::Parameter::getName(int maximumStringLength) const {
     traceScope();
     String name;
-    name << m_slotId << ":" << getPlugin().name << ":" << getParam().name;
+    {
+        std::lock_guard<std::mutex> lock(m_proc.m_loadedPluginsSyncMtx);
+        name << m_slotId << ":" << getPlugin().name << ":" << getParam().name;
+    }
     if (name.length() <= maximumStringLength) {
         return name;
     } else {
