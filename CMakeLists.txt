@@ -102,6 +102,10 @@ link_directories(${WEBP_LIBRARY_DIRS})
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/Common/Source AG_SOURCES_COMMON)
 list(REMOVE_ITEM AG_SOURCES_COMMON "${CMAKE_CURRENT_SOURCE_DIR}/Common/Source/TraceReader.cpp")
 
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  list(REMOVE_ITEM AG_SOURCES_COMMON "${CMAKE_CURRENT_SOURCE_DIR}/Common/Source/WindowHelper.mm")
+endif()
+
 if($ENV{AG_ENABLE_SENTRY})
   set(AG_ENABLE_SENTRY on)
   set(AG_SENTRY_DSN $ENV{AG_SENTRY_DSN})
