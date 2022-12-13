@@ -14,6 +14,10 @@ option(AG_ENABLE_ASAN "Enable AddressSanizizer." off)
 option(AG_VST2_PLUGIN_ENABLED "Enable the VST2 plugins." off)
 option(AG_AAX_PLUGIN_ENABLED "Enable the AAX plugins." off)
 
+# Uncomment and set to proper path for building with VSCode
+#set(AG_DEPS_ROOT /home/durgesh/audiogridder/audiogridder-deps/linux-x86_64)
+#set(AG_SDKS_ROOT ${AG_DEPS_ROOT})
+
 file(STRINGS ${CMAKE_SOURCE_DIR}/package/VERSION.num AG_VERSION)
 
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -160,9 +164,6 @@ else()
   set(AG_SENTRY_ENABLED 0)
 endif()
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  set(AG_WITH_SERVER on)
-endif()
 
 macro(ag_strip target_name target_dir)
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
