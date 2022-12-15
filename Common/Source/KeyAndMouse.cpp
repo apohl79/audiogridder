@@ -19,7 +19,6 @@
 #include "KeyAndMouse.hpp"
 #include "Utils.hpp"
 
-
 namespace e47 {
 
 setLogTagStatic("keyandmouse");
@@ -538,4 +537,3 @@ void keyEventUp(uint16_t keyCode, uint64_t flags, bool currentProcessOnly, void*
 }
 
 }  // namespace e47
-

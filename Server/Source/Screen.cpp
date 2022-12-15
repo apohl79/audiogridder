@@ -63,9 +63,9 @@ std::shared_ptr<juce::Image> captureScreenNative(juce::Rectangle<int> rect) {
 namespace e47 {
 
 std::shared_ptr<juce::Image> captureScreenNative(juce::Rectangle<int> rect) {
-	auto ret = std::make_shared<juce::Image>(juce::Image::ARGB, 10, 10, false);
-	return ret;
+    auto ret = std::make_shared<juce::Image>(juce::Image::ARGB, 10, 10, false);
+    return ret;
 }
 
-}//end namespace
+}  // namespace e47
 #endif
