@@ -416,6 +416,92 @@ inline WORD getVK(uint16_t keyCode) {
     }
     return vk;
 }
+
+#elif defined(JUCE_LINUX)
+
+#include <X11/extensions/XTest.h>
+//#include <X11/XKBlib.h>
+
+#define FLAG_VK_SHIFT 0x1
+#define FLAG_VK_CONTROL 0x2
+#define FLAG_VK_MENU 0x4
+
+void mouseDoubleClickEventInternal(XPoint /* location */) {
+    traceScope();
+    Display* display = XOpenDisplay(NULL);
+    if (!display) {
+        logln("Failed to open Display \n");
+        return;
+    }
+    /* Fake the mouse button Press and Release events */
+    XTestFakeButtonEvent(display, Button1, True, CurrentTime);
+    XTestFakeButtonEvent(display, Button1, False, CurrentTime);
+    XTestFakeButtonEvent(display, Button1, True, CurrentTime);
+    XTestFakeButtonEvent(display, Button1, False, CurrentTime);
+    XCloseDisplay(display);
+}
+/*
+| Physical Button | Button Event | normal action |
+|-----------------|--------------|---------------|
+|Left             |            1 |        select |
+|Middle           |            2 | paste/depends |
+|Right            |            3 |  context menu |
+|Scroll Up        |            4 |  context menu |
+|Scroll Down      |            5 |  context menu |
+|Custom           |           6+ |       depends |
+*/
+
+void mouseEventInternal(MouseEvType t, XPoint pos, uint64_t /* flags */) {
+    traceScope();
+    Display* display = XOpenDisplay(NULL);
+    if (!display) {
+        logln("Failed to open Display \n");
+        return;
+    }
+    switch (t) {
+        case MouseEvType::LEFT_DRAG:
+        case MouseEvType::RIGHT_DRAG:
+        case MouseEvType::OTHER_DRAG:
+        case MouseEvType::MOVE:
+            XTestFakeMotionEvent(display, -1, pos.x, pos.y, CurrentTime);
+            break;
+        case MouseEvType::LEFT_UP:
+            XTestFakeButtonEvent(display, Button1, False, CurrentTime);
+            break;
+        case MouseEvType::LEFT_DOWN:
+            XTestFakeButtonEvent(display, Button1, True, CurrentTime);
+            break;
+        case MouseEvType::RIGHT_UP:
+            XTestFakeButtonEvent(display, Button3, False, CurrentTime);
+            break;
+        case MouseEvType::RIGHT_DOWN:
+            XTestFakeButtonEvent(display, Button3, True, CurrentTime);
+            break;
+        case MouseEvType::OTHER_UP:
+            XTestFakeButtonEvent(display, Button2, False, CurrentTime);
+            break;
+        case MouseEvType::OTHER_DOWN:
+            XTestFakeButtonEvent(display, Button2, True, CurrentTime);
+            break;
+        default:
+            break;
+    }
+
+    XCloseDisplay(display);
+}
+void mouseScrollEventInternal(XPoint /* pos */, float /* deltaX */, float /* deltaY */) {}
+void keyEventInternal(uint16_t keyCode, uint64_t /*flags*/, bool keyDown, void* /*nativeHandle*/) {
+    Display* display = XOpenDisplay(NULL);
+    if (!display) {
+        logln("Failed to open Display \n");
+        return;
+    }
+    uint16_t modcode = XKeysymToKeycode(display, XStringToKeysym(getKeyName(keyCode).c_str()));
+    XTestFakeKeyEvent(display, modcode, keyDown, CurrentTime);
+    XCloseDisplay(display);
+}
+inline XPoint getScaledPoint(float x, float y) { return {(short)roundf(x), (short)roundf(y)}; }
+
 #endif
 
 void mouseEvent(MouseEvType t, float x, float y, uint64_t flags) {
@@ -435,6 +521,13 @@ void mouseEvent(MouseEvType t, float x, float y, uint64_t flags) {
     } else {
         auto mouseFlags = getMouseFlags(t);
         mouseEventInternal(pos, mouseFlags, flags);
+    }
+#elif defined(JUCE_LINUX)
+    XPoint loc = {(short int)x, (short int)y};
+    if (t == MouseEvType::DBL_CLICK) {
+        mouseDoubleClickEventInternal(loc);
+    } else {
+        mouseEventInternal(t, loc, flags);
     }
 #endif
 }
@@ -456,6 +549,10 @@ void mouseScrollEvent(float x, float y, float deltaX, float deltaY, bool isSmoot
 
     auto pos = getScaledPoint(x, y);
     mouseScrollEventInternal(pos, lround(deltaX * 512), lround(deltaY * 512));
+#elif defined(JUCE_LINUX)
+    XPoint loc = {(short int)x, (short int)y};
+    ignoreUnused(isSmooth);
+    mouseScrollEventInternal(loc, deltaX, deltaY);
 #endif
 }
 
@@ -465,6 +562,8 @@ void keyEvent(uint16_t keyCode, uint64_t flags, bool keyDown, bool currentProces
     keyEventInternal(keyCode, flags, keyDown, currentProcessOnly);
 #elif defined(JUCE_WINDOWS)
     keyEventInternal(getVK(keyCode), flags, keyDown, currentProcessOnly ? nativeHandle : nullptr);
+#elif defined(JUCE_LINUX)
+    keyEventInternal(keyCode, flags, keyDown, currentProcessOnly ? nativeHandle : nullptr);
 #endif
 }
 
@@ -472,6 +571,8 @@ void setShiftKey(uint64_t& flags) {
 #if defined(JUCE_MAC)
     flags |= kCGEventFlagMaskShift;
 #elif defined(JUCE_WINDOWS)
+    flags |= FLAG_VK_SHIFT;
+#elif defined(JUCE_LINUX)
     flags |= FLAG_VK_SHIFT;
 #endif
 }
@@ -481,6 +582,8 @@ void setControlKey(uint64_t& flags) {
     flags |= kCGEventFlagMaskControl;
 #elif defined(JUCE_WINDOWS)
     flags |= FLAG_VK_CONTROL;
+#elif defined(JUCE_LINUX)
+    flags |= FLAG_VK_CONTROL;
 #endif
 }
 
@@ -488,6 +591,8 @@ void setAltKey(uint64_t& flags) {
 #if defined(JUCE_MAC)
     flags |= kCGEventFlagMaskAlternate;
 #elif defined(JUCE_WINDOWS)
+    flags |= FLAG_VK_MENU;
+#elif defined(JUCE_LINUX)
     flags |= FLAG_VK_MENU;
 #endif
 }
@@ -498,6 +603,8 @@ void setCopyKeys(uint16_t& key, uint64_t& flags) {
     flags |= kCGEventFlagMaskCommand;
 #elif defined(JUCE_WINDOWS)
     flags |= FLAG_VK_CONTROL;
+#elif defined(JUCE_LINUX)
+    flags |= FLAG_VK_CONTROL;
 #endif
 }
 
@@ -506,6 +613,8 @@ void setPasteKeys(uint16_t& key, uint64_t& flags) {
 #if defined(JUCE_MAC)
     flags |= kCGEventFlagMaskCommand;
 #elif defined(JUCE_WINDOWS)
+    flags |= FLAG_VK_CONTROL;
+#elif defined(JUCE_LINUX)
     flags |= FLAG_VK_CONTROL;
 #endif
 }
@@ -516,6 +625,8 @@ void setCutKeys(uint16_t& key, uint64_t& flags) {
     flags |= kCGEventFlagMaskCommand;
 #elif defined(JUCE_WINDOWS)
     flags |= FLAG_VK_CONTROL;
+#elif defined(JUCE_LINUX)
+    flags |= FLAG_VK_CONTROL;
 #endif
 }
 
@@ -524,6 +635,8 @@ void setSelectAllKeys(uint16_t& key, uint64_t& flags) {
 #if defined(JUCE_MAC)
     flags |= kCGEventFlagMaskCommand;
 #elif defined(JUCE_WINDOWS)
+    flags |= FLAG_VK_CONTROL;
+#elif defined(JUCE_LINUX)
     flags |= FLAG_VK_CONTROL;
 #endif
 }

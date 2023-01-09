@@ -27,6 +27,10 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   list(REMOVE_ITEM AG_SOURCES_SERVER "${CMAKE_CURRENT_SOURCE_DIR}/Source/Screen.mm")
 endif()
 
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  list(REMOVE_ITEM  AG_SOURCES_SERVER "${CMAKE_CURRENT_SOURCE_DIR}/Source/ScreenHelper_linux.cpp")
+endif()
+
 target_sources(AudioGridderServer PRIVATE ${AG_SOURCES_SERVER} ${AG_SOURCES_COMMON})
 
 set(AG_PLUGINHOST_VST 0)
@@ -69,6 +73,11 @@ target_link_libraries(AudioGridderServer PRIVATE
   ${FFMPEG_LIBRARIES}
   ${WEBP_LIBRARIES}
   ${SENTRY_LIBRARIES})
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  target_link_libraries(AudioGridderServer PRIVATE  X11 Xtst)
+  target_compile_definitions(AudioGridderServer PRIVATE JUCE_LINUX=1)
+endif()
 
 ag_strip(AudioGridderServer Server)
 
