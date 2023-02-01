@@ -26,13 +26,28 @@ bool ScreenRecorder::m_downScale = false;
 int WEBP_QUALITY[3] = {4000, 8000, 16000};
 int MJPEG_QUALITY[3] = {9000000, 14000000, 20000000};
 
+void avLog(void* avcl, int level, const char* fmt, va_list vl) {
+    if (level > AV_LOG_ERROR) {
+        return;
+    }
+
+    static int printPrefix = 1;
+    static constexpr size_t lineSize = 1024;
+
+    char line[lineSize];
+    av_log_format_line2(avcl, level, fmt, vl, line, lineSize, &printPrefix);
+
+    setLogTagStatic("screenrec");
+    logln(line);
+}
+
 void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode, EncoderQuality quality) {
     setLogTagStatic("screenrec");
     traceScope();
 
     SharedInstance<ScreenRecorder>::initialize();
 
-    av_log_set_level(AV_LOG_QUIET);
+    av_log_set_callback(avLog);
 
     m_encMode = encMode;
     const char* encName = "unset";
@@ -52,6 +67,10 @@ void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode, EncoderQual
         return;
     }
 
+#ifdef JUCE_MAC
+    m_downScale = quality != ENC_QUALITY_HIGH;
+#endif
+
     if (m_initialized) {
         return;
     }
@@ -68,7 +87,6 @@ void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode, EncoderQual
     askForScreenRecordingPermission();
     m_inputFmtName = "avfoundation";
     m_inputStreamUrl = String(getCaptureDeviceIndex()) + ":none";
-    m_downScale = quality != ENC_QUALITY_HIGH;
 #else
     m_inputFmtName = "gdigrab";
     m_inputStreamUrl = "desktop";
@@ -89,6 +107,9 @@ ScreenRecorder::ScreenRecorder() : LogTag("screenrec") { traceScope(); }
 
 ScreenRecorder::~ScreenRecorder() {
     traceScope();
+    if (nullptr != m_thread) {
+        stop();
+    }
     cleanupInput();
     cleanupOutput();
 }
@@ -256,9 +277,16 @@ bool ScreenRecorder::prepareInput() {
     av_dict_set(&opts, "video_size", vidSize.getCharPointer(), 0);
     av_dict_set(&opts, "offset_x", String(m_captureRect.getX()).getCharPointer(), 0);
     av_dict_set(&opts, "offset_y", String(m_captureRect.getY()).getCharPointer(), 0);
+
+    logln("setting input options:");
+    logln("  video_size=" << vidSize);
+    logln("  offset_x=" << m_captureRect.getX());
+    logln("  offset_y=" << m_captureRect.getY());
 #endif
 
     int ret;
+
+    logln("opening input format " << m_inputFmtName << ": " << m_inputStreamUrl);
 
     m_captureFmtCtx = avformat_alloc_context();
     ret = avformat_open_input(&m_captureFmtCtx, m_inputStreamUrl.getCharPointer(), m_inputFmt, &opts);
@@ -273,6 +301,9 @@ bool ScreenRecorder::prepareInput() {
         return false;
     }
 
+    logln("looking for video stream (input has " << String(m_captureFmtCtx->nb_streams) << " streams)");
+
+    m_captureStreamIndex = -1;
     for (uint16 i = 0; i < m_captureFmtCtx->nb_streams; i++) {
         m_captureStream = m_captureFmtCtx->streams[i];
         if (m_captureStream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
@@ -285,11 +316,24 @@ bool ScreenRecorder::prepareInput() {
         return false;
     }
 
+    logln("found video stream at index " << m_captureStreamIndex);
+    logln("  codec.codec_id=" << m_captureStream->codecpar->codec_id);
+    logln("  codec.codec_tag=" << String(m_captureStream->codecpar->codec_tag));
+    logln("  codec.format=" << String(m_captureStream->codecpar->format));
+    logln("  codec.bit_rate=" << String(m_captureStream->codecpar->bit_rate));
+    logln("  codec.color_range=" << m_captureStream->codecpar->color_range);
+    logln("  codec.color_space=" << m_captureStream->codecpar->color_space);
+    logln("  codec.width=" << String(m_captureStream->codecpar->width));
+    logln("  codec.height=" << String(m_captureStream->codecpar->height));
+
     m_captureCodec = avcodec_find_decoder(m_captureStream->codecpar->codec_id);
     if (nullptr == m_captureCodec) {
         logError("prepareInput: unable to find capture codec");
         return false;
     }
+
+    logln("found decoder " << m_captureCodec->name << " (" << m_captureCodec->long_name << ")");
+
     m_captureCodecCtx = avcodec_alloc_context3(m_captureCodec);
     if (nullptr == m_captureCodecCtx) {
         logError("prepareInput: unable to allocate codec context");
@@ -307,8 +351,19 @@ bool ScreenRecorder::prepareInput() {
     }
 
     if (m_captureCodecCtx->pix_fmt < 0 || m_captureCodecCtx->pix_fmt >= AV_PIX_FMT_NB) {
+#ifdef JUCE_WINDOWS
+        if (strncmp(m_captureCodec->name, "bmp", 3) == 0) {
+            logln("prepareInput: warning: invalid input pixel format: pix_fmt = " + String(m_captureCodecCtx->pix_fmt));
+            logln("prepareInput: setting pixel format to AV_PIX_FMT_BGRA");
+            m_captureCodecCtx->pix_fmt = AV_PIX_FMT_BGRA;
+        } else {
+            logError("prepareInput: invalid input pixel format: pix_fmt = " + String(m_captureCodecCtx->pix_fmt));
+            return false;
+        }
+#else
         logError("prepareInput: invalid input pixel format: pix_fmt = " + String(m_captureCodecCtx->pix_fmt));
         return false;
+#endif
     }
 
     logln("prepareInput: input pixel format is " << m_captureCodecCtx->pix_fmt);
@@ -363,7 +418,7 @@ bool ScreenRecorder::prepareOutput() {
     m_outputCodecCtx->width = m_scaledWith;
     m_outputCodecCtx->height = m_scaledHeight;
 
-    avcodec_align_dimensions(m_outputCodecCtx, &m_outputCodecCtx->width, &m_outputCodecCtx->height);
+    // avcodec_align_dimensions(m_outputCodecCtx, &m_outputCodecCtx->width, &m_outputCodecCtx->height);
 
     logln("prepareOutput: setting output codec context dimensions to "
           << m_outputCodecCtx->width << "x" << m_outputCodecCtx->height << " (unalligned " << m_scaledWith << "x"
@@ -399,8 +454,11 @@ bool ScreenRecorder::prepareOutput() {
     m_outputFrame->height = m_outputCodecCtx->height;
     m_outputFrame->format = m_outputCodecCtx->pix_fmt;
 
+    int widthAlligned = m_outputCodecCtx->width, heightAlligned = m_outputCodecCtx->height;
+    avcodec_align_dimensions(m_outputCodecCtx, &widthAlligned, &heightAlligned);
+
     auto outputFrameBufSize =
-        (size_t)av_image_get_buffer_size(m_outputCodecCtx->pix_fmt, m_outputFrame->width, m_outputFrame->height, 32) +
+        (size_t)av_image_get_buffer_size(m_outputCodecCtx->pix_fmt, widthAlligned, heightAlligned, 32) +
         AV_INPUT_BUFFER_PADDING_SIZE;
 
     logln("prepareOutput: allocating output frame buffer with " << outputFrameBufSize << " bytes");
@@ -420,8 +478,8 @@ bool ScreenRecorder::prepareOutput() {
     }
 
     m_swsCtx = sws_getContext(m_captureRect.getWidth(), m_captureRect.getHeight(), m_captureCodecCtx->pix_fmt,
-                              m_outputFrame->width, m_outputFrame->height, m_outputCodecCtx->pix_fmt, SWS_BICUBIC,
-                              nullptr, nullptr, nullptr);
+                              m_outputFrame->width, m_outputFrame->height, m_outputCodecCtx->pix_fmt,
+                              m_scale < 1.0 ? SWS_BICUBIC : SWS_FAST_BILINEAR, nullptr, nullptr, nullptr);
     if (nullptr == m_swsCtx) {
         logError("prepareOutput: sws_getContext failed");
         return false;
@@ -477,12 +535,21 @@ void ScreenRecorder::record() {
                         if (m_captureFrame->width != m_cropFrame->width ||
                             m_captureFrame->height != m_cropFrame->height) {
                             // crop the frame to the window dimension
+                            bool cropErr = false;
                             for (int y = m_captureRect.getY(); y < m_captureRect.getBottom(); y++) {
                                 auto* src = m_captureFrame->data[0] + m_captureFrame->linesize[0] * y +
                                             m_captureRect.getX() * m_pxSize;
                                 auto* dst =
                                     m_cropFrame->data[0] + m_cropFrame->linesize[0] * (y - m_captureRect.getY());
-                                memcpy(dst, src, (size_t)m_cropFrame->linesize[0]);
+                                if (nullptr != src && nullptr != dst) {
+                                    memcpy(dst, src, (size_t)m_cropFrame->linesize[0]);
+                                } else {
+                                    cropErr = true;
+                                    break;
+                                }
+                            }
+                            if (cropErr) {
+                                continue;
                             }
                             frame = m_cropFrame;
                         }

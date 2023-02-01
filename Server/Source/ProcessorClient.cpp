@@ -17,9 +17,15 @@ std::unordered_set<int> ProcessorClient::m_workerPorts;
 std::mutex ProcessorClient::m_workerPortsMtx;
 
 ProcessorClient::~ProcessorClient() {
-    m_sockCmdOut.reset();
-    m_sockCmdIn.reset();
-    m_sockAudio.reset();
+    {
+        std::lock_guard<std::mutex> lock(m_cmdMtx);
+        m_sockCmdOut.reset();
+        m_sockCmdIn.reset();
+    }
+    {
+        std::lock_guard<std::mutex> lock(m_audioMtx);
+        m_sockAudio.reset();
+    }
     removeWorkerPort(m_port);
 }
 
@@ -128,7 +134,11 @@ bool ProcessorClient::startSandbox() {
 
 #ifndef AG_UNIT_TESTS
         args.add(File::getSpecialLocation(File::currentExecutableFile).getFullPathName());
-        args.addArray({"-id", String(getApp()->getServer()->getId())});
+        if (auto srv = getApp()->getServer()) {
+            args.addArray({"-id", String(srv->getId())});
+        } else {
+            throw std::runtime_error("no server object");
+        }
 #else
         auto exe = File::getSpecialLocation(File::currentExecutableFile).getParentDirectory();
 #if JUCE_WINDOWS
@@ -614,10 +624,6 @@ int ProcessorClient::getLatencySamples() { return m_latency; }
 template <typename T>
 void ProcessorClient::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages) {
     traceScope();
-
-    if (!isOk()) {
-        return;
-    }
 
     AudioPlayHead::PositionInfo posInfo;
     if (nullptr != m_playhead) {

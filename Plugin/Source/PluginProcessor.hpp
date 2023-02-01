@@ -51,7 +51,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     PluginProcessor(WrapperType wt);
     ~PluginProcessor() override;
 
-    void prepareToPlay(double sampleRate, int samplesPerBlock) override;
+    void prepareToPlay(double sampleRate, int blockSize) override;
     void releaseResources() override;
 
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
@@ -60,6 +60,9 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     bool canAddBus(bool /*isInput*/) const override { return true; }
     bool canRemoveBus(bool /*isInput*/) const override { return true; }
     void numChannelsChanged() override;
+
+    int getCustomBlockSize() const;
+    void setCustomBlockSize(int b);
 
     void processBlock(AudioBuffer<float>& buf, MidiBuffer& midi) override { processBlockInternal(buf, midi); }
     void processBlock(AudioBuffer<double>& buf, MidiBuffer& midi) override { processBlockInternal(buf, midi); }
@@ -95,7 +98,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     void getStateInformation(MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
-    json getState(bool withServers);
+    json getState(bool withActiveServer);
     bool setState(const json& j);
 
     const String& getMode() const { return m_mode; }
@@ -132,7 +135,8 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
             ID,
             LAYOUT,
             MONO_CHANNELS,
-            ACTIVE_CHANNEL
+            ACTIVE_CHANNEL,
+            PARAMSLIST
         };
         enum Indexes_v1 : uint8 { BYPASSED_V1 = 3 };
 
@@ -156,6 +160,13 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
             for (auto& p : presets) {
                 jpresets.push_back(p.toStdString());
             }
+            // for backwards compatibility
+            auto jparamsLegacy = json::array();
+            if (params.size() > 0) {
+                for (auto& p : params[0]) {
+                    jparamsLegacy.push_back(p.toJson());
+                }
+            }
             auto jparams = json::array();
             for (size_t ch = 0; ch < params.size(); ch++) {
                 jparams.push_back(json::array());
@@ -167,12 +178,13 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
                     name.toStdString(),
                     settings.toStdString(),
                     jpresets,
-                    jparams,
+                    jparamsLegacy,
                     bypassed,
                     id.toStdString(),
                     layout.toStdString(),
                     monoChannels.toInt(),
-                    activeChannel};
+                    activeChannel,
+                    jparams};
         }
 
         LoadedPlugin() {}
@@ -208,13 +220,15 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
                     monoChannels = j[MONO_CHANNELS].get<uint64>();
                 }
                 if (version >= 5) {
-                    params.resize(j[PARAMS].size());
-                    for (size_t ch = 0; ch < j[PARAMS].size(); ch++) {
-                        for (auto& p : j[PARAMS][ch]) {
+                    activeChannel = j[ACTIVE_CHANNEL].get<int>();
+                    // version 5 was broken, as the structure changed
+                    auto paramsListIdx = version == 5 ? PARAMS : PARAMSLIST;
+                    params.resize(j[paramsListIdx].size());
+                    for (size_t ch = 0; ch < j[paramsListIdx].size(); ch++) {
+                        for (auto& p : j[paramsListIdx][ch]) {
                             params[ch].push_back(Client::Parameter::fromJson(p));
                         }
                     }
-                    activeChannel = j[ACTIVE_CHANNEL].get<int>();
                 }
             } catch (const json::exception& e) {
                 setLogTagStatic("loadedplugin");
@@ -265,7 +279,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
 
     LoadedPlugin& getLoadedPlugin(int idx) {
         std::lock_guard<std::mutex> lock(m_loadedPluginsSyncMtx);
-        return idx > -1 && idx < (int)m_loadedPlugins.size() ? m_loadedPlugins[(size_t)idx] : m_unusedDummyPlugin;
+        return getLoadedPluginNoLock(idx);
     }
 
     bool loadPlugin(const ServerPlugin& plugin, const String& layout, uint64 monoChannels, String& err);
@@ -304,6 +318,8 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     void restoreSettingsB();
     void resetSettingsAB();
 
+    bool getMenuShowType() const { return m_menuShowType; }
+    void setMenuShowType(bool b) { m_menuShowType = b; }
     bool getMenuShowCategory() const { return m_menuShowCategory; }
     void setMenuShowCategory(bool b) { m_menuShowCategory = b; }
     bool getMenuShowCompany() const { return m_menuShowCompany; }
@@ -334,7 +350,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     void setCPULoad(float load);
 
     int getLatencyMillis() const {
-        return (int)lround(m_client->NUM_OF_BUFFERS * getBlockSize() * 1000 / getSampleRate());
+        return (int)lround(m_client->NUM_OF_BUFFERS * getCustomBlockSize() * 1000 / getSampleRate());
     }
 
     void showMonitor() {
@@ -376,7 +392,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     bool getBufferSizeByPlugin() const { return m_bufferSizeByPlugin; }
     void setBufferSizeByPlugin(bool b) { m_bufferSizeByPlugin = b; }
     bool getFixedOutboundBuffer() const { return m_client->FIXED_OUTBOUND_BUFFER; }
-    void setFixedOutboundBuffer(bool b) { m_client->FIXED_OUTBOUND_BUFFER = b; }
+    void setFixedOutboundBuffer(bool b);
 
     int getNumBuffers() const { return m_client->NUM_OF_BUFFERS; }
     void setNumBuffers(int n);
@@ -417,8 +433,8 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
         int m_paramIdx = 0;
         int m_slotId = 0;
 
-        const LoadedPlugin& getPlugin() const { return m_proc.getLoadedPlugin(m_idx); }
-        LoadedPlugin& getPlugin() { return m_proc.getLoadedPlugin(m_idx); }
+        const LoadedPlugin& getPlugin() const { return m_proc.getLoadedPluginNoLock(m_idx); }
+        LoadedPlugin& getPlugin() { return m_proc.getLoadedPluginNoLock(m_idx); }
         const Client::Parameter& getParam() const { return getPlugin().params[(size_t)m_channel][(size_t)m_paramIdx]; }
         Client::Parameter& getParam() { return getPlugin().params[(size_t)m_channel][(size_t)m_paramIdx]; }
 
@@ -481,6 +497,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     int m_activeServerLegacyFromCfg;
     String m_presetsDir;
     String m_defaultPreset;
+    int m_customBlockSize = 0;
 
     int m_numberOfAutomationSlots = 16;
     LoadedPlugin m_unusedDummyPlugin;
@@ -492,6 +509,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
 
     String m_settingsA, m_settingsB;
 
+    bool m_menuShowType = true;
     bool m_menuShowCategory = true;
     bool m_menuShowCompany = true;
     bool m_genericEditor = false;
@@ -521,6 +539,10 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     bool m_activeMidiNotes[128];
     bool m_midiIsPlaying = false;
     int m_blocksWithoutMidi = 0;
+
+    double m_processingTraceTresholdMs = 0.0;
+    TimeStatistic::Duration m_processingDurationGlobal;
+    TimeStatistic::Duration m_processingDurationLocal;
 
     static BusesProperties createBusesProperties(WrapperType wt) {
         int chIn = Defaults::PLUGIN_CHANNELS_IN;
@@ -589,6 +611,10 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
 
     template <typename T>
     void processBlockBypassedInternal(AudioBuffer<T>& buf, AudioRingBuffer<T>& bypassBuffer);
+
+    LoadedPlugin& getLoadedPluginNoLock(int idx) {
+        return idx > -1 && idx < (int)m_loadedPlugins.size() ? m_loadedPlugins[(size_t)idx] : m_unusedDummyPlugin;
+    }
 
     ENABLE_ASYNC_FUNCTORS();
 

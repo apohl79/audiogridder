@@ -12,7 +12,7 @@
 			<key>PACKAGE_FILES</key>
 			<dict>
 				<key>DEFAULT_INSTALL_LOCATION</key>
-				<string>/Applications</string>
+				<string>/</string>
 				<key>HIERARCHY</key>
 				<dict>
 					<key>CHILDREN</key>

@@ -19,57 +19,66 @@ thread_local std::shared_ptr<TimeTrace::TraceContext> t_traceCtx;
 
 void TimeStatistic::update(double t) {
     m_meter.increment();
-    std::lock_guard<std::mutex> lock(m_timesMtx);
-    m_times[m_timesIdx].push_back(t);
+    if (m_aggregate) {
+        std::lock_guard<std::mutex> lock(m_timesMtx);
+        m_times[m_timesIdx].push_back(t);
+    }
+    {
+        std::lock_guard<std::mutex> lock(m_mostRecentMtx);
+        m_mostRecentTimes[m_mostRecentIdx++] = t;
+        m_mostRecentIdx %= m_mostRecentTimes.size();
+    }
 }
 
 void TimeStatistic::aggregate() {
-    auto& data = m_times[m_timesIdx];
-    {
-        // switch to the other buffer
-        std::lock_guard<std::mutex> lock(m_timesMtx);
-        m_timesIdx = (m_timesIdx + 1) % 2;
-    }
-    Histogram hist(m_numOfBins, m_binSize);
-    if (!data.empty()) {
-        std::sort(data.begin(), data.end());
-        hist.min = data.front();
-        hist.max = data.back();
-        hist.count = data.size();
-        for (auto t : data) {
-            hist.sum += t;
+    if (m_aggregate) {
+        auto& data = m_times[m_timesIdx];
+        {
+            // switch to the other buffer
+            std::lock_guard<std::mutex> lock(m_timesMtx);
+            m_timesIdx = (m_timesIdx + 1) % 2;
         }
-        hist.avg = hist.sum / hist.count;
-        auto nfIdx = (size_t)(hist.count * 0.95);
-        hist.nintyFifth = data[nfIdx];
-
-        // calc the distribution over m_numOfBins bins with a size of m_binSize seconds
-        std::size_t count = 0;
-        std::size_t i = 0;
-        auto upper = m_binSize;
-        for (auto d : data) {
-            if (d < upper + 1 || i == m_numOfBins) {
-                // value fits into the bin
-                count++;
-            } else {
-                // create pair
-                hist.updateBin(i, count);
-                // next bin
-                while (d > upper && i < m_numOfBins) {
-                    i++;
-                    upper += m_binSize;
-                }
-                count = 1;
+        Histogram hist(m_numOfBins, m_binSize);
+        if (!data.empty()) {
+            std::sort(data.begin(), data.end());
+            hist.min = data.front();
+            hist.max = data.back();
+            hist.count = data.size();
+            for (auto t : data) {
+                hist.sum += t;
             }
+            hist.avg = hist.sum / hist.count;
+            auto nfIdx = (size_t)(hist.count * 0.95);
+            hist.nintyFifth = data[nfIdx];
+
+            // calc the distribution over m_numOfBins bins with a size of m_binSize seconds
+            std::size_t count = 0;
+            std::size_t i = 0;
+            auto upper = m_binSize;
+            for (auto d : data) {
+                if (d < upper + 1 || i == m_numOfBins) {
+                    // value fits into the bin
+                    count++;
+                } else {
+                    // create pair
+                    hist.updateBin(i, count);
+                    // next bin
+                    while (d > upper && i < m_numOfBins) {
+                        i++;
+                        upper += m_binSize;
+                    }
+                    count = 1;
+                }
+            }
+            hist.updateBin(i, count);
+            data.clear();
         }
-        hist.updateBin(i, count);
-        data.clear();
-    }
-    if (hist.count) {
-        std::lock_guard<std::mutex> lock(m_1minValuesMtx);
-        m_1minValues.push_back(std::move(hist));
-        if (m_1minValues.size() > 6) {
-            m_1minValues.erase(m_1minValues.begin());
+        if (hist.count) {
+            std::lock_guard<std::mutex> lock(m_1minValuesMtx);
+            m_1minValues.push_back(std::move(hist));
+            if (m_1minValues.size() > 6) {
+                m_1minValues.erase(m_1minValues.begin());
+            }
         }
     }
 }
@@ -116,6 +125,17 @@ TimeStatistic::Histogram TimeStatistic::get1minHistogram() {
         aggregate.nintyFifth /= values.size();
     }
     return aggregate;
+}
+
+double TimeStatistic::getMostRecentAverage() {
+    double total = 0.0;
+    {
+        std::lock_guard<std::mutex> lock(m_mostRecentMtx);
+        for (auto t : m_mostRecentTimes) {
+            total += t;
+        }
+    }
+    return total / m_mostRecentTimes.size();
 }
 
 void TimeStatistic::log(const String& name) {
@@ -186,9 +206,15 @@ void Metrics::run() {
     }
 }
 
-TimeStatistic::Duration TimeStatistic::getDuration(const String& name, bool show) {
+TimeStatistic::Duration TimeStatistic::getDuration(const String& name) {
+    auto ts = Metrics::getStatistic<TimeStatistic>(name);
+    return Duration(ts);
+}
+
+TimeStatistic::Duration TimeStatistic::getDuration(const String& name, bool show, bool aggregate) {
     auto ts = Metrics::getStatistic<TimeStatistic>(name);
     ts->setShowLog(show);
+    ts->setAggregate(aggregate);
     return Duration(ts);
 }
 
@@ -200,7 +226,11 @@ Metrics::StatsMap Metrics::getStats() {
 void Metrics::cleanup() { SharedInstance::cleanup(); }
 
 std::shared_ptr<TimeTrace::TraceContext> TimeTrace::createTraceContext() {
-    t_traceCtx = std::make_shared<TimeTrace::TraceContext>();
+    if (nullptr == t_traceCtx) {
+        t_traceCtx = std::make_shared<TimeTrace::TraceContext>();
+    } else {
+        t_traceCtx->reset();
+    }
     return t_traceCtx;
 }
 

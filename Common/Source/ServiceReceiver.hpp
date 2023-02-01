@@ -21,7 +21,7 @@ class ServiceReceiver : public Thread, public LogTag {
     ServiceReceiver() : Thread("ServiceReceiver"), LogTag("mdns") { startThread(); }
     ~ServiceReceiver() override {
         logln("stopping receiver");
-        stopThread(1000);
+        stopThread(1500);
     }
 
     void run() override;
@@ -36,7 +36,8 @@ class ServiceReceiver : public Thread, public LogTag {
 
     static Array<ServerInfo> getServers();
     static String hostToName(const String& host);
-    static ServerInfo hostToServerInfo(const String& host);
+    static ServerInfo lookupServerInfo(const String& host);
+    static ServerInfo lookupServerInfo(const Uuid& uuid);
 
   private:
     static std::shared_ptr<ServiceReceiver> m_inst;

@@ -124,6 +124,7 @@ class AudioStreamerTest : public UnitTest {
         PluginProcessor proc(AudioProcessor::wrapperType_Undefined);
         proc.getClient().setServer(String("127.0.0.1:999:test:0:0:1"));
         proc.getClient().NUM_OF_BUFFERS = 2;
+        proc.getClient().FIXED_OUTBOUND_BUFFER = false;
 
         while (proc.getBusCount(true) > 1 && proc.canRemoveBus(true)) {
             proc.removeBus(true);

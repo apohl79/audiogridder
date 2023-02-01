@@ -24,8 +24,7 @@ class Processor : public LogTagDelegate, public std::enable_shared_from_this<Pro
   public:
     static std::atomic_uint32_t loadedCount;
 
-    Processor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize);
-    Processor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize, bool isClient);
+    Processor(ProcessorChain& chain, const String& id, double sampleRate, int blockSize, bool isClient = false);
     ~Processor() override;
 
     //
@@ -51,10 +50,8 @@ class Processor : public LogTagDelegate, public std::enable_shared_from_this<Pro
     static std::unique_ptr<PluginDescription> findPluginDescritpion(const String& id, const KnownPluginList& pluglist,
                                                                     String* idNormalized = nullptr);
 
-    static Array<AudioProcessor::BusesLayout> findSupportedLayouts(std::shared_ptr<AudioPluginInstance> proc,
-                                                                   bool checkOnly = true, int srvId = 0);
-    static Array<AudioProcessor::BusesLayout> findSupportedLayouts(Processor* proc, bool checkOnly = true,
-                                                                   int srvId = 0);
+    static Array<AudioProcessor::BusesLayout> findSupportedLayouts(std::shared_ptr<AudioPluginInstance> proc);
+    static Array<AudioProcessor::BusesLayout> findSupportedLayouts(Processor* proc);
 
     const Array<AudioProcessor::BusesLayout>& getSupportedBusLayouts() const;
 
@@ -78,8 +75,8 @@ class Processor : public LogTagDelegate, public std::enable_shared_from_this<Pro
 
     const String& getPluginId() const { return m_id; }
 
-    bool processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMessages);
-    bool processBlock(AudioBuffer<double>& buffer, MidiBuffer& midiMessages);
+    bool processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMessages, int& latencySamples);
+    bool processBlock(AudioBuffer<double>& buffer, MidiBuffer& midiMessages, int& latencySamples);
 
     void processBlockBypassed(AudioBuffer<float>& buffer);
     void processBlockBypassed(AudioBuffer<double>& buffer);
@@ -88,7 +85,7 @@ class Processor : public LogTagDelegate, public std::enable_shared_from_this<Pro
     void releaseResources();
     int getLatencySamples();
     void suspendProcessing(const bool shouldBeSuspended);
-    void updateLatencyBuffers();
+    void updateLatencyBuffers(int newLatency);
     void enableAllBuses();
     void setProcessingPrecision(AudioProcessor::ProcessingPrecision p);
     void setMonoChannels(uint64 channels);
@@ -241,7 +238,7 @@ class Processor : public LogTagDelegate, public std::enable_shared_from_this<Pro
     }
 
     template <typename T>
-    bool processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages);
+    bool processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& midiMessages, int& latencySamples);
 
     template <typename T>
     void processBlockBypassedInternal(AudioBuffer<T>& buffer, AudioRingBuffer<T>& bypassBuffer);

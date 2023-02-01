@@ -343,7 +343,9 @@ void Worker::handleMessage(std::shared_ptr<Message<DelPlugin>> msg) {
     traceScope();
     int idx = pPLD(msg).getNumber();
     if (idx == m_activeEditorIdx) {
-        getApp()->getServer()->sandboxHideEditor();
+        if (auto srv = getApp()->getServer()) {
+            srv->sandboxHideEditor();
+        }
         m_screen->hideEditor();
         m_clipboardTracker->stop();
         m_activeEditorIdx = -1;
@@ -357,14 +359,16 @@ void Worker::handleMessage(std::shared_ptr<Message<EditPlugin>> msg) {
     traceScope();
     int idx = pDATA(msg)->index;
     if (auto proc = m_audio->getProcessor(idx)) {
-        getApp()->getServer()->sandboxShowEditor();
-        m_screen->showEditor(getThreadId(), proc, pDATA(msg)->channel, pDATA(msg)->x, pDATA(msg)->y,
-                             [this, idx] { sendHideEditor(idx); });
-        m_activeEditorIdx = idx;
-        if (getApp()->getServer()->getScreenLocalMode()) {
-            runOnMsgThreadAsync([this] { getApp()->addKeyListener(getThreadId(), m_keyWatcher.get()); });
-        } else if (!getApp()->getServer()->getScreenCapturingOff()) {
-            m_clipboardTracker->start();
+        if (auto srv = getApp()->getServer()) {
+            srv->sandboxShowEditor();
+            m_screen->showEditor(getThreadId(), proc, pDATA(msg)->channel, pDATA(msg)->x, pDATA(msg)->y,
+                                 [this, idx] { sendHideEditor(idx); });
+            m_activeEditorIdx = idx;
+            if (srv->getScreenLocalMode()) {
+                runOnMsgThreadAsync([this] { getApp()->addKeyListener(getThreadId(), m_keyWatcher.get()); });
+            } else if (!srv->getScreenCapturingOff()) {
+                m_clipboardTracker->start();
+            }
         }
     }
 }
@@ -373,7 +377,9 @@ void Worker::handleMessage(std::shared_ptr<Message<HidePlugin>> /* msg */, bool 
     traceScope();
     if (m_activeEditorIdx > -1) {
         if (!fromMaster) {
-            getApp()->getServer()->sandboxHideEditor();
+            if (auto srv = getApp()->getServer()) {
+                srv->sandboxHideEditor();
+            }
         }
         m_screen->hideEditor();
         m_clipboardTracker->stop();
@@ -548,7 +554,9 @@ void Worker::handleMessage(std::shared_ptr<Message<Rescan>> msg) {
     runOnMsgThreadAsync([this, wipe] {
         traceScope();
         if (wipe) {
-            getApp()->getServer()->saveKnownPluginList(true);
+            if (auto srv = getApp()->getServer()) {
+                srv->saveKnownPluginList(true);
+            }
         }
         getApp()->restartServer(true);
     });
@@ -570,87 +578,89 @@ void Worker::handleMessage(std::shared_ptr<Message<CPULoad>> msg) {
 
 void Worker::handleMessage(std::shared_ptr<Message<PluginList>> msg) {
     traceScope();
-    auto& pluginList = getApp()->getPluginList();
+
     json jlist = json::array();
-    for (auto& plugin : pluginList.getTypes()) {
-        auto jplug = Processor::createJson(plugin);
-        auto pluginId = Processor::createPluginID(plugin);
-        int pluginChIn = 0, pluginChOut = 0;
-        bool hasMono = false;
 
-        // add layouts, that match the number of output channels
-        auto& layouts = getApp()->getServer()->getPluginLayouts(pluginId);
-        if (layouts.isEmpty()) {
-            logln("warning: no known layouts for '" << plugin.name << "' (" << pluginId << ")");
-        }
-        StringArray slayouts;
-        for (auto& l : layouts) {
-            int chIn = getLayoutNumChannels(l, true);
-            int chOut = getLayoutNumChannels(l, false);
+    auto srv = getApp()->getServer();
 
-            pluginChIn = jmax(pluginChIn, chIn);
-            pluginChOut = jmax(pluginChOut, chOut);
+    if (nullptr != srv) {
+        bool isFxChain = m_cfg.channelsIn > 0;
 
-            bool isFxChain = m_cfg.channelsIn > 0;
-            bool match = false;
+        auto& pluginList = getApp()->getPluginList();
+        for (auto& plugin : pluginList.getTypes()) {
+            auto jplug = Processor::createJson(plugin);
+            auto pluginId = Processor::createPluginID(plugin);
+            int pluginChIn = 0, pluginChOut = 0;
+            bool hasMono = false;
 
-            if (plugin.name == "LoudMax") {
-                logln("-- " << describeLayout(l));
-            }
+            // add layouts, that match the number of output channels
+            auto& layouts = srv->getPluginLayouts(pluginId);
+            StringArray slayouts;
+            for (auto& l : layouts) {
+                int chIn = getLayoutNumChannels(l, true);
+                int chOut = getLayoutNumChannels(l, false);
 
-            if (isFxChain) {
-                if (l.inputBuses == l.outputBuses /* same inputs and outputs */ ||
-                    (l.inputBuses.size() == 2 /* main input bus and sidechain  */ &&
-                     l.outputBuses.size() == 1 /* single main output bus */ &&
-                     l.inputBuses[0] == l.outputBuses[0] /* main in and out buses are the same */)) {
-                    // the layout should match the outs exactly
-                    match = m_cfg.channelsOut == chOut;
+                pluginChIn = jmax(pluginChIn, chIn);
+                pluginChOut = jmax(pluginChOut, chOut);
+
+                bool match = false;
+
+                if (isFxChain) {
+                    if (l.inputBuses == l.outputBuses /* same inputs and outputs */ ||
+                        (l.inputBuses.size() == 2 /* main input bus and sidechain  */ &&
+                         l.outputBuses.size() == 1 /* single main output bus */ &&
+                         l.inputBuses[0] == l.outputBuses[0] /* main in and out buses are the same */)) {
+                        // the layout should match the outs exactly
+                        match = m_cfg.channelsOut == chOut;
+                    }
+                    if (chOut == 1) {
+                        hasMono = true;
+                    }
+                } else {
+                    match = plugin.isInstrument && m_cfg.channelsOut >= chOut;
                 }
-                if (chOut == 1) {
-                    hasMono = true;
+
+                if (match) {
+                    slayouts.addIfNotAlreadyThere(LogTag::getStrWithLeadingZero(chOut) + ":" +
+                                                  describeLayout(l, false, true, true));
                 }
-            } else {
-                match = plugin.isInstrument && m_cfg.channelsOut >= chOut;
             }
 
-            if (match) {
-                slayouts.addIfNotAlreadyThere(LogTag::getStrWithLeadingZero(chOut) + ":" +
-                                              describeLayout(l, false, true, true));
+            auto jlayouts = json::array();
+
+            if (slayouts.isEmpty()) {
+                jlayouts.push_back("Default");
             }
-        }
 
-        if (hasMono && m_cfg.channelsOut > 1) {
-            slayouts.add("01:Multi-Mono");
-        }
+            if (hasMono && m_cfg.channelsOut > 1) {
+                slayouts.add("01:Multi-Mono");
+            }
 
-        auto jlayouts = json::array();
-
-        if (slayouts.isEmpty()) {
-            jlayouts.push_back("Default");
-        } else {
             slayouts.sort(false);
+
             for (auto& l : slayouts) {
                 auto parts = StringArray::fromTokens(l, ":", "");
                 if (!jlayouts.contains(parts[1].toStdString())) {
                     jlayouts.push_back(parts[1].toStdString());
                 }
             }
-        }
 
-        jplug["layouts"] = jlayouts;
+            jplug["layouts"] = jlayouts;
 
-        bool match = m_noPluginListFilter;
-        // exact match is fine
-        match = (m_cfg.channelsIn == pluginChIn) || match;
-        // hide plugins with no inputs if we have inputs
-        match = (m_cfg.channelsIn > 0 && plugin.numInputChannels > 0) || match;
-        // for instruments (no inputs) allow any plugin with the isInstrument flag
-        match = (m_cfg.channelsIn == 0 && plugin.isInstrument) || match;
+            bool match = m_noPluginListFilter;
+            // exact match is fine
+            match = (m_cfg.channelsIn == pluginChIn) || match;
+            // hide plugins with no inputs if we have inputs
+            match = (m_cfg.channelsIn > 0 && plugin.numInputChannels > 0) || match;
+            // for instruments (no inputs) allow any plugin with the isInstrument flag
+            match = (m_cfg.channelsIn == 0 && plugin.isInstrument) || match;
 
-        if (match) {
-            jlist.push_back(jplug);
+            if (match) {
+                jlist.push_back(jplug);
+            }
         }
     }
+
     pPLD(msg).setJson({{"plugins", jlist}});
     msg->send(m_cmdIn.get());
 }
@@ -671,7 +681,11 @@ void Worker::handleMessage(std::shared_ptr<Message<GetScreenBounds>> /*msg*/) {
         DATA(res)->w = 0;
         DATA(res)->h = 0;
     }
-    if (getApp()->getServer()->getSandboxModeRuntime() == Server::SANDBOX_PLUGIN) {
+    bool isPluginRuntime = false;
+    if (auto srv = getApp()->getServer()) {
+        isPluginRuntime = srv->getSandboxModeRuntime() == Server::SANDBOX_PLUGIN;
+    }
+    if (isPluginRuntime) {
         // We don't want to block for updating the bounds of a plugin UI in a plugin isolation sandbox, so the response
         // goes back on the "command out" channel.
         std::lock_guard<std::mutex> lock(m_cmdOutMtx);
@@ -683,7 +697,7 @@ void Worker::handleMessage(std::shared_ptr<Message<GetScreenBounds>> /*msg*/) {
 
 void Worker::handleMessage(std::shared_ptr<Message<Clipboard>> msg) {
     traceScope();
-    SystemClipboard::copyTextToClipboard(pPLD(msg).getString());
+    runOnMsgThreadAsync([str = pPLD(msg).getString()] { SystemClipboard::copyTextToClipboard(str); });
 }
 
 void Worker::handleMessage(std::shared_ptr<Message<SetMonoChannels>> msg) {

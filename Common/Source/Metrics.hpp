@@ -14,6 +14,12 @@
 #include "SharedInstance.hpp"
 #include "Utils.hpp"
 
+#if JUCE_WINDOWS
+#ifdef max
+#undef max
+#endif
+#endif
+
 namespace e47 {
 
 class BasicStatistic {
@@ -74,6 +80,55 @@ class Meter : public BasicStatistic {
     inline double alpha(int secs) { return 1 - std::exp(std::log(0.005) / secs); }
 };
 
+class SizeMeter : public BasicStatistic, public LogTag {
+  public:
+    SizeMeter(size_t updatesPerSecond) : LogTag("stats"), m_data(updatesPerSecond) {
+        m_95thIdx = (size_t)(updatesPerSecond * 0.95);
+    }
+
+    ~SizeMeter() override {}
+
+    inline void update(size_t size) {
+        std::lock_guard<std::mutex> lock(m_mtx);
+        m_data[m_idx++] = size;
+        m_idx %= m_data.size();
+    }
+
+    inline void aggregate(size_t& avg, size_t& min, size_t& max, size_t& nintyFifth) const {
+        std::vector<size_t> data;
+        {
+            std::lock_guard<std::mutex> lock(m_mtx);
+            data.resize(m_data.size());
+            memcpy(data.data(), m_data.data(), sizeof(size_t) * m_data.size());
+        }
+        std::sort(data.begin(), data.end());
+        size_t total = 0;
+        min = std::numeric_limits<size_t>::max();
+        max = 0;
+        for (auto s : data) {
+            total += s;
+            min = jmin(s, min);
+            max = jmax(s, max);
+        }
+        avg = total / m_data.size();
+        nintyFifth = data[m_95thIdx];
+    }
+
+    void aggregate() override {}
+    void aggregate1s() override {}
+    void log(const String& name) override {
+        size_t avg, min, max, nfth;
+        aggregate(avg, min, max, nfth);
+        logln(name << ": avg " << avg << ", min " << min << ", max " << max << ", 95th " << nfth);
+    }
+
+  private:
+    mutable std::mutex m_mtx;
+    std::vector<size_t> m_data;
+    size_t m_idx = 0;
+    size_t m_95thIdx = 0;
+};
+
 class TimeStatistic : public BasicStatistic, public LogTag {
   public:
     class Duration {
@@ -82,6 +137,8 @@ class TimeStatistic : public BasicStatistic, public LogTag {
         Duration(const Duration& other)
             : m_timer(other.m_timer), m_start(other.m_start), m_finished(other.m_finished) {}
         ~Duration() { update(); }
+
+        void setTimeStatistic(std::shared_ptr<TimeStatistic> t) { m_timer = t; }
 
         void finish() {
             update();
@@ -187,20 +244,23 @@ class TimeStatistic : public BasicStatistic, public LogTag {
     };
 
     TimeStatistic(size_t numOfBins = 10, double binSize = 2 /* ms */)
-        : LogTag("stats"), m_numOfBins(numOfBins), m_binSize(binSize) {}
+        : LogTag("stats"), m_mostRecentTimes(32), m_numOfBins(numOfBins), m_binSize(binSize) {}
     ~TimeStatistic() override {}
 
     void update(double t);
     void aggregate() override;
     void aggregate1s() override;
     Histogram get1minHistogram();
+    double getMostRecentAverage();
     void run();
     void log(const String& name) override;
     void setShowLog(bool b) { m_showLog = b; }
+    void setAggregate(bool b) { m_aggregate = b; }
 
     Meter& getMeter() { return m_meter; }
 
-    static Duration getDuration(const String& name, bool show = true);
+    static Duration getDuration(const String& name);
+    static Duration getDuration(const String& name, bool show, bool aggregate);
 
     std::vector<Histogram> get1minValues();
 
@@ -222,10 +282,14 @@ class TimeStatistic : public BasicStatistic, public LogTag {
     uint8 m_timesIdx = 0;
     std::vector<Histogram> m_1minValues;
     std::mutex m_1minValuesMtx;
+    std::vector<double> m_mostRecentTimes;
+    size_t m_mostRecentIdx = 0;
+    std::mutex m_mostRecentMtx;
     size_t m_numOfBins;
     double m_binSize;
     Meter m_meter;
     bool m_showLog = true;
+    bool m_aggregate = true;
 
     bool m_hasExtValues = false;
     std::unordered_map<String, std::vector<Histogram>> m_ext1minValues;
@@ -247,13 +311,13 @@ class Metrics : public Thread, public LogTag, public SharedInstance<Metrics> {
 
     static StatsMap getStats();
 
-    template <typename T>
-    static std::shared_ptr<T> getStatistic(const String& name) {
+    template <typename T, typename... Args>
+    static std::shared_ptr<T> getStatistic(const String& name, Args... args) {
         std::lock_guard<std::mutex> lock(m_statsMtx);
         std::shared_ptr<T> stat;
         auto it = m_stats.find(name);
         if (m_stats.end() == it) {
-            auto itnew = m_stats.emplace(name, std::make_shared<T>());
+            auto itnew = m_stats.emplace(name, std::make_shared<T>(args...));
             stat = std::dynamic_pointer_cast<T>(itnew.first->second);
         } else {
             stat = std::dynamic_pointer_cast<T>(it->second);
@@ -283,35 +347,30 @@ class TimeTrace {
     };
 
     struct TraceContext {
-        TimeStatistic::Duration duration;
-        std::vector<Record> records;
+        TimeStatistic::Duration durationInc, durationTotal;
+        Array<Record> records;
         Uuid uuid;
+        double total = 0.0;
 
         void add(const String& name, Record::Type type = Record::TRACE) {
             Record r;
-            r.timeSpentMs = duration.update();
+            r.timeSpentMs = durationInc.update();
             r.type = type;
             TRACE_STRCPY(r.name, name);
-            records.push_back(std::move(r));
+            records.add(std::move(r));
         }
 
         void startGroup() { add({}, Record::START_GROUP); }
 
         void finishGroup(const String& name) { add(name, Record::FINISH_GROUP); }
 
-        double totalMs() const {
-            double total = 0.0;
-            for (auto& r : records) {
-                total += r.timeSpentMs;
-            }
-            return total;
-        }
+        void calcTotalMs() { total = durationTotal.update(); }
 
-        void summary(const LogTag* tag, const String& name, double treshold) const {
-            auto ms = totalMs();
-            if (ms > treshold) {
+        double summary(const LogTag* tag, const String& name, double treshold) {
+            calcTotalMs();
+            if (total > treshold) {
                 setLogTagByRef(*tag);
-                logln(name << " took " << ms << "ms (" << uuid.toDashedString() << ")");
+                logln(name << " took " << total << "ms (" << uuid.toDashedString() << ")");
 
                 std::vector<double> groupLevel;
 
@@ -344,16 +403,19 @@ class TimeTrace {
                     }
                 }
             }
+            return total;
         }
 
         void reset(Uuid id = Uuid()) {
-            duration.reset();
-            records.clear();
+            records.clearQuick();
             if (id != Uuid::null()) {
                 uuid = id;
             } else {
                 uuid = Uuid();
             }
+
+            durationInc.reset();
+            durationTotal.reset();
         }
     };
 

@@ -204,7 +204,7 @@ void App::initialise(const String& commandLineParameters) {
             m_server->startThread();
             break;
         }
-        case MASTER:
+        case MASTER: {
 #ifdef JUCE_MAC
             Process::setDockIconVisible(false);
             File appState("~/Library/Saved Application State/com.e47.AudioGridderServer.savedState");
@@ -212,82 +212,138 @@ void App::initialise(const String& commandLineParameters) {
                 appState.deleteRecursively();
             }
 #endif
-            m_child = std::make_unique<std::thread>([this, srvId] {
-                ChildProcess proc;
-                StringArray proc_args;
-                proc_args.add(File::getSpecialLocation(File::currentExecutableFile).getFullPathName());
-                proc_args.add("-server");
-                if (srvId > -1) {
-                    proc_args.add("-id");
-                    proc_args.add(String(srvId));
-                }
-                uint32 ec = 0;
-                bool done = false;
-                do {
-                    if (proc.start(proc_args)) {
-                        while (proc.isRunning()) {
-                            Thread::sleep(100);
-                            if (m_stopChild) {
-                                logln("killing child process");
-                                proc.kill();
-                                proc.waitForProcessToFinish(-1);
-                                File serverRunFile(Defaults::getConfigFileName(
-                                    Defaults::ConfigServerRun, {{"id", String(srvId > -1 ? srvId : 0)}}));
-                                if (serverRunFile.exists()) {
-                                    serverRunFile.deleteFile();
+            Array<int> ids;
+
+            if (srvId < 0) {
+                auto cfg = configParseFile(Defaults::getConfigFileName(Defaults::ConfigServerStartup));
+                if (jsonHasValue(cfg, "IDs")) {
+                    for (auto& range : StringArray::fromTokens(jsonGetValue(cfg, "IDs", String()), ",", "")) {
+                        if (range.containsChar('-')) {
+                            auto parts = StringArray::fromTokens(range, "-", "");
+                            if (parts.size() == 2) {
+                                int start = parts[0].getIntValue();
+                                int end = parts[1].getIntValue();
+                                for (int i = start; i <= end; i++) {
+                                    ids.add(i);
                                 }
-                                done = true;
-                                break;
                             }
-                        }
-                        ec = proc.getExitCode();
-                        if (ec == EXIT_RESTART) {
-                            logln("restarting server");
-                            continue;
-                        } else if (ec != 0) {
-                            logln("error: server failed with exit code " << (int)ec);
-                        }
-                        File serverRunFile(Defaults::getConfigFileName(Defaults::ConfigServerRun,
-                                                                       {{"id", String(srvId > -1 ? srvId : 0)}}));
-                        if (serverRunFile.exists()) {
-                            logln("error: server did non shutdown properly");
-                            serverRunFile.deleteFile();
                         } else {
+                            ids.add(range.getIntValue());
+                        }
+                    }
+                }
+            }
+
+            if (ids.isEmpty()) {
+                m_child = std::make_unique<std::thread>([this, srvId] {
+                    ChildProcess proc;
+                    StringArray procArgs;
+                    procArgs.add(File::getSpecialLocation(File::currentExecutableFile).getFullPathName());
+                    procArgs.add("-server");
+                    if (srvId > -1) {
+                        procArgs.add("-id");
+                        procArgs.add(String(srvId));
+                    }
+                    uint32 ec = 0;
+                    bool done = false;
+                    do {
+                        if (proc.start(procArgs)) {
+                            while (proc.isRunning()) {
+                                Thread::sleep(100);
+                                if (m_stopChild) {
+                                    logln("killing child process");
+                                    proc.kill();
+                                    proc.waitForProcessToFinish(-1);
+                                    File serverRunFile(Defaults::getConfigFileName(
+                                        Defaults::ConfigServerRun, {{"id", String(srvId > -1 ? srvId : 0)}}));
+                                    if (serverRunFile.exists()) {
+                                        serverRunFile.deleteFile();
+                                    }
+                                    done = true;
+                                    break;
+                                }
+                            }
+                            ec = proc.getExitCode();
+                            if (ec == EXIT_RESTART) {
+                                logln("restarting server");
+                                continue;
+                            } else if (ec != 0) {
+                                logln("error: server failed with exit code " << (int)ec);
+                            }
+                            File serverRunFile(Defaults::getConfigFileName(Defaults::ConfigServerRun,
+                                                                           {{"id", String(srvId > -1 ? srvId : 0)}}));
+                            if (serverRunFile.exists()) {
+                                logln("error: server did non shutdown properly");
+                                serverRunFile.deleteFile();
+                            } else {
+                                done = true;
+                            }
+                        } else {
+                            logln("error: failed to start server process");
+                            setApplicationReturnValue(1);
+                            quit();
                             done = true;
                         }
-                    } else {
-                        logln("error: failed to start server process");
-                        setApplicationReturnValue(1);
-                        quit();
-                        done = true;
+                    } while (!done);
+                    quit();
+                });
+            } else {
+                Tracer::cleanup();
+                Logger::cleanup();
+                m_child = std::make_unique<std::thread>([ids, args] {
+                    std::vector<ChildProcess> masters((size_t)ids.size());
+                    for (int i = 0; i < ids.size(); i++) {
+                        int id = ids[i];
+                        auto& proc = masters[(size_t)i];
+                        StringArray procArgs;
+                        procArgs.add(File::getSpecialLocation(File::currentExecutableFile).getFullPathName());
+                        procArgs.addArray(args);
+                        procArgs.addArray({"-id", String(id)});
+                        proc.start(procArgs);
                     }
-                } while (!done);
-                quit();
-            });
+                    for (int i = 0; i < ids.size(); i++) {
+                        auto& proc = masters[(size_t)i];
+                        proc.waitForProcessToFinish(-1);
+                    }
+                    quit();
+                });
+            }
             break;
+        }
     }
     logln("initialise complete");
 }
 
 void App::prepareShutdown(uint32 exitCode) {
     traceScope();
-    logln("preparing shutdown");
 
     m_exitCode = exitCode;
 
-    std::thread([this] {
-        Thread::setCurrentThreadName("ShutdownThread");
+    if (!m_preparingShutdown.exchange(true)) {
+        logln("preparing shutdown");
 
-        traceScope();
+        std::thread([this] {
+            Thread::setCurrentThreadName("ShutdownThread");
 
-        if (m_server != nullptr) {
-            m_server->shutdown();
-            m_server->waitForThreadToExit(-1);
-            m_server.reset();
-        }
+            traceScope();
 
+            if (m_server != nullptr) {
+                runOnMsgThreadSync([this] {
+                    hideEditor();
+                    hidePluginList();
+                    hideServerSettings();
+                });
+                m_server->shutdown();
+                m_server->waitForThreadToExit(-1);
+                m_server.reset();
+            }
+
+            quit();
+        }).detach();
+    } else {
+        logln("shutdown initiated already, quitting immediately");
         quit();
-    }).detach();
+    }
 }
 
 void App::shutdown() {
@@ -302,14 +358,21 @@ void App::shutdown() {
     }
 
     if (m_server != nullptr) {
+        hideEditor();
+        hidePluginList();
+        hideServerSettings();
+
         m_server->shutdown();
         m_server->waitForThreadToExit(-1);
         m_server.reset();
     }
 
+    logln("exit code = " << String(m_exitCode));
+
     Tracer::cleanup();
     Logger::cleanup();
     Sentry::cleanup();
+
     setApplicationReturnValue((int)m_exitCode);
 }
 
@@ -377,9 +440,11 @@ void App::showEditorInternal(Thread::ThreadID tid, std::shared_ptr<Processor> pr
         }
 
 #ifdef JUCE_MAC
-        if (getServer()->getSandboxMode() != Server::SANDBOX_PLUGIN ||
-            getServer()->getSandboxModeRuntime() == Server::SANDBOX_PLUGIN) {
-            Process::setDockIconVisible(true);
+        if (auto srv = getServer()) {
+            if (srv->getSandboxMode() != Server::SANDBOX_PLUGIN ||
+                srv->getSandboxModeRuntime() == Server::SANDBOX_PLUGIN) {
+                Process::setDockIconVisible(true);
+            }
         }
 #endif
     } else {
@@ -430,8 +495,12 @@ void App::hideEditor(Thread::ThreadID tid, bool updateMacOSDock) {
     }
 
 #ifdef JUCE_MAC
-    if (updateMacOSDock && (getServer()->getSandboxMode() != Server::SANDBOX_PLUGIN ||
-                            getServer()->getSandboxModeRuntime() == Server::SANDBOX_PLUGIN)) {
+    bool isPluginRuntime = false;
+    if (auto srv = getServer()) {
+        isPluginRuntime =
+            srv->getSandboxMode() != Server::SANDBOX_PLUGIN || srv->getSandboxModeRuntime() == Server::SANDBOX_PLUGIN;
+    }
+    if (updateMacOSDock && isPluginRuntime) {
         bool windowVisible = false;
         for (auto& pair : m_processors) {
             if (auto window = pair.second->getEditorWindow()) {
@@ -487,16 +556,18 @@ std::shared_ptr<ProcessorWindow> App::getCurrentWindow(Thread::ThreadID tid) {
 void App::moveEditor(Thread::ThreadID tid, int x, int y) {
     traceScope();
 
-    if (getServer()->getScreenLocalMode()) {
-        logln("moving editor: tid=0x" << String::toHexString((uint64)tid));
+    if (auto srv = getServer()) {
+        if (srv->getScreenLocalMode()) {
+            logln("moving editor: tid=0x" << String::toHexString((uint64)tid));
 
-        std::lock_guard<std::mutex> lock(m_processorsMtx);
+            std::lock_guard<std::mutex> lock(m_processorsMtx);
 
-        if (auto window = getCurrentWindow(tid)) {
-            logln("moving editor window to " << x << "x" << y);
-            window->move(x, y);
-        } else {
-            logln("moveEditor failed: no window for tid");
+            if (auto window = getCurrentWindow(tid)) {
+                logln("moving editor window to " << x << "x" << y);
+                window->move(x, y);
+            } else {
+                logln("moveEditor failed: no window for tid");
+            }
         }
     }
 }
@@ -565,6 +636,10 @@ Point<float> App::localPointToGlobal(Thread::ThreadID tid, Point<float> lp) {
                     ret.y -= disp->userArea.getY();
                 }
             }
+            if (auto srv = getApp()->getServer()) {
+                ret.x += srv->getScreenMouseOffsetX();
+                ret.y += srv->getScreenMouseOffsetY();
+            }
             return ret;
         } else {
             logln("failed to resolve local to global point: no active window");
@@ -600,7 +675,17 @@ void App::setWorkerErrorCallback(Thread::ThreadID tid, ErrorCallback fn) {
 PopupMenu App::getMenuForIndex(int topLevelMenuIndex, const String& /* menuName */) {
     PopupMenu menu;
     if (topLevelMenuIndex == 0) {  // Settings
-        menu.addItem("Settings", [this] {
+        bool enabled = m_splashWindow == nullptr;
+        if (auto srv = getApp()->getServer()) {
+            String n = srv->getName();
+            int id = srv->getId();
+            if (id > 0) {
+                n << ":" << id;
+            }
+            menu.addItem(n, false, false, nullptr);
+            menu.addSeparator();
+        }
+        menu.addItem("Settings", enabled, false, [this] {
             if (nullptr == m_srvSettingsWindow) {
                 m_srvSettingsWindow = std::make_unique<ServerSettingsWindow>(this);
                 updateDockIcon();
@@ -608,7 +693,7 @@ PopupMenu App::getMenuForIndex(int topLevelMenuIndex, const String& /* menuName 
                 windowToFront(m_srvSettingsWindow.get());
             }
         });
-        menu.addItem("Plugins", [this] {
+        menu.addItem("Plugins", enabled, false, [this] {
             if (nullptr == m_pluginListWindow) {
                 m_pluginListWindow = std::make_unique<PluginListWindow>(
                     this, m_server->getPluginList(), Defaults::getConfigFileName(Defaults::ConfigDeadMan));
@@ -618,7 +703,7 @@ PopupMenu App::getMenuForIndex(int topLevelMenuIndex, const String& /* menuName 
             }
         });
         menu.addSeparator();
-        menu.addItem("Statistics", [this] {
+        menu.addItem("Statistics", enabled, false, [this] {
             if (nullptr == m_statsWindow) {
                 m_statsWindow = std::make_unique<StatisticsWindow>(this);
                 updateDockIcon();
@@ -627,8 +712,8 @@ PopupMenu App::getMenuForIndex(int topLevelMenuIndex, const String& /* menuName 
             }
         });
         menu.addSeparator();
-        menu.addItem("Rescan", [this] { restartServer(true); });
-        menu.addItem("Wipe Cache & Rescan", [this] {
+        menu.addItem("Rescan", enabled, false, [this] { restartServer(true); });
+        menu.addItem("Wipe Cache & Rescan", enabled, false, [this] {
             m_server->saveKnownPluginList(true);
             restartServer(true);
         });
@@ -687,6 +772,24 @@ void App::setSplashInfo(const String& txt) {
     runOnMsgThreadAsync([this, txt] {
         if (nullptr != m_splashWindow) {
             m_splashWindow->setInfo(txt);
+        }
+    });
+}
+
+void App::enableCancelScan(int srvId, std::function<void()> onCancel) {
+    traceScope();
+    runOnMsgThreadAsync([this, srvId, onCancel] {
+        if (nullptr != m_splashWindow) {
+            m_splashWindow->setOnCancel(srvId, onCancel);
+        }
+    });
+}
+
+void App::disableCancelScan(int srvId) {
+    traceScope();
+    runOnMsgThreadAsync([this, srvId] {
+        if (nullptr != m_splashWindow) {
+            m_splashWindow->removeOnCancel(srvId);
         }
     });
 }

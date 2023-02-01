@@ -24,6 +24,12 @@
 
 namespace e47 {
 
+struct ScanPipeHdr {
+    enum Type : uint8 { LOAD_START, LOAD_FINISHED, SHELL };
+    Type type;
+    int len;
+};
+
 Server::Server(const json& opts) : Thread("Server"), LogTag("server"), m_opts(opts) { initAsyncFunctors(); }
 
 void Server::initialize() {
@@ -58,9 +64,14 @@ void Server::loadConfig() {
     traceScope();
     auto file = Defaults::getConfigFileName(Defaults::ConfigServer, {{"id", String(getId())}});
 
+    bool loadUuid = true;
+
 #ifndef AG_UNIT_TESTS
+    // If a server with a new ID is started and has no config yet, fallback to the default config
     if (!File(file).exists()) {
         file = Defaults::getConfigFileName(Defaults::ConfigServer, {{"id", "0"}});
+        // But do not inherit the UUID of the default server
+        loadUuid = false;
     }
 #endif
 
@@ -70,7 +81,9 @@ void Server::loadConfig() {
     Logger::setEnabled(jsonGetValue(cfg, "Logger", Logger::isEnabled()));
     m_id = jsonGetValue(cfg, "ID", m_id);
     m_name = jsonGetValue(cfg, "NAME", m_name);
-    m_uuid = jsonGetValue(cfg, "UUID", m_uuid.toDashedString());
+    if (loadUuid) {
+        m_uuid = jsonGetValue(cfg, "UUID", m_uuid.toDashedString());
+    }
 #ifdef JUCE_MAC
     m_enableAU = jsonGetValue(cfg, "AU", m_enableAU);
     logln("AudioUnit support " << (m_enableAU ? "enabled" : "disabled"));
@@ -104,18 +117,6 @@ void Server::loadConfig() {
     m_screenCapturingFFmpeg = jsonGetValue(cfg, "ScreenCapturingFFmpeg", m_screenCapturingFFmpeg);
     String encoder = "webp";
     m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
-    // if (jsonHasValue(cfg, "ScreenCapturingFFmpegEncoder")) {
-    //    encoder = jsonGetValue(cfg, "ScreenCapturingFFmpegEncoder", encoder);
-    //    if (encoder == "webp") {
-    //        m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
-    //    } else if (encoder == "mjpeg") {
-    //        m_screenCapturingFFmpegEncMode = ScreenRecorder::MJPEG;
-    //    } else {
-    //        logln("unknown ffmpeg encoder mode " << encoder << "! falling back to webp.");
-    //        m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
-    //        encoder = "webp";
-    //    }
-    //}
     m_screenCapturingOff = jsonGetValue(cfg, "ScreenCapturingOff", m_screenCapturingOff);
     m_screenCapturingFFmpegQuality = jsonGetValue(cfg, "ScreenCapturingFFmpegQual", m_screenCapturingFFmpegQuality);
     String scmode;
@@ -137,9 +138,12 @@ void Server::loadConfig() {
     }
     m_screenJpgQuality = jsonGetValue(cfg, "ScreenQuality", m_screenJpgQuality);
     m_screenLocalMode = jsonGetValue(cfg, "ScreenLocalMode", m_screenLocalMode);
+    m_screenMouseOffsetX = jsonGetValue(cfg, "ScreenMouseOffsetX", m_screenMouseOffsetX);
+    m_screenMouseOffsetY = jsonGetValue(cfg, "ScreenMouseOffsetY", m_screenMouseOffsetY);
     m_pluginWindowsOnTop = jsonGetValue(cfg, "PluginWindowsOnTop", m_pluginWindowsOnTop);
     m_scanForPlugins = jsonGetValue(cfg, "ScanForPlugins", m_scanForPlugins);
     m_crashReporting = jsonGetValue(cfg, "CrashReporting", m_crashReporting);
+    m_processingTraceTresholdMs = jsonGetValue(cfg, "ProcessingTraceTresholdMs", m_processingTraceTresholdMs);
     logln("crash reporting is " << (m_crashReporting ? "enabled" : "disabled"));
     m_sandboxMode = (SandboxMode)jsonGetValue(cfg, "SandboxMode", m_sandboxMode);
     logln("sandbox mode is " << (m_sandboxMode == SANDBOX_CHAIN    ? "chain isolation"
@@ -191,6 +195,8 @@ void Server::saveConfig() {
     j["ScreenQuality"] = m_screenJpgQuality;
     j["ScreenDiffDetection"] = m_screenDiffDetection;
     j["ScreenLocalMode"] = m_screenLocalMode;
+    j["ScreenMouseOffsetX"] = m_screenMouseOffsetX;
+    j["ScreenMouseOffsetY"] = m_screenMouseOffsetY;
     j["PluginWindowsOnTop"] = m_pluginWindowsOnTop;
     j["ExcludePlugins"] = json::array();
     for (auto& p : m_pluginExclude) {
@@ -200,6 +206,7 @@ void Server::saveConfig() {
     j["CrashReporting"] = m_crashReporting;
     j["SandboxMode"] = m_sandboxMode;
     j["SandboxLogAutoclean"] = m_sandboxLogAutoclean;
+    j["ProcessingTraceTresholdMs"] = m_processingTraceTresholdMs;
 
     File cfg(Defaults::getConfigFileName(Defaults::ConfigServer, {{"id", String(getId())}}));
     logln("saving config to " << cfg.getFullPathName());
@@ -294,23 +301,33 @@ bool Server::parsePluginLayouts(const String& id) {
             }
         }
     } else {
-        logln("parsing plugin layouts...");
+        auto readLayouts = [this](const std::string& key, const auto& jlayouts) {
+            if (jlayouts.is_array()) {
+                for (auto& jlayout : jlayouts) {
+                    auto layout = deserializeLayout(jsonGetValue(jlayout, "layout", String()));
+                    m_pluginLayouts[key].add(layout);
+                }
+            }
+        };
 
-        if (id.isNotEmpty()) {
-            auto it = m_jpluginLayouts.find(id.toStdString());
-            if (it != m_jpluginLayouts.end()) {
-                for (auto& jlayout : it.value()) {
-                    auto layout = deserializeLayout(jsonGetValue(jlayout, "layout", String()));
-                    m_pluginLayouts[it.key()].add(layout);
+        try {
+            logln("parsing " << m_jpluginLayouts.size() << " plugin layouts..."
+                             << (id.isNotEmpty() ? " (id=" + id + ")" : String()));
+
+            if (id.isNotEmpty()) {
+                auto it = m_jpluginLayouts.find(id.toStdString());
+                if (it != m_jpluginLayouts.end()) {
+                    readLayouts(it.key(), it.value());
+                }
+            } else {
+                for (auto it = m_jpluginLayouts.begin(); it != m_jpluginLayouts.end(); it++) {
+                    readLayouts(it.key(), it.value());
                 }
             }
-        } else {
-            for (auto it = m_jpluginLayouts.begin(); it != m_jpluginLayouts.end(); it++) {
-                for (auto& jlayout : it.value()) {
-                    auto layout = deserializeLayout(jsonGetValue(jlayout, "layout", String()));
-                    m_pluginLayouts[it.key()].add(layout);
-                }
-            }
+
+            logln("...ok");
+        } catch (const json::exception& e) {
+            logln("parsing plugin layouts failed: " << e.what());
         }
     }
     return true;
@@ -344,8 +361,11 @@ void Server::loadKnownPluginList(KnownPluginList& plist, json& playouts, int srv
 
     if (cacheFile.existsAsFile()) {
         logln("loading plugins cache from " << cacheFile.getFullPathName());
-        auto xml = XmlDocument::parse(cacheFile);
-        plist.recreateFromXml(*xml);
+        if (auto xml = XmlDocument::parse(cacheFile)) {
+            plist.recreateFromXml(*xml);
+        } else {
+            logln("failed to parse plugins cache " << cacheFile.getFullPathName());
+        }
     } else {
         logln("no plugins cache found");
     }
@@ -534,9 +554,14 @@ bool Server::scanPlugin(const String& id, const String& format, int srvId, bool 
 
     File crashFile(Defaults::getConfigFileName(Defaults::ConfigDeadMan, {{"id", String(srvId)}}));
     File errFile(Defaults::getConfigFileName(Defaults::ScanError, {{"id", String(srvId)}}));
+    File errFileLayout(Defaults::getConfigFileName(Defaults::ScanLayoutError, {{"id", String(srvId)}}));
 
     if (crashFile.existsAsFile()) {
         crashFile.deleteFile();
+    }
+
+    if (errFileLayout.existsAsFile()) {
+        errFileLayout.deleteFile();
     }
 
     errFile.create();
@@ -566,10 +591,28 @@ bool Server::scanPlugin(const String& id, const String& format, int srvId, bool 
 
     logln("...ok");
 
-    for (auto& t : newlist.getTypes()) {
+    String pipeName = "audiogridderscan." + String(srvId);
+    NamedPipe pipe;
+    if (!pipe.openExisting(pipeName)) {
+        logln("warning: can't open pipe " << pipeName);
+    }
+
+    auto types = newlist.getTypes();
+    for (auto& t : types) {
         auto pluginId = Processor::createPluginID(t);
         auto pluginIdDeprecated = Processor::createPluginIDDepricated(t);
         auto pluginIdWithName = Processor::createPluginIDWithName(t);
+
+        // update the server process
+        if (types.size() > 1 && pipe.isOpen()) {
+            String out = t.descriptiveName;
+            out << " (" << format.toLowerCase() << ")";
+            ScanPipeHdr hdr;
+            hdr.type = ScanPipeHdr::SHELL;
+            hdr.len = out.length();
+            pipe.write(&hdr, sizeof(hdr), 100);
+            pipe.write(out.toRawUTF8(), hdr.len, 100);
+        }
 
         logln("adding plugin description:");
         logln("  name            = " << t.name << " (" << t.descriptiveName << ")");
@@ -584,12 +627,49 @@ bool Server::scanPlugin(const String& id, const String& format, int srvId, bool 
         logln("  output channels = " << t.numOutputChannels);
         plist.addType(t);
 
-        logln("testing I/O layouts...");
-        String err;
-        if (auto inst = Processor::loadPlugin(t, 48000, 512, err)) {
-            auto layouts = Processor::findSupportedLayouts(inst, secondRun, srvId);
+        if (!secondRun) {
+            // Create an error file that we remove after testing, if we fail, the scanner will trigger a second
+            // run, that does not test I/O layouts
+            errFileLayout.create();
 
-            for (auto& l : layouts) {
+            logln("testing I/O layouts...");
+
+            // Let the scan master know, that we are loading a plugin now. This might hang, so the master can kill us.
+            if (pipe.isOpen()) {
+                ScanPipeHdr hdr;
+                hdr.type = ScanPipeHdr::LOAD_START;
+                hdr.len = 0;
+                pipe.write(&hdr, sizeof(hdr), 100);
+            }
+
+            String err;
+            if (auto inst = Processor::loadPlugin(t, 48000, 512, err)) {
+                logln("plugin loaded");
+
+                if (pipe.isOpen()) {
+                    ScanPipeHdr hdr;
+                    hdr.type = ScanPipeHdr::LOAD_FINISHED;
+                    hdr.len = 0;
+                    pipe.write(&hdr, sizeof(hdr), 100);
+                }
+
+                auto layouts = Processor::findSupportedLayouts(inst);
+
+                for (auto& l : layouts) {
+                    json jlayout = {{"description", describeLayout(l).toStdString()},
+                                    {"layout", serializeLayout(l).toStdString()}};
+                    playouts[pluginId.toStdString()].push_back(jlayout);
+                }
+
+                errFileLayout.deleteFile();
+            }
+        } else {
+            // testing I/O layouts failed during the first run, now we check for a mono fx plugin to enable multi-mono
+            // support for it
+            if (t.numInputChannels == 1 && t.numOutputChannels == 1) {
+                AudioProcessor::BusesLayout l;
+                l.inputBuses.add(AudioChannelSet::mono());
+                l.outputBuses.add(AudioChannelSet::mono());
                 json jlayout = {{"description", describeLayout(l).toStdString()},
                                 {"layout", serializeLayout(l).toStdString()}};
                 playouts[pluginId.toStdString()].push_back(jlayout);
@@ -604,7 +684,8 @@ bool Server::scanPlugin(const String& id, const String& format, int srvId, bool 
     return success;
 }
 
-void Server::scanNextPlugin(const String& id, const String& name, const String& fmt, int srvId, bool secondRun) {
+void Server::scanNextPlugin(const String& id, const String& name, const String& fmt, int srvId,
+                            std::function<void(const String&)> onShellPlugin, bool secondRun) {
     traceScope();
     String fileFmt = id;
     fileFmt << "|" << fmt;
@@ -616,43 +697,97 @@ void Server::scanNextPlugin(const String& id, const String& name, const String& 
     if (secondRun) {
         args.add("-secondrun");
     }
+    String pipeName = "audiogridderscan." + String(srvId);
+    NamedPipe pipe;
+    if (!pipe.createNewPipe(pipeName)) {
+        logln("warning: can't open pipe " << pipeName);
+    }
     bool blacklist = false;
     if (proc.start(args)) {
-        bool finished;
-        do {
-            proc.waitForProcessToFinish(30000);
-            finished = true;
-            if (proc.isRunning()) {
-                if (!AlertWindow::showOkCancelBox(
-                        AlertWindow::WarningIcon, "Timeout",
-                        "The plugin scan for '" + name + "' did not finish yet. Do you want to continue to wait?",
-                        "Wait", "Abort")) {
-                    logln("error: scan timeout of '" << name << "', killing scan process");
-                    proc.kill();
-                    blacklist = true;
-                } else {
-                    finished = false;
+        const int secondsPerPlugin = 30;
+        std::atomic_int secondsLeft{secondsPerPlugin};
+
+        FnThread outputReader(
+            [this, &pipe, &proc, &secondsLeft, name, secs = secondsPerPlugin, onShellPlugin] {
+                std::vector<char> buf(256);
+                std::unique_ptr<TimeStatistic::Timeout> loadTimeout;
+                String lastShellName;
+                while (proc.isRunning() && !currentThreadShouldExit()) {
+                    ScanPipeHdr hdr;
+                    if (pipe.read(&hdr, sizeof(hdr), 100) == sizeof(hdr)) {
+                        switch (hdr.type) {
+                            case ScanPipeHdr::LOAD_START:
+                                loadTimeout = std::make_unique<TimeStatistic::Timeout>(5000);
+                                break;
+                            case ScanPipeHdr::LOAD_FINISHED:
+                                loadTimeout.reset();
+                                break;
+                            case ScanPipeHdr::SHELL:
+                                if (pipe.read(buf.data(), hdr.len, 1000) == hdr.len) {
+                                    buf[(size_t)hdr.len] = 0;
+                                    lastShellName = buf.data();
+                                    // let the scanner know, that the current plugin is a shell and has plugins inside
+                                    onShellPlugin(lastShellName);
+                                    // increase the timeout as there might be mutliple plugins per shell
+                                    secondsLeft = secs;
+                                    logln("    -> shell plugin: " << lastShellName);
+                                }
+                                break;
+                        }
+                    }
+                    if (nullptr != loadTimeout && loadTimeout->getMillisecondsLeft() <= 0) {
+                        logln("error: load timeout for '" << (lastShellName.isNotEmpty() ? lastShellName : name)
+                                                          << "', killing process");
+                        proc.kill();
+                        loadTimeout.reset();
+                    }
                 }
-            } else {
+            },
+            "OutputReader", true);
+
+        bool finished;
+        int numTimeouts = 0;
+        do {
+            secondsLeft = secondsPerPlugin;
+
+            while (secondsLeft > 0) {
+                proc.waitForProcessToFinish(1000);
+                secondsLeft--;
+            }
+
+            finished = !proc.isRunning();
+
+            if (!finished) {
+                getApp()->enableCancelScan(srvId, [&proc] { proc.kill(); });
+
+                numTimeouts++;
+
+                if (!secondRun && numTimeouts > 9) {
+                    // In case the timeout thread is not able to kill the process (I've seen some waves shells on
+                    // Windows hanging the process) our last resort is killing it from here.
+                    proc.kill();
+                    finished = true;
+                }
+            }
+
+            if (finished) {
                 auto layoutErrFile =
                     File(Defaults::getConfigFileName(Defaults::ScanLayoutError, {{"id", String(srvId)}}));
                 auto errFile = File(Defaults::getConfigFileName(Defaults::ScanError, {{"id", String(srvId)}}));
-                auto ec = proc.getExitCode();
 
                 if (!secondRun && layoutErrFile.existsAsFile()) {
                     logln("error: scan for '" << name << "' failed while testing layouts, starting second run");
                     layoutErrFile.deleteFile();
-                    scanNextPlugin(id, name, fmt, srvId, true);
+                    scanNextPlugin(id, name, fmt, srvId, onShellPlugin, true);
                 } else {
                     if (errFile.existsAsFile()) {
                         logln("error: scan for '" << name << "' failed, as the plugin crashed the scanner probably");
                         errFile.deleteFile();
                         blacklist = true;
-                    } else if (ec != 0) {
-                        logln("error: scan for '" << name << "' failed with exit code " << (int)ec);
-                        blacklist = true;
                     }
                 }
+
+                getApp()->disableCancelScan(srvId);
             }
         } while (!finished);
     } else {
@@ -698,8 +833,14 @@ void Server::scanForPlugins(const std::vector<String>& include) {
 #endif
 
     std::set<String> neverSeenList = m_pluginExclude;
+    std::set<String> newBlacklistedPlugins;
 
     loadKnownPluginList();
+
+    // check for scan results after a crash
+    for (int i = Defaults::SCAN_ID_START; i < Defaults::SCAN_ID_START + Defaults::SCAN_WORKERS; i++) {
+        processScanResults(i, newBlacklistedPlugins);
+    }
 
     struct ScanThread : FnThread {
         int id;
@@ -754,7 +895,8 @@ void Server::scanForPlugins(const std::vector<String>& include) {
         auto plugindesc = m_pluginList.getTypeForFile(fileOrId);
         bool excluded = shouldExclude(name, fileOrId, include);
         if ((nullptr == plugindesc || fmt->pluginNeedsRescanning(*plugindesc)) &&
-            !m_pluginList.getBlacklistedFiles().contains(fileOrId) && !excluded) {
+            !m_pluginList.getBlacklistedFiles().contains(fileOrId) && newBlacklistedPlugins.count(fileOrId) == 0 &&
+            !excluded) {
             ScanThread* scanThread = nullptr;
             String* inProgressName = nullptr;
             do {
@@ -791,7 +933,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
 
             scanThread->fn = [this, fileOrId, pluginName = name, fmtName = fmt->getName(), srvId = scanThread->id,
                               updateSplash] {
-                scanNextPlugin(fileOrId, pluginName, fmtName, srvId);
+                scanNextPlugin(fileOrId, pluginName, fmtName, srvId, [&](const String& n) { updateSplash(n); });
                 updateSplash("");
             };
 
@@ -802,53 +944,11 @@ void Server::scanForPlugins(const std::vector<String>& include) {
         neverSeenList.erase(fileOrId);
     }
 
-    std::set<String> newBlacklistedPlugins;
-
     for (auto& t : scanThreads) {
         while (t.isThreadRunning()) {
             sleep(50);
         }
-
-        File cacheFile(Defaults::getConfigFileName(Defaults::ConfigPluginCache, {{"id", String(t.id)}}));
-        File layoutsFile(Defaults::getConfigFileName(Defaults::PluginLayouts, {{"id", String(t.id)}}));
-        File deadmanFile(Defaults::getConfigFileName(Defaults::ConfigDeadMan, {{"id", String(t.id)}}));
-
-        if (cacheFile.existsAsFile()) {
-            KnownPluginList plist;
-            json playouts;
-            loadKnownPluginList(plist, playouts, t.id);
-
-            for (auto& p : plist.getBlacklistedFiles()) {
-                if (!m_pluginList.getBlacklistedFiles().contains(p)) {
-                    m_pluginList.addToBlacklist(p);
-                    newBlacklistedPlugins.insert(getPluginName(p));
-                }
-            }
-
-            for (auto p : plist.getTypes()) {
-                m_pluginList.addType(p);
-            }
-
-            for (auto it = playouts.begin(); it != playouts.end(); it++) {
-                m_jpluginLayouts[it.key()] = it.value();
-            }
-
-            cacheFile.deleteFile();
-            layoutsFile.deleteFile();
-        }
-
-        if (deadmanFile.existsAsFile()) {
-            logln("reading scan crash file " << deadmanFile.getFullPathName());
-
-            StringArray lines;
-            deadmanFile.readLines(lines);
-
-            for (auto& line : lines) {
-                newBlacklistedPlugins.insert(getPluginName(line));
-            }
-
-            deadmanFile.deleteFile();
-        }
+        processScanResults(t.id, newBlacklistedPlugins);
     }
 
     m_pluginList.sort(KnownPluginList::sortAlphabetically, true);
@@ -868,7 +968,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
                 break;
             }
         }
-        String msg = "The following plugins failed during the plaugin scan:";
+        String msg = "The following plugins failed during the plugin scan:";
         msg << newLine << newLine;
         msg << showList.joinIntoString(newLine);
         msg << newLine;
@@ -878,6 +978,49 @@ void Server::scanForPlugins(const std::vector<String>& include) {
         msg << newLine << newLine;
         msg << "You can force a rescan via Plugin Manager.";
         AlertWindow::showMessageBox(AlertWindow::WarningIcon, "Failed Plugins", msg, "OK");
+    }
+}
+
+void Server::processScanResults(int id, std::set<String>& newBlacklistedPlugins) {
+    File cacheFile(Defaults::getConfigFileName(Defaults::ConfigPluginCache, {{"id", String(id)}}));
+    File layoutsFile(Defaults::getConfigFileName(Defaults::PluginLayouts, {{"id", String(id)}}));
+    File deadmanFile(Defaults::getConfigFileName(Defaults::ConfigDeadMan, {{"id", String(id)}}));
+
+    if (cacheFile.existsAsFile()) {
+        KnownPluginList plist;
+        json playouts;
+        loadKnownPluginList(plist, playouts, id);
+
+        for (auto& p : plist.getBlacklistedFiles()) {
+            if (!m_pluginList.getBlacklistedFiles().contains(p)) {
+                m_pluginList.addToBlacklist(p);
+                newBlacklistedPlugins.insert(getPluginName(p));
+            }
+        }
+
+        for (auto p : plist.getTypes()) {
+            m_pluginList.addType(p);
+        }
+
+        for (auto it = playouts.begin(); it != playouts.end(); it++) {
+            m_jpluginLayouts[it.key()] = it.value();
+        }
+
+        cacheFile.deleteFile();
+        layoutsFile.deleteFile();
+    }
+
+    if (deadmanFile.existsAsFile()) {
+        logln("reading scan crash file " << deadmanFile.getFullPathName());
+
+        StringArray lines;
+        deadmanFile.readLines(lines);
+
+        for (auto& line : lines) {
+            newBlacklistedPlugins.insert(getPluginName(line));
+        }
+
+        deadmanFile.deleteFile();
     }
 }
 
@@ -992,9 +1135,19 @@ void Server::runServer() {
                    << " instrument=" << (int)desc.isInstrument);
     }
 
+    // some time could have passed by until we reach that point, lets check if the user decided to quit
+    if (threadShouldExit()) {
+        return;
+    }
+
     m_sandboxDeleter = std::make_unique<SandboxDeleter>();
 
     checkPort();
+
+    // some time could have passed by until we reach that point, lets check if the user decided to quit
+    if (threadShouldExit()) {
+        return;
+    }
 
     if (getScreenLocalMode() && Defaults::unixDomainSocketsSupported()) {
         auto socketPath = Defaults::getSocketPath(Defaults::SERVER_SOCK, {{"id", String(getId())}}, true);
@@ -1095,7 +1248,10 @@ void Server::runServer() {
                             traceScope();
                             if (!sendHandshakeResponse(clnt, true, sandboxPort)) {
                                 logln("failed to send handshake response for sandbox " << id);
+                                auto deleter = m_sandboxes[id];
+                                deleter->terminate();
                                 m_sandboxes.remove(id);
+                                m_sandboxDeleter->add(std::move(deleter));
                             }
                             clnt->close();
                             delete clnt;
@@ -1160,6 +1316,7 @@ void Server::runServer() {
 
         if (m_sandboxes.size() > 0) {
             for (auto sandbox : m_sandboxes) {
+                sandbox->terminate();
                 m_sandboxDeleter->add(sandbox);
             }
             m_sandboxes.clear();
@@ -1275,6 +1432,7 @@ void Server::runSandboxChain() {
     logln("terminating sandbox connection to master");
     if (nullptr != m_sandboxController) {
         auto* deleter = m_sandboxController.release();
+        deleter->terminate();
         std::thread([deleter] { delete deleter; }).detach();
     }
 
@@ -1425,6 +1583,7 @@ void Server::handleDisconnectFromSandbox(SandboxMaster& sandbox) {
         Metrics::getStatistic<Meter>("NetBytesOut")->removeExtRate1min(sandbox.id);
         Metrics::getStatistic<Meter>("NetBytesIn")->removeExtRate1min(sandbox.id);
         auto deleter = m_sandboxes[sandbox.id];
+        deleter->terminate();
         m_sandboxes.remove(sandbox.id);
         m_sandboxDeleter->add(std::move(deleter));
     }

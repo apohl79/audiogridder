@@ -142,7 +142,13 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
 
     std::atomic_int NUM_OF_BUFFERS{Defaults::DEFAULT_NUM_OF_BUFFERS};
     std::atomic_int LOAD_PLUGIN_TIMEOUT{Defaults::DEFAULT_LOAD_PLUGIN_TIMEOUT};
+
+    // Don't send smaller chunks of samples than the blocksize reported by the DAW
     std::atomic_bool FIXED_OUTBOUND_BUFFER{true};
+
+    // Calculates the read timeout based on the blocksize and sample rate to make sure the plugin responds fast enough
+    // for processing the audio in realtime, even if it has to drop samples
+    std::atomic_bool LIVE_MODE{false};
 
     void run() override;
 
@@ -155,7 +161,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     int getNumActiveChannels() const;
     double getSampleRate() const { return m_sampleRate; }
     int getSamplesPerBlock() const { return m_samplesPerBlock; }
-    double isUsingDoublePrecission() const { return m_doublePrecission; }
+    bool isUsingDoublePrecission() const { return m_doublePrecission; }
     int getLatencySamples() const { return m_latency + NUM_OF_BUFFERS * m_samplesPerBlock + m_latencyManual; }
     void setLatencySamplesManual(int s) { m_latencyManual = s; }
     int getLatencySamplesManual() { return m_latencyManual; }
@@ -258,7 +264,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     String m_loadedPluginsString;
     std::mutex m_srvMtx;
     ServerInfo m_srvInfo;
-    float m_srvLoad;
+    float m_srvLoad = 0.0f;
     bool m_srvLocalMode = false;
     int m_srvLoadLastUpdated = 0;
     bool m_needsReconnect = false;

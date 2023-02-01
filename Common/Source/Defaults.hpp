@@ -64,6 +64,7 @@ static const String PLUGIN_CONFIG_FILE_OLD = "~/.audiogridder";
 static const String KNOWN_PLUGINS_FILE_OLD = "~/.audiogridderserver.cache";
 
 static const String SERVER_CONFIG_FILE = "~/.audiogridder/audiogridderserver{id}.cfg";
+static const String SERVERS_STARTUP_FILE = "~/.audiogridder/serverstartup.cfg";
 static const String PLUGIN_CONFIG_FILE = "~/.audiogridder/audiogridderplugin.cfg";
 static const String PLUGIN_TRAY_CONFIG_FILE = "~/.audiogridder/audiogridderplugintray.cfg";
 static const String KNOWN_PLUGINS_FILE = "~/.audiogridder/audiogridderserver{id}.cache";
@@ -90,6 +91,9 @@ static const String KNOWN_PLUGINS_FILE_OLD =
 static const String SERVER_CONFIG_FILE =
     File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
     "\\AudioGridder\\audiogridderserver{id}.cfg";
+static const String SERVERS_STARTUP_FILE =
+    File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
+    "\\AudioGridder\\serverstartup.cfg";
 static const String PLUGIN_CONFIG_FILE =
     File::getSpecialLocation(File::userApplicationDataDirectory).getFullPathName() +
     "\\AudioGridder\\audiogridderplugin.cfg";
@@ -126,6 +130,7 @@ static const String DOMAIN_SOCKETS_DIR =
 
 enum ConfigFileType {
     ConfigServer,
+    ConfigServerStartup,
     ConfigServerRun,
     ConfigPlugin,
     ConfigPluginCache,
@@ -221,6 +226,9 @@ inline String getConfigFileName(ConfigFileType type, const std::unordered_map<St
             file = SERVER_CONFIG_FILE;
             fileOld = SERVER_CONFIG_FILE_OLD;
             break;
+        case ConfigServerStartup:
+            file = SERVERS_STARTUP_FILE;
+            break;
         case ConfigPlugin:
             file = PLUGIN_CONFIG_FILE;
             fileOld = PLUGIN_CONFIG_FILE_OLD;
@@ -313,6 +321,7 @@ static constexpr int DEFAULT_NUM_RECENTS = 10;
 static constexpr int DEFAULT_LOAD_PLUGIN_TIMEOUT = 15000;
 
 static constexpr uint32 BG_COLOR = 0xff222222;
+static constexpr uint32 BG_ACTIVE_COLOR = 0xff323232;
 static constexpr uint32 TOOLTIP_BG_COLOR = 0xe0323232;
 static constexpr uint32 BUTTON_COLOR = 0xff333333;
 static constexpr uint32 SLIDERTRACK_COLOR = 0xffffc13b;

@@ -254,7 +254,9 @@ void PluginListComponent::removePluginItems(const std::vector<int> indexes) {
         }
     }
 
-    getApp()->getServer()->saveConfig();
+    if (auto srv = getApp()->getServer()) {
+        srv->saveConfig();
+    }
 }
 
 void PluginListComponent::addPluginItems(const std::vector<int> indexes) {
@@ -280,12 +282,14 @@ void PluginListComponent::addPluginItems(const std::vector<int> indexes) {
         m_excludeList.erase(name);
     }
 
-    getApp()->getServer()->saveConfig();
-    getApp()->getServer()->addPlugins(names, [this, names](bool success, const String& name) {
-        if (!success) {
-            m_excludeList.insert(name);
-        }
-    });
+    if (auto srv = getApp()->getServer()) {
+        srv->saveConfig();
+        srv->addPlugins(names, [this, names](bool success, const String& name) {
+            if (!success) {
+                m_excludeList.insert(name);
+            }
+        });
+    }
 }
 
 void PluginListComponent::rescanPluginItems(const std::vector<int> indexes) {
@@ -304,7 +308,9 @@ void PluginListComponent::rescanPluginItems(const std::vector<int> indexes) {
 
     for (auto& id : ids) {
         m_list.removeFromBlacklist(id);
-        getApp()->getServer()->saveKnownPluginList();
+        if (auto srv = getApp()->getServer()) {
+            srv->saveKnownPluginList();
+        }
     }
 }
 

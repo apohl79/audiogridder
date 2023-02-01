@@ -99,7 +99,7 @@ std::string getTimeStr(double timediff, bool keepShort = false) {
 
     auto format = [&](int w) {
         if (!keepShort) {
-            str << std::setfill('0') << std::setw(w);
+            str << std::setfill('0') << std::setw(w) << std::fixed;
         }
     };
 
@@ -116,6 +116,7 @@ std::string getTimeStr(double timediff, bool keepShort = false) {
         str << s << ",";
     }
     format(10);
+    str.precision(3);
     str << ms;
 
     return str.str();
@@ -141,6 +142,17 @@ void printColumn(std::stringstream& col, int& width, bool color, bool updateWidt
         std::cout << (color ? colors[colIdx] : "") << std::setw(width) << col.str() << (color ? RESET : "") << " | ";
     }
     col.str("");
+}
+
+bool isInTimeRange(const TraceRecord& rec, const std::string& from, const std::string& to) {
+    double timediff;
+    if (REV_TIME) {
+        timediff = (LAST_TIME - rec.time);
+    } else {
+        timediff = (rec.time - FIRST_TIME);
+    }
+    auto recTime = getTimeStr(timediff);
+    return (from.empty() || from <= recTime) && (to.empty() || recTime <= to);
 }
 
 void printRecord(const TraceRecord& rec, bool updateCols = false) {
@@ -272,6 +284,8 @@ int main(int argc, char** argv) {
         ("thread,t", bpo::value<std::vector<std::string>>(), "Show specific thread(s)\n(format: [!]0x<hex id> | [!]s:<name> | [!]<decimal id>)")
         ("tag,x", bpo::value<std::vector<std::string>>(), "Show specific tag(s)\n(format: [!]0x<hex id> | [!]s:<name> | [!]<decimal id>)")
         ("rt", "Reverse time display")
+        ("from", bpo::value<std::string>(), "Time range from")
+        ("to", bpo::value<std::string>(), "Time range to")
         ;
     // clang-format on
 
@@ -294,6 +308,14 @@ int main(int argc, char** argv) {
     bool statsmode = opts.count("stats");
 
     REV_TIME = opts.count("rt");
+
+    std::string timeFilterFrom, timeFilterTo;
+    if (opts.count("from")) {
+        timeFilterFrom = opts["from"].as<std::string>();
+    }
+    if (opts.count("to")) {
+        timeFilterTo = opts["to"].as<std::string>();
+    }
 
     using IDFilter = std::set<uint64>;
     using NameFilter = std::set<std::string>;
@@ -436,6 +458,9 @@ int main(int argc, char** argv) {
             if (tagNameFilterExcl.size() > 0 && exists(tagNameFilterExcl, std::string(r.tagName))) {
                 continue;
             }
+            if (!isInTimeRange(r, timeFilterFrom, timeFilterTo)) {
+                continue;
+            }
             printRecord(r);
         }
     } else if (statsmode) {
@@ -485,6 +510,9 @@ int main(int argc, char** argv) {
                 tagNameFilterExcl.size() > 0) {
                 std::vector<TraceRecord> filter;
                 for (auto& r : kv.second) {
+                    if (!isInTimeRange(r, timeFilterFrom, timeFilterTo)) {
+                        continue;
+                    }
                     if (exists(tagIdFilterIncl, r.tagId)) {
                         filter.push_back(r);
                     } else if (exists(tagNameFilterIncl, std::string(r.tagName))) {
@@ -508,6 +536,9 @@ int main(int argc, char** argv) {
             } else {
                 for (auto it2 = (show ? kv.second.end() - (int)show : kv.second.begin()); it2 != kv.second.end();
                      it2++) {
+                    if (!isInTimeRange(*it2, timeFilterFrom, timeFilterTo)) {
+                        continue;
+                    }
                     if (first) {
                         printThreadHeader(threadNameId.str(), kv.second.size());
                         first = false;

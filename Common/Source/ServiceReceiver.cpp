@@ -132,6 +132,9 @@ bool ServiceReceiver::updateServers() {
     // reachable checks of existing servers
     int idx = 0;
     for (auto& srv : getServersInternal()) {
+        if (threadShouldExit()) {
+            return false;
+        }
         if (!isReachable(srv)) {
             std::lock_guard<std::mutex> lock(m_serversMtx);
             m_servers.remove(idx);
@@ -142,6 +145,9 @@ bool ServiceReceiver::updateServers() {
     }
     // reachable checks of new servers
     for (auto& srv : newServers) {
+        if (threadShouldExit()) {
+            return false;
+        }
         if (isReachable(srv)) {
             std::lock_guard<std::mutex> lock(m_serversMtx);
             m_servers.add(srv);
@@ -286,9 +292,24 @@ String ServiceReceiver::hostToName(const String& host) {
     return host;
 }
 
-ServerInfo ServiceReceiver::hostToServerInfo(const String& host) {
+ServerInfo ServiceReceiver::lookupServerInfo(const String& host) {
     for (auto& s : getServers()) {
         if (s.getHost() == host) {
+            return s;
+        } else if (s.getHostAndID() == host) {
+            return s;
+        } else if (s.getName() == host) {
+            return s;
+        } else if (s.getNameAndID() == host) {
+            return s;
+        }
+    }
+    return {};
+}
+
+ServerInfo ServiceReceiver::lookupServerInfo(const Uuid& uuid) {
+    for (auto& s : getServers()) {
+        if (s.getUUID() == uuid) {
             return s;
         }
     }

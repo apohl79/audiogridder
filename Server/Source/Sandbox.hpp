@@ -27,8 +27,11 @@ class SandboxPeer : public LogTagDelegate {
     bool send(const SandboxMessage& msg, ResponseCallback callback = nullptr, bool shouldBlock = false);
     void read(const MemoryBlock& data);
 
+    void terminate() { m_terminated = true; }
+
   protected:
     Server& m_server;
+    std::atomic_bool m_terminated{false};
 
     virtual bool sendMessage(const MemoryBlock&) = 0;
     virtual void handleMessage(const SandboxMessage&) = 0;

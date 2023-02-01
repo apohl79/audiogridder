@@ -81,6 +81,21 @@ class SplashWindow : public TopLevelWindow {
             c->addMouseListener(this, true);
         }
 
+        m_cancelScan.setButtonText("Cancel slow scans");
+        m_cancelScan.setBounds(getWidth() - 120, 170, 100, 20);
+        m_cancelScan.onClick = [this] {
+            for (auto& p : m_onCancelCallbacks) {
+                if (nullptr != p.second) {
+                    p.second();
+                    p.second = nullptr;
+                }
+            }
+            m_onCancelCallbacks.clear();
+            m_cancelScan.setVisible(false);
+        };
+        addChildAndSetID(&m_cancelScan, "cancelScan");
+        m_cancelScan.setVisible(false);
+
         setVisible(true);
         windowToFront(this);
     }
@@ -92,6 +107,21 @@ class SplashWindow : public TopLevelWindow {
     void setInfo(const String& txt, Justification just = Justification::left) {
         m_info.setJustificationType(just);
         m_info.setText(txt, NotificationType::dontSendNotification);
+    }
+
+    void setOnCancel(int srvId, std::function<void()> f) {
+        m_onCancelCallbacks[srvId] = f;
+        String txt = "Cancel ";
+        txt << m_onCancelCallbacks.size() << " slow scan" << (m_onCancelCallbacks.size() > 1 ? "s" : "");
+        m_cancelScan.setButtonText(txt);
+        m_cancelScan.setVisible(true);
+    }
+
+    void removeOnCancel(int srvId) {
+        m_onCancelCallbacks.erase(srvId);
+        if (m_onCancelCallbacks.empty()) {
+            m_cancelScan.setVisible(false);
+        }
     }
 
     std::function<void(bool)> onClick = nullptr;
@@ -109,6 +139,9 @@ class SplashWindow : public TopLevelWindow {
     Label m_info;
     Label m_version;
     Label m_date;
+    TextButton m_cancelScan;
+
+    std::unordered_map<int, std::function<void()>> m_onCancelCallbacks;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SplashWindow)
 };
