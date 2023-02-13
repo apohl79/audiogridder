@@ -2,7 +2,7 @@
 #
 # Author: Andreas Pohl
 
-import os, argparse, sys, shutil, glob, subprocess, zipfile, locale, ssl
+import os, argparse, sys, shutil, glob, subprocess, zipfile, locale, ssl, json
 from urllib import request
 
 lastLogMsgLen = 0
@@ -145,7 +145,7 @@ def getVersion():
 
 def getMacToolchain(args):
     toolchain = ''
-    if args.macostarget in ('10.7', '10.8'):
+    if args.macostarget in ('10.7', '10.8', '10.9'):
         toolchain = '/Library/Developer/10/CommandLineTools'
     elif args.macostarget == '11.1':
         toolchain = '/Library/Developer/13/CommandLineTools'
@@ -216,7 +216,26 @@ def conf(args):
         cmake_params.append('-DAG_WITH_TESTS=ON')
 
     cmake_command = 'cmake ' + ' '.join(cmake_params)
-    execute(cmake_command)
+    if args.vscode:
+        os.makedirs('.vscode', exist_ok=True)
+        settings = dict()
+        with open('.vscode/settings.json', 'r') as f:
+            settings = json.load(f)
+        settings['cmake.buildDirectory'] = '${workspaceFolder}/' + buildDir
+        settings['cmake.configureSettings'] = dict()
+        for p in cmake_params:
+            if p.startswith('-D') and not p.startswith('-DCMAKE_BUILD_TYPE'):
+                (name, val) = p[2:].split('=')
+                if val == 'ON':
+                    val = True
+                elif val == 'OFF':
+                    val = False
+                settings['cmake.configureSettings'][name] = val
+        log('updating vscode settings...')
+        with open('.vscode/settings.json', 'w') as f:
+            json.dump(settings, f, indent=4)
+    else:
+        execute(cmake_command)
 
 def build(args):
     cmake_params = []
@@ -471,6 +490,8 @@ def main():
                              help='Build type (default: %(default)s)')
     parser_conf.add_argument('-b', '--build-dir', dest='builddir', metavar='DIR', type=str, default=None,
                              help='Override the build directory (default: %(default)s)')
+    parser_conf.add_argument('--vscode', dest='vscode', action='store_true', default=False,
+                             help='Do not run cmake, just prepare the build directory and update the VSCode settings (default: %(default)s)')
     parser_conf.add_argument('--platform', dest='platform', metavar='PLATFORM', type=str, default=defaultPlatform,
                              choices=['macos', 'windows', 'linux'],
                              help='OS platform (default: %(default)s)')
