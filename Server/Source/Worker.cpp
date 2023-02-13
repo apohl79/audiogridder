@@ -509,7 +509,7 @@ void Worker::handleMessage(std::shared_ptr<Message<RecentsList>> msg) {
 void Worker::handleMessage(std::shared_ptr<Message<Preset>> msg) {
     traceScope();
     if (auto proc = m_audio->getProcessor(pDATA(msg)->idx)) {
-        proc->setCurrentProgram(pDATA(msg)->channel, pDATA(msg)->preset);
+        proc->setCurrentProgram(pDATA(msg)->preset, pDATA(msg)->channel);
     }
 }
 
