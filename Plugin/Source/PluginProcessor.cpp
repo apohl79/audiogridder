@@ -457,17 +457,17 @@ const String PluginProcessor::getProgramName(int /* index */) { return {}; }
 
 void PluginProcessor::changeProgramName(int /* index */, const String& /* newName */) {}
 
-void PluginProcessor::prepareToPlay(double sampleRate, int blockSize) {
+void PluginProcessor::prepareToPlay(double sampleRate, int blckSize) {
     traceScope();
 
-    int clientBlockSize = blockSize;
+    int clientBlockSize = blckSize;
 
-    if (m_customBlockSize > blockSize) {
-        clientBlockSize = (int)std::ceil((float)m_customBlockSize / blockSize) * blockSize;
+    if (m_customBlockSize > blckSize) {
+        clientBlockSize = (int)std::ceil((float)m_customBlockSize / blckSize) * blckSize;
     }
 
     logln("prepareToPlay: sampleRate = " << sampleRate << ", blockSize = " << clientBlockSize
-                                         << (clientBlockSize != blockSize ? ", dawBlockSize = " + String(blockSize)
+                                         << (clientBlockSize != blckSize ? ", dawBlockSize = " + String(blckSize)
                                                                           : ""));
     logln("I/O layout: " << describeLayout(getBusesLayout()));
 
@@ -578,11 +578,11 @@ void PluginProcessor::numChannelsChanged() {
 }
 
 int PluginProcessor::getCustomBlockSize() const {
-    int blockSize = getBlockSize();
-    if (m_customBlockSize > blockSize) {
-        blockSize = (int)std::ceil((float)m_customBlockSize / blockSize) * blockSize;
+    int blckSize = getBlockSize();
+    if (m_customBlockSize > blckSize) {
+        blckSize = (int)std::ceil((float)m_customBlockSize / blckSize) * blckSize;
     }
-    return blockSize;
+    return blckSize;
 }
 
 void PluginProcessor::setCustomBlockSize(int b) {
@@ -1789,9 +1789,9 @@ void PluginProcessor::TrayConnection::sendStatus() {
 
     if (!m_processor->m_loadedPluginsOk) {
         std::stringstream str;
+        bool first = true;
         for (int idx = 0; idx < m_processor->getNumOfLoadedPlugins(); idx++) {
             auto& plug = m_processor->getLoadedPlugin(idx);
-            bool first = true;
             if (!plug.ok) {
                 str << (first ? String() : newLine) << plug.name << ": " << plug.error;
                 first = false;

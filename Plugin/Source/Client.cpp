@@ -435,10 +435,10 @@ void Client::init() {
             std::lock_guard<std::mutex> audiolck(m_audioMtx);
             if (m_doublePrecission) {
                 m_audioStreamerD = std::make_shared<AudioStreamer<double>>(this, audioSock);
-                m_audioStreamerD->startThread(Thread::realtimeAudioPriority);
+                m_audioStreamerD->startThread(Thread::Priority::highest);
             } else {
                 m_audioStreamerF = std::make_shared<AudioStreamer<float>>(this, audioSock);
-                m_audioStreamerF->startThread(Thread::realtimeAudioPriority);
+                m_audioStreamerF->startThread(Thread::Priority::highest);
             }
         } else {
             return;
