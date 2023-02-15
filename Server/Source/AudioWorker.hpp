@@ -103,16 +103,8 @@ class AudioWorker : public Thread, public LogTagDelegate {
     bool waitForData();
 
     template <typename T>
-    AudioBuffer<T>* getProcBuffer();
-
-    template <>
-    AudioBuffer<float>* getProcBuffer() {
+    AudioBuffer<T>* getProcBuffer() {
         return &m_procBufferF;
-    }
-
-    template <>
-    AudioBuffer<double>* getProcBuffer() {
-        return &m_procBufferD;
     }
 
     template <typename T>

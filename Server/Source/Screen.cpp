@@ -57,3 +57,24 @@ std::shared_ptr<juce::Image> captureScreenNative(juce::Rectangle<int> rect) {
 }  // namespace e47
 
 #endif
+
+#if defined(JUCE_LINUX)
+namespace e47 {
+
+int getScreenShotData(unsigned char** buffer, unsigned int w, unsigned int h);
+
+std::shared_ptr<juce::Image> captureScreenNative(juce::Rectangle<int> rect) {
+    unsigned int w = roundl(rect.getWidth() * 1);
+    unsigned int h = roundl(rect.getHeight() * 1);
+
+    // ALOCATE for COPY DATA
+    auto ret = std::make_shared<juce::Image>(juce::Image::ARGB, w, h, false);
+    juce::Image::BitmapData bd(*ret, 0, 0, (int)w, (int)h);
+
+    /* GET Image */
+    getScreenShotData(&bd.data, w, h);
+    return ret;
+}
+
+}  // namespace e47
+#endif
