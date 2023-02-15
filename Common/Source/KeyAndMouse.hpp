@@ -8,8 +8,6 @@
 #ifndef KeyAndMouse_hpp
 #define KeyAndMouse_hpp
 
-#if defined(JUCE_MAC) || defined(JUCE_WINDOWS)
-
 #include <stdint.h>
 #include <string>
 #include <unordered_map>
@@ -40,7 +38,5 @@ void keyEventDown(uint16_t keyCode, uint64_t flags = 0, bool currentProcessOnly 
 void keyEventUp(uint16_t keyCode, uint64_t flags = 0, bool currentProcessOnly = false, void* nativeHandle = nullptr);
 
 }  // namespace e47
-
-#endif
 
 #endif /* KeyAndMouse_hpp */

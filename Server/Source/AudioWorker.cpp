@@ -164,6 +164,11 @@ void AudioWorker::run() {
     logln("audio processor terminated");
 }
 
+template <>
+AudioBuffer<double>* AudioWorker::getProcBuffer() {
+    return &m_procBufferD;
+}
+
 template <typename T>
 void AudioWorker::processBlock(AudioBuffer<T>& buffer, MidiBuffer& midi) {
     int numChannels = jmax(m_channelsIn + m_channelsSC, m_channelsOut) + m_chain->getExtraChannels();

@@ -14,7 +14,7 @@
 #include "CPUInfo.hpp"
 #include "ChannelSet.hpp"
 
-#ifdef JUCE_MAC
+#if defined(JUCE_MAC) || defined(JUCE_LINUX)
 #include <sys/socket.h>
 #include <fcntl.h>
 #else

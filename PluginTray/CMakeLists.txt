@@ -54,6 +54,10 @@ target_link_libraries(AudioGridderPluginTray PRIVATE
   juce::juce_recommended_warning_flags
   ${SENTRY_LIBRARIES})
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  target_link_libraries(AudioGridderPluginTray PRIVATE  X11 Xtst)
+endif()
+
 ag_strip(AudioGridderPluginTray Tray)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")

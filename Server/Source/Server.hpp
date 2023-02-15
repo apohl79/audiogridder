@@ -115,7 +115,7 @@ class Server : public Thread, public LogTag {
     int getNumLoadedBySandboxes() {
         int sum = 0;
         for (auto c : m_sandboxLoadedCount) {
-            sum += c;
+            sum += (int)c;
         }
         return sum;
     }
