@@ -265,6 +265,12 @@ bool ScreenRecorder::prepareInput() {
     traceScope();
     AVDictionary* opts = nullptr;
 
+    // check if the plugin window is fully visible
+    if (m_captureRect.getX() < 0 || m_captureRect.getY() < 0) {
+        logError("The plugin window must be fully visible to be captured!");
+        return false;
+    }
+
 #ifdef JUCE_MAC
     // This works only when building ffmpeg for OSX 10.8+. Thats why there is a separate 10.7 build.
     // av_dict_set(&opts, "capture_cursor", "0", 0); // the default is 0 anyways, so we don't need to call this.
@@ -407,14 +413,6 @@ bool ScreenRecorder::prepareOutput() {
             logError("prepareOutput: unable to allocate codec context");
             return false;
         }
-    }
-
-    // Make sure the capture rect does not go beyond the input capture area
-    if (m_captureRect.getWidth() > m_captureCodecCtx->width) {
-        m_captureRect.setWidth(m_captureCodecCtx->width);
-    }
-    if (m_captureRect.getHeight() > m_captureCodecCtx->height) {
-        m_captureRect.setHeight(m_captureCodecCtx->height);
     }
 
     m_scaledWith = m_downScale ? (int)(m_captureRect.getWidth() / m_scale) : m_captureRect.getWidth();
