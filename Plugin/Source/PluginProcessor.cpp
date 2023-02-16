@@ -466,9 +466,9 @@ void PluginProcessor::prepareToPlay(double sampleRate, int blckSize) {
         clientBlockSize = (int)std::ceil((float)m_customBlockSize / blckSize) * blckSize;
     }
 
-    logln("prepareToPlay: sampleRate = " << sampleRate << ", blockSize = " << clientBlockSize
-                                         << (clientBlockSize != blckSize ? ", dawBlockSize = " + String(blckSize)
-                                                                          : ""));
+    logln(
+        "prepareToPlay: sampleRate = " << sampleRate << ", blockSize = " << clientBlockSize
+                                       << (clientBlockSize != blckSize ? ", dawBlockSize = " + String(blckSize) : ""));
     logln("I/O layout: " << describeLayout(getBusesLayout()));
 
     if (!m_client->isThreadRunning()) {

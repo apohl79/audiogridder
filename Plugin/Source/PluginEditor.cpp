@@ -754,6 +754,13 @@ void PluginEditor::showServerMenu() {
         m_processor.setFixedOutboundBuffer(!m_processor.getFixedOutboundBuffer());
     });
 
+    if (m_processor.getBufferSizeByPlugin()) {
+        subm.addItem("Save current settings as default", true, false, [this] {
+            traceScope();
+            m_processor.saveConfig();
+        });
+    }
+
     subm.addSeparator();
 
     PopupMenu subsubm;
