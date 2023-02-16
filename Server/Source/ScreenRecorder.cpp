@@ -409,6 +409,14 @@ bool ScreenRecorder::prepareOutput() {
         }
     }
 
+    // Make sure the capture rect does not go beyond the input capture area
+    if (m_captureRect.getWidth() > m_captureCodecCtx->width) {
+        m_captureRect.setWidth(m_captureCodecCtx->width);
+    }
+    if (m_captureRect.getHeight() > m_captureCodecCtx->height) {
+        m_captureRect.setHeight(m_captureCodecCtx->height);
+    }
+
     m_scaledWith = m_downScale ? (int)(m_captureRect.getWidth() / m_scale) : m_captureRect.getWidth();
     m_scaledHeight = m_downScale ? (int)(m_captureRect.getHeight() / m_scale) : m_captureRect.getHeight();
 
