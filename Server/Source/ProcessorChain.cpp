@@ -228,9 +228,9 @@ bool ProcessorChain::initPluginInstance(Processor* proc, const String& layout, S
     posInfo.setTimeInSamples(makeOptional(0));
     posInfo.setTimeInSeconds(makeOptional(0.0));
     posInfo.setBpm(makeOptional(120.0));
-    ProcessorChain::PlayHead playHead(&posInfo);
+    ProcessorChain::PlayHead pHead(&posInfo);
     // set a temporary playhead just for preProcessBlocks
-    proc->setPlayHead(&playHead);
+    proc->setPlayHead(&pHead);
     // process some samples now, as some plugins might update their latency only then
     if (prec == AudioProcessor::doublePrecision) {
         preProcessBlocks<double>(proc);

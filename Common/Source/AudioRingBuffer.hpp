@@ -67,7 +67,7 @@ class AudioRingBuffer {
         }
     }
 
-    int read(T** dst, int dstStartSample, int numSamples) {
+    int read(T* const* dst, int dstStartSample, int numSamples) {
         size_t samplesToRead = jmin(m_samples, (size_t)numSamples);
         if (m_readOffset + samplesToRead <= m_samples) {
             for (size_t c = 0; c < m_channels; c++) {
@@ -117,7 +117,7 @@ class AudioRingBuffer {
         return (int)samplesToWrite;
     }
 
-    void process(T** src, int numSamples) {
+    void process(T* const* src, int numSamples) {
         int offset = 0;
         while (numSamples > 0) {
             int samples = jmin(numSamples, (int)m_samples / 2);

@@ -17,4 +17,6 @@ compile_commands.json
 .projectile
 .dir-locals.el
 .cache
+.vscode
 TestsData
+suppress-win.txt

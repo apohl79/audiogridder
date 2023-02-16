@@ -20,6 +20,11 @@
 #include <sys/socket.h>
 #endif
 
+#ifdef JUCE_LINUX
+#include <sys/socket.h>
+#define SO_NOSIGPIPE MSG_NOSIGNAL
+#endif
+
 #include <regex>
 
 namespace e47 {

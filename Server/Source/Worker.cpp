@@ -14,7 +14,7 @@
 #include "CPUInfo.hpp"
 #include "ChannelSet.hpp"
 
-#ifdef JUCE_MAC
+#if defined(JUCE_MAC) || defined(JUCE_LINUX)
 #include <sys/socket.h>
 #include <fcntl.h>
 #else
@@ -97,7 +97,7 @@ void Worker::run() {
     sock.reset(accept(m_masterSocket.get(), 2000));
     if (nullptr != sock && sock->isConnected()) {
         m_audio->init(std::move(sock), m_cfg);
-        m_audio->startThread(Thread::realtimeAudioPriority);
+        m_audio->startThread(Thread::Priority::highest);
     } else {
         logln("failed to establish audio connection");
     }
@@ -509,7 +509,7 @@ void Worker::handleMessage(std::shared_ptr<Message<RecentsList>> msg) {
 void Worker::handleMessage(std::shared_ptr<Message<Preset>> msg) {
     traceScope();
     if (auto proc = m_audio->getProcessor(pDATA(msg)->idx)) {
-        proc->setCurrentProgram(pDATA(msg)->channel, pDATA(msg)->preset);
+        proc->setCurrentProgram(pDATA(msg)->preset, pDATA(msg)->channel);
     }
 }
 

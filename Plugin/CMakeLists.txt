@@ -47,6 +47,8 @@ macro(ag_add_plugin type)
     VST3_CATEGORIES Network ${AG_VST3_CATEGORY}
     AAX_CATEGORY ${AG_AAX_CATEGORY}
     AU_MAIN_TYPE ${AG_AU_TYPE}
+    AU_SANDBOX_SAFE TRUE
+    SUPPRESS_AU_PLIST_RESOURCE_USAGE TRUE
     COPY_PLUGIN_AFTER_BUILD FALSE)
 
   juce_generate_juce_header(AudioGridder${type})

@@ -71,7 +71,7 @@ bool read(StreamingSocket* socket, void* data, int size, int timeoutMilliseconds
         traceln("warning, blocking read");
     }
     MessageHelper::seterr(e, MessageHelper::E_NONE);
-    if (nullptr != socket && !socket->isConnected()) {
+    if (nullptr == socket || !socket->isConnected()) {
         MessageHelper::seterr(e, MessageHelper::E_STATE);
         traceln("failed: E_STATE");
         return false;
@@ -137,18 +137,20 @@ bool setNonBlocking(int handle) noexcept {
 }
 
 StreamingSocket* accept(StreamingSocket* master, int timeoutMs, std::function<bool()> abortFn) {
-    TimeStatistic::Timeout timeout(timeoutMs);
-    do {
-        if (master->waitUntilReady(true, 20) > 0) {
-            auto sock = master->waitForNextConnection();
-            if (nullptr != sock) {
-                return sock;
+    if (nullptr != master) {
+        TimeStatistic::Timeout timeout(timeoutMs);
+        do {
+            if (master->waitUntilReady(true, 20) > 0) {
+                auto sock = master->waitForNextConnection();
+                if (nullptr != sock) {
+                    return sock;
+                }
             }
-        }
-        if (nullptr != abortFn && abortFn()) {
-            return nullptr;
-        }
-    } while (timeout.getMillisecondsLeft() > 0);
+            if (nullptr != abortFn && abortFn()) {
+                return nullptr;
+            }
+        } while (timeout.getMillisecondsLeft() > 0);
+    }
     return nullptr;
 }
 
