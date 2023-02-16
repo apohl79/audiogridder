@@ -744,22 +744,23 @@ void PluginEditor::showServerMenu() {
         return n;
     };
 
-    subm.addItem("Allow individual buffer size by plugin", true, m_processor.getBufferSizeByPlugin(), [this] {
+    subm.addItem("Same buffer size for all plugins", true, !m_processor.getBufferSizeByPlugin(), [this] {
         traceScope();
         m_processor.setBufferSizeByPlugin(!m_processor.getBufferSizeByPlugin());
         m_processor.saveConfig();
-    });
-    subm.addItem("Use fixed size outbound buffers", true, m_processor.getFixedOutboundBuffer(), [this] {
-        traceScope();
-        m_processor.setFixedOutboundBuffer(!m_processor.getFixedOutboundBuffer());
     });
 
     if (m_processor.getBufferSizeByPlugin()) {
         subm.addItem("Save current settings as default", true, false, [this] {
             traceScope();
-            m_processor.saveConfig();
+            m_processor.saveConfig(-1, true);
         });
     }
+
+    subm.addItem("Use fixed size outbound buffers", true, m_processor.getFixedOutboundBuffer(), [this] {
+        traceScope();
+        m_processor.setFixedOutboundBuffer(!m_processor.getFixedOutboundBuffer());
+    });
 
     subm.addSeparator();
 
