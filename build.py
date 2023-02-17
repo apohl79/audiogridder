@@ -606,7 +606,7 @@ def main():
             args.macostarget = '11.1'
         if args.mode == 'conf':
             (newToolchain, lastToolchain, sysroot) = setMacToolchain(args, args.macostoolchain)
-        if 'keychainPass' in vars(args):
+        if 'keychainPass' in vars(args) and args.keychainPass is not None:
             execute('security unlock -p ' + args.keychainPass)
 
     if args.mode == 'conf':
