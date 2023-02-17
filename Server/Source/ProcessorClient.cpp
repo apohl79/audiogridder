@@ -654,24 +654,29 @@ void ProcessorClient::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
     {
         std::lock_guard<std::mutex> lock(m_audioMtx);
 
-        TimeTrace::addTracePoint("pc_lock");
+        if (nullptr != m_sockAudio) {
+            TimeTrace::addTracePoint("pc_lock");
 
-        if (!msg.sendToServer(m_sockAudio.get(), *sendBuffer, midiMessages, posInfo, sendBuffer->getNumChannels(),
-                              sendBuffer->getNumSamples(), &e, *m_bytesOutMeter)) {
-            logln("error while sending audio message to sandbox: " << e.toString());
-            m_sockAudio->close();
+            if (!msg.sendToServer(m_sockAudio.get(), *sendBuffer, midiMessages, posInfo, sendBuffer->getNumChannels(),
+                                  sendBuffer->getNumSamples(), &e, *m_bytesOutMeter)) {
+                logln("error while sending audio message to sandbox: " << e.toString());
+                m_sockAudio->close();
+                return;
+            }
+
+            TimeTrace::addTracePoint("pc_send");
+
+            if (!msg.readFromServer(m_sockAudio.get(), *sendBuffer, midiMessages, &e, *m_bytesInMeter)) {
+                logln("error while reading audio message from sandbox: " << e.toString());
+                m_sockAudio->close();
+                return;
+            }
+
+            TimeTrace::addTracePoint("pc_read");
+        } else {
+            logln("error while sending audio message: no socket");
             return;
         }
-
-        TimeTrace::addTracePoint("pc_send");
-
-        if (!msg.readFromServer(m_sockAudio.get(), *sendBuffer, midiMessages, &e, *m_bytesInMeter)) {
-            logln("error while reading audio message from sandbox: " << e.toString());
-            m_sockAudio->close();
-            return;
-        }
-
-        TimeTrace::addTracePoint("pc_read");
     }
 
     m_channelMapper.mapReverse(sendBuffer, &buffer);
