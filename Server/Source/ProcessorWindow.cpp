@@ -103,6 +103,12 @@ juce::Rectangle<int> ProcessorWindow::getScreenCaptureRect() {
     return m_screenCaptureRect;
 }
 
+bool ProcessorWindow::isFullyVisible() const {
+    return m_screenCaptureRect.getX() >= 0 && m_screenCaptureRect.getY() >= 0 &&
+           m_screenCaptureRect.getRight() <= m_totalRect.getRight() &&
+           m_screenCaptureRect.getBottom() <= m_totalRect.getBottom();
+}
+
 void ProcessorWindow::updateScreenCaptureArea() {
     traceScope();
     auto rect = getScreenCaptureRect();
@@ -113,7 +119,15 @@ void ProcessorWindow::updateScreenCaptureArea() {
                 traceln("updating area");
                 m_screenCaptureRect = rect;
                 rec->stop();
-                rec->resume(m_screenCaptureRect);
+
+                if (isFullyVisible()) {
+                    rec->resume(m_screenCaptureRect);
+                } else {
+                    if (auto onErr = getApp()->getWorkerErrorCallback(m_tid)) {
+                        onErr("Screen capturing failed: The plugin window must be fully visible to be captured!");
+                    }
+                    logln("error: can't resume capturing when plugin window not fully visible");
+                }
             }
         }
     } else {
@@ -130,17 +144,24 @@ void ProcessorWindow::startCapturing() {
             } else {
                 m_screenCaptureRect = getScreenCaptureRect();
                 if (!m_screenCaptureRect.isEmpty()) {
-                    if (auto rec = ScreenRecorder::getInstance()) {
-                        if (rec->isRecording()) {
-                            rec->stop();
-                        }
-                        rec->start(m_screenCaptureRect, m_callbackFFmpeg, [tid = m_tid](const String& err) {
-                            if (auto onErr = getApp()->getWorkerErrorCallback(tid)) {
-                                onErr("Screen capturing failed: " + err);
+                    if (isFullyVisible()) {
+                        if (auto rec = ScreenRecorder::getInstance()) {
+                            if (rec->isRecording()) {
+                                rec->stop();
                             }
-                        });
+                            rec->start(m_screenCaptureRect, m_callbackFFmpeg, [tid = m_tid](const String& err) {
+                                if (auto onErr = getApp()->getWorkerErrorCallback(tid)) {
+                                    onErr("Screen capturing failed: " + err);
+                                }
+                            });
+                        } else {
+                            logln("error: no screen recorder");
+                        }
                     } else {
-                        logln("error: no screen recorder");
+                        if (auto onErr = getApp()->getWorkerErrorCallback(m_tid)) {
+                            onErr("Screen capturing failed: The plugin window must be fully visible to be captured!");
+                        }
+                        logln("error: can't start capturing when plugin window not fully visible");
                     }
                 } else {
                     // when launching a plugin sandbox, it might take a little bit to ramp up the plugin editor, so we
@@ -182,16 +203,19 @@ void ProcessorWindow::setVisible(bool b) {
             m_processor->hideEditor();
         }
     }
+    bool wasVisible = false;
     if (!m_processor->isClient()) {
+        wasVisible = isVisible();
         Component::setVisible(b);
     }
-    if (b) {
+    if (b && !wasVisible) {
         if (m_processor->isClient()) {
             m_processor->showEditor(getX(), getY());
         } else {
             windowToFront(this);
         }
         m_startCapturingRetry = 0;
+        logln("starting to capture from set visible");
         startCapturing();
     }
     m_isShowing = b;

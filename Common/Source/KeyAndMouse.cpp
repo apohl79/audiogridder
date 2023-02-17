@@ -420,7 +420,7 @@ inline WORD getVK(uint16_t keyCode) {
 #elif defined(JUCE_LINUX)
 
 #include <X11/extensions/XTest.h>
-//#include <X11/XKBlib.h>
+// #include <X11/XKBlib.h>
 
 #define FLAG_VK_SHIFT 0x1
 #define FLAG_VK_CONTROL 0x2

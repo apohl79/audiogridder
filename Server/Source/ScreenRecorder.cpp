@@ -265,6 +265,12 @@ bool ScreenRecorder::prepareInput() {
     traceScope();
     AVDictionary* opts = nullptr;
 
+    // check if the plugin window is fully visible
+    if (m_captureRect.getX() < 0 || m_captureRect.getY() < 0) {
+        logError("The plugin window must be fully visible to be captured!");
+        return false;
+    }
+
 #ifdef JUCE_MAC
     // This works only when building ffmpeg for OSX 10.8+. Thats why there is a separate 10.7 build.
     // av_dict_set(&opts, "capture_cursor", "0", 0); // the default is 0 anyways, so we don't need to call this.
