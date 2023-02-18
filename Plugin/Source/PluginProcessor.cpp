@@ -249,7 +249,8 @@ void PluginProcessor::loadConfig(const json& j, bool isUpdate) {
     m_bufferSizeByPlugin = jsonGetValue(j, "BufferSettingByPlugin", m_bufferSizeByPlugin);
     m_numberOfBuffersDefault = jsonGetValue(j, "NumberOfBuffersDefault", m_client->NUM_OF_BUFFERS.load());
     m_customBlockSizeDefault = jsonGetValue(j, "CustomBlockSize", m_customBlockSize);
-    m_fixedOutboundBufferDefault = jsonGetValue(j, "FixedOutboundBufferDefault", m_client->FIXED_OUTBOUND_BUFFER.load());
+    m_fixedOutboundBufferDefault =
+        jsonGetValue(j, "FixedOutboundBufferDefault", m_client->FIXED_OUTBOUND_BUFFER.load());
 
     if (!isUpdate) {
         if (jsonHasValue(j, "Servers")) {
