@@ -41,87 +41,93 @@ void GenericEditor::resized() {
     int row = 0;
 
     auto& plugin = m_processor.getLoadedPlugin(active);
-    auto& params = plugin.getActiveParams();
-    for (int i = 0; i < (int)params.size(); i++) {
-        auto& param = params[(size_t)i];
-        if (param.category > AudioProcessorParameter::genericParameter) {
-            continue;  // Parameters like meters are not supported for now.
-        }
-
-        auto lbl = std::make_unique<Label>("lbl", param.name);
-        lbl->setBounds(leftIndent, topIndent + (rowHeight + rowSpace) * row, labelWidth, rowHeight);
-        addAndMakeVisible(lbl.get());
-        m_labels.add(std::move(lbl));
-        if (param.allValues.size() > 2) {
-            auto c = std::make_unique<ComboBox>();
-            for (int idx = 0; idx < param.allValues.size(); idx++) {
-                c->addItem(param.allValues[idx], idx + 1);
+    if (plugin.params.size() > 0) {
+        auto& params = plugin.getActiveParams();
+        for (int i = 0; i < (int)params.size(); i++) {
+            auto& param = params[(size_t)i];
+            if (param.category > AudioProcessorParameter::genericParameter) {
+                continue;  // Parameters like meters are not supported for now.
             }
-            c->setSelectedId((int)param.getValue() + 1, NotificationType::dontSendNotification);
-            c->setBounds(leftIndent + labelWidth, topIndent + (rowHeight + rowSpace) * row, componentWidth, rowHeight);
-            c->onChange = [this, active, channel = plugin.activeChannel, i] {
-                auto* locComp = dynamic_cast<ComboBox*>(getComponent(i));
-                auto& locParam = getParameter(i);
-                locParam.setValue((float)locComp->getSelectedItemIndex());
-                m_processor.updateParameterValue(active, channel, i, locParam.currentValue);
-            };
 
-            auto tracker = std::make_unique<GestureTracker>(this, i, plugin.activeChannel);
-            c->addMouseListener(tracker.get(), true);
-            m_gestureTrackers.add(std::move(tracker));
-
-            addAndMakeVisible(c.get());
-            m_components.add(std::move(c));
-        } else {
-            auto c = std::make_unique<Slider>(Slider::LinearHorizontal, Slider::TextBoxRight);
-            c->setTextValueSuffix(param.label);
-            c->setNormalisableRange(param.range);
-            if (param.isBoolean) {
-                c->setNumDecimalPlacesToDisplay(0);
-                c->setSliderSnapsToMousePosition(false);
-                auto handler = std::make_unique<OnClick>(this, [this, i] {
-                    auto* locComp = dynamic_cast<Slider*>(getComponent(i));
-                    auto newVal = locComp->getValue() == 0.0 ? 1.0 : 0.0;
-                    locComp->setValue(newVal);
-                });
-                c->addMouseListener(handler.get(), true);
-                m_clickHandlers.add(std::move(handler));
-            } else {
-                c->setNumDecimalPlacesToDisplay(2);
-            }
-            c->setBounds(leftIndent + labelWidth, topIndent + (rowHeight + rowSpace) * row, componentWidth, rowHeight);
-            c->setValue(param.getValue(), NotificationType::dontSendNotification);
-            c->onValueChange = [this, active, channel = plugin.activeChannel, i] {
-                auto* locComp = dynamic_cast<Slider*>(getComponent(i));
-                auto& locParam = getParameter(i);
-                locParam.setValue((float)locComp->getValue());
-                m_processor.updateParameterValue(active, channel, i, locParam.currentValue);
-            };
-
-            auto tracker = std::make_unique<GestureTracker>(this, i, plugin.activeChannel);
-            c->addMouseListener(tracker.get(), true);
-            m_gestureTrackers.add(std::move(tracker));
-
-            addAndMakeVisible(c.get());
-            m_components.add(std::move(c));
-
-            String rangeInfo;
-            if (param.isBoolean) {
-                rangeInfo << "off-on";
-            } else {
-                rangeInfo << String(param.range.start, 0) << "-" << String(param.range.end, 0);
-            }
-            lbl = std::make_unique<Label>("lbl", rangeInfo);
-            lbl->setBounds(leftIndent + labelWidth + componentWidth, topIndent + (rowHeight + rowSpace) * row,
-                           rangeInfoWidth, rowHeight);
-            lbl->setAlpha(0.3f);
-            auto fnt = lbl->getFont();
-            fnt.setHeight(12);
-            lbl->setFont(fnt);
+            auto lbl = std::make_unique<Label>("lbl", param.name);
+            lbl->setBounds(leftIndent, topIndent + (rowHeight + rowSpace) * row, labelWidth, rowHeight);
             addAndMakeVisible(lbl.get());
             m_labels.add(std::move(lbl));
+            if (param.allValues.size() > 2) {
+                auto c = std::make_unique<ComboBox>();
+                for (int idx = 0; idx < param.allValues.size(); idx++) {
+                    c->addItem(param.allValues[idx], idx + 1);
+                }
+                c->setSelectedId((int)param.getValue() + 1, NotificationType::dontSendNotification);
+                c->setBounds(leftIndent + labelWidth, topIndent + (rowHeight + rowSpace) * row, componentWidth,
+                             rowHeight);
+                c->onChange = [this, active, channel = plugin.activeChannel, i] {
+                    auto* locComp = dynamic_cast<ComboBox*>(getComponent(i));
+                    auto& locParam = getParameter(i);
+                    locParam.setValue((float)locComp->getSelectedItemIndex());
+                    m_processor.updateParameterValue(active, channel, i, locParam.currentValue);
+                };
+
+                auto tracker = std::make_unique<GestureTracker>(this, i, plugin.activeChannel);
+                c->addMouseListener(tracker.get(), true);
+                m_gestureTrackers.add(std::move(tracker));
+
+                addAndMakeVisible(c.get());
+                m_components.add(std::move(c));
+            } else {
+                auto c = std::make_unique<Slider>(Slider::LinearHorizontal, Slider::TextBoxRight);
+                c->setTextValueSuffix(param.label);
+                c->setNormalisableRange(param.range);
+                if (param.isBoolean) {
+                    c->setNumDecimalPlacesToDisplay(0);
+                    c->setSliderSnapsToMousePosition(false);
+                    auto handler = std::make_unique<OnClick>(this, [this, i] {
+                        auto* locComp = dynamic_cast<Slider*>(getComponent(i));
+                        auto newVal = locComp->getValue() == 0.0 ? 1.0 : 0.0;
+                        locComp->setValue(newVal);
+                    });
+                    c->addMouseListener(handler.get(), true);
+                    m_clickHandlers.add(std::move(handler));
+                } else {
+                    c->setNumDecimalPlacesToDisplay(2);
+                }
+                c->setBounds(leftIndent + labelWidth, topIndent + (rowHeight + rowSpace) * row, componentWidth,
+                             rowHeight);
+                c->setValue(param.getValue(), NotificationType::dontSendNotification);
+                c->onValueChange = [this, active, channel = plugin.activeChannel, i] {
+                    auto* locComp = dynamic_cast<Slider*>(getComponent(i));
+                    auto& locParam = getParameter(i);
+                    locParam.setValue((float)locComp->getValue());
+                    m_processor.updateParameterValue(active, channel, i, locParam.currentValue);
+                };
+
+                auto tracker = std::make_unique<GestureTracker>(this, i, plugin.activeChannel);
+                c->addMouseListener(tracker.get(), true);
+                m_gestureTrackers.add(std::move(tracker));
+
+                addAndMakeVisible(c.get());
+                m_components.add(std::move(c));
+
+                String rangeInfo;
+                if (param.isBoolean) {
+                    rangeInfo << "off-on";
+                } else {
+                    rangeInfo << String(param.range.start, 0) << "-" << String(param.range.end, 0);
+                }
+                lbl = std::make_unique<Label>("lbl", rangeInfo);
+                lbl->setBounds(leftIndent + labelWidth + componentWidth, topIndent + (rowHeight + rowSpace) * row,
+                               rangeInfoWidth, rowHeight);
+                lbl->setAlpha(0.3f);
+                auto fnt = lbl->getFont();
+                fnt.setHeight(12);
+                lbl->setFont(fnt);
+                addAndMakeVisible(lbl.get());
+                m_labels.add(std::move(lbl));
+            }
+            row++;
         }
-        row++;
+    } else {
+        logln("generic editor: plugin has no parameters");
     }
     setSize(leftIndent + labelWidth + componentWidth + rangeInfoWidth, 20 + (rowHeight + rowSpace) * row);
 }
