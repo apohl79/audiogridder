@@ -1253,16 +1253,17 @@ void Server::runServer() {
                             traceScope();
                             if (!sendHandshakeResponse(clnt, true, sandboxPort)) {
                                 logln("failed to send handshake response for sandbox " << id);
-                                auto deleter = m_sandboxes[id];
-                                deleter->terminate();
-                                m_sandboxes.remove(id);
-                                m_sandboxDeleter->add(std::move(deleter));
+                                std::shared_ptr<SandboxMaster> deleter;
+                                if (m_sandboxes.getAndRemove(id, deleter)) {
+                                    deleter->terminate();
+                                    m_sandboxDeleter->add(std::move(deleter));
+                                }
                             }
                             clnt->close();
                             delete clnt;
                         };
                         if (sandbox->send(SandboxMessage(SandboxMessage::CONFIG, cfg.toJson()), nullptr, true)) {
-                            m_sandboxes.set(id, std::move(sandbox));
+                            m_sandboxes[id] = std::move(sandbox);
                         } else {
                             logln("failed to send message to sandbox");
                         }
@@ -1320,9 +1321,9 @@ void Server::runServer() {
         shutdownWorkers();
 
         if (m_sandboxes.size() > 0) {
-            for (auto sandbox : m_sandboxes) {
-                sandbox->terminate();
-                m_sandboxDeleter->add(sandbox);
+            for (auto pair : m_sandboxes) {
+                pair.second->terminate();
+                m_sandboxDeleter->add(pair.second);
             }
             m_sandboxes.clear();
         }
@@ -1449,6 +1450,8 @@ void Server::runSandboxChain() {
 }
 
 void Server::runSandboxPlugin() {
+    traceScope();
+
     auto workerMasterSocket = std::make_shared<StreamingSocket>();
 
 #ifndef JUCE_WINDOWS
@@ -1520,6 +1523,7 @@ void Server::runSandboxPlugin() {
 }
 
 bool Server::sendHandshakeResponse(StreamingSocket* sock, bool sandboxEnabled, int port) {
+    traceScope();
     HandshakeResponse resp = {AG_PROTOCOL_VERSION, 0, 0};
     if (sandboxEnabled) {
         resp.setFlag(HandshakeResponse::SANDBOX_ENABLED);
@@ -1532,6 +1536,7 @@ bool Server::sendHandshakeResponse(StreamingSocket* sock, bool sandboxEnabled, i
 }
 
 bool Server::createWorkerListener(std::shared_ptr<StreamingSocket> sock, bool isLocal, int& workerPort) {
+    traceScope();
     int workerPortMax = getOpt("workerPortMax", Defaults::CLIENT_PORT + 1000);
     workerPort = getOpt("workerPort", Defaults::CLIENT_PORT);
     if (isLocal) {
@@ -1554,10 +1559,12 @@ bool Server::createWorkerListener(std::shared_ptr<StreamingSocket> sock, bool is
 }
 
 void Server::handleMessageFromSandbox(SandboxMaster& sandbox, const SandboxMessage& msg) {
+    traceScope();
     if (msg.type == SandboxMessage::SHOW_EDITOR) {
-        if (!m_screenLocalMode && m_sandboxHasScreen.isNotEmpty() && m_sandboxHasScreen != sandbox.id &&
-            m_sandboxes.contains(m_sandboxHasScreen)) {
-            m_sandboxes.getReference(m_sandboxHasScreen)->send(SandboxMessage(SandboxMessage::HIDE_EDITOR, {}));
+        if (!m_screenLocalMode && m_sandboxHasScreen.isNotEmpty() && m_sandboxHasScreen != sandbox.id) {
+            if (auto sb = m_sandboxes[m_sandboxHasScreen]) {
+                sb->send(SandboxMessage(SandboxMessage::HIDE_EDITOR, {}));
+            }
         }
         m_sandboxHasScreen = sandbox.id;
     } else if (msg.type == SandboxMessage::HIDE_EDITOR && m_sandboxHasScreen == sandbox.id) {
@@ -1580,16 +1587,17 @@ void Server::handleMessageFromSandbox(SandboxMaster& sandbox, const SandboxMessa
 }
 
 void Server::handleDisconnectFromSandbox(SandboxMaster& sandbox) {
-    if (m_sandboxes.contains(sandbox.id)) {
+    traceScope();
+
+    std::shared_ptr<SandboxMaster> deleter;
+    if (m_sandboxes.getAndRemove(sandbox.id, deleter)) {
         logln("disconnected from sandbox " << sandbox.id);
         m_sandboxLoadedCount.remove(sandbox.id);
         Metrics::getStatistic<TimeStatistic>("audio")->removeExt1minValues(sandbox.id);
         Metrics::getStatistic<TimeStatistic>("audio")->getMeter().removeExtRate1min(sandbox.id);
         Metrics::getStatistic<Meter>("NetBytesOut")->removeExtRate1min(sandbox.id);
         Metrics::getStatistic<Meter>("NetBytesIn")->removeExtRate1min(sandbox.id);
-        auto deleter = m_sandboxes[sandbox.id];
         deleter->terminate();
-        m_sandboxes.remove(sandbox.id);
         m_sandboxDeleter->add(std::move(deleter));
     }
 }
@@ -1600,6 +1608,7 @@ void Server::handleConnectedToMaster() {
 }
 
 void Server::handleDisconnectedFromMaster() {
+    traceScope();
     if (m_sandboxConnectedToMaster.exchange(false)) {
         logln("disconnected from sandbox master");
         signalThreadShouldExit();
@@ -1608,6 +1617,7 @@ void Server::handleDisconnectedFromMaster() {
 }
 
 void Server::handleMessageFromMaster(const SandboxMessage& msg) {
+    traceScope();
     if (msg.type == SandboxMessage::CONFIG) {
         logln("config message from sandbox master: " << msg.data.dump());
         m_sandboxConfig.fromJson(msg.data);
@@ -1623,12 +1633,14 @@ void Server::handleMessageFromMaster(const SandboxMessage& msg) {
 }
 
 void Server::sandboxShowEditor() {
+    traceScope();
     if (m_sandboxModeRuntime == SANDBOX_CHAIN && nullptr != m_sandboxController) {
         m_sandboxController->send(SandboxMessage(SandboxMessage::SHOW_EDITOR, {}), nullptr, true);
     }
 }
 
 void Server::sandboxHideEditor() {
+    traceScope();
     if (m_sandboxModeRuntime == SANDBOX_CHAIN && nullptr != m_sandboxController) {
         m_sandboxController->send(SandboxMessage(SandboxMessage::HIDE_EDITOR, {}));
     }
@@ -1636,6 +1648,7 @@ void Server::sandboxHideEditor() {
 
 void Server::updateSandboxNetworkStats(const String& key, uint32 loaded, double bytesIn, double bytesOut, double rps,
                                        const std::vector<TimeStatistic::Histogram>& audioHists) {
+    traceScope();
     m_sandboxLoadedCount.set(key, loaded);
     Metrics::getStatistic<Meter>("NetBytesIn")->updateExtRate1min(key, bytesIn);
     Metrics::getStatistic<Meter>("NetBytesOut")->updateExtRate1min(key, bytesOut);

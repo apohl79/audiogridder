@@ -733,6 +733,60 @@ struct FnTimer : Timer {
     }
 };
 
+template <typename K, typename V>
+class SafeHashMap {
+  public:
+    bool contains(const K& key) {
+        std::lock_guard<std::mutex> lock(m_mtx);
+        return m_elements.find(key) != m_elements.end();
+    }
+
+    void clear() {
+        std::lock_guard<std::mutex> lock(m_mtx);
+        m_elements.clear();
+    }
+
+    V& operator[](const K& key) {
+        std::lock_guard<std::mutex> lock(m_mtx);
+        return m_elements[key];
+    }
+
+    V operator[](const K& key) const {
+        std::lock_guard<std::mutex> lock(m_mtx);
+        return m_elements[key];
+    }
+
+    bool getAndRemove(const K& key, V& val) {
+        std::lock_guard<std::mutex> lock(m_mtx);
+        auto it = m_elements.find(key);
+        if (it != m_elements.end()) {
+            val = it->second;
+            m_elements.erase(it);
+            return true;
+        }
+        return false;
+    }
+
+    void erase(const K& key) {
+        std::lock_guard<std::mutex> lock(m_mtx);
+        m_elements.erase(key);
+    }
+
+    size_t size() const {
+        std::lock_guard<std::mutex> lock(m_mtx);
+        return m_elements.size();
+    }
+
+    auto begin() noexcept { return m_elements.begin(); }
+    const auto begin() const noexcept { return m_elements.begin(); }
+    auto end() noexcept { return m_elements.end(); }
+    const auto end() const noexcept { return m_elements.end(); }
+
+  private:
+    std::unordered_map<K, V> m_elements;
+    mutable std::mutex m_mtx;
+};
+
 }  // namespace e47
 
 #endif /* Utils_hpp */

@@ -111,7 +111,7 @@ class Server : public Thread, public LogTag {
     void handleDisconnectedFromMaster();
     void handleConnectedToMaster();
 
-    int getNumSandboxes() { return m_sandboxes.size(); }
+    int getNumSandboxes() { return (int)m_sandboxes.size(); }
     int getNumLoadedBySandboxes() {
         int sum = 0;
         for (auto c : m_sandboxLoadedCount) {
@@ -178,7 +178,7 @@ class Server : public Thread, public LogTag {
     bool m_sandboxLogAutoclean = true;
     double m_processingTraceTresholdMs = 0.0;
 
-    HashMap<String, std::shared_ptr<SandboxMaster>, DefaultHashFunctions, CriticalSection> m_sandboxes;
+    SafeHashMap<String, std::shared_ptr<SandboxMaster>> m_sandboxes;
 
     std::unique_ptr<SandboxSlave> m_sandboxController;
 
