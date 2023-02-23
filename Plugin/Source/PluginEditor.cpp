@@ -172,6 +172,9 @@ PluginEditor::~PluginEditor() {
 
 void PluginEditor::paint(Graphics& g) {
     traceScope();
+    if (m_shouldExit) {
+        return;
+    }
     FillType ft;
     auto colBG = getLookAndFeel().findColour(ResizableWindow::backgroundColourId);
     auto tp = m_processor.getTrackProperties();
@@ -228,6 +231,9 @@ void PluginEditor::ToolsButton::paintButton(Graphics& g, bool shouldDrawButtonAs
 
 void PluginEditor::resized() {
     traceScope();
+    if (m_shouldExit) {
+        return;
+    }
     int buttonWidth = 196;
     int buttonHeight = 20;
     int logoHeight = m_logo.getHeight();
@@ -324,6 +330,9 @@ void PluginEditor::resized() {
 
 void PluginEditor::buttonClicked(Button* button, const ModifierKeys& modifiers, PluginButton::AreaType area) {
     traceScope();
+    if (m_shouldExit) {
+        return;
+    }
     if (!button->getName().compare("newPlug")) {
         auto addFn = [this](const ServerPlugin& plug, const String& layout) {
             traceScope();
@@ -524,6 +533,9 @@ void PluginEditor::buttonClicked(Button* button, const ModifierKeys& modifiers, 
 
 void PluginEditor::buttonClicked(Button* button) {
     traceScope();
+    if (m_shouldExit) {
+        return;
+    }
     TextButton* tb = reinterpret_cast<TextButton*>(button);
     if (tb == &m_toolsButtonPlus) {
         m_processor.increaseSCArea();
@@ -641,6 +653,9 @@ int PluginEditor::getPluginIndex(const String& name) {
 
 void PluginEditor::focusOfChildComponentChanged(FocusChangeType cause) {
     traceScope();
+    if (m_shouldExit) {
+        return;
+    }
     bool focus = hasKeyboardFocus(true);
     if (focus) {
         // reactivate the plugin screen
@@ -716,6 +731,9 @@ void PluginEditor::updateState() {
 
 void PluginEditor::mouseUp(const MouseEvent& event) {
     traceScope();
+    if (m_shouldExit) {
+        return;
+    }
     if (event.eventComponent == &m_srvIcon) {
         showServerMenu();
     } else if (event.eventComponent == &m_settingsIcon) {
