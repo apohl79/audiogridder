@@ -367,6 +367,8 @@ void App::shutdown() {
         m_server.reset();
     }
 
+    m_splashHider.signalThreadShouldExit();
+
     logln("exit code = " << String(m_exitCode));
 
     Tracer::cleanup();
@@ -755,16 +757,19 @@ void App::hideSplashWindow(int wait) {
     traceScope();
     auto ptrcpy = m_splashWindow;
     m_splashWindow.reset();
-    std::thread([this, ptrcpy, wait] {
+    m_splashHider.fn = [this, ptrcpy, wait] {
         Thread::sleep(wait);
         int step = 10;
-        while (step-- > 0) {
+        while (step-- > 0 && !Thread::currentThreadShouldExit()) {
             float alpha = 1.0f * (float)step / 10.0f;
             runOnMsgThreadAsync([ptrcpy, alpha] { ptrcpy->setAlpha(alpha); });
             Thread::sleep(40);
         }
-        runOnMsgThreadAsync([this, ptrcpy] { updateDockIcon(); });
-    }).detach();
+        if (!Thread::currentThreadShouldExit()) {
+            runOnMsgThreadAsync([this, ptrcpy] { updateDockIcon(); });
+        }
+    };
+    m_splashHider.startThread();
 }
 
 void App::setSplashInfo(const String& txt) {
