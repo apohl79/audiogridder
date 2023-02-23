@@ -35,7 +35,7 @@ void windowToFront(Component* c) {
     if (nullptr != c && !c->isAlwaysOnTop()) {
         c->setAlwaysOnTop(true);
         c->toFront(true);
-        c->setAlwaysOnTop(false);
+        Timer::callAfterDelay(100, [c] { c->setAlwaysOnTop(false); });
     }
 }
 
