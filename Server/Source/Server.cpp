@@ -1524,7 +1524,7 @@ void Server::runSandboxPlugin() {
 
 bool Server::sendHandshakeResponse(StreamingSocket* sock, bool sandboxEnabled, int port) {
     traceScope();
-    HandshakeResponse resp = {AG_PROTOCOL_VERSION, 0, 0};
+    HandshakeResponse resp = {AG_PROTOCOL_VERSION, 0, 0, 0, 0, 0, 0, 0, 0};
     if (sandboxEnabled) {
         resp.setFlag(HandshakeResponse::SANDBOX_ENABLED);
     }
