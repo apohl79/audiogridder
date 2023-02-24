@@ -87,6 +87,9 @@ void ScreenRecorder::initialize(ScreenRecorder::EncoderMode encMode, EncoderQual
     askForScreenRecordingPermission();
     m_inputFmtName = "avfoundation";
     m_inputStreamUrl = String(getCaptureDeviceIndex()) + ":none";
+#elif defined JUCE_LINUX
+    m_inputFmtName = "x11grab";
+    m_inputStreamUrl = ":0.0";
 #else
     m_inputFmtName = "gdigrab";
     m_inputStreamUrl = "desktop";
@@ -291,11 +294,14 @@ bool ScreenRecorder::prepareInput() {
 #endif
 
     int ret;
-
-    logln("opening input format " << m_inputFmtName << ": " << m_inputStreamUrl);
+    String streamUrl = m_inputStreamUrl;
+#ifdef JUCE_LINUX
+    streamUrl = streamUrl << "+" << m_captureRect.getX() << "," << m_captureRect.getY();
+#endif
+    logln("opening input format " << m_inputFmtName << ": " << streamUrl);
 
     m_captureFmtCtx = avformat_alloc_context();
-    ret = avformat_open_input(&m_captureFmtCtx, m_inputStreamUrl.getCharPointer(), m_inputFmt, &opts);
+    ret = avformat_open_input(&m_captureFmtCtx, streamUrl.getCharPointer(), m_inputFmt, &opts);
     if (ret != 0) {
         logError("prepareInput: avformat_open_input failed: err = " + String(ret));
         return false;
