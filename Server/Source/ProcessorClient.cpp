@@ -90,8 +90,8 @@ bool ProcessorClient::isOk() {
 
     {
         std::lock_guard<std::mutex> lock(m_cmdMtx);
-        ok = m_process.isRunning() && nullptr != m_sockCmdIn && m_sockCmdIn->isConnected() &&
-             nullptr != m_sockCmdOut && m_sockCmdOut->isConnected();
+        ok = m_process.isRunning() && nullptr != m_sockCmdIn && m_sockCmdIn->isConnected() && nullptr != m_sockCmdOut &&
+             m_sockCmdOut->isConnected();
     }
 
     {

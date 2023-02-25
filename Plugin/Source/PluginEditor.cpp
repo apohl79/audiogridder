@@ -1062,15 +1062,54 @@ void PluginEditor::showSettingsMenu() {
         if (bus->isEnabled()) {
             auto& layout = bus->getCurrentLayout();
             bool isInput = bus->isInput();
-            for (int i = 0; i < bus->getNumberOfChannels(); i++) {
-                auto name = bus->getName() + ": " + layout.getChannelTypeName(layout.getTypeOfChannel(i));
-                subm.addItem(name, true, m_processor.getActiveChannels().isActive(ch, isInput), [this, ch, isInput] {
-                    m_processor.getActiveChannels().setActive(ch, isInput,
-                                                              !m_processor.getActiveChannels().isActive(ch, isInput));
+            if (bus->getNumberOfChannels() == 1) {
+                subm.addItem(bus->getName(), true, m_processor.getActiveChannels().isActive(ch, isInput),
+                             [this, ch, isInput] {
+                                 m_processor.getActiveChannels().setActive(
+                                     ch, isInput, !m_processor.getActiveChannels().isActive(ch, isInput));
+                                 m_processor.updateChannelMapping();
+                                 m_processor.getClient().reconnect();
+                             });
+                ch++;
+            } else {
+                PopupMenu busm;
+                bool allActive = true;
+                size_t numChannels = (size_t)bus->getNumberOfChannels();
+                size_t numActive = 0;
+
+                for (size_t i = 0; i < numChannels; i++) {
+                    if (m_processor.getActiveChannels().isActive(ch + i, isInput)) {
+                        numActive++;
+                    }
+                }
+
+                allActive = numActive == numChannels;
+
+                busm.addItem("All channels", true, allActive, [this, ch, numChannels, isInput, allActive] {
+                    for (size_t i = 0; i < numChannels; i++) {
+                        m_processor.getActiveChannels().setActive(ch + i, isInput, !allActive);
+                    }
                     m_processor.updateChannelMapping();
                     m_processor.getClient().reconnect();
                 });
-                ch++;
+
+                busm.addSeparator();
+
+                for (size_t i = 0; i < numChannels; i++) {
+                    auto name = layout.getChannelTypeName(layout.getTypeOfChannel((int)i));
+                    busm.addItem(name, true, m_processor.getActiveChannels().isActive(ch + i, isInput),
+                                 [this, ch, i, isInput] {
+                                     m_processor.getActiveChannels().setActive(
+                                         ch + i, isInput, !m_processor.getActiveChannels().isActive(ch + i, isInput));
+                                     m_processor.updateChannelMapping();
+                                     m_processor.getClient().reconnect();
+                                 });
+                }
+
+                String name = bus->getName();
+                name << " (" << numActive << "/" << numChannels << ")";
+                subm.addSubMenu(name, busm, true, nullptr, allActive, 0);
+                ch += numChannels;
             }
         }
     };
