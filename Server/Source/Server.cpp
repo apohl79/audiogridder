@@ -119,6 +119,20 @@ void Server::loadConfig() {
     }
     m_vstNoStandardFolders = jsonGetValue(cfg, "VSTNoStandardFolders", false);
     logln("include VST standard folders is " << (m_vstNoStandardFolders ? "disabled" : "enabled"));
+
+    m_enableLV2 = jsonGetValue(cfg, "LV2", m_enableLV2);
+    logln("LV2 support " << (m_enableLV2 ? "enabled" : "disabled"));
+    m_lv2Folders.clear();
+    if (jsonHasValue(cfg, "LV2Folders") && cfg["LV2Folders"].size() > 0) {
+        logln("LV2 custom folders:");
+        for (auto& s : cfg["LV2Folders"]) {
+            if (s.get<std::string>().length() > 0) {
+                logln("  " << s.get<std::string>());
+                m_lv2Folders.add(s.get<std::string>());
+            }
+        }
+    }
+
     m_screenCapturingFFmpeg = jsonGetValue(cfg, "ScreenCapturingFFmpeg", m_screenCapturingFFmpeg);
     String encoder = "webp";
     m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
