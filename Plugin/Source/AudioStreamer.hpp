@@ -35,7 +35,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
 
         for (int i = 0; i < clnt->NUM_OF_BUFFERS; i++) {
             AudioMidiBuffer buf;
-            buf.channelsRequested = clnt->getChannelsIn();
+            buf.channelsRequested = clnt->getChannelsOut();
             buf.samplesRequested = clnt->getSamplesPerBlock();
             buf.audio.setSize(clnt->getChannelsIn(), clnt->getSamplesPerBlock());
             buf.audio.clear();
@@ -404,7 +404,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
 
             if (numChannels > 0 && numSamples > 0 && srcBuffer.getNumChannels() > 0 && srcBuffer.getNumSamples() > 0) {
                 if ((audio.getNumSamples() - workingSamples) < numSamples || audio.getNumChannels() < numChannels) {
-                    audio.setSize(numChannels, workingSamples + numSamples, true);
+                    audio.setSize(numChannels, workingSamples + numSamples, true, true);
                 }
                 for (int chan = 0; chan < numChannels; chan++) {
                     audio.copyFrom(chan, workingSamples, srcBuffer, chan, 0, numSamples);
@@ -444,7 +444,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
                 } else {
                     if ((audio.getNumSamples() - workingSamples) < numSamples ||
                         audio.getNumChannels() < srcBuffer.getNumChannels()) {
-                        audio.setSize(srcBuffer.getNumChannels(), workingSamples + numSamples, true);
+                        audio.setSize(srcBuffer.getNumChannels(), workingSamples + numSamples, true, true);
                     }
                     for (int chan = 0; chan < srcBuffer.getNumChannels(); chan++) {
                         traceln("  copying channel " << chan);
@@ -468,7 +468,7 @@ class AudioStreamer : public Thread, public LogTagDelegate {
 
             if (numChannels > 0 && numSamples > 0 && audio.getNumChannels() > 0 && audio.getNumSamples() > 0) {
                 if (dstBuffer.getNumSamples() < numSamples || dstBuffer.getNumChannels() < numChannels) {
-                    dstBuffer.setSize(numChannels, numSamples, true);
+                    dstBuffer.setSize(numChannels, numSamples, true, true);
                 }
                 for (int chan = 0; chan < numChannels; chan++) {
                     dstBuffer.copyFrom(chan, 0, audio, chan, 0, numSamples);
@@ -504,7 +504,6 @@ class AudioStreamer : public Thread, public LogTagDelegate {
         }
 
         void shiftAndResize(int samples) {
-            samples = jmin(samples, workingSamples);
             if (workingSamples > 0) {
                 if (audio.getNumSamples() >= workingSamples) {
                     for (int chan = 0; chan < audio.getNumChannels(); chan++) {

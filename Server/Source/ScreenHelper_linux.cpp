@@ -5,7 +5,7 @@
 namespace e47 {
 static Display* display = NULL;
 
-int getScreenShotData(unsigned char** buffer, unsigned int width, unsigned int height) {
+int getScreenShotData(unsigned char** buffer, int x, int y, unsigned int width, unsigned int height) {
     int ret = 0;
     if (!display) {
         display = XOpenDisplay(NULL);
@@ -17,9 +17,8 @@ int getScreenShotData(unsigned char** buffer, unsigned int width, unsigned int h
     }
 
     Window win = DefaultRootWindow(display);
-    int x = 0, y = 0; /* Window position */
     XImage* img = XGetImage(display, win, x, y, width, height, AllPlanes, ZPixmap);
-    memcpy(*buffer, &img->data, width * height * 4);
+    memcpy(*buffer, img->data, width * height * 4);
     XDestroyImage(img);
     return ret;
 }

@@ -65,6 +65,8 @@ class ProcessorWindow : public DocumentWindow, private Timer, public LogTag {
 
     void timerCallback() override { captureWindow(); }
 
+    bool isFullyVisible() const;
+
     ENABLE_ASYNC_FUNCTORS();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ProcessorWindow)

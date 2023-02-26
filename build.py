@@ -162,12 +162,12 @@ def setMacToolchain(args, toolchain=None):
     else:
         newToolchain = lastToolchain
     log('Using toolchain: ' + newToolchain)
-    sdk = '/SDKs/MacOS.sdk'
+    sdk = '/SDKs/MacOSX.sdk'
     if args.macostarget == '11.1':
-        sdk = '/SDKs/MacOS11.sdk'
+        sdk = '/SDKs/MacOSX11.1.sdk'
     return (newToolchain, lastToolchain, newToolchain + sdk)
 
-def conf(args):
+def conf(args, sysroot):
     cmake_params = []
 
     platform = getPlatform(args)
@@ -195,6 +195,7 @@ def conf(args):
 
     if platform == 'macos':
         cmake_params.append('-DCMAKE_OSX_ARCHITECTURES=' + getArch(args))
+        cmake_params.append('-DCMAKE_OSX_SYSROOT=' + sysroot)
         cmake_params.append('-DAG_MACOS_TARGET=' + args.macostarget)
         if not args.nosigning:
             execute('codesign --force --sign AudioGridder --timestamp=none ' + buildDir + '/bin/crashpad_handler')
@@ -485,6 +486,10 @@ def main():
     defaultPlatform = getPlatform(None)
     defaultArch = getArch(None)
 
+    if defaultPlatform == 'macos':
+        parser.add_argument('-k', '--unlock-keychain', dest='keychainPass', metavar='PASSWORD', type=str, default=None,
+                            help='Unlock the default keychain on macOS using the given password')
+
     parser_conf = subparsers.add_parser('conf', help='Configure the build system')
     parser_conf.add_argument('-t', '--type', dest='buildtype', metavar='TYPE', type=str, default='RelWithDebInfo',
                              help='Build type (default: %(default)s)')
@@ -594,15 +599,18 @@ def main():
 
     newToolchain = ''
     lastToolchain = ''
+    sysroot = ''
 
     if getPlatform(args) == 'macos':
         if 'arch' in vars(args) and args.arch == 'arm64':
             args.macostarget = '11.1'
         if args.mode == 'conf':
             (newToolchain, lastToolchain, sysroot) = setMacToolchain(args, args.macostoolchain)
+        if 'keychainPass' in vars(args) and args.keychainPass is not None:
+            execute('security unlock -p ' + args.keychainPass)
 
     if args.mode == 'conf':
-        conf(args)
+        conf(args, sysroot)
     elif args.mode == 'build':
         build(args)
     elif args.mode == 'pack':

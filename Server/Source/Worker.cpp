@@ -265,37 +265,43 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
     jresult["success"] = success;
     jresult["err"] = err.toStdString();
     if (success) {
-        proc = m_audio->getProcessor(m_audio->getSize() - 1);
-        jresult["latency"] = m_audio->getLatencySamples();
-        jresult["disabledSideChain"] = !wasSidechainDisabled && m_audio->isSidechainDisabled();
-        jresult["name"] = proc->getName().toStdString();
-        jresult["hasEditor"] = proc->hasEditor();
-        jresult["supportsDoublePrecision"] = proc->supportsDoublePrecisionProcessing();
-        jresult["channelInstances"] = proc->getChannelInstances();
-        auto ts = proc->getTailLengthSeconds();
-        if (ts == std::numeric_limits<double>::infinity()) {
-            ts = 0.0;
+        if ((proc = m_audio->getProcessor(m_audio->getSize() - 1))) {
+            jresult["latency"] = m_audio->getLatencySamples();
+            jresult["disabledSideChain"] = !wasSidechainDisabled && m_audio->isSidechainDisabled();
+            jresult["name"] = proc->getName().toStdString();
+            jresult["hasEditor"] = proc->hasEditor();
+            jresult["supportsDoublePrecision"] = proc->supportsDoublePrecisionProcessing();
+            jresult["channelInstances"] = proc->getChannelInstances();
+            auto ts = proc->getTailLengthSeconds();
+            if (ts == std::numeric_limits<double>::infinity()) {
+                ts = 0.0;
+            }
+            jresult["tailSeconds"] = ts;
+            jresult["numOutputChannels"] = proc->getTotalNumOutputChannels();
+            proc->setCallbacks(
+                [this, ctx = getAsyncContext()](int idx, int channel, int paramIdx, float val) mutable {
+                    ctx.execute(
+                        [this, idx, channel, paramIdx, val] { sendParamValueChange(idx, channel, paramIdx, val); });
+                },
+                [this, ctx = getAsyncContext()](int idx, int channel, int paramIdx, bool gestureIsStarting) mutable {
+                    ctx.execute([this, idx, channel, paramIdx, gestureIsStarting] {
+                        sendParamGestureChange(idx, channel, paramIdx, gestureIsStarting);
+                    });
+                },
+                [this, ctx = getAsyncContext()](Message<Key>& m) mutable {
+                    ctx.execute([this, &m] {
+                        std::lock_guard<std::mutex> lock(m_cmdOutMtx);
+                        m.send(m_cmdOut.get());
+                    });
+                },
+                [this, ctx = getAsyncContext()](int idx, bool ok, const String& procErr) mutable {
+                    ctx.execute([this, idx, ok, &procErr] { sendStatusChange(idx, ok, procErr); });
+                });
+        } else {
+            logln("error: getProcessor returned nullptr");
+            jresult["success"] = success = false;
+            jresult["err"] = "failed to load processor after adding";
         }
-        jresult["tailSeconds"] = ts;
-        jresult["numOutputChannels"] = proc->getTotalNumOutputChannels();
-        proc->setCallbacks(
-            [this, ctx = getAsyncContext()](int idx, int channel, int paramIdx, float val) mutable {
-                ctx.execute([this, idx, channel, paramIdx, val] { sendParamValueChange(idx, channel, paramIdx, val); });
-            },
-            [this, ctx = getAsyncContext()](int idx, int channel, int paramIdx, bool gestureIsStarting) mutable {
-                ctx.execute([this, idx, channel, paramIdx, gestureIsStarting] {
-                    sendParamGestureChange(idx, channel, paramIdx, gestureIsStarting);
-                });
-            },
-            [this, ctx = getAsyncContext()](Message<Key>& m) mutable {
-                ctx.execute([this, &m] {
-                    std::lock_guard<std::mutex> lock(m_cmdOutMtx);
-                    m.send(m_cmdOut.get());
-                });
-            },
-            [this, ctx = getAsyncContext()](int idx, bool ok, const String& procErr) mutable {
-                ctx.execute([this, idx, ok, &procErr] { sendStatusChange(idx, ok, procErr); });
-            });
     }
     Message<AddPluginResult> msgResult(this);
     PLD(msgResult).setJson(jresult);

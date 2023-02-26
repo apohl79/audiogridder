@@ -111,7 +111,7 @@ class Server : public Thread, public LogTag {
     void handleDisconnectedFromMaster();
     void handleConnectedToMaster();
 
-    int getNumSandboxes() { return m_sandboxes.size(); }
+    int getNumSandboxes() { return (int)m_sandboxes.size(); }
     int getNumLoadedBySandboxes() {
         int sum = 0;
         for (auto c : m_sandboxLoadedCount) {
@@ -156,12 +156,17 @@ class Server : public Thread, public LogTag {
     bool m_enableVST2 = true;
     float m_screenJpgQuality = 0.9f;
     bool m_screenDiffDetection = true;
-    bool m_screenCapturingFFmpeg = true;
     bool m_screenCapturingOff = false;
     bool m_screenLocalMode = false;
     int m_screenMouseOffsetX = 0;
     int m_screenMouseOffsetY = 0;
+#ifdef JUCE_LINUX
+    bool m_pluginWindowsOnTop = true;
+    bool m_screenCapturingFFmpeg = false;
+#else
     bool m_pluginWindowsOnTop = false;
+    bool m_screenCapturingFFmpeg = true;
+#endif
     ScreenRecorder::EncoderMode m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
     ScreenRecorder::EncoderQuality m_screenCapturingFFmpegQuality = ScreenRecorder::ENC_QUALITY_MEDIUM;
     StringArray m_vst3Folders;
@@ -173,7 +178,7 @@ class Server : public Thread, public LogTag {
     bool m_sandboxLogAutoclean = true;
     double m_processingTraceTresholdMs = 0.0;
 
-    HashMap<String, std::shared_ptr<SandboxMaster>, DefaultHashFunctions, CriticalSection> m_sandboxes;
+    SafeHashMap<String, std::shared_ptr<SandboxMaster>> m_sandboxes;
 
     std::unique_ptr<SandboxSlave> m_sandboxController;
 
