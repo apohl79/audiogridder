@@ -167,6 +167,14 @@ def setMacToolchain(args, toolchain=None):
         sdk = '/SDKs/MacOSX11.1.sdk'
     return (newToolchain, lastToolchain, newToolchain + sdk)
 
+def formatCode(args):
+    for line in subprocess.run(['git', 'status'], stdout=subprocess.PIPE).stdout.decode('utf8').split('\n'):
+        if ('modified:' in line or 'new file:' in line) and \
+           (line.endswith('.cpp') or line.endswith('.hpp')):
+            fname = line.split('\t')[1][12:]
+            execute("dos2unix " + fname)
+            execute("clang-format --verbose -i " + fname)
+
 def conf(args, sysroot):
     cmake_params = []
 
@@ -595,6 +603,8 @@ def main():
     parser_tests.add_argument('-v', '--verbose', dest='verbose', action='store_true', default=False,
                               help='Show tests log (default: %(default)s)')
 
+    parser_format = subparsers.add_parser('format', help='Format C++ files that changed')
+
     args = parser.parse_args()
 
     newToolchain = ''
@@ -623,6 +633,8 @@ def main():
         archive(args)
     elif args.mode == 'tests':
         tests(args)
+    elif args.mode == 'format':
+        formatCode(args)
     else:
         parser.print_usage()
 
