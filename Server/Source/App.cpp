@@ -147,7 +147,9 @@ void App::initialise(const String& commandLineParameters) {
             traceScope();
             showSplashWindow();
             setSplashInfo("Starting server...");
+#ifndef JUCE_LINUX
             m_menuWindow = std::make_unique<MenuBarWindow>(this);
+#endif
 #ifdef JUCE_MAC
             if (!askForAccessibilityPermission()) {
                 AlertWindow::showMessageBox(
