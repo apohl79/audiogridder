@@ -116,6 +116,8 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     std::shared_ptr<SplashWindow> m_splashWindow;
     std::unique_ptr<MenuBarWindow> m_menuWindow;
 
+    FnThread m_splashHider;
+
     uint32 m_exitCode = 0;
 
     template <typename T>

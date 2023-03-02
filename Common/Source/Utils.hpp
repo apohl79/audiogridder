@@ -47,7 +47,7 @@ using namespace std::chrono_literals;
 
 #define traceln(M)                                                                        \
     do {                                                                                  \
-        if (Tracer::isEnabled() && nullptr != getLogTagSource()) {                        \
+        if (Tracer::isEnabled()) {                                                        \
             String __msg;                                                                 \
             __msg << M;                                                                   \
             Tracer::traceMessage(getLogTagSource(), __FILE__, __LINE__, __func__, __msg); \

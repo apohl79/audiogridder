@@ -90,8 +90,8 @@ bool ProcessorClient::isOk() {
 
     {
         std::lock_guard<std::mutex> lock(m_cmdMtx);
-        ok = m_process.isRunning() && nullptr != m_sockCmdIn && m_sockCmdIn->isConnected() &&
-             nullptr != m_sockCmdOut & m_sockCmdOut->isConnected();
+        ok = m_process.isRunning() && nullptr != m_sockCmdIn && m_sockCmdIn->isConnected() && nullptr != m_sockCmdOut &&
+             m_sockCmdOut->isConnected();
     }
 
     {
@@ -438,12 +438,12 @@ bool ProcessorClient::load(const String& settings, const String& layout, uint64 
             m_tailSeconds = jresult["tailSeconds"].get<double>();
             m_numOutputChannels = jresult["numOutputChannels"].get<int>();
             m_lastChannelInstances = jresult["channelInstances"].get<int>();
-        } catch (const json::parse_error& e) {
-            err = "json error when reading result: " + String(e.what());
+        } catch (const json::parse_error& ex) {
+            err = "json error when reading result: " + String(ex.what());
             setAndLogError(err);
             return false;
-        } catch (const std::exception& e) {
-            err = "std error when reading result: " + String(e.what());
+        } catch (const std::exception& ex) {
+            err = "std error when reading result: " + String(ex.what());
             setAndLogError(err);
             return false;
         }

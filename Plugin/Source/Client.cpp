@@ -192,9 +192,10 @@ void Client::handleMessage(std::shared_ptr<Message<Key>> msg) {
         traceScope();
         void* nativeHandle = nullptr;
 #ifdef JUCE_WINDOWS
-        auto* e = m_processor->getActiveEditor();
-        if (nullptr != e) {
-            nativeHandle = e->getPeer()->getNativeHandle();
+        if (auto* e = m_processor->getActiveEditor()) {
+            if (auto* p = e->getPeer()) {
+                nativeHandle = p->getNativeHandle();
+            }
         }
         if (nullptr == nativeHandle) {
             logln("unable to get native handle");

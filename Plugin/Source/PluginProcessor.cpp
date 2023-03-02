@@ -209,6 +209,11 @@ PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
 PluginProcessor::~PluginProcessor() {
     traceScope();
     stopAsyncFunctors();
+    runOnMsgThreadSync([this] {
+        if (auto* e = (PluginEditor*)getActiveEditor()) {
+            e->setShouldExit();
+        }
+    });
     m_tray.reset();
     logln("plugin shutdown: terminating client");
     m_client->signalThreadShouldExit();
