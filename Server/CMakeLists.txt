@@ -75,7 +75,7 @@ target_link_libraries(AudioGridderServer PRIVATE
   ${SENTRY_LIBRARIES})
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  target_link_libraries(AudioGridderServer PRIVATE  X11 Xtst)
+  target_link_libraries(AudioGridderServer PRIVATE  X11 Xtst xcb xcb-shm xcb-xfixes xcb-shape)
   target_compile_definitions(AudioGridderServer PRIVATE JUCE_LINUX=1)
 endif()
 

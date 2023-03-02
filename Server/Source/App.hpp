@@ -49,7 +49,13 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     void menuItemSelected(int /* menuItemID */, int /* topLevelMenuIndex */) override {}
 
     // MenuBarModel
-    StringArray getMenuBarNames() override { return {"Settings"}; }
+    StringArray getMenuBarNames() override {
+#ifdef JUCE_LINUX
+        return {"Tools"};
+#else
+        return {"Settings"};
+#endif
+    }
 
     void prepareShutdown(uint32 exitCode = 0);
     const KnownPluginList& getPluginList();
