@@ -33,9 +33,13 @@ void windowToFront(Component* c) {
     setLogTagStatic("utils");
     traceScope();
     if (nullptr != c && !c->isAlwaysOnTop()) {
+#ifndef JUCE_LINUX
         c->setAlwaysOnTop(true);
+#endif
         c->toFront(true);
+#ifndef JUCE_LINUX
         Timer::callAfterDelay(100, [c] { c->setAlwaysOnTop(false); });
+#endif
     }
 }
 
