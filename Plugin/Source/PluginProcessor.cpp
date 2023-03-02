@@ -1882,7 +1882,7 @@ void PluginProcessor::TrayConnection::run() {
 #elif JUCE_WINDOWS
                 path << "/AudioGridderPluginTray/AudioGridderPluginTray.exe";
 #elif JUCE_LINUX
-                path << "/local/bin/AudioGridderPluginTray";
+                path << "/local/share/audiogridder/AudioGridderPluginTray";
 #endif
                 if (File(path).existsAsFile()) {
                     logln("tray connection failed, trying to run tray app: " << path);
