@@ -672,7 +672,7 @@ void App::setWorkerErrorCallback(Thread::ThreadID tid, ErrorCallback fn) {
     }
 }
 
-PopupMenu App::getMenuForIndex(int topLevelMenuIndex, const String& /* menuName */) {
+PopupMenu App::getMenuForIndex(int topLevelMenuIndex, const String& menuName) {
     PopupMenu menu;
     if (topLevelMenuIndex == 0) {  // Settings
         bool enabled = m_splashWindow == nullptr;
@@ -685,6 +685,7 @@ PopupMenu App::getMenuForIndex(int topLevelMenuIndex, const String& /* menuName 
             menu.addItem(n, false, false, nullptr);
             menu.addSeparator();
         }
+#ifndef JUCE_LINUX
         menu.addItem("Settings", enabled, false, [this] {
             if (nullptr == m_srvSettingsWindow) {
                 m_srvSettingsWindow = std::make_unique<ServerSettingsWindow>(this);
@@ -693,6 +694,7 @@ PopupMenu App::getMenuForIndex(int topLevelMenuIndex, const String& /* menuName 
                 windowToFront(m_srvSettingsWindow.get());
             }
         });
+#endif
         menu.addItem("Plugins", enabled, false, [this] {
             if (nullptr == m_pluginListWindow) {
                 m_pluginListWindow = std::make_unique<PluginListWindow>(
@@ -718,6 +720,15 @@ PopupMenu App::getMenuForIndex(int topLevelMenuIndex, const String& /* menuName 
             restartServer(true);
         });
     }
+#ifdef JUCE_LINUX
+    if (menuName != "Tray") {
+        menu.addSeparator();
+        menu.addItem("Restart", [this] { getApp()->prepareShutdown(App::EXIT_RESTART); });
+        menu.addItem("Quit", [this] { getApp()->prepareShutdown(); });
+    }
+#else
+    ignoreUnused(menuName);
+#endif
     return menu;
 }
 
@@ -729,8 +740,14 @@ void App::hidePluginList() {
 
 void App::hideServerSettings() {
     traceScope();
+#ifdef JUCE_LINUX
+    if (nullptr != m_srvSettingsWindow) {
+        m_srvSettingsWindow->setMinimised(true);
+    }
+#else
     m_srvSettingsWindow.reset();
     updateDockIcon();
+#endif
 }
 
 void App::hideStatistics() {
@@ -763,7 +780,12 @@ void App::hideSplashWindow(int wait) {
             runOnMsgThreadAsync([ptrcpy, alpha] { ptrcpy->setAlpha(alpha); });
             Thread::sleep(40);
         }
-        runOnMsgThreadAsync([this, ptrcpy] { updateDockIcon(); });
+        runOnMsgThreadAsync([this, ptrcpy] {
+#ifdef JUCE_LINUX
+            m_srvSettingsWindow = std::make_unique<ServerSettingsWindow>(this);
+#endif
+            updateDockIcon();
+        });
     }).detach();
 }
 
