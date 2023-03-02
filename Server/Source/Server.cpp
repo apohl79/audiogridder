@@ -291,7 +291,7 @@ void Server::loadKnownPluginList() {
 }
 
 bool Server::parsePluginLayouts(const String& id) {
-    if (m_jpluginLayouts.empty()) {
+    if (m_jpluginLayouts.empty() && !m_pluginList.getTypes().isEmpty()) {
         if (m_sandboxModeRuntime == SANDBOX_NONE) {
             String msg =
                 "No cached plugin layouts have been found. This can increase plugin loading times and not all "
