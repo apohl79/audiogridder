@@ -209,6 +209,11 @@ PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
 PluginProcessor::~PluginProcessor() {
     traceScope();
     stopAsyncFunctors();
+    runOnMsgThreadSync([this] {
+        if (auto* e = (PluginEditor*)getActiveEditor()) {
+            e->setShouldExit();
+        }
+    });
     m_tray.reset();
     logln("plugin shutdown: terminating client");
     m_client->signalThreadShouldExit();
@@ -1877,7 +1882,7 @@ void PluginProcessor::TrayConnection::run() {
 #elif JUCE_WINDOWS
                 path << "/AudioGridderPluginTray/AudioGridderPluginTray.exe";
 #elif JUCE_LINUX
-                path << "/local/bin/AudioGridderPluginTray";
+                path << "/local/share/audiogridder/AudioGridderPluginTray";
 #endif
                 if (File(path).existsAsFile()) {
                     logln("tray connection failed, trying to run tray app: " << path);

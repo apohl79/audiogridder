@@ -10,6 +10,8 @@
 #include "Server.hpp"
 #include "WindowPositions.hpp"
 
+#include "Images.hpp"
+
 namespace e47 {
 
 ServerSettingsWindow::ServerSettingsWindow(App* app)
@@ -32,6 +34,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     int borderLR = 15;  // left/right border
     int borderTB = 15;  // top/bottom border
     int rowHeight = 30;
+    int extraBorderTB = 0;
 
     int fieldWidth = 50;
     int wideFieldWidth = 250;
@@ -48,27 +51,34 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     int saveButtonWidth = 125;
     int saveButtonHeight = 30;
 
+#ifdef JUCE_LINUX
+    setMenuBar(app);
+    extraBorderTB = 20;
+    totalHeight += extraBorderTB;
+#endif
+
     auto getLabelBounds = [&](int r) {
-        return juce::Rectangle<int>(borderLR, borderTB + r * rowHeight, labelWidth, labelHeight);
+        return juce::Rectangle<int>(borderLR, extraBorderTB + borderTB + r * rowHeight, labelWidth, labelHeight);
     };
     auto getFieldBounds = [&](int r) {
-        return juce::Rectangle<int>(totalWidth - fieldWidth - borderLR, borderTB + r * rowHeight + 3, fieldWidth,
-                                    fieldHeight);
+        return juce::Rectangle<int>(totalWidth - fieldWidth - borderLR, extraBorderTB + borderTB + r * rowHeight + 3,
+                                    fieldWidth, fieldHeight);
     };
     auto getWideFieldBounds = [&](int r) {
-        return juce::Rectangle<int>(totalWidth - wideFieldWidth - borderLR, borderTB + r * rowHeight + 3,
-                                    wideFieldWidth, fieldHeight);
+        return juce::Rectangle<int>(totalWidth - wideFieldWidth - borderLR,
+                                    extraBorderTB + borderTB + r * rowHeight + 3, wideFieldWidth, fieldHeight);
     };
     auto getCheckBoxBounds = [&](int r) {
-        return juce::Rectangle<int>(totalWidth - checkBoxWidth - borderLR, borderTB + r * rowHeight + 3, checkBoxWidth,
-                                    checkBoxHeight);
+        return juce::Rectangle<int>(totalWidth - checkBoxWidth - borderLR, extraBorderTB + borderTB + r * rowHeight + 3,
+                                    checkBoxWidth, checkBoxHeight);
     };
     auto getLargeFieldBounds = [&](int r) {
-        return juce::Rectangle<int>(totalWidth - largeFieldWidth - borderLR, borderTB + r * rowHeight + 3,
-                                    largeFieldWidth, largeFieldHeight);
+        return juce::Rectangle<int>(totalWidth - largeFieldWidth - borderLR,
+                                    extraBorderTB + borderTB + r * rowHeight + 3, largeFieldWidth, largeFieldHeight);
     };
     auto getHeaderBounds = [&](int r) {
-        return juce::Rectangle<int>(borderLR, borderTB + r * rowHeight + 7, totalWidth - borderLR * 2, headerHeight);
+        return juce::Rectangle<int>(borderLR, extraBorderTB + borderTB + r * rowHeight + 7, totalWidth - borderLR * 2,
+                                    headerHeight);
     };
 
     int row = 0;
@@ -651,7 +661,11 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     centreWithSize(totalWidth, totalHeight);
     setBounds(WindowPositions::get(WindowPositions::ServerSettings, getBounds()));
     setVisible(true);
+#ifdef JUCE_LINUX
+    setMinimised(true);
+#else
     windowToFront(this);
+#endif
 }
 
 ServerSettingsWindow::~ServerSettingsWindow() {

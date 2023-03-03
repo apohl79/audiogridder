@@ -142,7 +142,6 @@ def getVersion():
         return f.readline().rstrip()
     return ''
 
-
 def getMacToolchain(args):
     toolchain = ''
     if args.macostarget in ('10.7', '10.8', '10.9'):
@@ -166,6 +165,14 @@ def setMacToolchain(args, toolchain=None):
     if args.macostarget == '11.1':
         sdk = '/SDKs/MacOSX11.1.sdk'
     return (newToolchain, lastToolchain, newToolchain + sdk)
+
+def formatCode(args):
+    for line in subprocess.run(['git', 'status'], stdout=subprocess.PIPE).stdout.decode('utf8').split('\n'):
+        if ('modified:' in line or 'new file:' in line) and \
+           (line.endswith('.cpp') or line.endswith('.hpp')):
+            fname = line.split('\t')[1][12:]
+            execute("dos2unix " + fname)
+            execute("clang-format --verbose -i " + fname)
 
 def conf(args, sysroot):
     cmake_params = []
@@ -357,31 +364,63 @@ def packReal(platform, arch, version, buildDir, macosTarget):
             zf.close()
 
     elif platform == 'linux':
-        os.makedirs('package/build/linux/vst', exist_ok=True)
-        os.makedirs('package/build/linux/vst3/AudioGridder.vst3/Contents/x86_64-linux', exist_ok=True)
-        os.makedirs('package/build/linux/vst3/AudioGridderInst.vst3/Contents/x86_64-linux', exist_ok=True)
-        os.makedirs('package/build/linux/vst3/AudioGridderMidi.vst3/Contents/x86_64-linux', exist_ok=True)
-        os.makedirs('package/build/linux/bin', exist_ok=True)
+        installers = []
 
-        log('copying vst plugins...')
-        for src in glob.glob(buildDir + '/lib/lib*.so'):
-            dst = src.replace(buildDir + '/lib/lib', 'package/build/linux/vst/')
-            shutil.copyfile(src, dst)
-        log('copying vst3 plugins...')
-        for src in glob.glob(buildDir + '/lib/AudioGridder*.so'):
-            name = src.replace(buildDir + '/lib/', '').replace('.so', '')
-            dst = 'package/build/linux/vst3/' + name + '.vst3/Contents/x86_64-linux/' + name + '.so'
-            shutil.copyfile(src, dst)
-        log('copying binaries...')
-        shutil.copy(buildDir + '/bin/AudioGridderPluginTray', 'package/build/linux/bin')
-        shutil.copy(buildDir + '/bin/crashpad_handler', 'package/build/linux/bin')
+        instName = 'package/build/AudioGridderPlugin_' + version + '-Linux.sh'
+        installers.append(instName)
+        instDir = buildDir + '/inst'
+        if os.path.isdir(instDir):
+            shutil.rmtree(instDir)
+        vst2Dir = instDir + '/vst'
+        vst3Dir = instDir + '/vst3'
+        binDir = instDir + '/bin'
+        os.makedirs(vst2Dir)
+        os.makedirs(vst3Dir)
+        os.makedirs(binDir)
+        configureFile('package/install_linux_plugin.sh', instDir + '/install_linux_plugin.sh',
+                      {'version': version})
+        os.chmod(instDir + '/install_linux_plugin.sh', 0o755)
+        for p in ['AudioGridder', 'AudioGridderInst', 'AudioGridderMidi']:
+            shutil.copyfile(buildDir + '/lib/lib' + p + '.so', vst2Dir + '/' + p + '.so')
+            vst3So = p + '.so'
+            vst3Bundle = vst3Dir + '/' + p + '.vst3/Contents/x86_64-linux'
+            os.makedirs(vst3Bundle)
+            shutil.copyfile(buildDir + '/lib/' + vst3So, vst3Bundle + '/' + vst3So)
+        for f in ['AudioGridderPluginTray', 'crashpad_handler']:
+            shutil.copyfile(buildDir + '/bin/' + f, binDir + '/' + f)
+        execute('bash package/makeself.sh --bzip2 ' + instDir + ' ' + instName + ' "installer files" ./install_linux_plugin.sh')
+        shutil.rmtree(instDir)
 
-        os.chdir('package/build/linux')
-        execute('zip -r ../AudioGridder_' + version + '-Linux.zip vst vst3 bin')
-        execute('zip -j ../AudioGridder_' + version + '-Linux.zip ../../install-trayapp-linux.sh')
+        instName = 'package/build/AudioGridderServer_' + version + '-Linux.sh'
+        installers.append(instName)
+        instDir = buildDir + '/inst'
+        if os.path.isdir(instDir):
+            shutil.rmtree(instDir)
+        binDir = instDir + '/bin'
+        resDir = instDir + '/resources'
+        os.makedirs(binDir)
+        os.makedirs(resDir)
+        configureFile('package/install_linux_server.sh', instDir + '/install_linux_server.sh',
+                      {'version': version})
+        os.chmod(instDir + '/install_linux_server.sh', 0o755)
+        for f in ['AudioGridderServer', 'crashpad_handler']:
+            shutil.copyfile(buildDir + '/bin/' + f, binDir + '/' + f)
+        shutil.copyfile('Server/Resources/icon64.png', resDir + '/icon64.png')
+        shutil.copyfile('package/audiogridderserver.desktop', resDir + '/audiogridderserver.desktop')
+        execute('bash package/makeself.sh --bzip2 ' + instDir + ' ' + instName + ' "installer files" ./install_linux_server.sh')
+        shutil.rmtree(instDir)
 
-        os.chdir('../../..')
-        shutil.rmtree('package/build/linux', ignore_errors=True)
+        execute('zip -j -9 package/build/AudioGridder_' + version + '-Linux-Installers.zip ' + ' '.join(installers))
+        execute('zip -r -9 package/build/AudioGridder_' + version + '-Linux.zip ' + buildDir + \
+                ' -i "*/bin/*" "*/lib/*" -x "*.a" "*/JUCE/*"')
+
+def configureFile(inFile, outFile, variables):
+    with open(inFile, 'r') as ifile:
+        with open(outFile, 'w') as ofile:
+            for l in ifile.readlines():
+                for k in variables.keys():
+                    l = l.replace('#' + k + '#', variables[k])
+                ofile.write(l)
 
 def upload(args):
     sentry_params = []
@@ -595,6 +634,8 @@ def main():
     parser_tests.add_argument('-v', '--verbose', dest='verbose', action='store_true', default=False,
                               help='Show tests log (default: %(default)s)')
 
+    parser_format = subparsers.add_parser('format', help='Format C++ files that changed')
+
     args = parser.parse_args()
 
     newToolchain = ''
@@ -623,6 +664,8 @@ def main():
         archive(args)
     elif args.mode == 'tests':
         tests(args)
+    elif args.mode == 'format':
+        formatCode(args)
     else:
         parser.print_usage()
 

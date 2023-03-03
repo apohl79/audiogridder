@@ -169,13 +169,13 @@ macro(ag_strip target_name target_dir)
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     add_custom_target(${target_name}_DBGSYM ALL DEPENDS ${target_name}
       COMMAND
-        ${CMAKE_COMMAND} -E echo "Creating DWARF file from $<TARGET_FILE:${target_name}>"
+        ${CMAKE_COMMAND} -E echo "Copying debug symbols for $<TARGET_FILE:${target_name}>"
       COMMAND
         ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/debug/${target_dir}
       COMMAND
         ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${target_name}> ${CMAKE_BINARY_DIR}/debug/${target_dir}
-      COMMAND
-        /usr/bin/dsymutil -o ${CMAKE_BINARY_DIR}/debug/${target_dir}/$<TARGET_FILE_NAME:${target_name}>.dSYM $<TARGET_FILE:${target_name}>
+      #COMMAND
+      #  /usr/bin/dsymutil -o ${CMAKE_BINARY_DIR}/debug/${target_dir}/$<TARGET_FILE_NAME:${target_name}>.dSYM $<TARGET_FILE:${target_name}>
       )
     add_custom_target(${target_name}_STRIP ALL DEPENDS ${target_name}_DBGSYM
       COMMAND
@@ -317,7 +317,7 @@ endmacro()
 # Remove some warnings from the JUCE list as the JUCE code triggers those itself...
 if((CMAKE_CXX_COMPILER_ID STREQUAL "Clang") OR (CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang"))
   target_compile_options(juce_recommended_warning_flags INTERFACE
-    -Wno-unused-variable -Wno-unused-function -Wno-deprecated -Wno-switch-enum -Wno-missing-prototypes)
+    -Wno-unused-variable -Wno-unused-function -Wno-deprecated -Wno-switch-enum -Wno-missing-prototypes -Wno-c99-extensions)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   target_compile_options(juce_recommended_warning_flags INTERFACE
     -Wno-unused-variable -Wno-unused-but-set-variable -Wno-switch-enum)

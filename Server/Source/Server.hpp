@@ -159,16 +159,15 @@ class Server : public Thread, public LogTag {
     bool m_enableLV2 = true;
     float m_screenJpgQuality = 0.9f;
     bool m_screenDiffDetection = true;
+    bool m_screenCapturingFFmpeg = true;
     bool m_screenCapturingOff = false;
     bool m_screenLocalMode = false;
     int m_screenMouseOffsetX = 0;
     int m_screenMouseOffsetY = 0;
 #ifdef JUCE_LINUX
     bool m_pluginWindowsOnTop = true;
-    bool m_screenCapturingFFmpeg = false;
 #else
     bool m_pluginWindowsOnTop = false;
-    bool m_screenCapturingFFmpeg = true;
 #endif
     ScreenRecorder::EncoderMode m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
     ScreenRecorder::EncoderQuality m_screenCapturingFFmpegQuality = ScreenRecorder::ENC_QUALITY_MEDIUM;

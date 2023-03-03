@@ -305,7 +305,7 @@ void Server::loadKnownPluginList() {
 }
 
 bool Server::parsePluginLayouts(const String& id) {
-    if (m_jpluginLayouts.empty()) {
+    if (m_jpluginLayouts.empty() && !m_pluginList.getTypes().isEmpty()) {
         if (m_sandboxModeRuntime == SANDBOX_NONE) {
             String msg =
                 "No cached plugin layouts have been found. This can increase plugin loading times and not all "
@@ -1538,7 +1538,7 @@ void Server::runSandboxPlugin() {
 
 bool Server::sendHandshakeResponse(StreamingSocket* sock, bool sandboxEnabled, int port) {
     traceScope();
-    HandshakeResponse resp = {AG_PROTOCOL_VERSION, 0, 0};
+    HandshakeResponse resp = {AG_PROTOCOL_VERSION, 0, 0, 0, 0, 0, 0, 0, 0};
     if (sandboxEnabled) {
         resp.setFlag(HandshakeResponse::SANDBOX_ENABLED);
     }
