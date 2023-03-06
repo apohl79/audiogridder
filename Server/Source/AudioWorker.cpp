@@ -81,12 +81,12 @@ void AudioWorker::run() {
     auto traceCtx = TimeTrace::createTraceContext();
     Uuid traceId;
 
-    auto processingTresholMs = -1.0;
+    auto processingTresholdMs = -1.0;
     if (auto srv = getApp()->getServer()) {
-        processingTresholMs = srv->getProcessingTraceTresholdMs();
+        processingTresholdMs = srv->getProcessingTraceTresholdMs();
     }
-    if (processingTresholMs <= 0.0) {
-        processingTresholMs = m_samplesPerBlock / m_sampleRate * 1000 - 1;
+    if (processingTresholdMs <= 0.0) {
+        processingTresholdMs = m_samplesPerBlock / m_sampleRate * 1000 - 1;
     }
 
     MessageHelper::Error e;
@@ -137,7 +137,7 @@ void AudioWorker::run() {
                     sendOk = msg.sendToClient(m_socket.get(), bufferF, midi, m_chain->getLatencySamples(),
                                               bufferF.getNumChannels(), &e, *bytesOut);
                 }
-                traceCtx->summary(getLogTagSource(), "process audio", processingTresholMs);
+                traceCtx->summary(getLogTagSource(), "process audio", processingTresholdMs);
                 if (!sendOk) {
                     logln("error: failed to send audio data to client: " << e.toString());
                     m_socket->close();
