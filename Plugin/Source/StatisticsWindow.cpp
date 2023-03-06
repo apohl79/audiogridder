@@ -132,7 +132,7 @@ StatisticsWindow::StatisticsWindow()
 
     totalHeight += row * rowHeight;
 
-    auto audioTime = Metrics::getStatistic<TimeStatistic>("audio");
+    auto audioTime = Metrics::getStatistic<TimeStatistic>("audio_stream");
     auto bytesOutMeter = Metrics::getStatistic<Meter>("NetBytesOut");
     auto bytesInMeter = Metrics::getStatistic<Meter>("NetBytesIn");
 
