@@ -20,12 +20,12 @@ python3 build.py conf --disable-signing
 python3 build.py build
 ```
 
-##building with visual studio code
-    On Linux, install juce dependencies, build essentials along with g++
-    Download and install VSCode.
-    Install Microsoft C C++ extension pack and Cmake Tools along with ninja build
-    Open Audiogridder folder and import. All configuration will be set automatically.
-    Select build type, target and build
+### Building with Visual Studio Code on Linux
+- Install juce dependencies, build essentials along with g++
+- Download and install VSCode
+- Install Microsoft C/C++ extension pack and CMake tools along with ninja build
+- Open AudioGridder folder and import. All configuration will be set automatically.
+- Select build type, target and build
 
 ## Coding conventions
 
@@ -35,7 +35,7 @@ single statement control blocks, etc). Also before submitting a pull request,
 make sure you are running the code formater.
 
 ```
-package/format.sh
+python3 build.py format
 ```
 
 Thanks for your contributions!
