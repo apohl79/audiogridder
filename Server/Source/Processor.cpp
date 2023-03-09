@@ -308,6 +308,12 @@ std::shared_ptr<AudioPluginInstance> Processor::loadPlugin(const PluginDescripti
     String err2;
     AudioPluginFormatManager plugmgr;
     plugmgr.addDefaultFormats();
+#if JUCE_PLUGINHOST_LV2
+    if (plugdesc.pluginFormatName == "LV2") {
+        AudioPluginFormat* fmt = new LV2PluginFormat();
+        plugmgr.addFormat(fmt);
+    }
+#endif
     std::shared_ptr<AudioPluginInstance> inst;
     runOnMsgThreadSync([&] {
         traceScope();

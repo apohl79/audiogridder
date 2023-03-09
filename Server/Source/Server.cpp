@@ -198,6 +198,11 @@ void Server::saveConfig() {
     for (auto& f : m_vst2Folders) {
         j["VST2Folders"].push_back(f.toStdString());
     }
+    j["LV2"] = m_enableLV2;
+    j["LV2Folders"] = json::array();
+    for (auto& f : m_lv2Folders) {
+        j["LV2Folders"].push_back(f.toStdString());
+    }
     j["VSTNoStandardFolders"] = m_vstNoStandardFolders;
     j["ScreenCapturingFFmpeg"] = m_screenCapturingFFmpeg;
     switch (m_screenCapturingFFmpegEncMode) {
@@ -265,6 +270,10 @@ void Server::loadKnownPluginList() {
 #endif
         } else if (desc.pluginFormatName == "VST3") {
             fmt = std::make_unique<VST3PluginFormat>();
+#if JUCE_PLUGINHOST_LV2
+        } else if (desc.pluginFormatName == "LV2") {
+            fmt = std::make_unique<LV2PluginFormat>();
+#endif
         }
 
         if (nullptr != fmt) {
@@ -560,6 +569,10 @@ bool Server::scanPlugin(const String& id, const String& format, int srvId, bool 
     } else if (!format.compare("AudioUnit")) {
         fmt = std::make_unique<AudioUnitPluginFormat>();
 #endif
+#if JUCE_PLUGINHOST_LV2
+    } else if (!format.compare("LV2")) {
+        fmt = std::make_unique<LV2PluginFormat>();
+#endif
     } else {
         return false;
     }
@@ -832,7 +845,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
     traceScope();
     logln("scanning for plugins...");
     std::vector<std::unique_ptr<AudioPluginFormat>> fmts;
-    size_t fmtAU = 0, fmtVST = 0, fmtVST3 = 0;
+    size_t fmtAU = 0, fmtVST = 0, fmtVST3 = 0, fmtLV2 = 0;
 
 #if JUCE_MAC
     if (m_enableAU) {
@@ -848,6 +861,12 @@ void Server::scanForPlugins(const std::vector<String>& include) {
     if (m_enableVST2) {
         fmtVST = fmts.size();
         fmts.push_back(std::make_unique<VSTPluginFormat>());
+    }
+#endif
+#if JUCE_PLUGINHOST_LV2
+    if (m_enableLV2) {
+        fmtLV2 = fmts.size();
+        fmts.push_back(std::make_unique<LV2PluginFormat>());
     }
 #endif
 
@@ -877,13 +896,27 @@ void Server::scanForPlugins(const std::vector<String>& include) {
     std::atomic<float> progress{0};
 
     StringArray fileOrIds;
+    KnownPluginList pluginList;
 
     for (auto& fmt : fmts) {
         FileSearchPath searchPaths;
         if (fmt->getName().compare("AudioUnit") && !m_vstNoStandardFolders) {
             searchPaths = fmt->getDefaultLocationsToSearch();
         }
-        if (!fmt->getName().compare("VST3")) {
+        if (fmt->getName().compare("LV2")) {
+            searchPaths = fmt->getDefaultLocationsToSearch();
+            for (auto& f : m_lv2Folders) {
+                searchPaths.addIfNotAlreadyThere(f);
+            }
+            logln("LV2 search paths  " << searchPaths.toString());
+            File x(".\aax.txt");
+            PluginDirectoryScanner scanner(pluginList, *fmts[fmtLV2], searchPaths, true, x);
+            String nextPlug;
+            while (scanner.scanNextFile(true, nextPlug)) {
+                logln("LV2 search:  " << nextPlug);
+            }
+
+        } else if (!fmt->getName().compare("VST3")) {
             for (auto& f : m_vst3Folders) {
                 searchPaths.addIfNotAlreadyThere(f);
             }
@@ -901,9 +934,16 @@ void Server::scanForPlugins(const std::vector<String>& include) {
         auto& fileOrId = fileOrIds.getReference(idx);
         auto name = getPluginName(fileOrId, false);
         auto type = getPluginType(fileOrId);
+        std::unique_ptr<PluginDescription> pluginDesc = pluginList.getTypeForFile(fileOrId);
+        if (type == "unknown" && pluginDesc != nullptr) {
+            type = pluginDesc->pluginFormatName;
+            logln("Id " << fileOrId << " name " << name << " type " << type);
+        }
+
         auto* fmt = type == "au"     ? fmts[fmtAU].get()
                     : type == "vst3" ? fmts[fmtVST3].get()
                     : type == "vst"  ? fmts[fmtVST].get()
+                    : type == "LV2"  ? fmts[fmtLV2].get()
                                      : nullptr;
 
         if (nullptr == fmt) {

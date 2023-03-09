@@ -51,6 +51,8 @@ class Server : public Thread, public LogTag {
     void setEnableVST2(bool b) { m_enableVST2 = b; }
     bool getEnableLV2() const { return m_enableLV2; }
     void setEnableLV2(bool b) { m_enableLV2 = b; }
+    const StringArray& getLV2Folders() const { return m_lv2Folders; }
+    void setLV2Folders(const StringArray& folders) { m_lv2Folders = folders; }
     const StringArray& getVST3Folders() const { return m_vst3Folders; }
     void setVST3Folders(const StringArray& folders) { m_vst3Folders = folders; }
     const StringArray& getVST2Folders() const { return m_vst2Folders; }
