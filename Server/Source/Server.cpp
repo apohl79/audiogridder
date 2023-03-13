@@ -900,28 +900,19 @@ void Server::scanForPlugins(const std::vector<String>& include) {
 
     for (auto& fmt : fmts) {
         FileSearchPath searchPaths;
-        if (fmt->getName().compare("AudioUnit") && !m_vstNoStandardFolders) {
+        if (fmt->getName() != "AudioUnit" && (!fmt->getName().startsWith("VST") || !m_vstNoStandardFolders)) {
             searchPaths = fmt->getDefaultLocationsToSearch();
         }
-        if (fmt->getName().compare("LV2")) {
-            searchPaths = fmt->getDefaultLocationsToSearch();
-            for (auto& f : m_lv2Folders) {
-                searchPaths.addIfNotAlreadyThere(f);
-            }
-            logln("LV2 search paths  " << searchPaths.toString());
-            File x(".\aax.txt");
-            PluginDirectoryScanner scanner(pluginList, *fmts[fmtLV2], searchPaths, true, x);
-            String nextPlug;
-            while (scanner.scanNextFile(true, nextPlug)) {
-                logln("LV2 search:  " << nextPlug);
-            }
-
-        } else if (!fmt->getName().compare("VST3")) {
+        if (fmt->getName() == "VST3") {
             for (auto& f : m_vst3Folders) {
                 searchPaths.addIfNotAlreadyThere(f);
             }
-        } else if (!fmt->getName().compare("VST")) {
+        } else if (fmt->getName() == "VST") {
             for (auto& f : m_vst2Folders) {
+                searchPaths.addIfNotAlreadyThere(f);
+            }
+        } else if (fmt->getName() == "LV2") {
+            for (auto& f : m_lv2Folders) {
                 searchPaths.addIfNotAlreadyThere(f);
             }
         }
@@ -932,18 +923,14 @@ void Server::scanForPlugins(const std::vector<String>& include) {
 
     for (int idx = 0; idx < fileOrIds.size(); idx++) {
         auto& fileOrId = fileOrIds.getReference(idx);
-        auto name = getPluginName(fileOrId, false);
-        auto type = getPluginType(fileOrId);
-        std::unique_ptr<PluginDescription> pluginDesc = pluginList.getTypeForFile(fileOrId);
-        if (type == "unknown" && pluginDesc != nullptr) {
-            type = pluginDesc->pluginFormatName;
-            logln("Id " << fileOrId << " name " << name << " type " << type);
-        }
+        auto pluginDesc = m_pluginList.getTypeForFile(fileOrId);
+        auto name = getPluginName(fileOrId, pluginDesc.get(), false);
+        auto type = getPluginType(fileOrId, pluginDesc.get());
 
         auto* fmt = type == "au"     ? fmts[fmtAU].get()
                     : type == "vst3" ? fmts[fmtVST3].get()
                     : type == "vst"  ? fmts[fmtVST].get()
-                    : type == "LV2"  ? fmts[fmtLV2].get()
+                    : type == "lv2"  ? fmts[fmtLV2].get()
                                      : nullptr;
 
         if (nullptr == fmt) {
@@ -951,9 +938,8 @@ void Server::scanForPlugins(const std::vector<String>& include) {
             continue;
         }
 
-        auto plugindesc = m_pluginList.getTypeForFile(fileOrId);
         bool excluded = shouldExclude(name, fileOrId, include);
-        if ((nullptr == plugindesc || fmt->pluginNeedsRescanning(*plugindesc)) &&
+        if ((nullptr == pluginDesc || fmt->pluginNeedsRescanning(*pluginDesc)) &&
             !m_pluginList.getBlacklistedFiles().contains(fileOrId) && newBlacklistedPlugins.count(fileOrId) == 0 &&
             !excluded) {
             ScanThread* scanThread = nullptr;
@@ -969,7 +955,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
                 }
             } while (scanThread == nullptr);
 
-            String splashName = getPluginName(fileOrId);
+            String splashName = getPluginName(fileOrId, pluginDesc.get());
 
             progress = (float)idx / fileOrIds.size() * 100.0f;
 
@@ -1053,7 +1039,8 @@ void Server::processScanResults(int id, std::set<String>& newBlacklistedPlugins)
         for (auto& p : plist.getBlacklistedFiles()) {
             if (!m_pluginList.getBlacklistedFiles().contains(p)) {
                 m_pluginList.addToBlacklist(p);
-                newBlacklistedPlugins.insert(getPluginName(p));
+                auto pdesc = plist.getTypeForIdentifierString(p);
+                newBlacklistedPlugins.insert(getPluginName(p, pdesc.get()));
             }
         }
 
@@ -1076,7 +1063,7 @@ void Server::processScanResults(int id, std::set<String>& newBlacklistedPlugins)
         deadmanFile.readLines(lines);
 
         for (auto& line : lines) {
-            newBlacklistedPlugins.insert(getPluginName(line));
+            newBlacklistedPlugins.insert(getPluginName(line, nullptr));
         }
 
         deadmanFile.deleteFile();
