@@ -49,6 +49,10 @@ class Server : public Thread, public LogTag {
     void setEnableVST3(bool b) { m_enableVST3 = b; }
     bool getEnableVST2() const { return m_enableVST2; }
     void setEnableVST2(bool b) { m_enableVST2 = b; }
+    bool getEnableLV2() const { return m_enableLV2; }
+    void setEnableLV2(bool b) { m_enableLV2 = b; }
+    const StringArray& getLV2Folders() const { return m_lv2Folders; }
+    void setLV2Folders(const StringArray& folders) { m_lv2Folders = folders; }
     const StringArray& getVST3Folders() const { return m_vst3Folders; }
     void setVST3Folders(const StringArray& folders) { m_vst3Folders = folders; }
     const StringArray& getVST2Folders() const { return m_vst2Folders; }
@@ -154,6 +158,7 @@ class Server : public Thread, public LogTag {
     bool m_enableAU = true;
     bool m_enableVST3 = true;
     bool m_enableVST2 = true;
+    bool m_enableLV2 = true;
     float m_screenJpgQuality = 0.9f;
     bool m_screenDiffDetection = true;
     bool m_screenCapturingFFmpeg = true;
@@ -170,6 +175,7 @@ class Server : public Thread, public LogTag {
     ScreenRecorder::EncoderQuality m_screenCapturingFFmpegQuality = ScreenRecorder::ENC_QUALITY_MEDIUM;
     StringArray m_vst3Folders;
     StringArray m_vst2Folders;
+    StringArray m_lv2Folders;
     bool m_vstNoStandardFolders;
     bool m_scanForPlugins = true;
     bool m_crashReporting = true;

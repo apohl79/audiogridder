@@ -646,27 +646,37 @@ inline int getLayoutNumChannels(const AudioProcessor::BusesLayout& l, bool isInp
 }
 #endif
 
-inline String getPluginType(const String& id) {
+inline String getPluginType(const String& id, const PluginDescription* pdesc) {
     String type;
-    File f(id);
-    if (f.exists()) {
-        if (f.getFileExtension().toLowerCase() == ".dll") {
-            type = "vst";
+    if (pdesc != nullptr) {
+        if (pdesc->pluginFormatName == "AudioUnit") {
+            type = "au";
         } else {
-            type = f.getFileExtension().toLowerCase().substring(1);
+            type = pdesc->pluginFormatName.toLowerCase();
         }
-    } else if (id.startsWith("AudioUnit")) {
-        type = "au";
     } else {
-        type = "unknown";
+        File f(id);
+        if (f.exists()) {
+            if (f.getFileExtension().toLowerCase() == ".dll") {
+                type = "vst";
+            } else {
+                type = f.getFileExtension().toLowerCase().substring(1);
+            }
+        } else if (id.startsWith("AudioUnit")) {
+            type = "au";
+        } else {
+            type = "lv2";
+        }
     }
     return type;
 }
 
-inline String getPluginName(const String& id, bool withType = true) {
+inline String getPluginName(const String& id, const PluginDescription* pdesc, bool withType = true) {
     String name;
     File f(id);
-    if (f.exists()) {
+    if (pdesc != nullptr) {
+        name = pdesc->name;
+    } else if (f.exists()) {
         name = f.getFileNameWithoutExtension();
 #if JUCE_MAC && AG_SERVER
     } else if (id.startsWith("AudioUnit")) {
@@ -677,7 +687,7 @@ inline String getPluginName(const String& id, bool withType = true) {
         name = id;
     }
     if (withType) {
-        name << " (" << getPluginType(id) << ")";
+        name << " (" << getPluginType(id, pdesc) << ")";
     }
     return name;
 }

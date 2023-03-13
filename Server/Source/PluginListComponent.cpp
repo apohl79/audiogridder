@@ -59,7 +59,8 @@ class PluginListComponent::TableModel : public TableListBoxModel {
 
             File f(name);
             String type;
-            if (f.getFileExtension().toLowerCase() == ".vst" || f.getFileExtension().toLowerCase() == ".vst3") {
+            if (f.getFileExtension().toLowerCase() == ".lv2" || f.getFileExtension().toLowerCase() == ".vst" ||
+                f.getFileExtension().toLowerCase() == ".vst3") {
                 name = f.getFileNameWithoutExtension();
                 type = f.getFileExtension().toUpperCase().substring(1);
             } else if (f.getFileExtension().toLowerCase() == ".dll") {

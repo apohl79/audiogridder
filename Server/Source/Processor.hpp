@@ -221,7 +221,7 @@ class Processor : public LogTagDelegate, public std::enable_shared_from_this<Pro
     int m_lastKnownLatency = 0;
     Point<int> m_lastPosition = {0, 0};
 
-    enum FormatType { VST, VST3, AU };
+    enum FormatType { VST, VST3, AU, LV2 };
     FormatType m_fmt;
 
     std::shared_ptr<AudioPluginInstance> getPlugin(int channel) {

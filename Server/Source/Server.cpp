@@ -119,6 +119,20 @@ void Server::loadConfig() {
     }
     m_vstNoStandardFolders = jsonGetValue(cfg, "VSTNoStandardFolders", false);
     logln("include VST standard folders is " << (m_vstNoStandardFolders ? "disabled" : "enabled"));
+
+    m_enableLV2 = jsonGetValue(cfg, "LV2", m_enableLV2);
+    logln("LV2 support " << (m_enableLV2 ? "enabled" : "disabled"));
+    m_lv2Folders.clear();
+    if (jsonHasValue(cfg, "LV2Folders") && cfg["LV2Folders"].size() > 0) {
+        logln("LV2 custom folders:");
+        for (auto& s : cfg["LV2Folders"]) {
+            if (s.get<std::string>().length() > 0) {
+                logln("  " << s.get<std::string>());
+                m_lv2Folders.add(s.get<std::string>());
+            }
+        }
+    }
+
     m_screenCapturingFFmpeg = jsonGetValue(cfg, "ScreenCapturingFFmpeg", m_screenCapturingFFmpeg);
     String encoder = "webp";
     m_screenCapturingFFmpegEncMode = ScreenRecorder::WEBP;
@@ -183,6 +197,11 @@ void Server::saveConfig() {
     j["VST2Folders"] = json::array();
     for (auto& f : m_vst2Folders) {
         j["VST2Folders"].push_back(f.toStdString());
+    }
+    j["LV2"] = m_enableLV2;
+    j["LV2Folders"] = json::array();
+    for (auto& f : m_lv2Folders) {
+        j["LV2Folders"].push_back(f.toStdString());
     }
     j["VSTNoStandardFolders"] = m_vstNoStandardFolders;
     j["ScreenCapturingFFmpeg"] = m_screenCapturingFFmpeg;
@@ -251,6 +270,10 @@ void Server::loadKnownPluginList() {
 #endif
         } else if (desc.pluginFormatName == "VST3") {
             fmt = std::make_unique<VST3PluginFormat>();
+#if JUCE_PLUGINHOST_LV2
+        } else if (desc.pluginFormatName == "LV2") {
+            fmt = std::make_unique<LV2PluginFormat>();
+#endif
         }
 
         if (nullptr != fmt) {
@@ -546,6 +569,10 @@ bool Server::scanPlugin(const String& id, const String& format, int srvId, bool 
     } else if (!format.compare("AudioUnit")) {
         fmt = std::make_unique<AudioUnitPluginFormat>();
 #endif
+#if JUCE_PLUGINHOST_LV2
+    } else if (!format.compare("LV2")) {
+        fmt = std::make_unique<LV2PluginFormat>();
+#endif
     } else {
         return false;
     }
@@ -818,7 +845,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
     traceScope();
     logln("scanning for plugins...");
     std::vector<std::unique_ptr<AudioPluginFormat>> fmts;
-    size_t fmtAU = 0, fmtVST = 0, fmtVST3 = 0;
+    size_t fmtAU = 0, fmtVST = 0, fmtVST3 = 0, fmtLV2 = 0;
 
 #if JUCE_MAC
     if (m_enableAU) {
@@ -834,6 +861,12 @@ void Server::scanForPlugins(const std::vector<String>& include) {
     if (m_enableVST2) {
         fmtVST = fmts.size();
         fmts.push_back(std::make_unique<VSTPluginFormat>());
+    }
+#endif
+#if JUCE_PLUGINHOST_LV2
+    if (m_enableLV2) {
+        fmtLV2 = fmts.size();
+        fmts.push_back(std::make_unique<LV2PluginFormat>());
     }
 #endif
 
@@ -863,18 +896,23 @@ void Server::scanForPlugins(const std::vector<String>& include) {
     std::atomic<float> progress{0};
 
     StringArray fileOrIds;
+    KnownPluginList pluginList;
 
     for (auto& fmt : fmts) {
         FileSearchPath searchPaths;
-        if (fmt->getName().compare("AudioUnit") && !m_vstNoStandardFolders) {
+        if (fmt->getName() != "AudioUnit" && (!fmt->getName().startsWith("VST") || !m_vstNoStandardFolders)) {
             searchPaths = fmt->getDefaultLocationsToSearch();
         }
-        if (!fmt->getName().compare("VST3")) {
+        if (fmt->getName() == "VST3") {
             for (auto& f : m_vst3Folders) {
                 searchPaths.addIfNotAlreadyThere(f);
             }
-        } else if (!fmt->getName().compare("VST")) {
+        } else if (fmt->getName() == "VST") {
             for (auto& f : m_vst2Folders) {
+                searchPaths.addIfNotAlreadyThere(f);
+            }
+        } else if (fmt->getName() == "LV2") {
+            for (auto& f : m_lv2Folders) {
                 searchPaths.addIfNotAlreadyThere(f);
             }
         }
@@ -885,11 +923,14 @@ void Server::scanForPlugins(const std::vector<String>& include) {
 
     for (int idx = 0; idx < fileOrIds.size(); idx++) {
         auto& fileOrId = fileOrIds.getReference(idx);
-        auto name = getPluginName(fileOrId, false);
-        auto type = getPluginType(fileOrId);
+        auto pluginDesc = m_pluginList.getTypeForFile(fileOrId);
+        auto name = getPluginName(fileOrId, pluginDesc.get(), false);
+        auto type = getPluginType(fileOrId, pluginDesc.get());
+
         auto* fmt = type == "au"     ? fmts[fmtAU].get()
                     : type == "vst3" ? fmts[fmtVST3].get()
                     : type == "vst"  ? fmts[fmtVST].get()
+                    : type == "lv2"  ? fmts[fmtLV2].get()
                                      : nullptr;
 
         if (nullptr == fmt) {
@@ -897,9 +938,8 @@ void Server::scanForPlugins(const std::vector<String>& include) {
             continue;
         }
 
-        auto plugindesc = m_pluginList.getTypeForFile(fileOrId);
         bool excluded = shouldExclude(name, fileOrId, include);
-        if ((nullptr == plugindesc || fmt->pluginNeedsRescanning(*plugindesc)) &&
+        if ((nullptr == pluginDesc || fmt->pluginNeedsRescanning(*pluginDesc)) &&
             !m_pluginList.getBlacklistedFiles().contains(fileOrId) && newBlacklistedPlugins.count(fileOrId) == 0 &&
             !excluded) {
             ScanThread* scanThread = nullptr;
@@ -915,7 +955,7 @@ void Server::scanForPlugins(const std::vector<String>& include) {
                 }
             } while (scanThread == nullptr);
 
-            String splashName = getPluginName(fileOrId);
+            String splashName = getPluginName(fileOrId, pluginDesc.get());
 
             progress = (float)idx / fileOrIds.size() * 100.0f;
 
@@ -999,7 +1039,8 @@ void Server::processScanResults(int id, std::set<String>& newBlacklistedPlugins)
         for (auto& p : plist.getBlacklistedFiles()) {
             if (!m_pluginList.getBlacklistedFiles().contains(p)) {
                 m_pluginList.addToBlacklist(p);
-                newBlacklistedPlugins.insert(getPluginName(p));
+                auto pdesc = plist.getTypeForIdentifierString(p);
+                newBlacklistedPlugins.insert(getPluginName(p, pdesc.get()));
             }
         }
 
@@ -1022,7 +1063,7 @@ void Server::processScanResults(int id, std::set<String>& newBlacklistedPlugins)
         deadmanFile.readLines(lines);
 
         for (auto& line : lines) {
-            newBlacklistedPlugins.insert(getPluginName(line));
+            newBlacklistedPlugins.insert(getPluginName(line, nullptr));
         }
 
         deadmanFile.deleteFile();
