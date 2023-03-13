@@ -244,6 +244,39 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     row++;
 
     label = std::make_unique<Label>();
+    label->setText("LV2 Support:", NotificationType::dontSendNotification);
+    label->setBounds(getLabelBounds(row));
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
+
+    m_lv2Support.setBounds(getCheckBoxBounds(row));
+    m_lv2Support.setToggleState(srv->getEnableLV2(), NotificationType::dontSendNotification);
+    addChildAndSetID(&m_lv2Support, "lv2");
+
+    row++;
+
+    label = std::make_unique<Label>();
+    tmpStr = "LV2 Custom Folders";
+    tmpStr << newLine << "(one folder per line):";
+    label->setText(tmpStr, NotificationType::dontSendNotification);
+    label->setBounds(getLabelBounds(row));
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
+
+    m_lv2Folders.setBounds(getLargeFieldBounds(row));
+    m_lv2Folders.setMultiLine(true, false);
+    m_lv2Folders.setReturnKeyStartsNewLine(true);
+    addChildAndSetID(&m_lv2Folders, "lv2fold");
+
+    tmpStr = "";
+    for (auto& folder : srv->getLV2Folders()) {
+        tmpStr << folder << newLine;
+    }
+    m_lv2Folders.setText(tmpStr);
+
+    row += largeFieldRows;
+
+    label = std::make_unique<Label>();
     label->setText("Screen Capturing", NotificationType::dontSendNotification);
     label->setJustificationType(Justification::centredTop);
     label->setBounds(getHeaderBounds(row));
@@ -552,6 +585,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
             srv2->setEnableAU(m_auSupport.getToggleState());
             srv2->setEnableVST3(m_vst3Support.getToggleState());
             srv2->setEnableVST2(m_vst2Support.getToggleState());
+            srv2->setEnableLV2(m_lv2Support.getToggleState());
             srv2->setScanForPlugins(m_scanForPlugins.getToggleState());
             srv2->setSandboxMode((Server::SandboxMode)m_sandboxMode.getSelectedItemIndex());
             srv2->setCrashReporting(m_crashReporting.getToggleState());
@@ -610,6 +644,10 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
                 srv2->setVST2Folders(StringArray::fromLines(m_vst2Folders.getText()));
             }
             srv2->setVSTNoStandardFolders(m_vstNoStandardFolders.getToggleState());
+
+            if (m_lv2Folders.getText().length() > 0) {
+                srv2->setLV2Folders(StringArray::fromLines(m_lv2Folders.getText()));
+            }
 
             auto offsetParts = StringArray::fromTokens(m_screenMouseOffsetXY.getText(), "x", "");
             if (offsetParts.size() >= 2) {
