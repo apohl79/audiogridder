@@ -20,3 +20,8 @@ compile_commands.json
 .vscode
 TestsData
 suppress-win.txt
+
+#KC
+.idea
+cmake-build-*
+audiogridder-deps

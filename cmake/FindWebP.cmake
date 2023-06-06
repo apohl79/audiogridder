@@ -7,6 +7,7 @@ macro(WEBP_FIND varname shortname headername)
     PATHS
     ${FFMPEG_ROOT}/include
     $ENV{FFMPEG_DIR}/include
+    /usr/include/x86_64-linux-gnu
     /usr/local/include
     /usr/include/
     NO_DEFAULT_PATH
@@ -23,6 +24,7 @@ macro(WEBP_FIND varname shortname headername)
     PATHS
     ${FFMPEG_ROOT}/lib
     $ENV{FFMPEG_DIR}/lib
+    /usr/lib/x86_64-linux-gnu
     /usr/local/lib
     /usr/lib
     NO_DEFAULT_PATH

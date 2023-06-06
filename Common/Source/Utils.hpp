@@ -644,7 +644,6 @@ inline int getLayoutNumChannels(const AudioProcessor::BusesLayout& l, bool isInp
     }
     return num;
 }
-#endif
 
 inline String getPluginType(const String& id, const PluginDescription* pdesc) {
     String type;
@@ -691,6 +690,7 @@ inline String getPluginName(const String& id, const PluginDescription* pdesc, bo
     }
     return name;
 }
+#endif
 
 struct FnThread : Thread {
     std::function<void()> fn;
