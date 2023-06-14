@@ -10,7 +10,7 @@ option(AG_ENABLE_DYNAMIC_LINKING "Enable dynamic linking of ffmpeg/webp." off)
 option(AG_ENABLE_CODE_SIGNING "Enable code signing." on)
 option(AG_ENABLE_DEBUG_COPY_STEP "Enable copying binaries after building in Debug mode (on macOS)." on)
 option(AG_ENABLE_SENTRY "Enable crash reporting via sentry." off)
-option(AG_ENABLE_ASAN "Enable AddressSanizizer." off)
+option(AG_ENABLE_ASAN "Enable AddressSanitizer." off)
 option(AG_VST2_PLUGIN_ENABLED "Enable the VST2 plugins." off)
 option(AG_AAX_PLUGIN_ENABLED "Enable the AAX plugins." off)
 
