@@ -117,7 +117,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
 
     void loadConfig();
     void loadConfig(const json& j, bool isUpdate = false);
-    void saveConfig(int numOfBuffers = -1);
+    void saveConfig(int numOfBuffers = -1, bool saveBufferDefaults = false);
 
     Client& getClient() { return *m_client; }
     std::vector<ServerPlugin> getPlugins(const String& type) const;
@@ -498,6 +498,10 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     String m_presetsDir;
     String m_defaultPreset;
     int m_customBlockSize = 0;
+
+    int m_numberOfBuffersDefault = Defaults::DEFAULT_NUM_OF_BUFFERS;
+    int m_customBlockSizeDefault = 0;
+    bool m_fixedOutboundBufferDefault = false;
 
     int m_numberOfAutomationSlots = 16;
     LoadedPlugin m_unusedDummyPlugin;

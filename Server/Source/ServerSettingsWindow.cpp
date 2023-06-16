@@ -10,6 +10,8 @@
 #include "Server.hpp"
 #include "WindowPositions.hpp"
 
+#include "Images.hpp"
+
 namespace e47 {
 
 ServerSettingsWindow::ServerSettingsWindow(App* app)
@@ -32,6 +34,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     int borderLR = 15;  // left/right border
     int borderTB = 15;  // top/bottom border
     int rowHeight = 30;
+    int extraBorderTB = 0;
 
     int fieldWidth = 50;
     int wideFieldWidth = 250;
@@ -48,27 +51,34 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     int saveButtonWidth = 125;
     int saveButtonHeight = 30;
 
+#ifdef JUCE_LINUX
+    setMenuBar(app);
+    extraBorderTB = 20;
+    totalHeight += extraBorderTB;
+#endif
+
     auto getLabelBounds = [&](int r) {
-        return juce::Rectangle<int>(borderLR, borderTB + r * rowHeight, labelWidth, labelHeight);
+        return juce::Rectangle<int>(borderLR, extraBorderTB + borderTB + r * rowHeight, labelWidth, labelHeight);
     };
     auto getFieldBounds = [&](int r) {
-        return juce::Rectangle<int>(totalWidth - fieldWidth - borderLR, borderTB + r * rowHeight + 3, fieldWidth,
-                                    fieldHeight);
+        return juce::Rectangle<int>(totalWidth - fieldWidth - borderLR, extraBorderTB + borderTB + r * rowHeight + 3,
+                                    fieldWidth, fieldHeight);
     };
     auto getWideFieldBounds = [&](int r) {
-        return juce::Rectangle<int>(totalWidth - wideFieldWidth - borderLR, borderTB + r * rowHeight + 3,
-                                    wideFieldWidth, fieldHeight);
+        return juce::Rectangle<int>(totalWidth - wideFieldWidth - borderLR,
+                                    extraBorderTB + borderTB + r * rowHeight + 3, wideFieldWidth, fieldHeight);
     };
     auto getCheckBoxBounds = [&](int r) {
-        return juce::Rectangle<int>(totalWidth - checkBoxWidth - borderLR, borderTB + r * rowHeight + 3, checkBoxWidth,
-                                    checkBoxHeight);
+        return juce::Rectangle<int>(totalWidth - checkBoxWidth - borderLR, extraBorderTB + borderTB + r * rowHeight + 3,
+                                    checkBoxWidth, checkBoxHeight);
     };
     auto getLargeFieldBounds = [&](int r) {
-        return juce::Rectangle<int>(totalWidth - largeFieldWidth - borderLR, borderTB + r * rowHeight + 3,
-                                    largeFieldWidth, largeFieldHeight);
+        return juce::Rectangle<int>(totalWidth - largeFieldWidth - borderLR,
+                                    extraBorderTB + borderTB + r * rowHeight + 3, largeFieldWidth, largeFieldHeight);
     };
     auto getHeaderBounds = [&](int r) {
-        return juce::Rectangle<int>(borderLR, borderTB + r * rowHeight + 7, totalWidth - borderLR * 2, headerHeight);
+        return juce::Rectangle<int>(borderLR, extraBorderTB + borderTB + r * rowHeight + 7, totalWidth - borderLR * 2,
+                                    headerHeight);
     };
 
     int row = 0;
@@ -232,6 +242,39 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 
     tooltip.clear();
     row++;
+
+    label = std::make_unique<Label>();
+    label->setText("LV2 Support:", NotificationType::dontSendNotification);
+    label->setBounds(getLabelBounds(row));
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
+
+    m_lv2Support.setBounds(getCheckBoxBounds(row));
+    m_lv2Support.setToggleState(srv->getEnableLV2(), NotificationType::dontSendNotification);
+    addChildAndSetID(&m_lv2Support, "lv2");
+
+    row++;
+
+    label = std::make_unique<Label>();
+    tmpStr = "LV2 Custom Folders";
+    tmpStr << newLine << "(one folder per line):";
+    label->setText(tmpStr, NotificationType::dontSendNotification);
+    label->setBounds(getLabelBounds(row));
+    addChildAndSetID(label.get(), "lbl");
+    m_components.push_back(std::move(label));
+
+    m_lv2Folders.setBounds(getLargeFieldBounds(row));
+    m_lv2Folders.setMultiLine(true, false);
+    m_lv2Folders.setReturnKeyStartsNewLine(true);
+    addChildAndSetID(&m_lv2Folders, "lv2fold");
+
+    tmpStr = "";
+    for (auto& folder : srv->getLV2Folders()) {
+        tmpStr << folder << newLine;
+    }
+    m_lv2Folders.setText(tmpStr);
+
+    row += largeFieldRows;
 
     label = std::make_unique<Label>();
     label->setText("Screen Capturing", NotificationType::dontSendNotification);
@@ -542,6 +585,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
             srv2->setEnableAU(m_auSupport.getToggleState());
             srv2->setEnableVST3(m_vst3Support.getToggleState());
             srv2->setEnableVST2(m_vst2Support.getToggleState());
+            srv2->setEnableLV2(m_lv2Support.getToggleState());
             srv2->setScanForPlugins(m_scanForPlugins.getToggleState());
             srv2->setSandboxMode((Server::SandboxMode)m_sandboxMode.getSelectedItemIndex());
             srv2->setCrashReporting(m_crashReporting.getToggleState());
@@ -601,6 +645,10 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
             }
             srv2->setVSTNoStandardFolders(m_vstNoStandardFolders.getToggleState());
 
+            if (m_lv2Folders.getText().length() > 0) {
+                srv2->setLV2Folders(StringArray::fromLines(m_lv2Folders.getText()));
+            }
+
             auto offsetParts = StringArray::fromTokens(m_screenMouseOffsetXY.getText(), "x", "");
             if (offsetParts.size() >= 2) {
                 srv2->setScreenMouseOffsetX(offsetParts[0].getIntValue());
@@ -651,7 +699,11 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     centreWithSize(totalWidth, totalHeight);
     setBounds(WindowPositions::get(WindowPositions::ServerSettings, getBounds()));
     setVisible(true);
+#ifdef JUCE_LINUX
+    setMinimised(true);
+#else
     windowToFront(this);
+#endif
 }
 
 ServerSettingsWindow::~ServerSettingsWindow() {

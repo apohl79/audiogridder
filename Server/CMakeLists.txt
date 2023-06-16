@@ -23,6 +23,14 @@ juce_generate_juce_header(AudioGridderServer)
 
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/Source AG_SOURCES_SERVER)
 
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  list(REMOVE_ITEM AG_SOURCES_SERVER "${CMAKE_CURRENT_SOURCE_DIR}/Source/Screen.mm")
+endif()
+
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  list(REMOVE_ITEM  AG_SOURCES_SERVER "${CMAKE_CURRENT_SOURCE_DIR}/Source/ScreenHelper_linux.cpp")
+endif()
+
 target_sources(AudioGridderServer PRIVATE ${AG_SOURCES_SERVER} ${AG_SOURCES_COMMON})
 
 set(AG_PLUGINHOST_VST 0)
@@ -37,6 +45,7 @@ target_compile_definitions(AudioGridderServer PRIVATE
   AG_SENTRY_CRASHPAD_PATH="${AG_SENTRY_CRASHPAD_PATH}"
   JUCE_PLUGINHOST_VST3=1
   JUCE_PLUGINHOST_VST=${AG_PLUGINHOST_VST}
+  JUCE_PLUGINHOST_LV2=1
   JUCE_WEB_BROWSER=0
   JUCE_USE_CURL=0
   JUCE_MODAL_LOOPS_PERMITTED=1
@@ -65,6 +74,11 @@ target_link_libraries(AudioGridderServer PRIVATE
   ${FFMPEG_LIBRARIES}
   ${WEBP_LIBRARIES}
   ${SENTRY_LIBRARIES})
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  target_link_libraries(AudioGridderServer PRIVATE  X11 Xtst xcb xcb-shm xcb-xfixes xcb-shape)
+  target_compile_definitions(AudioGridderServer PRIVATE JUCE_LINUX=1)
+endif()
 
 ag_strip(AudioGridderServer Server)
 

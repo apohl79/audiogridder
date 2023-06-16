@@ -10,9 +10,13 @@ option(AG_ENABLE_DYNAMIC_LINKING "Enable dynamic linking of ffmpeg/webp." off)
 option(AG_ENABLE_CODE_SIGNING "Enable code signing." on)
 option(AG_ENABLE_DEBUG_COPY_STEP "Enable copying binaries after building in Debug mode (on macOS)." on)
 option(AG_ENABLE_SENTRY "Enable crash reporting via sentry." off)
-option(AG_ENABLE_ASAN "Enable AddressSanizizer." off)
+option(AG_ENABLE_ASAN "Enable AddressSanitizer." off)
 option(AG_VST2_PLUGIN_ENABLED "Enable the VST2 plugins." off)
 option(AG_AAX_PLUGIN_ENABLED "Enable the AAX plugins." off)
+
+# Uncomment and set to proper path for building with VSCode
+#set(AG_DEPS_ROOT $ENV{HOME}/audiogridder/audiogridder-deps/linux-x86_64)
+#set(AG_SDKS_ROOT ${AG_DEPS_ROOT})
 
 file(STRINGS ${CMAKE_SOURCE_DIR}/package/VERSION.num AG_VERSION)
 
@@ -102,6 +106,10 @@ link_directories(${WEBP_LIBRARY_DIRS})
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/Common/Source AG_SOURCES_COMMON)
 list(REMOVE_ITEM AG_SOURCES_COMMON "${CMAKE_CURRENT_SOURCE_DIR}/Common/Source/TraceReader.cpp")
 
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  list(REMOVE_ITEM AG_SOURCES_COMMON "${CMAKE_CURRENT_SOURCE_DIR}/Common/Source/WindowHelper.mm")
+endif()
+
 if($ENV{AG_ENABLE_SENTRY})
   set(AG_ENABLE_SENTRY on)
   set(AG_SENTRY_DSN $ENV{AG_SENTRY_DSN})
@@ -156,21 +164,18 @@ else()
   set(AG_SENTRY_ENABLED 0)
 endif()
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  set(AG_WITH_SERVER off)
-endif()
 
 macro(ag_strip target_name target_dir)
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     add_custom_target(${target_name}_DBGSYM ALL DEPENDS ${target_name}
       COMMAND
-        ${CMAKE_COMMAND} -E echo "Creating DWARF file from $<TARGET_FILE:${target_name}>"
+        ${CMAKE_COMMAND} -E echo "Copying debug symbols for $<TARGET_FILE:${target_name}>"
       COMMAND
         ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/debug/${target_dir}
       COMMAND
         ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${target_name}> ${CMAKE_BINARY_DIR}/debug/${target_dir}
-      COMMAND
-        /usr/bin/dsymutil -o ${CMAKE_BINARY_DIR}/debug/${target_dir}/$<TARGET_FILE_NAME:${target_name}>.dSYM $<TARGET_FILE:${target_name}>
+      #COMMAND
+      #  /usr/bin/dsymutil -o ${CMAKE_BINARY_DIR}/debug/${target_dir}/$<TARGET_FILE_NAME:${target_name}>.dSYM $<TARGET_FILE:${target_name}>
       )
     add_custom_target(${target_name}_STRIP ALL DEPENDS ${target_name}_DBGSYM
       COMMAND
@@ -312,7 +317,7 @@ endmacro()
 # Remove some warnings from the JUCE list as the JUCE code triggers those itself...
 if((CMAKE_CXX_COMPILER_ID STREQUAL "Clang") OR (CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang"))
   target_compile_options(juce_recommended_warning_flags INTERFACE
-    -Wno-unused-variable -Wno-unused-function -Wno-deprecated -Wno-switch-enum -Wno-missing-prototypes)
+    -Wno-unused-variable -Wno-unused-function -Wno-deprecated -Wno-switch-enum -Wno-missing-prototypes -Wno-c99-extensions)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   target_compile_options(juce_recommended_warning_flags INTERFACE
     -Wno-unused-variable -Wno-unused-but-set-variable -Wno-switch-enum)

@@ -17,8 +17,11 @@ compile_commands.json
 .projectile
 .dir-locals.el
 .cache
+.vscode
 TestsData
+suppress-win.txt
 
+#KC
 .idea
-cmake-build-debug
+cmake-build-*
 audiogridder-deps

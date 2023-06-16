@@ -49,7 +49,13 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     void menuItemSelected(int /* menuItemID */, int /* topLevelMenuIndex */) override {}
 
     // MenuBarModel
-    StringArray getMenuBarNames() override { return {"Settings"}; }
+    StringArray getMenuBarNames() override {
+#ifdef JUCE_LINUX
+        return {"Tools"};
+#else
+        return {"Settings"};
+#endif
+    }
 
     void prepareShutdown(uint32 exitCode = 0);
     const KnownPluginList& getPluginList();
@@ -109,6 +115,8 @@ class App : public JUCEApplication, public MenuBarModel, public LogTag {
     std::unique_ptr<StatisticsWindow> m_statsWindow;
     std::shared_ptr<SplashWindow> m_splashWindow;
     std::unique_ptr<MenuBarWindow> m_menuWindow;
+
+    FnThread m_splashHider;
 
     uint32 m_exitCode = 0;
 

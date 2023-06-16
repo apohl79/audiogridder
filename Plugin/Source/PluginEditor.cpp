@@ -172,6 +172,9 @@ PluginEditor::~PluginEditor() {
 
 void PluginEditor::paint(Graphics& g) {
     traceScope();
+    if (m_shouldExit) {
+        return;
+    }
     FillType ft;
     auto colBG = getLookAndFeel().findColour(ResizableWindow::backgroundColourId);
     auto tp = m_processor.getTrackProperties();
@@ -228,6 +231,9 @@ void PluginEditor::ToolsButton::paintButton(Graphics& g, bool shouldDrawButtonAs
 
 void PluginEditor::resized() {
     traceScope();
+    if (m_shouldExit) {
+        return;
+    }
     int buttonWidth = 196;
     int buttonHeight = 20;
     int logoHeight = m_logo.getHeight();
@@ -324,6 +330,9 @@ void PluginEditor::resized() {
 
 void PluginEditor::buttonClicked(Button* button, const ModifierKeys& modifiers, PluginButton::AreaType area) {
     traceScope();
+    if (m_shouldExit) {
+        return;
+    }
     if (!button->getName().compare("newPlug")) {
         auto addFn = [this](const ServerPlugin& plug, const String& layout) {
             traceScope();
@@ -524,6 +533,9 @@ void PluginEditor::buttonClicked(Button* button, const ModifierKeys& modifiers, 
 
 void PluginEditor::buttonClicked(Button* button) {
     traceScope();
+    if (m_shouldExit) {
+        return;
+    }
     TextButton* tb = reinterpret_cast<TextButton*>(button);
     if (tb == &m_toolsButtonPlus) {
         m_processor.increaseSCArea();
@@ -641,6 +653,9 @@ int PluginEditor::getPluginIndex(const String& name) {
 
 void PluginEditor::focusOfChildComponentChanged(FocusChangeType cause) {
     traceScope();
+    if (m_shouldExit) {
+        return;
+    }
     bool focus = hasKeyboardFocus(true);
     if (focus) {
         // reactivate the plugin screen
@@ -716,6 +731,9 @@ void PluginEditor::updateState() {
 
 void PluginEditor::mouseUp(const MouseEvent& event) {
     traceScope();
+    if (m_shouldExit) {
+        return;
+    }
     if (event.eventComponent == &m_srvIcon) {
         showServerMenu();
     } else if (event.eventComponent == &m_settingsIcon) {
@@ -744,11 +762,19 @@ void PluginEditor::showServerMenu() {
         return n;
     };
 
-    subm.addItem("Allow individual buffer size by plugin", true, m_processor.getBufferSizeByPlugin(), [this] {
+    subm.addItem("Same buffer size for all plugins", true, !m_processor.getBufferSizeByPlugin(), [this] {
         traceScope();
         m_processor.setBufferSizeByPlugin(!m_processor.getBufferSizeByPlugin());
         m_processor.saveConfig();
     });
+
+    if (m_processor.getBufferSizeByPlugin()) {
+        subm.addItem("Save current settings as default", true, false, [this] {
+            traceScope();
+            m_processor.saveConfig(-1, true);
+        });
+    }
+
     subm.addItem("Use fixed size outbound buffers", true, m_processor.getFixedOutboundBuffer(), [this] {
         traceScope();
         m_processor.setFixedOutboundBuffer(!m_processor.getFixedOutboundBuffer());
@@ -1036,15 +1062,54 @@ void PluginEditor::showSettingsMenu() {
         if (bus->isEnabled()) {
             auto& layout = bus->getCurrentLayout();
             bool isInput = bus->isInput();
-            for (int i = 0; i < bus->getNumberOfChannels(); i++) {
-                auto name = bus->getName() + ": " + layout.getChannelTypeName(layout.getTypeOfChannel(i));
-                subm.addItem(name, true, m_processor.getActiveChannels().isActive(ch, isInput), [this, ch, isInput] {
-                    m_processor.getActiveChannels().setActive(ch, isInput,
-                                                              !m_processor.getActiveChannels().isActive(ch, isInput));
+            if (bus->getNumberOfChannels() == 1) {
+                subm.addItem(bus->getName(), true, m_processor.getActiveChannels().isActive(ch, isInput),
+                             [this, ch, isInput] {
+                                 m_processor.getActiveChannels().setActive(
+                                     ch, isInput, !m_processor.getActiveChannels().isActive(ch, isInput));
+                                 m_processor.updateChannelMapping();
+                                 m_processor.getClient().reconnect();
+                             });
+                ch++;
+            } else {
+                PopupMenu busm;
+                bool allActive = true;
+                size_t numChannels = (size_t)bus->getNumberOfChannels();
+                size_t numActive = 0;
+
+                for (size_t i = 0; i < numChannels; i++) {
+                    if (m_processor.getActiveChannels().isActive(ch + i, isInput)) {
+                        numActive++;
+                    }
+                }
+
+                allActive = numActive == numChannels;
+
+                busm.addItem("All channels", true, allActive, [this, ch, numChannels, isInput, allActive] {
+                    for (size_t i = 0; i < numChannels; i++) {
+                        m_processor.getActiveChannels().setActive(ch + i, isInput, !allActive);
+                    }
                     m_processor.updateChannelMapping();
                     m_processor.getClient().reconnect();
                 });
-                ch++;
+
+                busm.addSeparator();
+
+                for (size_t i = 0; i < numChannels; i++) {
+                    auto name = layout.getChannelTypeName(layout.getTypeOfChannel((int)i));
+                    busm.addItem(name, true, m_processor.getActiveChannels().isActive(ch + i, isInput),
+                                 [this, ch, i, isInput] {
+                                     m_processor.getActiveChannels().setActive(
+                                         ch + i, isInput, !m_processor.getActiveChannels().isActive(ch + i, isInput));
+                                     m_processor.updateChannelMapping();
+                                     m_processor.getClient().reconnect();
+                                 });
+                }
+
+                String name = bus->getName();
+                name << " (" << numActive << "/" << numChannels << ")";
+                subm.addSubMenu(name, busm, true, nullptr, allActive, 0);
+                ch += numChannels;
             }
         }
     };

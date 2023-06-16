@@ -2,7 +2,7 @@
 #
 # Author: Andreas Pohl
 
-import os, argparse, sys, shutil, glob, subprocess, zipfile, locale, ssl
+import os, argparse, sys, shutil, glob, subprocess, zipfile, locale, ssl, json
 from urllib import request
 
 lastLogMsgLen = 0
@@ -142,10 +142,9 @@ def getVersion():
         return f.readline().rstrip()
     return ''
 
-
 def getMacToolchain(args):
     toolchain = ''
-    if args.macostarget in ('10.7', '10.8'):
+    if args.macostarget in ('10.7', '10.8', '10.9'):
         toolchain = '/Library/Developer/10/CommandLineTools'
     elif args.macostarget == '11.1':
         toolchain = '/Library/Developer/13/CommandLineTools'
@@ -162,12 +161,20 @@ def setMacToolchain(args, toolchain=None):
     else:
         newToolchain = lastToolchain
     log('Using toolchain: ' + newToolchain)
-    sdk = '/SDKs/MacOS.sdk'
+    sdk = '/SDKs/MacOSX.sdk'
     if args.macostarget == '11.1':
-        sdk = '/SDKs/MacOS11.sdk'
+        sdk = '/SDKs/MacOSX11.1.sdk'
     return (newToolchain, lastToolchain, newToolchain + sdk)
 
-def conf(args):
+def formatCode(args):
+    for line in subprocess.run(['git', 'status'], stdout=subprocess.PIPE).stdout.decode('utf8').split('\n'):
+        if ('modified:' in line or 'new file:' in line) and \
+           (line.endswith('.cpp') or line.endswith('.hpp')):
+            fname = line.split('\t')[1][12:]
+            execute("dos2unix " + fname)
+            execute("clang-format --verbose -i " + fname)
+
+def conf(args, sysroot):
     cmake_params = []
 
     platform = getPlatform(args)
@@ -195,6 +202,7 @@ def conf(args):
 
     if platform == 'macos':
         cmake_params.append('-DCMAKE_OSX_ARCHITECTURES=' + getArch(args))
+        cmake_params.append('-DCMAKE_OSX_SYSROOT=' + sysroot)
         cmake_params.append('-DAG_MACOS_TARGET=' + args.macostarget)
         if not args.nosigning:
             execute('codesign --force --sign AudioGridder --timestamp=none ' + buildDir + '/bin/crashpad_handler')
@@ -216,7 +224,26 @@ def conf(args):
         cmake_params.append('-DAG_WITH_TESTS=ON')
 
     cmake_command = 'cmake ' + ' '.join(cmake_params)
-    execute(cmake_command)
+    if args.vscode:
+        os.makedirs('.vscode', exist_ok=True)
+        settings = dict()
+        with open('.vscode/settings.json', 'r') as f:
+            settings = json.load(f)
+        settings['cmake.buildDirectory'] = '${workspaceFolder}/' + buildDir
+        settings['cmake.configureSettings'] = dict()
+        for p in cmake_params:
+            if p.startswith('-D') and not p.startswith('-DCMAKE_BUILD_TYPE'):
+                (name, val) = p[2:].split('=')
+                if val == 'ON':
+                    val = True
+                elif val == 'OFF':
+                    val = False
+                settings['cmake.configureSettings'][name] = val
+        log('updating vscode settings...')
+        with open('.vscode/settings.json', 'w') as f:
+            json.dump(settings, f, indent=4)
+    else:
+        execute(cmake_command)
 
 def build(args):
     cmake_params = []
@@ -337,31 +364,63 @@ def packReal(platform, arch, version, buildDir, macosTarget):
             zf.close()
 
     elif platform == 'linux':
-        os.makedirs('package/build/linux/vst', exist_ok=True)
-        os.makedirs('package/build/linux/vst3/AudioGridder.vst3/Contents/x86_64-linux', exist_ok=True)
-        os.makedirs('package/build/linux/vst3/AudioGridderInst.vst3/Contents/x86_64-linux', exist_ok=True)
-        os.makedirs('package/build/linux/vst3/AudioGridderMidi.vst3/Contents/x86_64-linux', exist_ok=True)
-        os.makedirs('package/build/linux/bin', exist_ok=True)
+        installers = []
 
-        log('copying vst plugins...')
-        for src in glob.glob(buildDir + '/lib/lib*.so'):
-            dst = src.replace(buildDir + '/lib/lib', 'package/build/linux/vst/')
-            shutil.copyfile(src, dst)
-        log('copying vst3 plugins...')
-        for src in glob.glob(buildDir + '/lib/AudioGridder*.so'):
-            name = src.replace(buildDir + '/lib/', '').replace('.so', '')
-            dst = 'package/build/linux/vst3/' + name + '.vst3/Contents/x86_64-linux/' + name + '.so'
-            shutil.copyfile(src, dst)
-        log('copying binaries...')
-        shutil.copy(buildDir + '/bin/AudioGridderPluginTray', 'package/build/linux/bin')
-        shutil.copy(buildDir + '/bin/crashpad_handler', 'package/build/linux/bin')
+        instName = 'package/build/AudioGridderPlugin_' + version + '-Linux.sh'
+        installers.append(instName)
+        instDir = buildDir + '/inst'
+        if os.path.isdir(instDir):
+            shutil.rmtree(instDir)
+        vst2Dir = instDir + '/vst'
+        vst3Dir = instDir + '/vst3'
+        binDir = instDir + '/bin'
+        os.makedirs(vst2Dir)
+        os.makedirs(vst3Dir)
+        os.makedirs(binDir)
+        configureFile('package/install_linux_plugin.sh', instDir + '/install_linux_plugin.sh',
+                      {'version': version})
+        os.chmod(instDir + '/install_linux_plugin.sh', 0o755)
+        for p in ['AudioGridder', 'AudioGridderInst', 'AudioGridderMidi']:
+            shutil.copyfile(buildDir + '/lib/lib' + p + '.so', vst2Dir + '/' + p + '.so')
+            vst3So = p + '.so'
+            vst3Bundle = vst3Dir + '/' + p + '.vst3/Contents/x86_64-linux'
+            os.makedirs(vst3Bundle)
+            shutil.copyfile(buildDir + '/lib/' + vst3So, vst3Bundle + '/' + vst3So)
+        for f in ['AudioGridderPluginTray', 'crashpad_handler']:
+            shutil.copyfile(buildDir + '/bin/' + f, binDir + '/' + f)
+        execute('bash package/makeself.sh --bzip2 ' + instDir + ' ' + instName + ' "installer files" ./install_linux_plugin.sh')
+        shutil.rmtree(instDir)
 
-        os.chdir('package/build/linux')
-        execute('zip -r ../AudioGridder_' + version + '-Linux.zip vst vst3 bin')
-        execute('zip -j ../AudioGridder_' + version + '-Linux.zip ../../install-trayapp-linux.sh')
+        instName = 'package/build/AudioGridderServer_' + version + '-Linux.sh'
+        installers.append(instName)
+        instDir = buildDir + '/inst'
+        if os.path.isdir(instDir):
+            shutil.rmtree(instDir)
+        binDir = instDir + '/bin'
+        resDir = instDir + '/resources'
+        os.makedirs(binDir)
+        os.makedirs(resDir)
+        configureFile('package/install_linux_server.sh', instDir + '/install_linux_server.sh',
+                      {'version': version})
+        os.chmod(instDir + '/install_linux_server.sh', 0o755)
+        for f in ['AudioGridderServer', 'crashpad_handler']:
+            shutil.copyfile(buildDir + '/bin/' + f, binDir + '/' + f)
+        shutil.copyfile('Server/Resources/icon64.png', resDir + '/icon64.png')
+        shutil.copyfile('package/audiogridderserver.desktop', resDir + '/audiogridderserver.desktop')
+        execute('bash package/makeself.sh --bzip2 ' + instDir + ' ' + instName + ' "installer files" ./install_linux_server.sh')
+        shutil.rmtree(instDir)
 
-        os.chdir('../../..')
-        shutil.rmtree('package/build/linux', ignore_errors=True)
+        execute('zip -j -9 package/build/AudioGridder_' + version + '-Linux-Installers.zip ' + ' '.join(installers))
+        execute('zip -r -9 package/build/AudioGridder_' + version + '-Linux.zip ' + buildDir + \
+                ' -i "*/bin/*" "*/lib/*" -x "*.a" "*/JUCE/*"')
+
+def configureFile(inFile, outFile, variables):
+    with open(inFile, 'r') as ifile:
+        with open(outFile, 'w') as ofile:
+            for l in ifile.readlines():
+                for k in variables.keys():
+                    l = l.replace('#' + k + '#', variables[k])
+                ofile.write(l)
 
 def upload(args):
     sentry_params = []
@@ -466,11 +525,17 @@ def main():
     defaultPlatform = getPlatform(None)
     defaultArch = getArch(None)
 
+    if defaultPlatform == 'macos':
+        parser.add_argument('-k', '--unlock-keychain', dest='keychainPass', metavar='PASSWORD', type=str, default=None,
+                            help='Unlock the default keychain on macOS using the given password')
+
     parser_conf = subparsers.add_parser('conf', help='Configure the build system')
     parser_conf.add_argument('-t', '--type', dest='buildtype', metavar='TYPE', type=str, default='RelWithDebInfo',
                              help='Build type (default: %(default)s)')
     parser_conf.add_argument('-b', '--build-dir', dest='builddir', metavar='DIR', type=str, default=None,
                              help='Override the build directory (default: %(default)s)')
+    parser_conf.add_argument('--vscode', dest='vscode', action='store_true', default=False,
+                             help='Do not run cmake, just prepare the build directory and update the VSCode settings (default: %(default)s)')
     parser_conf.add_argument('--platform', dest='platform', metavar='PLATFORM', type=str, default=defaultPlatform,
                              choices=['macos', 'windows', 'linux'],
                              help='OS platform (default: %(default)s)')
@@ -569,19 +634,24 @@ def main():
     parser_tests.add_argument('-v', '--verbose', dest='verbose', action='store_true', default=False,
                               help='Show tests log (default: %(default)s)')
 
+    parser_format = subparsers.add_parser('format', help='Format C++ files that changed')
+
     args = parser.parse_args()
 
     newToolchain = ''
     lastToolchain = ''
+    sysroot = ''
 
     if getPlatform(args) == 'macos':
         if 'arch' in vars(args) and args.arch == 'arm64':
             args.macostarget = '11.1'
         if args.mode == 'conf':
             (newToolchain, lastToolchain, sysroot) = setMacToolchain(args, args.macostoolchain)
+        if 'keychainPass' in vars(args) and args.keychainPass is not None:
+            execute('security unlock -p ' + args.keychainPass)
 
     if args.mode == 'conf':
-        conf(args)
+        conf(args, sysroot)
     elif args.mode == 'build':
         build(args)
     elif args.mode == 'pack':
@@ -594,6 +664,8 @@ def main():
         archive(args)
     elif args.mode == 'tests':
         tests(args)
+    elif args.mode == 'format':
+        formatCode(args)
     else:
         parser.print_usage()
 

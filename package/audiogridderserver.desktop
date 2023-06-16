@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=AudioGridder Server
+Comment=AudioGridder Server Backend
+Exec=/usr/local/bin/AudioGridderServer
+Icon=/usr/local/share/audiogridder/icon64.png
+Type=Application
+Terminal=false
+Categories=Audio;
+Keywords=Audio;

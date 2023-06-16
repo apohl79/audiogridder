@@ -90,8 +90,8 @@ bool ProcessorClient::isOk() {
 
     {
         std::lock_guard<std::mutex> lock(m_cmdMtx);
-        ok = m_process.isRunning() && nullptr != m_sockCmdIn && m_sockCmdIn->isConnected() &&
-             nullptr != m_sockCmdOut & m_sockCmdOut->isConnected();
+        ok = m_process.isRunning() && nullptr != m_sockCmdIn && m_sockCmdIn->isConnected() && nullptr != m_sockCmdOut &&
+             m_sockCmdOut->isConnected();
     }
 
     {
@@ -438,12 +438,12 @@ bool ProcessorClient::load(const String& settings, const String& layout, uint64 
             m_tailSeconds = jresult["tailSeconds"].get<double>();
             m_numOutputChannels = jresult["numOutputChannels"].get<int>();
             m_lastChannelInstances = jresult["channelInstances"].get<int>();
-        } catch (const json::parse_error& e) {
-            err = "json error when reading result: " + String(e.what());
+        } catch (const json::parse_error& ex) {
+            err = "json error when reading result: " + String(ex.what());
             setAndLogError(err);
             return false;
-        } catch (const std::exception& e) {
-            err = "std error when reading result: " + String(e.what());
+        } catch (const std::exception& ex) {
+            err = "std error when reading result: " + String(ex.what());
             setAndLogError(err);
             return false;
         }
@@ -654,24 +654,29 @@ void ProcessorClient::processBlockInternal(AudioBuffer<T>& buffer, MidiBuffer& m
     {
         std::lock_guard<std::mutex> lock(m_audioMtx);
 
-        TimeTrace::addTracePoint("pc_lock");
+        if (nullptr != m_sockAudio) {
+            TimeTrace::addTracePoint("pc_lock");
 
-        if (!msg.sendToServer(m_sockAudio.get(), *sendBuffer, midiMessages, posInfo, sendBuffer->getNumChannels(),
-                              sendBuffer->getNumSamples(), &e, *m_bytesOutMeter)) {
-            logln("error while sending audio message to sandbox: " << e.toString());
-            m_sockAudio->close();
+            if (!msg.sendToServer(m_sockAudio.get(), *sendBuffer, midiMessages, posInfo, sendBuffer->getNumChannels(),
+                                  sendBuffer->getNumSamples(), &e, *m_bytesOutMeter)) {
+                logln("error while sending audio message to sandbox: " << e.toString());
+                m_sockAudio->close();
+                return;
+            }
+
+            TimeTrace::addTracePoint("pc_send");
+
+            if (!msg.readFromServer(m_sockAudio.get(), *sendBuffer, midiMessages, &e, *m_bytesInMeter)) {
+                logln("error while reading audio message from sandbox: " << e.toString());
+                m_sockAudio->close();
+                return;
+            }
+
+            TimeTrace::addTracePoint("pc_read");
+        } else {
+            logln("error while sending audio message: no socket");
             return;
         }
-
-        TimeTrace::addTracePoint("pc_send");
-
-        if (!msg.readFromServer(m_sockAudio.get(), *sendBuffer, midiMessages, &e, *m_bytesInMeter)) {
-            logln("error while reading audio message from sandbox: " << e.toString());
-            m_sockAudio->close();
-            return;
-        }
-
-        TimeTrace::addTracePoint("pc_read");
     }
 
     m_channelMapper.mapReverse(sendBuffer, &buffer);

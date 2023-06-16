@@ -49,6 +49,7 @@ Processor::Processor(ProcessorChain& chain, const String& id, double sampleRate,
       m_isClient(isClient),
       m_fmt(id.startsWith("VST3")  ? VST3
             : id.startsWith("VST") ? VST
+            : id.startsWith("LV2") ? LV2
                                    : AU) {
     initAsyncFunctors();
 
@@ -93,7 +94,7 @@ String Processor::convertJUCEtoAGPluginID(const String& id) {
 
     if ((pos = id.indexOfChar(0, '-')) > -1) {
         format = id.substring(0, pos);
-        if (format != "AudioUnit" && format != "VST" && format != "VST3") {
+        if (format != "AudioUnit" && format != "VST" && format != "VST3" && format != "LV2") {
             return {};
         }
         name = id.substring(pos + 1);
@@ -307,6 +308,12 @@ std::shared_ptr<AudioPluginInstance> Processor::loadPlugin(const PluginDescripti
     String err2;
     AudioPluginFormatManager plugmgr;
     plugmgr.addDefaultFormats();
+#if JUCE_PLUGINHOST_LV2
+    if (plugdesc.pluginFormatName == "LV2") {
+        AudioPluginFormat* fmt = new LV2PluginFormat();
+        plugmgr.addFormat(fmt);
+    }
+#endif
     std::shared_ptr<AudioPluginInstance> inst;
     runOnMsgThreadSync([&] {
         traceScope();

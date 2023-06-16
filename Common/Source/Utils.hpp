@@ -47,7 +47,7 @@ using namespace std::chrono_literals;
 
 #define traceln(M)                                                                        \
     do {                                                                                  \
-        if (Tracer::isEnabled() && nullptr != getLogTagSource()) {                        \
+        if (Tracer::isEnabled()) {                                                        \
             String __msg;                                                                 \
             __msg << M;                                                                   \
             Tracer::traceMessage(getLogTagSource(), __FILE__, __LINE__, __func__, __msg); \
@@ -644,29 +644,38 @@ inline int getLayoutNumChannels(const AudioProcessor::BusesLayout& l, bool isInp
     }
     return num;
 }
-#endif
 
-inline String getPluginType(const String& id) {
+inline String getPluginType(const String& id, const PluginDescription* pdesc) {
     String type;
-    File f(id);
-    if (f.exists()) {
-        if (f.getFileExtension().toLowerCase() == ".dll") {
-            type = "vst";
+    if (pdesc != nullptr) {
+        if (pdesc->pluginFormatName == "AudioUnit") {
+            type = "au";
         } else {
-            type = f.getFileExtension().toLowerCase().substring(1);
+            type = pdesc->pluginFormatName.toLowerCase();
         }
-    } else if (id.startsWith("AudioUnit")) {
-        type = "au";
     } else {
-        type = "unknown";
+        File f(id);
+        if (f.exists()) {
+            if (f.getFileExtension().toLowerCase() == ".dll") {
+                type = "vst";
+            } else {
+                type = f.getFileExtension().toLowerCase().substring(1);
+            }
+        } else if (id.startsWith("AudioUnit")) {
+            type = "au";
+        } else {
+            type = "lv2";
+        }
     }
     return type;
 }
 
-inline String getPluginName(const String& id, bool withType = true) {
+inline String getPluginName(const String& id, const PluginDescription* pdesc, bool withType = true) {
     String name;
     File f(id);
-    if (f.exists()) {
+    if (pdesc != nullptr) {
+        name = pdesc->name;
+    } else if (f.exists()) {
         name = f.getFileNameWithoutExtension();
 #if JUCE_MAC && AG_SERVER
     } else if (id.startsWith("AudioUnit")) {
@@ -677,10 +686,11 @@ inline String getPluginName(const String& id, bool withType = true) {
         name = id;
     }
     if (withType) {
-        name << " (" << getPluginType(id) << ")";
+        name << " (" << getPluginType(id, pdesc) << ")";
     }
     return name;
 }
+#endif
 
 struct FnThread : Thread {
     std::function<void()> fn;
@@ -731,6 +741,60 @@ struct FnTimer : Timer {
             fn = nullptr;
         }
     }
+};
+
+template <typename K, typename V>
+class SafeHashMap {
+  public:
+    bool contains(const K& key) {
+        std::lock_guard<std::mutex> lock(m_mtx);
+        return m_elements.find(key) != m_elements.end();
+    }
+
+    void clear() {
+        std::lock_guard<std::mutex> lock(m_mtx);
+        m_elements.clear();
+    }
+
+    V& operator[](const K& key) {
+        std::lock_guard<std::mutex> lock(m_mtx);
+        return m_elements[key];
+    }
+
+    V operator[](const K& key) const {
+        std::lock_guard<std::mutex> lock(m_mtx);
+        return m_elements[key];
+    }
+
+    bool getAndRemove(const K& key, V& val) {
+        std::lock_guard<std::mutex> lock(m_mtx);
+        auto it = m_elements.find(key);
+        if (it != m_elements.end()) {
+            val = it->second;
+            m_elements.erase(it);
+            return true;
+        }
+        return false;
+    }
+
+    void erase(const K& key) {
+        std::lock_guard<std::mutex> lock(m_mtx);
+        m_elements.erase(key);
+    }
+
+    size_t size() const {
+        std::lock_guard<std::mutex> lock(m_mtx);
+        return m_elements.size();
+    }
+
+    auto begin() noexcept { return m_elements.begin(); }
+    const auto begin() const noexcept { return m_elements.begin(); }
+    auto end() noexcept { return m_elements.end(); }
+    const auto end() const noexcept { return m_elements.end(); }
+
+  private:
+    std::unordered_map<K, V> m_elements;
+    mutable std::mutex m_mtx;
 };
 
 }  // namespace e47

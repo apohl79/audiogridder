@@ -208,7 +208,11 @@ inline String getSentryCrashpadPath() {
 #endif
 
 #if JUCE_LINUX
-    // the install script puts crashpad into /usr/local/bin
+    // the install script puts crashpad into /usr/local/bin and later into /usr/local/share/audiogridder
+    path = "/usr/local/share/audiogridder/" + filename;
+    if (File(path).existsAsFile()) {
+        return path;
+    }
     path = "/usr/local/bin/" + filename;
     if (File(path).existsAsFile()) {
         return path;

@@ -209,6 +209,11 @@ PluginProcessor::PluginProcessor(AudioProcessor::WrapperType wt)
 PluginProcessor::~PluginProcessor() {
     traceScope();
     stopAsyncFunctors();
+    runOnMsgThreadSync([this] {
+        if (auto* e = (PluginEditor*)getActiveEditor()) {
+            e->setShouldExit();
+        }
+    });
     m_tray.reset();
     logln("plugin shutdown: terminating client");
     m_client->signalThreadShouldExit();
@@ -246,6 +251,12 @@ void PluginProcessor::loadConfig(const json& j, bool isUpdate) {
 
     m_scale = jsonGetValue(j, "ZoomFactor", m_scale);
 
+    m_bufferSizeByPlugin = jsonGetValue(j, "BufferSettingByPlugin", m_bufferSizeByPlugin);
+    m_numberOfBuffersDefault = jsonGetValue(j, "NumberOfBuffersDefault", m_client->NUM_OF_BUFFERS.load());
+    m_customBlockSizeDefault = jsonGetValue(j, "CustomBlockSize", m_customBlockSize);
+    m_fixedOutboundBufferDefault =
+        jsonGetValue(j, "FixedOutboundBufferDefault", m_client->FIXED_OUTBOUND_BUFFER.load());
+
     if (!isUpdate) {
         if (jsonHasValue(j, "Servers")) {
             for (auto& srv : j["Servers"]) {
@@ -254,7 +265,12 @@ void PluginProcessor::loadConfig(const json& j, bool isUpdate) {
         }
         m_activeServerFromCfg = jsonGetValue(j, "LastServer", m_activeServerFromCfg);
         m_activeServerLegacyFromCfg = jsonGetValue(j, "Last", m_activeServerLegacyFromCfg);
-        m_client->NUM_OF_BUFFERS = jsonGetValue(j, "NumberOfBuffers", m_client->NUM_OF_BUFFERS.load());
+        m_client->NUM_OF_BUFFERS = m_bufferSizeByPlugin
+                                       ? m_numberOfBuffersDefault
+                                       : jsonGetValue(j, "NumberOfBuffers", m_client->NUM_OF_BUFFERS.load());
+        m_client->FIXED_OUTBOUND_BUFFER =
+            m_bufferSizeByPlugin ? m_fixedOutboundBufferDefault
+                                 : jsonGetValue(j, "FixedOutboundBuffer", m_client->FIXED_OUTBOUND_BUFFER.load());
         m_client->LOAD_PLUGIN_TIMEOUT = jsonGetValue(j, "LoadPluginTimeoutMS", m_client->LOAD_PLUGIN_TIMEOUT.load());
 
         if (m_scale != Desktop::getInstance().getGlobalScaleFactor()) {
@@ -290,7 +306,6 @@ void PluginProcessor::loadConfig(const json& j, bool isUpdate) {
     m_disableRecents = jsonGetValue(j, "DisableRecents", m_disableRecents);
     m_keepEditorOpen = jsonGetValue(j, "KeepEditorOpen", m_keepEditorOpen);
     m_bypassWhenNotConnected = jsonGetValue(j, "BypassWhenNotConnected", m_bypassWhenNotConnected.load());
-    m_bufferSizeByPlugin = jsonGetValue(j, "BufferSettingByPlugin", m_bufferSizeByPlugin);
     m_client->FIXED_OUTBOUND_BUFFER = jsonGetValue(j, "FixedOutboundBuffer", m_client->FIXED_OUTBOUND_BUFFER.load());
     m_processingTraceTresholdMs = jsonGetValue(j, "ProcessingTraceTresholdMs", m_processingTraceTresholdMs);
     m_client->LIVE_MODE = jsonGetValue(j, "LiveMode", m_client->LIVE_MODE.load());
@@ -304,7 +319,7 @@ void PluginProcessor::loadConfig(const json& j, bool isUpdate) {
     }
 }
 
-void PluginProcessor::saveConfig(int numOfBuffers) {
+void PluginProcessor::saveConfig(int numOfBuffers, bool saveBufferDefaults) {
     traceScope();
 
     auto jservers = json::array();
@@ -313,18 +328,13 @@ void PluginProcessor::saveConfig(int numOfBuffers) {
     }
 
     if (numOfBuffers < 0) {
-        if (m_bufferSizeByPlugin) {
-            numOfBuffers = Defaults::DEFAULT_NUM_OF_BUFFERS;
-        } else {
-            numOfBuffers = m_client->NUM_OF_BUFFERS;
-        }
+        numOfBuffers = m_client->NUM_OF_BUFFERS;
     }
 
     json jcfg;
     jcfg["_comment_"] = "PLEASE DO NOT CHANGE THIS FILE WHILE YOUR DAW IS RUNNING AND HAS AUDIOGRIDDER PLUGINS LOADED";
     jcfg["Servers"] = jservers;
     jcfg["LastServer"] = m_client->getServer().serialize().toStdString();
-    jcfg["NumberOfBuffers"] = numOfBuffers;
     jcfg["NumberOfAutomationSlots"] = m_numberOfAutomationSlots;
     jcfg["LoadPluginTimeoutMS"] = m_client->LOAD_PLUGIN_TIMEOUT.load();
     jcfg["MenuShowType"] = m_menuShowType;
@@ -349,12 +359,26 @@ void PluginProcessor::saveConfig(int numOfBuffers) {
     jcfg["KeepEditorOpen"] = m_keepEditorOpen;
     jcfg["BypassWhenNotConnected"] = m_bypassWhenNotConnected.load();
     jcfg["BufferSettingByPlugin"] = m_bufferSizeByPlugin;
-    if (!m_bufferSizeByPlugin) {
-        jcfg["FixedOutboundBuffer"] = m_client->FIXED_OUTBOUND_BUFFER.load();
-        jcfg["CustomBlockSize"] = m_customBlockSize;
-    }
     jcfg["ProcessingTraceTresholdMs"] = m_processingTraceTresholdMs;
     jcfg["LiveMode"] = m_client->LIVE_MODE.load();
+
+    if (!m_bufferSizeByPlugin) {
+        jcfg["NumberOfBuffers"] = numOfBuffers;
+        jcfg["FixedOutboundBuffer"] = m_client->FIXED_OUTBOUND_BUFFER.load();
+        jcfg["CustomBlockSize"] = m_customBlockSize;
+    } else {
+        jcfg["NumberOfBuffers"] = Defaults::DEFAULT_NUM_OF_BUFFERS;
+    }
+
+    if (saveBufferDefaults) {
+        m_numberOfBuffersDefault = numOfBuffers;
+        m_fixedOutboundBufferDefault = m_client->FIXED_OUTBOUND_BUFFER.load();
+        m_customBlockSizeDefault = m_customBlockSize;
+    }
+
+    jcfg["NumberOfBuffersDefault"] = m_numberOfBuffersDefault;
+    jcfg["FixedOutboundBufferDefault"] = m_fixedOutboundBufferDefault;
+    jcfg["CustomBlockSizeDefault"] = m_customBlockSizeDefault;
 
     configWriteFile(Defaults::getConfigFileName(Defaults::ConfigPlugin), jcfg);
 }
@@ -457,18 +481,18 @@ const String PluginProcessor::getProgramName(int /* index */) { return {}; }
 
 void PluginProcessor::changeProgramName(int /* index */, const String& /* newName */) {}
 
-void PluginProcessor::prepareToPlay(double sampleRate, int blockSize) {
+void PluginProcessor::prepareToPlay(double sampleRate, int blckSize) {
     traceScope();
 
-    int clientBlockSize = blockSize;
+    int clientBlockSize = blckSize;
 
-    if (m_customBlockSize > blockSize) {
-        clientBlockSize = (int)std::ceil((float)m_customBlockSize / blockSize) * blockSize;
+    if (m_customBlockSize > blckSize) {
+        clientBlockSize = (int)std::ceil((float)m_customBlockSize / blckSize) * blckSize;
     }
 
-    logln("prepareToPlay: sampleRate = " << sampleRate << ", blockSize = " << clientBlockSize
-                                         << (clientBlockSize != blockSize ? ", dawBlockSize = " + String(blockSize)
-                                                                          : ""));
+    logln(
+        "prepareToPlay: sampleRate = " << sampleRate << ", blockSize = " << clientBlockSize
+                                       << (clientBlockSize != blckSize ? ", dawBlockSize = " + String(blckSize) : ""));
     logln("I/O layout: " << describeLayout(getBusesLayout()));
 
     if (!m_client->isThreadRunning()) {
@@ -578,11 +602,11 @@ void PluginProcessor::numChannelsChanged() {
 }
 
 int PluginProcessor::getCustomBlockSize() const {
-    int blockSize = getBlockSize();
-    if (m_customBlockSize > blockSize) {
-        blockSize = (int)std::ceil((float)m_customBlockSize / blockSize) * blockSize;
+    int blckSize = getBlockSize();
+    if (m_customBlockSize > blckSize) {
+        blckSize = (int)std::ceil((float)m_customBlockSize / blckSize) * blckSize;
     }
-    return blockSize;
+    return blckSize;
 }
 
 void PluginProcessor::setCustomBlockSize(int b) {
@@ -1789,9 +1813,9 @@ void PluginProcessor::TrayConnection::sendStatus() {
 
     if (!m_processor->m_loadedPluginsOk) {
         std::stringstream str;
+        bool first = true;
         for (int idx = 0; idx < m_processor->getNumOfLoadedPlugins(); idx++) {
             auto& plug = m_processor->getLoadedPlugin(idx);
-            bool first = true;
             if (!plug.ok) {
                 str << (first ? String() : newLine) << plug.name << ": " << plug.error;
                 first = false;
@@ -1858,7 +1882,7 @@ void PluginProcessor::TrayConnection::run() {
 #elif JUCE_WINDOWS
                 path << "/AudioGridderPluginTray/AudioGridderPluginTray.exe";
 #elif JUCE_LINUX
-                path << "/local/bin/AudioGridderPluginTray";
+                path << "/local/share/audiogridder/AudioGridderPluginTray";
 #endif
                 if (File(path).existsAsFile()) {
                     logln("tray connection failed, trying to run tray app: " << path);

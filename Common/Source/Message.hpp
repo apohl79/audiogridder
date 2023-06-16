@@ -470,8 +470,11 @@ template <typename T>
 class DataPayload : public Payload {
   public:
     T* data;
-    DataPayload(int type) : Payload(type, sizeof(T)) { realign(); }
-    virtual void realign() override { data = reinterpret_cast<T*>(payloadBuffer.data()); }
+    DataPayload(int type) : Payload(type, sizeof(T)) { realignInternal(); }
+    virtual void realign() override { realignInternal(); }
+
+  private:
+    void realignInternal() { data = reinterpret_cast<T*>(payloadBuffer.data()); }
 };
 
 class NumberPayload : public DataPayload<int> {
@@ -493,7 +496,7 @@ class StringPayload : public Payload {
     int* size;
     char* str;
 
-    StringPayload(int type) : Payload(type, sizeof(int)) { realign(); }
+    StringPayload(int type) : Payload(type, sizeof(int)) { realignInternal(); }
 
     void setString(const String& s) {
         setSize((int)sizeof(int) + s.length());
@@ -508,7 +511,10 @@ class StringPayload : public Payload {
         return {};
     }
 
-    virtual void realign() override {
+    virtual void realign() override { realignInternal(); }
+
+  private:
+    void realignInternal() {
         size = reinterpret_cast<int*>(payloadBuffer.data());
         str = (size_t)getSize() > sizeof(int) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(int) : nullptr;
     }
@@ -519,7 +525,7 @@ class BinaryPayload : public Payload {
     int* size;
     char* data;
 
-    BinaryPayload(int type) : Payload(type, sizeof(int)) { realign(); }
+    BinaryPayload(int type) : Payload(type, sizeof(int)) { realignInternal(); }
 
     void setData(const char* src, int len) {
         setSize((int)sizeof(int) + len);
@@ -527,7 +533,10 @@ class BinaryPayload : public Payload {
         memcpy(data, src, static_cast<size_t>(len));
     }
 
-    virtual void realign() override {
+    virtual void realign() override { realignInternal(); }
+
+  private:
+    void realignInternal() {
         size = reinterpret_cast<int*>(payloadBuffer.data());
         data = (size_t)getSize() > sizeof(int) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(int) : nullptr;
     }
@@ -601,7 +610,7 @@ class Result : public Payload {
     hdr_t* hdr;
     char* str;
 
-    Result() : Payload(Type) { realign(); }
+    Result() : Payload(Type) { realignInternal(); }
 
     void setResult(int rc, const String& s) {
         setSize(static_cast<int>(sizeof(hdr_t)) + s.length());
@@ -613,7 +622,10 @@ class Result : public Payload {
     int getReturnCode() const { return hdr->rc; }
     String getString() const { return String(str, (size_t)hdr->size); }
 
-    virtual void realign() override {
+    virtual void realign() override { realignInternal(); }
+
+  private:
+    void realignInternal() {
         hdr = reinterpret_cast<hdr_t*>(payloadBuffer.data());
         str =
             (size_t)getSize() > sizeof(hdr_t) ? reinterpret_cast<char*>(payloadBuffer.data()) + sizeof(hdr_t) : nullptr;
