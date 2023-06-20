@@ -1,0 +1,12 @@
+{
+  "name" : "audiogridder",
+  "version-string" : "1.0.0",
+  "builtin-baseline" : "85c222bc31ce1a747c98f0dd74ab47baab91744c",
+  "dependencies" : [ {
+    "name" : "boost",
+    "version>=" : "1.82.0#2"
+  }, {
+    "name" : "ffmpeg",
+    "version>=" : "5.1.2#6"
+  } ]
+}
