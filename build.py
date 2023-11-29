@@ -119,7 +119,7 @@ def getDepsDir(args):
     if depsDir is None or not os.path.isdir(depsDir):
         depsDir = os.environ.get('AG_DEPS_ROOT')
     if depsDir is None or not os.path.isdir(depsDir):
-        log('error: missing dependcies root, use --deps-root')
+        log('error: missing dependencies root, use --deps-root')
         exit(1)
     return os.path.abspath(depsDir).replace('\\', '/') + '/' + getPlatformArch(args)
 

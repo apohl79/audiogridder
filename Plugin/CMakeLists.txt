@@ -84,6 +84,12 @@ macro(ag_add_plugin type)
     juce::juce_recommended_warning_flags)
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    target_link_libraries(AudioGridder${type}
+            PRIVATE
+            "-framework CoreMedia"
+            "-framework VideoToolbox"
+    )
+
     ag_strip(AudioGridder${type}_AU AU)
   endif()
 
