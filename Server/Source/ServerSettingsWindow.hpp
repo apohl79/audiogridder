@@ -11,6 +11,11 @@
 #include <JuceHeader.h>
 
 #include "Utils.hpp"
+#include "ServerSettings/MainTab.hpp"
+#include "ServerSettings/PluginFormatsTab.hpp"
+#include "ServerSettings/ScreenCapturingTab.hpp"
+#include "ServerSettings/StartupTab.hpp"
+#include "ServerSettings/DiagnosticsTab.hpp"
 
 namespace e47 {
 
@@ -34,6 +39,8 @@ class ServerSettingsWindow : public DocumentWindow, public LogTag {
     Label m_screenJpgQualityLbl, m_screenDiffDetectionLbl, m_screenCapturingQualityLbl, m_pluginWindowsOnTopLbl;
     ComboBox m_screenCapturingMode, m_screenCapturingQuality, m_sandboxMode;
     TooltipWindow m_tooltipWindow;
+
+    TabbedComponent m_tabbedComponent;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ServerSettingsWindow)
 };

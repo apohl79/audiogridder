@@ -19,7 +19,8 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
                      LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId),
                      DocumentWindow::closeButton),
       LogTag("settings"),
-      m_app(app) {
+      m_app(app),
+      m_tabbedComponent(TabbedButtonBar::TabsAtTop) {
     traceScope();
     setUsingNativeTitleBar(true);
 

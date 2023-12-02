@@ -22,6 +22,7 @@ juce_add_gui_app(AudioGridderServer
 juce_generate_juce_header(AudioGridderServer)
 
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/Source AG_SOURCES_SERVER)
+aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/Source/ServerSettings AG_SOURCES_SERVER_SETTINGS)
 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   list(REMOVE_ITEM AG_SOURCES_SERVER "${CMAKE_CURRENT_SOURCE_DIR}/Source/Screen.mm")
@@ -31,7 +32,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
   list(REMOVE_ITEM  AG_SOURCES_SERVER "${CMAKE_CURRENT_SOURCE_DIR}/Source/ScreenHelper_linux.cpp")
 endif()
 
-target_sources(AudioGridderServer PRIVATE ${AG_SOURCES_SERVER} ${AG_SOURCES_COMMON})
+target_sources(AudioGridderServer PRIVATE ${AG_SOURCES_SERVER} ${AG_SOURCES_SERVER_SETTINGS} ${AG_SOURCES_COMMON})
 
 set(AG_PLUGINHOST_VST 0)
 if(AG_SDKS_ROOT)
