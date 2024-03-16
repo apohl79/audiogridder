@@ -6,3 +6,18 @@
 */
 
 #include "ScreenCapturingTab.hpp"
+
+ScreenCapturingTab::ScreenCapturingTab()
+{
+
+}
+
+void ScreenCapturingTab::paint (Graphics& g)
+{
+
+}
+
+void ScreenCapturingTab::resized()
+{
+
+}

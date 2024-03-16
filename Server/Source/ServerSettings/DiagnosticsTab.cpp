@@ -6,3 +6,18 @@
 */
 
 #include "DiagnosticsTab.hpp"
+
+DiagnosticsTab::DiagnosticsTab()
+{
+
+}
+
+void DiagnosticsTab::paint (Graphics& g)
+{
+
+}
+
+void DiagnosticsTab::resized()
+{
+
+}

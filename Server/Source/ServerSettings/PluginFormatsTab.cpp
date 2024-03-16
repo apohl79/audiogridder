@@ -6,3 +6,18 @@
 */
 
 #include "PluginFormatsTab.hpp"
+
+PluginFormatsTab::PluginFormatsTab()
+{
+
+}
+
+void PluginFormatsTab::paint (Graphics& g)
+{
+
+}
+
+void PluginFormatsTab::resized()
+{
+
+}

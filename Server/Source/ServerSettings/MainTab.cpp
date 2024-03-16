@@ -6,3 +6,18 @@
 */
 
 #include "MainTab.hpp"
+
+MainTab::MainTab()
+{
+
+}
+
+void MainTab::paint (Graphics& g)
+{
+
+}
+
+void MainTab::resized()
+{
+
+}

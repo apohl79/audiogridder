@@ -7,10 +7,18 @@
 
 #pragma once
 
-class StartupTab
+#include <JuceHeader.h>
+#include "TabCommon.h"
+
+class StartupTab : public juce::Component
 {
   public:
+    StartupTab();
+    void paint (Graphics& g) override;
+    void resized() override;
+    bool getScanForPlugins() { return m_scanForPlugins.getToggleState(); }
   private:
+    ToggleButton m_scanForPlugins;
 };
 
 

@@ -7,10 +7,20 @@
 
 #pragma once
 
-class DiagnosticsTab
+#include <JuceHeader.h>
+#include "TabCommon.h"
+
+class DiagnosticsTab : public juce::Component
 {
   public:
+    DiagnosticsTab();
+    void paint (Graphics& g) override;
+    void resized() override;
+    bool getTracerEnabled() { return m_tracer.getToggleState(); }
+    bool getLoggerEnabled() { return m_logger.getToggleState(); }
+    bool getCrashReportingEnabled() { return m_crashReporting.getToggleState(); }
   private:
+    ToggleButton m_tracer, m_logger, m_crashReporting;
 };
 
 

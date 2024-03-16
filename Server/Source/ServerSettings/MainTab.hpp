@@ -7,10 +7,21 @@
 
 #pragma once
 
-class MainTab
+#include <JuceHeader.h>
+#include "TabCommon.h"
+
+class MainTab : public juce::Component
 {
   public:
+    MainTab();
+    void paint (Graphics& g) override;
+    void resized() override;
+    String getNameText() { return m_nameText.getText(); }
+    String getIdText() { return m_idText.getText(); }
+    int getSandboxSelectedIndex() { return m_sandboxMode.getSelectedItemIndex(); }
   private:
+    TextEditor m_nameText, m_idText;
+    ComboBox m_sandboxMode;
 };
 
 
