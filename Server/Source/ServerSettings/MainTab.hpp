@@ -9,19 +9,23 @@
 
 #include <JuceHeader.h>
 #include "TabCommon.h"
+#include "Utils.hpp"
 
-class MainTab : public juce::Component
-{
+namespace e47 {
+
+class MainTab : public juce::Component {
   public:
-    MainTab();
-    void paint (Graphics& g) override;
+    MainTab(const String& initName, int initId, int initMode);
+    void paint(Graphics& g) override;
     void resized() override;
     String getNameText() { return m_nameText.getText(); }
-    String getIdText() { return m_idText.getText(); }
+    String getIdText() { return m_idTextLabel.getText(); }
     int getSandboxSelectedIndex() { return m_sandboxMode.getSelectedItemIndex(); }
+
   private:
-    TextEditor m_nameText, m_idText;
+    Label m_nameLabel, m_idLabel, m_sandboxLabel, m_idTextLabel;
+    TextEditor m_nameText;
     ComboBox m_sandboxMode;
 };
 
-
+}  // namespace e47

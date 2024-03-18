@@ -7,17 +7,21 @@
 
 #include "PluginFormatsTab.hpp"
 
+namespace e47 {
+
 PluginFormatsTab::PluginFormatsTab()
 {
-
 }
 
 void PluginFormatsTab::paint (Graphics& g)
 {
-
+    auto bgColour = LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId);
+    g.setColour(bgColour);
 }
 
 void PluginFormatsTab::resized()
 {
 
 }
+
+}  // namespace e47

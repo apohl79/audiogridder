@@ -10,6 +10,8 @@
 #include <JuceHeader.h>
 #include "TabCommon.h"
 
+namespace e47 {
+
 class StartupTab : public juce::Component
 {
   public:
@@ -21,4 +23,4 @@ class StartupTab : public juce::Component
     ToggleButton m_scanForPlugins;
 };
 
-
+}  // namespace e47

@@ -7,17 +7,21 @@
 
 #include "StartupTab.hpp"
 
+namespace e47 {
+
 StartupTab::StartupTab()
 {
-
 }
 
 void StartupTab::paint (Graphics& g)
 {
-
+    auto bgColour = LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId);
+    g.setColour(bgColour);
 }
 
 void StartupTab::resized()
 {
 
 }
+
+}  // namespace e47

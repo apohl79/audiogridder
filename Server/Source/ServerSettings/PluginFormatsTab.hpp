@@ -10,6 +10,8 @@
 #include <JuceHeader.h>
 #include "TabCommon.h"
 
+namespace e47 {
+
 class PluginFormatsTab : public juce::Component
 {
   public:
@@ -28,3 +30,5 @@ class PluginFormatsTab : public juce::Component
     ToggleButton m_auSupport, m_vst2Support, m_vst3Support, m_lv2Support, m_vstNoStandardFolders;
     TextEditor m_vst2Folders, m_vst3Folders, m_lv2Folders;
 };
+
+}  // namespace e47

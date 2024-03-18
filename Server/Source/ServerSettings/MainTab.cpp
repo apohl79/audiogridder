@@ -7,17 +7,58 @@
 
 #include "MainTab.hpp"
 
-MainTab::MainTab()
-{
+namespace e47 {
 
+MainTab::MainTab(const String& initName, int initId, int initMode)
+{
+    int row = 0;
+
+    m_nameLabel.setText("Server Name:", NotificationType::dontSendNotification);
+    m_nameLabel.setBounds(getLabelBounds(row));
+    addAndMakeVisible(m_nameLabel);
+
+    m_nameText.setText(initName);
+    m_nameText.setBounds(getWideFieldBounds(row));
+    addAndMakeVisible(m_nameText);
+
+    row++;
+
+    m_idLabel.setText("Server ID:", NotificationType::dontSendNotification);
+    m_idLabel.setBounds(getLabelBounds(row));
+    addAndMakeVisible(m_idLabel);
+
+    String id(initId);
+    m_idTextLabel.setText(id, NotificationType::dontSendNotification);
+    m_idTextLabel.setBounds(getFieldBounds(row));
+    m_idTextLabel.setJustificationType(Justification::right);
+    addAndMakeVisible(m_idTextLabel);
+
+    row++;
+
+    String tooltip;
+    tooltip << "Chain Isolation: Each AG plugin chain created by an AG plugin will run in a dedicated process."
+            << newLine << newLine
+            << "Plugin Isolation: Each plugin loaded into an AG plugin chain will run in a dedicated process.";
+    m_sandboxLabel.setText("Sandbox Mode:", NotificationType::dontSendNotification);
+    m_sandboxLabel.setBounds(getLabelBounds(row));
+    m_sandboxLabel.setTooltip(tooltip);
+    addAndMakeVisible(m_sandboxLabel);
+
+    m_sandboxMode.setBounds(getWideFieldBounds(row));
+    m_sandboxMode.addItem("Disabled", 1);
+    m_sandboxMode.addItem("Chain Isolation", 2);
+    m_sandboxMode.addItem("Plugin Isolation", 3);
+    m_sandboxMode.setSelectedItemIndex(initMode);
+    m_sandboxMode.setTooltip(tooltip);
+    addAndMakeVisible(m_sandboxMode);
 }
 
-void MainTab::paint (Graphics& g)
+void MainTab::paint(Graphics& g)
 {
-
+    auto bgColour = LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId);
+    g.setColour(bgColour);
 }
 
-void MainTab::resized()
-{
+void MainTab::resized() {}
 
-}
+}  // namespace e47

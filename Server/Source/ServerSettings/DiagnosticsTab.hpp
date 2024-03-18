@@ -10,6 +10,8 @@
 #include <JuceHeader.h>
 #include "TabCommon.h"
 
+namespace e47 {
+
 class DiagnosticsTab : public juce::Component
 {
   public:
@@ -23,4 +25,4 @@ class DiagnosticsTab : public juce::Component
     ToggleButton m_tracer, m_logger, m_crashReporting;
 };
 
-
+}  // namespace e47

@@ -10,6 +10,8 @@
 #include <JuceHeader.h>
 #include "TabCommon.h"
 
+namespace e47 {
+
 class ScreenCapturingTab : public juce::Component
 {
   public:
@@ -28,4 +30,4 @@ class ScreenCapturingTab : public juce::Component
     TextEditor m_screenJpgQuality, m_screenMouseOffsetXY;
 };
 
-
+}  // namespace e47

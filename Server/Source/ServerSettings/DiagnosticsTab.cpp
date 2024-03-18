@@ -7,17 +7,21 @@
 
 #include "DiagnosticsTab.hpp"
 
+namespace e47 {
+
 DiagnosticsTab::DiagnosticsTab()
 {
-
 }
 
 void DiagnosticsTab::paint (Graphics& g)
 {
-
+    auto bgColour = LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId);
+    g.setColour(bgColour);
 }
 
 void DiagnosticsTab::resized()
 {
 
 }
+
+}  // namespace e47

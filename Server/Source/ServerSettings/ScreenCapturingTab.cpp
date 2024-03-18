@@ -7,17 +7,21 @@
 
 #include "ScreenCapturingTab.hpp"
 
+namespace e47 {
+
 ScreenCapturingTab::ScreenCapturingTab()
 {
-
 }
 
 void ScreenCapturingTab::paint (Graphics& g)
 {
-
+    auto bgColour = LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId);
+    g.setColour(bgColour);
 }
 
 void ScreenCapturingTab::resized()
 {
 
 }
+
+}  // namespace e47

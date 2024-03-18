@@ -23,7 +23,8 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 #if OLD_LAYOUT
 #else
       ,
-      m_tabbedComponent(TabbedButtonBar::TabsAtTop)
+      m_tabbedComponent(TabbedButtonBar::TabsAtTop),
+      m_mainTab(app->getServer()->getName(), app->getServer()->getId(), app->getServer()->getSandboxMode())
 #endif
 {
     traceScope();
@@ -705,11 +706,14 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     int totalHeight = 400;
     int saveButtonRegionHeight = 50;
     addAndMakeVisible(&m_tabbedComponent);
-    m_tabbedComponent.addTab("Main", Colours::black, &m_mainTab, true);
-    m_tabbedComponent.addTab("Formats", Colours::black, &m_pluginFormatsTab, true);
-    m_tabbedComponent.addTab("Capture", Colours::black, &m_screenCapturingTab, true);
-    m_tabbedComponent.addTab("Startup", Colours::black, &m_startupTab, true);
-    m_tabbedComponent.addTab("Diagnostics", Colours::black, &m_diagnosticsTab, true);
+
+    auto bgColour = LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId);
+
+    m_tabbedComponent.addTab("Main", bgColour, &m_mainTab, true);
+    m_tabbedComponent.addTab("Formats", bgColour, &m_pluginFormatsTab, true);
+    m_tabbedComponent.addTab("Capture", bgColour, &m_screenCapturingTab, true);
+    m_tabbedComponent.addTab("Startup", bgColour, &m_startupTab, true);
+    m_tabbedComponent.addTab("Diagnostics", bgColour, &m_diagnosticsTab, true);
     m_tabbedComponent.setBounds(0, 0, totalWidth, totalHeight - saveButtonRegionHeight);
 
     m_saveButton.setButtonText("Save");
@@ -857,4 +861,5 @@ void ServerSettingsWindow::closeButtonPressed() {
     traceScope();
     m_app->hideServerSettings();
 }
+
 }  // namespace e47
