@@ -15,7 +15,8 @@ namespace e47 {
 class ScreenCapturingTab : public juce::Component
 {
   public:
-    ScreenCapturingTab();
+    ScreenCapturingTab(bool capOff, bool localMode, bool capFFmpeg, bool diffDetect, bool winOnTop,
+                       int FFmpegQuality, int offsetX, int offsetY, float screenQuality);
     void paint (Graphics& g) override;
     void resized() override;
     int getModeSelectedId() { return m_screenCapturingMode.getSelectedId(); }
@@ -28,6 +29,8 @@ class ScreenCapturingTab : public juce::Component
     ComboBox m_screenCapturingMode, m_screenCapturingQuality;
     ToggleButton m_pluginWindowsOnTop, m_screenDiffDetection;
     TextEditor m_screenJpgQuality, m_screenMouseOffsetXY;
+    Label m_screenCapturingModeLbl, m_screenCapturingQualityLbl, m_pluginWindowsOnTopLbl,
+          m_screenDiffDetectionLbl, m_screenJpgQualityLbl, m_screenMouseOffsetXYLbl;
 };
 
 }  // namespace e47

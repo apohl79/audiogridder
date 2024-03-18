@@ -24,7 +24,18 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 #else
       ,
       m_tabbedComponent(TabbedButtonBar::TabsAtTop),
-      m_mainTab(app->getServer()->getName(), app->getServer()->getId(), app->getServer()->getSandboxMode())
+      m_mainTab(app->getServer()->getName(), app->getServer()->getId(), app->getServer()->getSandboxMode()),
+      m_pluginFormatsTab(app->getServer()->getEnableAU(), app->getServer()->getEnableVST3(), app->getServer()->getEnableVST2(),
+                         app->getServer()->getVSTNoStandardFolders(), app->getServer()->getEnableLV2(),
+                         app->getServer()->getVST3Folders(), app->getServer()->getVST2Folders(),
+                         app->getServer()->getLV2Folders()),
+      m_screenCapturingTab(app->getServer()->getScreenCapturingOff(), app->getServer()->getScreenLocalMode(),
+                           app->getServer()->getScreenCapturingFFmpeg(), app->getServer()->getScreenDiffDetection(),
+                           app->getServer()->getPluginWindowsOnTop(), app->getServer()->getScreenCapturingFFmpegQuality(),
+                           app->getServer()->getScreenMouseOffsetX(), app->getServer()->getScreenMouseOffsetY(),
+                           app->getServer()->getScreenQuality()),
+      m_startupTab(app->getServer()->getScanForPlugins()),
+      m_diagnosticsTab(app->getServer()->getCrashReporting())
 #endif
 {
     traceScope();
@@ -703,7 +714,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
 
     addChildAndSetID(&m_saveButton, "save");
 #else
-    int totalHeight = 400;
+    int totalHeight = 435;
     int saveButtonRegionHeight = 50;
     addAndMakeVisible(&m_tabbedComponent);
 

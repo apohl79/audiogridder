@@ -9,7 +9,7 @@
 
 namespace e47 {
 
-MainTab::MainTab(const String& initName, int initId, int initMode)
+MainTab::MainTab(const String& name, int id, int mode)
 {
     int row = 0;
 
@@ -17,7 +17,7 @@ MainTab::MainTab(const String& initName, int initId, int initMode)
     m_nameLabel.setBounds(getLabelBounds(row));
     addAndMakeVisible(m_nameLabel);
 
-    m_nameText.setText(initName);
+    m_nameText.setText(name);
     m_nameText.setBounds(getWideFieldBounds(row));
     addAndMakeVisible(m_nameText);
 
@@ -27,8 +27,8 @@ MainTab::MainTab(const String& initName, int initId, int initMode)
     m_idLabel.setBounds(getLabelBounds(row));
     addAndMakeVisible(m_idLabel);
 
-    String id(initId);
-    m_idTextLabel.setText(id, NotificationType::dontSendNotification);
+    String idStr(id);
+    m_idTextLabel.setText(idStr, NotificationType::dontSendNotification);
     m_idTextLabel.setBounds(getFieldBounds(row));
     m_idTextLabel.setJustificationType(Justification::right);
     addAndMakeVisible(m_idTextLabel);
@@ -48,7 +48,7 @@ MainTab::MainTab(const String& initName, int initId, int initMode)
     m_sandboxMode.addItem("Disabled", 1);
     m_sandboxMode.addItem("Chain Isolation", 2);
     m_sandboxMode.addItem("Plugin Isolation", 3);
-    m_sandboxMode.setSelectedItemIndex(initMode);
+    m_sandboxMode.setSelectedItemIndex(mode);
     m_sandboxMode.setTooltip(tooltip);
     addAndMakeVisible(m_sandboxMode);
 }

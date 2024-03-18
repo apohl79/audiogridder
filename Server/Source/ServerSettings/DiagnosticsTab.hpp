@@ -15,7 +15,7 @@ namespace e47 {
 class DiagnosticsTab : public juce::Component
 {
   public:
-    DiagnosticsTab();
+    DiagnosticsTab(bool crashReporting);
     void paint (Graphics& g) override;
     void resized() override;
     bool getTracerEnabled() { return m_tracer.getToggleState(); }
@@ -23,6 +23,7 @@ class DiagnosticsTab : public juce::Component
     bool getCrashReportingEnabled() { return m_crashReporting.getToggleState(); }
   private:
     ToggleButton m_tracer, m_logger, m_crashReporting;
+    Label m_tracerLbl, m_loggerLbl, m_crashReportingLbl;
 };
 
 }  // namespace e47

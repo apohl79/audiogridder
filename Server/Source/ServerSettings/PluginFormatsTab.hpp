@@ -15,7 +15,8 @@ namespace e47 {
 class PluginFormatsTab : public juce::Component
 {
   public:
-    PluginFormatsTab();
+    PluginFormatsTab(bool au, bool vst3, bool vst2, bool vst2NoStandard, bool lv2,
+                     const StringArray& vst3Folders, const StringArray& vst2Folders, const StringArray& lv2Folders);
     void paint (Graphics& g) override;
     void resized() override;
     bool getAuSupport() { return m_auSupport.getToggleState(); }
@@ -29,6 +30,8 @@ class PluginFormatsTab : public juce::Component
   private:
     ToggleButton m_auSupport, m_vst2Support, m_vst3Support, m_lv2Support, m_vstNoStandardFolders;
     TextEditor m_vst2Folders, m_vst3Folders, m_lv2Folders;
+    Label m_auLabel, m_vst3Label, m_vst3CustomLabel, m_vst2Label, m_vst2CustomLabel, m_vst2CustomOnlyLabel,
+          m_lv2Label, m_lv2CustomLabel;
 };
 
 }  // namespace e47

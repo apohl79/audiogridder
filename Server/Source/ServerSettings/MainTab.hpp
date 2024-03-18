@@ -15,7 +15,7 @@ namespace e47 {
 
 class MainTab : public juce::Component {
   public:
-    MainTab(const String& initName, int initId, int initMode);
+    MainTab(const String& name, int id, int mode);
     void paint(Graphics& g) override;
     void resized() override;
     String getNameText() { return m_nameText.getText(); }
