@@ -15,8 +15,7 @@ namespace e47 {
 class ScreenCapturingTab : public juce::Component
 {
   public:
-    ScreenCapturingTab(bool capOff, bool localMode, bool capFFmpeg, bool diffDetect, bool winOnTop,
-                       int FFmpegQuality, int offsetX, int offsetY, float screenQuality);
+    ScreenCapturingTab(CaptureSettings captureSettings);
     void paint (Graphics& g) override;
     void resized() override;
     int getModeSelectedId() { return m_screenCapturingMode.getSelectedId(); }

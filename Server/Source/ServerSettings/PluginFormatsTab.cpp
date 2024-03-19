@@ -9,9 +9,7 @@
 
 namespace e47 {
 
-PluginFormatsTab::PluginFormatsTab(bool au, bool vst3, bool vst2, bool vst2NoStandard, bool lv2,
-                                   const StringArray& vst3Folders, const StringArray& vst2Folders,
-                                   const StringArray& lv2Folders)
+PluginFormatsTab::PluginFormatsTab(FormatSettings formatSettings)
 {
     int row = 0;
     String tmpStr;
@@ -22,7 +20,7 @@ PluginFormatsTab::PluginFormatsTab(bool au, bool vst3, bool vst2, bool vst2NoSta
     addAndMakeVisible(m_auLabel);
 
     m_auSupport.setBounds(getCheckBoxBounds(row));
-    m_auSupport.setToggleState(au, NotificationType::dontSendNotification);
+    m_auSupport.setToggleState(formatSettings.au, NotificationType::dontSendNotification);
     addAndMakeVisible(m_auSupport);
 
     row++;
@@ -33,7 +31,7 @@ PluginFormatsTab::PluginFormatsTab(bool au, bool vst3, bool vst2, bool vst2NoSta
     addAndMakeVisible(m_vst3Label);
 
     m_vst3Support.setBounds(getCheckBoxBounds(row));
-    m_vst3Support.setToggleState(vst3, NotificationType::dontSendNotification);
+    m_vst3Support.setToggleState(formatSettings.vst3, NotificationType::dontSendNotification);
     addAndMakeVisible(m_vst3Support);
 
     row++;
@@ -50,7 +48,7 @@ PluginFormatsTab::PluginFormatsTab(bool au, bool vst3, bool vst2, bool vst2NoSta
     addAndMakeVisible(m_vst3Folders);
 
     tmpStr = "";
-    for (auto& folder : vst3Folders) {
+    for (auto& folder : formatSettings.vst3Folders) {
         tmpStr << folder << newLine;
     }
     m_vst3Folders.setText(tmpStr);
@@ -62,7 +60,7 @@ PluginFormatsTab::PluginFormatsTab(bool au, bool vst3, bool vst2, bool vst2NoSta
     addAndMakeVisible(m_vst2Label);
 
     m_vst2Support.setBounds(getCheckBoxBounds(row));
-    m_vst2Support.setToggleState(vst2, NotificationType::dontSendNotification);
+    m_vst2Support.setToggleState(formatSettings.vst2, NotificationType::dontSendNotification);
     addAndMakeVisible(m_vst2Support);
 
     row++;
@@ -79,7 +77,7 @@ PluginFormatsTab::PluginFormatsTab(bool au, bool vst3, bool vst2, bool vst2NoSta
     addChildAndSetID(&m_vst2Folders, "vst2fold");
 
     tmpStr = "";
-    for (auto& folder : vst2Folders) {
+    for (auto& folder : formatSettings.vst2Folders) {
         tmpStr << folder << newLine;
     }
     m_vst2Folders.setText(tmpStr);
@@ -93,7 +91,7 @@ PluginFormatsTab::PluginFormatsTab(bool au, bool vst3, bool vst2, bool vst2NoSta
     addAndMakeVisible(m_vst2CustomOnlyLabel);
 
     m_vstNoStandardFolders.setBounds(getCheckBoxBounds(row));
-    m_vstNoStandardFolders.setToggleState(vst2NoStandard, NotificationType::dontSendNotification);
+    m_vstNoStandardFolders.setToggleState(formatSettings.vst2NoStandard, NotificationType::dontSendNotification);
     m_vstNoStandardFolders.setTooltip(tooltip);
     addChildAndSetID(&m_vstNoStandardFolders, "vstnostandarddirs");
 
@@ -104,7 +102,7 @@ PluginFormatsTab::PluginFormatsTab(bool au, bool vst3, bool vst2, bool vst2NoSta
     addAndMakeVisible(m_lv2Label);
 
     m_lv2Support.setBounds(getCheckBoxBounds(row));
-    m_lv2Support.setToggleState(lv2, NotificationType::dontSendNotification);
+    m_lv2Support.setToggleState(formatSettings.lv2, NotificationType::dontSendNotification);
     addAndMakeVisible(m_lv2Support);
 
     row++;
@@ -121,7 +119,7 @@ PluginFormatsTab::PluginFormatsTab(bool au, bool vst3, bool vst2, bool vst2NoSta
     addChildAndSetID(&m_lv2Folders, "lv2fold");
 
     tmpStr = "";
-    for (auto& folder : lv2Folders) {
+    for (auto& folder : formatSettings.lv2Folders) {
         tmpStr << folder << newLine;
     }
     m_lv2Folders.setText(tmpStr);

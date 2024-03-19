@@ -9,7 +9,7 @@
 
 namespace e47 {
 
-MainTab::MainTab(const String& name, int id, int mode)
+MainTab::MainTab(MainSettings mainSettings)
 {
     int row = 0;
 
@@ -17,7 +17,7 @@ MainTab::MainTab(const String& name, int id, int mode)
     m_nameLabel.setBounds(getLabelBounds(row));
     addAndMakeVisible(m_nameLabel);
 
-    m_nameText.setText(name);
+    m_nameText.setText(mainSettings.name);
     m_nameText.setBounds(getWideFieldBounds(row));
     addAndMakeVisible(m_nameText);
 
@@ -27,7 +27,7 @@ MainTab::MainTab(const String& name, int id, int mode)
     m_idLabel.setBounds(getLabelBounds(row));
     addAndMakeVisible(m_idLabel);
 
-    String idStr(id);
+    String idStr(mainSettings.id);
     m_idTextLabel.setText(idStr, NotificationType::dontSendNotification);
     m_idTextLabel.setBounds(getFieldBounds(row));
     m_idTextLabel.setJustificationType(Justification::right);
@@ -48,7 +48,7 @@ MainTab::MainTab(const String& name, int id, int mode)
     m_sandboxMode.addItem("Disabled", 1);
     m_sandboxMode.addItem("Chain Isolation", 2);
     m_sandboxMode.addItem("Plugin Isolation", 3);
-    m_sandboxMode.setSelectedItemIndex(mode);
+    m_sandboxMode.setSelectedItemIndex(mainSettings.mode);
     m_sandboxMode.setTooltip(tooltip);
     addAndMakeVisible(m_sandboxMode);
 }

@@ -9,14 +9,14 @@
 
 #include <JuceHeader.h>
 #include "TabCommon.h"
+#include "Server.hpp"
 
 namespace e47 {
 
 class PluginFormatsTab : public juce::Component
 {
   public:
-    PluginFormatsTab(bool au, bool vst3, bool vst2, bool vst2NoStandard, bool lv2,
-                     const StringArray& vst3Folders, const StringArray& vst2Folders, const StringArray& lv2Folders);
+    PluginFormatsTab(FormatSettings formatSettings);
     void paint (Graphics& g) override;
     void resized() override;
     bool getAuSupport() { return m_auSupport.getToggleState(); }

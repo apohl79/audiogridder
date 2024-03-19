@@ -55,3 +55,17 @@ static auto getHeaderBounds = [](int r) {
     return juce::Rectangle<int>(borderLR, extraBorderTB + borderTB + r * rowHeight + 7, totalWidth - borderLR * 2,
                                 headerHeight);
 };
+
+struct MainSettings {
+    const String& name; int id; int mode;
+};
+
+struct FormatSettings {
+    bool au; bool vst3; bool vst2; bool vst2NoStandard; bool lv2;
+    const StringArray& vst3Folders; const StringArray& vst2Folders; const StringArray& lv2Folders;
+};
+
+struct CaptureSettings {
+    bool capOff; bool localMode; bool capFFmpeg; bool diffDetect; bool winOnTop;
+    int FFmpegQuality; int offsetX; int offsetY; float screenQuality;
+};

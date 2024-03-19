@@ -10,8 +10,7 @@
 
 namespace e47 {
 
-ScreenCapturingTab::ScreenCapturingTab(bool capOff, bool localMode, bool capFFmpeg, bool diffDetect, bool winOnTop,
-                                       int FFmpegQuality, int offsetX, int offsetY, float screenQuality)
+ScreenCapturingTab::ScreenCapturingTab(CaptureSettings captureSettings)
 {
     String tooltip;
     int row = 0;
@@ -39,13 +38,13 @@ ScreenCapturingTab::ScreenCapturingTab(bool capOff, bool localMode, bool capFFmp
     m_screenCapturingMode.addItem("Disabled (Local Mode)", 4);
     m_screenCapturingMode.addItem("Disabled", 5);
     int mode = 1;
-    if (capOff) {
-        if (localMode) {
+    if (captureSettings.capOff) {
+        if (captureSettings.localMode) {
             mode = 4;
         } else {
             mode = 5;
         }
-    } else if (!capFFmpeg) {
+    } else if (!captureSettings.capFFmpeg) {
         mode = 3;
     }
     // else {
@@ -134,7 +133,7 @@ ScreenCapturingTab::ScreenCapturingTab(bool capOff, bool localMode, bool capFFmp
     m_screenCapturingQuality.addItem("High", ScreenRecorder::ENC_QUALITY_HIGH + 1);
     m_screenCapturingQuality.addItem("Medium", ScreenRecorder::ENC_QUALITY_MEDIUM + 1);
     m_screenCapturingQuality.addItem("Low", ScreenRecorder::ENC_QUALITY_LOW + 1);
-    m_screenCapturingQuality.setSelectedId(FFmpegQuality + 1);
+    m_screenCapturingQuality.setSelectedId(captureSettings.FFmpegQuality + 1);
     addAndMakeVisible(m_screenCapturingQuality);
 
     row++;
@@ -144,7 +143,7 @@ ScreenCapturingTab::ScreenCapturingTab(bool capOff, bool localMode, bool capFFmp
     addAndMakeVisible(m_screenDiffDetectionLbl);
 
     m_screenDiffDetection.setBounds(getCheckBoxBounds(row));
-    m_screenDiffDetection.setToggleState(diffDetect, NotificationType::dontSendNotification);
+    m_screenDiffDetection.setToggleState(captureSettings.diffDetect, NotificationType::dontSendNotification);
     m_screenDiffDetection.onClick = [this] {
         if (m_screenCapturingMode.getSelectedId() == 2) {
             if (m_screenDiffDetection.getToggleState()) {
@@ -168,7 +167,7 @@ ScreenCapturingTab::ScreenCapturingTab(bool capOff, bool localMode, bool capFFmp
     addAndMakeVisible(m_screenJpgQualityLbl);
 
     String q;
-    q << screenQuality;
+    q << captureSettings.screenQuality;
     m_screenJpgQuality.setText(q);
     m_screenJpgQuality.setBounds(getFieldBounds(row));
     addAndMakeVisible(m_screenJpgQuality);
@@ -179,7 +178,7 @@ ScreenCapturingTab::ScreenCapturingTab(bool capOff, bool localMode, bool capFFmp
     m_pluginWindowsOnTopLbl.setBounds(getLabelBounds(row));
     addAndMakeVisible(m_pluginWindowsOnTopLbl);
 
-    m_pluginWindowsOnTop.setToggleState(winOnTop, NotificationType::dontSendNotification);
+    m_pluginWindowsOnTop.setToggleState(captureSettings.winOnTop, NotificationType::dontSendNotification);
     m_pluginWindowsOnTop.setBounds(getCheckBoxBounds(row));
     addAndMakeVisible(m_pluginWindowsOnTop);
 
@@ -190,7 +189,7 @@ ScreenCapturingTab::ScreenCapturingTab(bool capOff, bool localMode, bool capFFmp
     addAndMakeVisible(m_screenMouseOffsetXYLbl);
 
     m_screenMouseOffsetXY.setBounds(getWideFieldBounds(row));
-    m_screenMouseOffsetXY.setText(String(offsetX) + "x" + String(offsetY));
+    m_screenMouseOffsetXY.setText(String(captureSettings.offsetX) + "x" + String(captureSettings.offsetY));
     m_screenMouseOffsetXY.setInputFilter(new TextEditor::LengthAndCharacterRestriction(11, "0123456789x-,"), true);
     addAndMakeVisible(m_screenMouseOffsetXY);
 }
