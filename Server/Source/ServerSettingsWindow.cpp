@@ -721,8 +721,9 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_tabbedComponent.setBounds(0, 0, totalWidth, totalHeight - saveButtonRegionHeight);
 
     m_saveButton.setButtonText("Save");
-    m_saveButton.setBounds(totalWidth / 2 - saveButtonWidth / 2, totalHeight - saveButtonRegionHeight / 2 - saveButtonHeight / 2,
-                           saveButtonWidth, saveButtonHeight);
+    m_saveButton.setBounds(totalWidth / 2 - saveButtonWidth / 2,
+                           totalHeight - saveButtonRegionHeight / 2 - saveButtonHeight / 2, saveButtonWidth,
+                           saveButtonHeight);
     addAndMakeVisible(&m_saveButton);
 
     m_saveButton.onClick = [this, app] {

@@ -1,9 +1,9 @@
 /*
-* Copyright (c) 2024 Andreas Pohl
-* Licensed under MIT (https://github.com/apohl79/audiogridder/blob/master/COPYING)
-*
-* Author: Kieran Coulter
-*/
+ * Copyright (c) 2024 Andreas Pohl
+ * Licensed under MIT (https://github.com/apohl79/audiogridder/blob/master/COPYING)
+ *
+ * Author: Kieran Coulter
+ */
 
 #include "DiagnosticsTab.hpp"
 #include "Logger.hpp"
@@ -11,8 +11,7 @@
 
 namespace e47 {
 
-DiagnosticsTab::DiagnosticsTab(bool crashReporting)
-{
+DiagnosticsTab::DiagnosticsTab(bool crashReporting) {
     int row = 0;
 
     m_loggerLbl.setText("Logging:", NotificationType::dontSendNotification);
@@ -35,7 +34,8 @@ DiagnosticsTab::DiagnosticsTab(bool crashReporting)
 
     row++;
 
-    m_crashReportingLbl.setText("Send crash reports (please enable if you have issues!):", NotificationType::dontSendNotification);
+    m_crashReportingLbl.setText("Send crash reports (please enable if you have issues!):",
+                                NotificationType::dontSendNotification);
     m_crashReportingLbl.setBounds(getLabelBounds(row));
     addAndMakeVisible(m_crashReportingLbl);
 
@@ -44,15 +44,11 @@ DiagnosticsTab::DiagnosticsTab(bool crashReporting)
     addChildAndSetID(&m_crashReporting, "dumps");
 }
 
-void DiagnosticsTab::paint (Graphics& g)
-{
+void DiagnosticsTab::paint(Graphics& g) {
     auto bgColour = LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId);
     g.setColour(bgColour);
 }
 
-void DiagnosticsTab::resized()
-{
-
-}
+void DiagnosticsTab::resized() {}
 
 }  // namespace e47

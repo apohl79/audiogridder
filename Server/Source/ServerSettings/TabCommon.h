@@ -1,8 +1,8 @@
 /*
-* Copyright (c) 2024 Andreas Pohl
-* Licensed under MIT (https://github.com/apohl79/audiogridder/blob/master/COPYING)
-*
-* Author: Kieran Coulter
+ * Copyright (c) 2024 Andreas Pohl
+ * Licensed under MIT (https://github.com/apohl79/audiogridder/blob/master/COPYING)
+ *
+ * Author: Kieran Coulter
  */
 
 #pragma once
@@ -40,16 +40,16 @@ static auto getFieldBounds = [](int r) {
                                 fieldWidth, fieldHeight);
 };
 static auto getWideFieldBounds = [](int r) {
-    return juce::Rectangle<int>(totalWidth - wideFieldWidth - borderLR,
-                                extraBorderTB + borderTB + r * rowHeight + 3, wideFieldWidth, fieldHeight);
+    return juce::Rectangle<int>(totalWidth - wideFieldWidth - borderLR, extraBorderTB + borderTB + r * rowHeight + 3,
+                                wideFieldWidth, fieldHeight);
 };
 static auto getCheckBoxBounds = [](int r) {
     return juce::Rectangle<int>(totalWidth - checkBoxWidth - borderLR, extraBorderTB + borderTB + r * rowHeight + 3,
                                 checkBoxWidth, checkBoxHeight);
 };
 static auto getLargeFieldBounds = [](int r) {
-    return juce::Rectangle<int>(totalWidth - largeFieldWidth - borderLR,
-                                extraBorderTB + borderTB + r * rowHeight + 3, largeFieldWidth, largeFieldHeight);
+    return juce::Rectangle<int>(totalWidth - largeFieldWidth - borderLR, extraBorderTB + borderTB + r * rowHeight + 3,
+                                largeFieldWidth, largeFieldHeight);
 };
 static auto getHeaderBounds = [](int r) {
     return juce::Rectangle<int>(borderLR, extraBorderTB + borderTB + r * rowHeight + 7, totalWidth - borderLR * 2,
@@ -57,15 +57,30 @@ static auto getHeaderBounds = [](int r) {
 };
 
 struct MainSettings {
-    const String& name; int id; int mode;
+    const String& name;
+    int id;
+    int mode;
 };
 
 struct FormatSettings {
-    bool au; bool vst3; bool vst2; bool vst2NoStandard; bool lv2;
-    const StringArray& vst3Folders; const StringArray& vst2Folders; const StringArray& lv2Folders;
+    bool au;
+    bool vst3;
+    bool vst2;
+    bool vst2NoStandard;
+    bool lv2;
+    const StringArray& vst3Folders;
+    const StringArray& vst2Folders;
+    const StringArray& lv2Folders;
 };
 
 struct CaptureSettings {
-    bool capOff; bool localMode; bool capFFmpeg; bool diffDetect; bool winOnTop;
-    int FFmpegQuality; int offsetX; int offsetY; float screenQuality;
+    bool capOff;
+    bool localMode;
+    bool capFFmpeg;
+    bool diffDetect;
+    bool winOnTop;
+    int FFmpegQuality;
+    int offsetX;
+    int offsetY;
+    float screenQuality;
 };

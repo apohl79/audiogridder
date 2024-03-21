@@ -1,16 +1,15 @@
 /*
-* Copyright (c) 2024 Andreas Pohl
-* Licensed under MIT (https://github.com/apohl79/audiogridder/blob/master/COPYING)
-*
-* Author: Kieran Coulter
-*/
+ * Copyright (c) 2024 Andreas Pohl
+ * Licensed under MIT (https://github.com/apohl79/audiogridder/blob/master/COPYING)
+ *
+ * Author: Kieran Coulter
+ */
 
 #include "MainTab.hpp"
 
 namespace e47 {
 
-MainTab::MainTab(MainSettings mainSettings)
-{
+MainTab::MainTab(MainSettings mainSettings) {
     int row = 0;
 
     m_nameLabel.setText("Server Name:", NotificationType::dontSendNotification);
@@ -53,8 +52,7 @@ MainTab::MainTab(MainSettings mainSettings)
     addAndMakeVisible(m_sandboxMode);
 }
 
-void MainTab::paint(Graphics& g)
-{
+void MainTab::paint(Graphics& g) {
     auto bgColour = LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId);
     g.setColour(bgColour);
 }

@@ -1175,10 +1175,9 @@ void Server::runServer() {
     logln("available plugins:");
     for (auto& desc : m_pluginList.getTypes()) {
         logln("  " << desc.name << " [" << Processor::createPluginID(desc) << ", "
-                   << Processor::createPluginIDDepricated(desc) << "]"
-                   << " version=" << desc.version << " format=" << desc.pluginFormatName
-                   << " ins=" << desc.numInputChannels << " outs=" << desc.numOutputChannels
-                   << " instrument=" << (int)desc.isInstrument);
+                   << Processor::createPluginIDDepricated(desc) << "]" << " version=" << desc.version
+                   << " format=" << desc.pluginFormatName << " ins=" << desc.numInputChannels
+                   << " outs=" << desc.numOutputChannels << " instrument=" << (int)desc.isInstrument);
     }
 
     // some time could have passed by until we reach that point, lets check if the user decided to quit

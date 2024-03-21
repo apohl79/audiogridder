@@ -1,17 +1,16 @@
 /*
-* Copyright (c) 2024 Andreas Pohl
-* Licensed under MIT (https://github.com/apohl79/audiogridder/blob/master/COPYING)
-*
-* Author: Kieran Coulter
-*/
+ * Copyright (c) 2024 Andreas Pohl
+ * Licensed under MIT (https://github.com/apohl79/audiogridder/blob/master/COPYING)
+ *
+ * Author: Kieran Coulter
+ */
 
 #include "ScreenCapturingTab.hpp"
 #include "ScreenRecorder.hpp"
 
 namespace e47 {
 
-ScreenCapturingTab::ScreenCapturingTab(CaptureSettings captureSettings)
-{
+ScreenCapturingTab::ScreenCapturingTab(CaptureSettings captureSettings) {
     String tooltip;
     int row = 0;
 
@@ -194,15 +193,11 @@ ScreenCapturingTab::ScreenCapturingTab(CaptureSettings captureSettings)
     addAndMakeVisible(m_screenMouseOffsetXY);
 }
 
-void ScreenCapturingTab::paint (Graphics& g)
-{
+void ScreenCapturingTab::paint(Graphics& g) {
     auto bgColour = LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId);
     g.setColour(bgColour);
 }
 
-void ScreenCapturingTab::resized()
-{
-
-}
+void ScreenCapturingTab::resized() {}
 
 }  // namespace e47

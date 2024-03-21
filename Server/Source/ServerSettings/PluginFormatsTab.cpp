@@ -1,16 +1,15 @@
 /*
-* Copyright (c) 2024 Andreas Pohl
-* Licensed under MIT (https://github.com/apohl79/audiogridder/blob/master/COPYING)
-*
-* Author: Kieran Coulter
-*/
+ * Copyright (c) 2024 Andreas Pohl
+ * Licensed under MIT (https://github.com/apohl79/audiogridder/blob/master/COPYING)
+ *
+ * Author: Kieran Coulter
+ */
 
 #include "PluginFormatsTab.hpp"
 
 namespace e47 {
 
-PluginFormatsTab::PluginFormatsTab(FormatSettings formatSettings)
-{
+PluginFormatsTab::PluginFormatsTab(FormatSettings formatSettings) {
     int row = 0;
     String tmpStr;
 
@@ -125,15 +124,11 @@ PluginFormatsTab::PluginFormatsTab(FormatSettings formatSettings)
     m_lv2Folders.setText(tmpStr);
 }
 
-void PluginFormatsTab::paint (Graphics& g)
-{
+void PluginFormatsTab::paint(Graphics& g) {
     auto bgColour = LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId);
     g.setColour(bgColour);
 }
 
-void PluginFormatsTab::resized()
-{
-
-}
+void PluginFormatsTab::resized() {}
 
 }  // namespace e47

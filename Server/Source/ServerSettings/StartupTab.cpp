@@ -1,17 +1,16 @@
 /*
-* Copyright (c) 2024 Andreas Pohl
-* Licensed under MIT (https://github.com/apohl79/audiogridder/blob/master/COPYING)
-*
-* Author: Kieran Coulter
-*/
+ * Copyright (c) 2024 Andreas Pohl
+ * Licensed under MIT (https://github.com/apohl79/audiogridder/blob/master/COPYING)
+ *
+ * Author: Kieran Coulter
+ */
 
 #include "StartupTab.hpp"
 #include "Defaults.hpp"
 
 namespace e47 {
 
-StartupTab::StartupTab(bool scanForPlugins)
-{
+StartupTab::StartupTab(bool scanForPlugins) {
     String tooltip;
     int row = 0;
 
@@ -44,15 +43,11 @@ StartupTab::StartupTab(bool scanForPlugins)
     addAndMakeVisible(m_scanForPlugins);
 }
 
-void StartupTab::paint (Graphics& g)
-{
+void StartupTab::paint(Graphics& g) {
     auto bgColour = LookAndFeel::getDefaultLookAndFeel().findColour(ResizableWindow::backgroundColourId);
     g.setColour(bgColour);
 }
 
-void StartupTab::resized()
-{
-
-}
+void StartupTab::resized() {}
 
 }  // namespace e47
