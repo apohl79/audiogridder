@@ -9,12 +9,17 @@
 
 static int totalWidth = 600;
 
+#ifdef JUCE_LINUX
+static int totalHeight = 100;
+static int extraBorderTB = 20;
+#else
 static int totalHeight = 80;
+static int extraBorderTB = 0;
+#endif
+
 static int borderLR = 15;  // left/right border
 static int borderTB = 15;  // top/bottom border
 static int rowHeight = 30;
-static int extraBorderTB = 0;
-
 static int fieldWidth = 50;
 static int wideFieldWidth = 250;
 static int fieldHeight = 25;
@@ -26,11 +31,6 @@ static int checkBoxHeight = 25;
 static int largeFieldRows = 2;
 static int largeFieldWidth = 250;
 static int largeFieldHeight = largeFieldRows * rowHeight - 10;
-
-#ifdef JUCE_LINUX
-extraBorderTB = 20;
-totalHeight += extraBorderTB;
-#endif
 
 static auto getLabelBounds = [](int r) {
     return juce::Rectangle<int>(borderLR, extraBorderTB + borderTB + r * rowHeight, labelWidth, labelHeight);
