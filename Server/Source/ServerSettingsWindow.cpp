@@ -25,8 +25,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
       m_pluginFormatsTab(app->getServer()->getFormatSettings()),
       m_screenCapturingTab(app->getServer()->getCaptureSettings()),
       m_startupTab(app->getServer()->getScanForPlugins()),
-      m_diagnosticsTab(app->getServer()->getCrashReporting())
-{
+      m_diagnosticsTab(app->getServer()->getCrashReporting()) {
     traceScope();
     setUsingNativeTitleBar(true);
 
