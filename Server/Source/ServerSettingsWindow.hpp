@@ -21,8 +21,6 @@ namespace e47 {
 
 class App;
 
-#define OLD_LAYOUT 0
-
 class ServerSettingsWindow : public DocumentWindow, public LogTag {
   public:
     explicit ServerSettingsWindow(App* app);
