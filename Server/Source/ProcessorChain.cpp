@@ -218,7 +218,7 @@ bool ProcessorChain::initPluginInstance(Processor* proc, const String& layout, S
         if (proc->supportsDoublePrecisionProcessing()) {
             prec = AudioProcessor::doublePrecision;
         } else {
-            logln("host wants double precission but plugin '" << proc->getName() << "' does not support it");
+            logln("host wants double precision but plugin '" << proc->getName() << "' does not support it");
         }
     }
     proc->setProcessingPrecision(prec);

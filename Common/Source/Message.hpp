@@ -98,7 +98,7 @@ struct HandshakeRequest {
     int channelsSC;
     double sampleRate;
     int samplesPerBlock;
-    bool doublePrecission;
+    bool doublePrecision;
     uint64 clientId;
     uint8 flags;
     uint8 unused1;
@@ -117,7 +117,7 @@ struct HandshakeRequest {
         j["channelsSC"] = channelsSC;
         j["rate"] = sampleRate;
         j["samplesPerBlock"] = samplesPerBlock;
-        j["doublePrecission"] = doublePrecission;
+        j["doublePrecision"] = doublePrecision;
         j["clientId"] = clientId;
         j["flags"] = flags;
         j["activeChannels"] = activeChannels;
@@ -131,7 +131,7 @@ struct HandshakeRequest {
         channelsSC = j["channelsSC"].get<int>();
         sampleRate = j["rate"].get<double>();
         samplesPerBlock = j["samplesPerBlock"].get<int>();
-        doublePrecission = j["doublePrecission"].get<bool>();
+        doublePrecision = j["doublePrecision"].get<bool>();
         clientId = j["clientId"].get<uint64>();
         flags = j["flags"].get<uint8>();
         activeChannels = j["activeChannels"].get<uint64>();

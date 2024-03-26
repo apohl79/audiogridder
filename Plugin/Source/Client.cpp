@@ -310,7 +310,7 @@ void Client::init(int channelsIn, int channelsOut, int channelsSC, double rate, 
     traceScope();
     logln("init: channelsIn=" << channelsIn << " channelsOut=" << channelsOut << " channelsSC=" << channelsSC
                               << " rate=" << rate << " samplesPerBlock=" << samplesPerBlock
-                              << " doublePrecission=" << (int)doublePrecission);
+                              << " doublePrecision=" << (int)doublePrecission);
     LockByID lock(*this, INIT1);
     if (!m_ready || m_channelsIn != channelsIn || m_channelsOut != channelsOut || m_channelsSC != channelsSC ||
         m_sampleRate != rate || m_samplesPerBlock != samplesPerBlock || m_doublePrecission != doublePrecission) {

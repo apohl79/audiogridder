@@ -22,6 +22,7 @@ juce_add_gui_app(AudioGridderServer
 juce_generate_juce_header(AudioGridderServer)
 
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/Source AG_SOURCES_SERVER)
+aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/Source/ServerSettings AG_SOURCES_SERVER_SETTINGS)
 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   list(REMOVE_ITEM AG_SOURCES_SERVER "${CMAKE_CURRENT_SOURCE_DIR}/Source/Screen.mm")
@@ -31,7 +32,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
   list(REMOVE_ITEM  AG_SOURCES_SERVER "${CMAKE_CURRENT_SOURCE_DIR}/Source/ScreenHelper_linux.cpp")
 endif()
 
-target_sources(AudioGridderServer PRIVATE ${AG_SOURCES_SERVER} ${AG_SOURCES_COMMON})
+target_sources(AudioGridderServer PRIVATE ${AG_SOURCES_SERVER} ${AG_SOURCES_SERVER_SETTINGS} ${AG_SOURCES_COMMON})
 
 set(AG_PLUGINHOST_VST 0)
 if(AG_SDKS_ROOT)
@@ -52,7 +53,8 @@ target_compile_definitions(AudioGridderServer PRIVATE
   JUCE_DISABLE_AUDIOPROCESSOR_BEGIN_END_GESTURE_CHECKING
   JUCE_DISABLE_ASSERTIONS
   JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:AudioGridderServer,JUCE_PRODUCT_NAME>"
-  JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:AudioGridderServer,JUCE_VERSION>")
+  JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:AudioGridderServer,JUCE_VERSION>"
+  JUCE_DISPLAY_SPLASH_SCREEN=0)
 
 target_compile_features(AudioGridderServer PRIVATE cxx_std_14)
 
@@ -83,7 +85,12 @@ endif()
 ag_strip(AudioGridderServer Server)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  target_link_libraries(AudioGridderServer PRIVATE "-framework AVFoundation -framework CoreMedia")
+  target_link_libraries(AudioGridderServer
+          PRIVATE
+          "-framework AVFoundation"
+          "-framework CoreMedia"
+          "-framework OpenGL"
+          "-framework Security")
   if(AG_MACOS_TARGET STRGREATER_EQUAL 10.8)
     target_link_libraries(AudioGridderServer PRIVATE "-framework VideoToolbox")
   endif()

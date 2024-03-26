@@ -33,21 +33,21 @@ class Processor : public LogTagDelegate, public std::enable_shared_from_this<Pro
     static String createPluginID(const PluginDescription& d);
     // These are for some backwards compatibility
     static String createPluginIDWithName(const PluginDescription& d);
-    static String createPluginIDDepricated(const PluginDescription& d);
+    static String createPluginIDDeprecated(const PluginDescription& d);
     static String convertJUCEtoAGPluginID(const String& id);
 
     inline static json createJson(const PluginDescription& d) {
         return {{"name", d.name.toStdString()},
                 {"company", d.manufacturerName.toStdString()},
-                {"id", createPluginIDDepricated(d).toStdString()},
+                {"id", createPluginIDDeprecated(d).toStdString()},
                 {"id2", createPluginID(d).toStdString()},
                 {"type", d.pluginFormatName.toStdString()},
                 {"category", d.category.toStdString()},
                 {"isInstrument", d.isInstrument}};
     }
 
-    static std::unique_ptr<PluginDescription> findPluginDescritpion(const String& id, String* idNormalized = nullptr);
-    static std::unique_ptr<PluginDescription> findPluginDescritpion(const String& id, const KnownPluginList& pluglist,
+    static std::unique_ptr<PluginDescription> findPluginDescription(const String& id, String* idNormalized = nullptr);
+    static std::unique_ptr<PluginDescription> findPluginDescription(const String& id, const KnownPluginList& pluglist,
                                                                     String* idNormalized = nullptr);
 
     static Array<AudioProcessor::BusesLayout> findSupportedLayouts(std::shared_ptr<AudioPluginInstance> proc);

@@ -19,6 +19,7 @@
 #include "json.hpp"
 #include "ScreenRecorder.hpp"
 #include "Sandbox.hpp"
+#include "ServerSettings/TabCommon.h"
 
 namespace e47 {
 
@@ -86,6 +87,24 @@ class Server : public Thread, public LogTag {
     void setSandboxMode(SandboxMode m) { m_sandboxMode = m; }
     bool getCrashReporting() const { return m_crashReporting; }
     void setCrashReporting(bool b) { m_crashReporting = b; }
+
+    MainSettings getMainSettings()
+    {
+        return { m_name, m_id, m_sandboxMode };
+    }
+
+    FormatSettings getFormatSettings()
+    {
+        return { m_enableAU, m_enableVST3, m_enableVST2, m_vstNoStandardFolders, m_enableLV2,
+                 m_vst3Folders, m_vst2Folders, m_lv2Folders };
+    }
+
+    CaptureSettings getCaptureSettings()
+    {
+        return { m_screenCapturingOff, m_screenLocalMode, m_screenCapturingFFmpeg, m_screenDiffDetection,
+                 m_pluginWindowsOnTop, m_screenCapturingFFmpegQuality, m_screenMouseOffsetX, m_screenMouseOffsetY,
+                 m_screenJpgQuality };
+    }
 
     const KnownPluginList& getPluginList() const { return m_pluginList; }
     KnownPluginList& getPluginList() { return m_pluginList; }

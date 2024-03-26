@@ -22,6 +22,6 @@ void askForScreenRecordingPermission();
 bool askForAccessibilityPermission();
 #endif
 
-}
+}  // namespace e47
 
 #endif /* Screen_h */
