@@ -30,7 +30,7 @@ DiagnosticsTab::DiagnosticsTab(bool crashReporting) {
 
     m_tracer.setBounds(getCheckBoxBounds(row));
     m_tracer.setToggleState(Tracer::isEnabled(), NotificationType::dontSendNotification);
-    addChildAndSetID(&m_tracer, "tracer");
+    addAndMakeVisible(m_tracer);
 
     row++;
 
@@ -41,7 +41,7 @@ DiagnosticsTab::DiagnosticsTab(bool crashReporting) {
 
     m_crashReporting.setBounds(getCheckBoxBounds(row));
     m_crashReporting.setToggleState(crashReporting, NotificationType::dontSendNotification);
-    addChildAndSetID(&m_crashReporting, "dumps");
+    addAndMakeVisible(m_crashReporting);
 }
 
 void DiagnosticsTab::paint(Graphics& g) {

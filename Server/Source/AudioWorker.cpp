@@ -39,7 +39,7 @@ void AudioWorker::init(std::unique_ptr<StreamingSocket> s, HandshakeRequest cfg)
     m_socket = std::move(s);
     m_sampleRate = cfg.sampleRate;
     m_samplesPerBlock = cfg.samplesPerBlock;
-    m_doublePrecission = cfg.doublePrecission;
+    m_doublePrecision = cfg.doublePrecision;
     m_channelsIn = cfg.channelsIn;
     m_channelsOut = cfg.channelsOut;
     m_channelsSC = cfg.channelsSC;
@@ -50,7 +50,7 @@ void AudioWorker::init(std::unique_ptr<StreamingSocket> s, HandshakeRequest cfg)
     m_channelMapper.print();
     m_chain = std::make_shared<ProcessorChain>(
         getLogTagSource(), ProcessorChain::createBussesProperties(m_channelsIn, m_channelsOut, m_channelsSC), cfg);
-    if (m_doublePrecission && m_chain->supportsDoublePrecisionProcessing()) {
+    if (m_doublePrecision && m_chain->supportsDoublePrecisionProcessing()) {
         m_chain->setProcessingPrecision(AudioProcessor::doublePrecision);
     }
     m_chain->updateChannels(m_channelsIn, m_channelsOut, m_channelsSC);
@@ -81,12 +81,12 @@ void AudioWorker::run() {
     auto traceCtx = TimeTrace::createTraceContext();
     Uuid traceId;
 
-    auto processingTresholdMs = -1.0;
+    auto processingThresholdMs = -1.0;
     if (auto srv = getApp()->getServer()) {
-        processingTresholdMs = srv->getProcessingTraceTresholdMs();
+        processingThresholdMs = srv->getProcessingTraceTresholdMs();
     }
-    if (processingTresholdMs <= 0.0) {
-        processingTresholdMs = m_samplesPerBlock / m_sampleRate * 1000 - 1;
+    if (processingThresholdMs <= 0.0) {
+        processingThresholdMs = m_samplesPerBlock / m_sampleRate * 1000 - 1;
     }
 
     MessageHelper::Error e;
@@ -137,7 +137,7 @@ void AudioWorker::run() {
                     sendOk = msg.sendToClient(m_socket.get(), bufferF, midi, m_chain->getLatencySamples(),
                                               bufferF.getNumChannels(), &e, *bytesOut);
                 }
-                traceCtx->summary(getLogTagSource(), "process audio", processingTresholdMs);
+                traceCtx->summary(getLogTagSource(), "process audio", processingThresholdMs);
                 if (!sendOk) {
                     logln("error: failed to send audio data to client: " << e.toString());
                     m_socket->close();
@@ -175,7 +175,7 @@ void AudioWorker::processBlock(AudioBuffer<T>& buffer, MidiBuffer& midi) {
     if (numChannels <= buffer.getNumChannels()) {
         m_chain->processBlock(buffer, midi);
     } else {
-        // we received less channels, now we need to map the input/output data
+        // we received fewer channels, now we need to map the input/output data
         auto* procBuffer = getProcBuffer<T>();
         procBuffer->setSize(numChannels, buffer.getNumSamples());
         if (m_activeChannels.getNumActiveChannels(true) > 0) {
@@ -236,7 +236,7 @@ String AudioWorker::getRecentsList(String host) const {
 
 void AudioWorker::addToRecentsList(const String& id, const String& host) {
     traceScope();
-    auto plug = Processor::findPluginDescritpion(id);
+    auto plug = Processor::findPluginDescription(id);
     if (plug != nullptr) {
         std::lock_guard<std::mutex> lock(m_recentsMtx);
         auto& recents = m_recents[host];

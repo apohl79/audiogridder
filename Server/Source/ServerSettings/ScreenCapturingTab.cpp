@@ -47,7 +47,7 @@ ScreenCapturingTab::ScreenCapturingTab(CaptureSettings captureSettings) {
         mode = 3;
     }
     // else {
-    //    switch (srv->getScreenCapturingFFmpegEncoder()) {
+    //    switch (captureSettings.capFFmpegEncoder) { //TODO: NOTE: This struct element doesn't exist yet
     //        case ScreenRecorder::WEBP:
     //            mode = 1;
     //            break;

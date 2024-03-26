@@ -92,7 +92,7 @@ class AudioWorker : public Thread, public LogTagDelegate {
     ChannelMapper m_channelMapper;
     double m_sampleRate;
     int m_samplesPerBlock;
-    bool m_doublePrecission;
+    bool m_doublePrecision;
     std::shared_ptr<ProcessorChain> m_chain;
     static std::unordered_map<String, RecentsListType> m_recents;
     static std::mutex m_recentsMtx;

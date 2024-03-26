@@ -632,7 +632,7 @@ bool Server::scanPlugin(const String& id, const String& format, int srvId, bool 
     auto types = newlist.getTypes();
     for (auto& t : types) {
         auto pluginId = Processor::createPluginID(t);
-        auto pluginIdDeprecated = Processor::createPluginIDDepricated(t);
+        auto pluginIdDeprecated = Processor::createPluginIDDeprecated(t);
         auto pluginIdWithName = Processor::createPluginIDWithName(t);
 
         // update the server process
@@ -1175,7 +1175,7 @@ void Server::runServer() {
     logln("available plugins:");
     for (auto& desc : m_pluginList.getTypes()) {
         logln("  " << desc.name << " [" << Processor::createPluginID(desc) << ", "
-                   << Processor::createPluginIDDepricated(desc) << "]" << " version=" << desc.version
+                   << Processor::createPluginIDDeprecated(desc) << "]" << " version=" << desc.version
                    << " format=" << desc.pluginFormatName << " ins=" << desc.numInputChannels
                    << " outs=" << desc.numOutputChannels << " instrument=" << (int)desc.isInstrument);
     }
@@ -1259,7 +1259,7 @@ void Server::runServer() {
 
                         logln("  rate                      = " << cfg.sampleRate);
                         logln("  samplesPerBlock           = " << cfg.samplesPerBlock);
-                        logln("  doublePrecission          = " << static_cast<int>(cfg.doublePrecission));
+                        logln("  doublePrecision          = " << static_cast<int>(cfg.doublePrecision));
                         logln("  flags.NoPluginListFilter  = "
                               << (int)cfg.isFlag(HandshakeRequest::NO_PLUGINLIST_FILTER));
                     } else {

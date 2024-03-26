@@ -92,7 +92,7 @@ PluginFormatsTab::PluginFormatsTab(FormatSettings formatSettings) {
     m_vstNoStandardFolders.setBounds(getCheckBoxBounds(row));
     m_vstNoStandardFolders.setToggleState(formatSettings.vst2NoStandard, NotificationType::dontSendNotification);
     m_vstNoStandardFolders.setTooltip(tooltip);
-    addChildAndSetID(&m_vstNoStandardFolders, "vstnostandarddirs");
+    addAndMakeVisible(m_vstNoStandardFolders);
 
     row++;
 
@@ -115,7 +115,7 @@ PluginFormatsTab::PluginFormatsTab(FormatSettings formatSettings) {
     m_lv2Folders.setBounds(getLargeFieldBounds(row));
     m_lv2Folders.setMultiLine(true, false);
     m_lv2Folders.setReturnKeyStartsNewLine(true);
-    addChildAndSetID(&m_lv2Folders, "lv2fold");
+    addAndMakeVisible(m_lv2Folders);
 
     tmpStr = "";
     for (auto& folder : formatSettings.lv2Folders) {
