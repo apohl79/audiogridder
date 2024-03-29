@@ -74,7 +74,7 @@ String Processor::createPluginIDWithName(const PluginDescription& d) {
     return d.pluginFormatName + (d.name.isNotEmpty() ? "-" + d.name : "") + "-" + String::toHexString(d.uniqueId);
 }
 
-String Processor::createPluginIDDepricated(const PluginDescription& d) {
+String Processor::createPluginIDDeprecated(const PluginDescription& d) {
     return d.pluginFormatName + (d.name.isNotEmpty() ? "-" + d.name : "") + "-" + String::toHexString(d.deprecatedUid);
 }
 
@@ -124,16 +124,16 @@ String Processor::convertJUCEtoAGPluginID(const String& id) {
     auto convertedId = format + "-" + name + "-" + pluginId;
 
     setLogTagStatic("processor");
-    logln("sucessfully converted JUCE ID " << id << " to AG ID " << convertedId);
+    logln("successfully converted JUCE ID " << id << " to AG ID " << convertedId);
 
     return convertedId;
 }
 
-std::unique_ptr<PluginDescription> Processor::findPluginDescritpion(const String& id, String* idNormalized) {
-    return findPluginDescritpion(id, getApp()->getPluginList(), idNormalized);
+std::unique_ptr<PluginDescription> Processor::findPluginDescription(const String& id, String* idNormalized) {
+    return findPluginDescription(id, getApp()->getPluginList(), idNormalized);
 }
 
-std::unique_ptr<PluginDescription> Processor::findPluginDescritpion(const String& id, const KnownPluginList& pluglist,
+std::unique_ptr<PluginDescription> Processor::findPluginDescription(const String& id, const KnownPluginList& pluglist,
                                                                     String* idNormalized) {
     std::unique_ptr<PluginDescription> plugdesc;
     setLogTagStatic("processor");
@@ -143,9 +143,9 @@ std::unique_ptr<PluginDescription> Processor::findPluginDescritpion(const String
     for (auto& desc : pluglist.getTypes()) {
         auto descId = createPluginID(desc);
         auto descIdWithName = createPluginIDWithName(desc);
-        auto descIdDepricated = createPluginIDDepricated(desc);
-        if (descId == id || descIdWithName == id || descIdWithName == convertedId || descIdDepricated == id ||
-            descIdDepricated == convertedId) {
+        auto descIdDeprecated = createPluginIDDeprecated(desc);
+        if (descId == id || descIdWithName == id || descIdWithName == convertedId || descIdDeprecated == id ||
+            descIdDeprecated == convertedId) {
             plugdesc = std::make_unique<PluginDescription>(desc);
             if (nullptr != idNormalized) {
                 *idNormalized = descId;
@@ -333,7 +333,7 @@ std::shared_ptr<AudioPluginInstance> Processor::loadPlugin(const String& id, dou
                                                            String& err, String* idNormalized) {
     setLogTagStatic("processor");
     traceScope();
-    auto plugdesc = findPluginDescritpion(id, idNormalized);
+    auto plugdesc = findPluginDescription(id, idNormalized);
     if (nullptr != plugdesc) {
         return loadPlugin(*plugdesc, sampleRate, blockSize, err);
     } else {
@@ -376,7 +376,7 @@ bool Processor::load(const String& settings, const String& layout, uint64 monoCh
 
     if (m_isClient) {
 #ifndef AG_UNIT_TESTS
-        bool found = nullptr != findPluginDescritpion(m_id, &m_idNormalized);
+        bool found = nullptr != findPluginDescription(m_id, &m_idNormalized);
 #else
         bool found = true;
         m_idNormalized = m_id;
