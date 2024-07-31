@@ -22,10 +22,14 @@ macro(WEBP_FIND varname shortname headername)
   find_library(WEBP_${varname}_LIBRARIES
     NAMES ${LIB_NAMES}
     PATHS
+    ${FFMPEG_ROOT}/lib64
     ${FFMPEG_ROOT}/lib
+    $ENV{FFMPEG_DIR}/lib64
     $ENV{FFMPEG_DIR}/lib
     /usr/lib/x86_64-linux-gnu
+    /usr/local/lib64
     /usr/local/lib
+    /usr/lib64
     /usr/lib
     NO_DEFAULT_PATH
     DOC "Location of FFMPEG Libs")

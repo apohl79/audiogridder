@@ -6,10 +6,13 @@ macro(FFMPEG_FIND varname shortname headername)
   find_path(FFMPEG_${varname}_INCLUDE_DIRS lib${shortname}/${headername}
     PATHS
     ${FFMPEG_ROOT}/include
+    ${FFMPEG_ROOT}/include/ffmpeg
     $ENV{FFMPEG_DIR}/include
+    $ENV{FFMPEG_DIR}/include/ffmpeg
     /usr/include/x86_64-linux-gnu
     /usr/local/include
     /usr/include/
+    /usr/include/ffmpeg
     NO_DEFAULT_PATH
     DOC "Location of FFMPEG Headers")
 
@@ -22,10 +25,14 @@ macro(FFMPEG_FIND varname shortname headername)
   find_library(FFMPEG_${varname}_LIBRARIES
     NAMES ${LIB_NAMES}
     PATHS
+    ${FFMPEG_ROOT}/lib64
     ${FFMPEG_ROOT}/lib
+    $ENV{FFMPEG_DIR}/lib64
     $ENV{FFMPEG_DIR}/lib
     /usr/lib/x86_64-linux-gnu
+    /usr/local/lib64
     /usr/local/lib
+    /usr/lib64
     /usr/lib
     NO_DEFAULT_PATH
     DOC "Location of FFMPEG Libs")
