@@ -25,7 +25,9 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
       m_pluginFormatsTab(app->getServer()->getFormatSettings()),
       m_screenCapturingTab(app->getServer()->getCaptureSettings()),
       m_startupTab(app->getServer()->getScanForPlugins()),
-      m_diagnosticsTab(app->getServer()->getCrashReporting()) {
+      m_diagnosticsTab(app->getServer()->getCrashReporting()),
+      m_ioTab(app->getServer()->getIOSettings())
+{
     traceScope();
     setUsingNativeTitleBar(true);
 
@@ -49,6 +51,7 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
     m_tabbedComponent.addTab("Capture", bgColour, &m_screenCapturingTab, true);
     m_tabbedComponent.addTab("Startup", bgColour, &m_startupTab, true);
     m_tabbedComponent.addTab("Diagnostics", bgColour, &m_diagnosticsTab, true);
+    m_tabbedComponent.addTab("I/O", bgColour, &m_ioTab, true);
     m_tabbedComponent.setBounds(0, 0, totalWidth, totalHeight - saveButtonRegionHeight);
 
     m_saveButton.setButtonText("Save");
@@ -169,6 +172,9 @@ ServerSettingsWindow::ServerSettingsWindow(App* app)
                     }
                 }
             }
+
+            srv2->saveDeviceConfig();
+
             configWriteFile(Defaults::getConfigFileName(Defaults::ConfigServerStartup), {{"IDs", valid.toStdString()}});
         }
 

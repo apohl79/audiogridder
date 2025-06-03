@@ -9,6 +9,7 @@
 #define Server_hpp
 
 #include <JuceHeader.h>
+#include <juce_audio_devices/juce_audio_devices.h>
 #include <set>
 #include <thread>
 
@@ -106,6 +107,22 @@ class Server : public Thread, public LogTag {
                  m_screenJpgQuality };
     }
 
+    IOSettings getIOSettings()
+    {
+        m_minAudioInputChannels = 0;
+        m_maxAudioInputChannels = std::numeric_limits<int>::max();
+        m_minAudioOutputChannels = 0;
+        m_maxAudioOutputChannels = std::numeric_limits<int>::max();
+        m_showMidiInputOptions = true;
+        m_showMidiOutputSelector = true;
+        m_showChannelsAsStereoPairs = true;
+        m_hideAdvancedOptionsWithButton = true;
+
+        return { m_audioDeviceManager, m_minAudioInputChannels, m_maxAudioInputChannels,
+                 m_minAudioOutputChannels, m_maxAudioOutputChannels, m_showMidiInputOptions, m_showMidiOutputSelector,
+                 m_showChannelsAsStereoPairs, m_hideAdvancedOptionsWithButton };
+    }
+
     const KnownPluginList& getPluginList() const { return m_pluginList; }
     KnownPluginList& getPluginList() { return m_pluginList; }
     const Array<AudioProcessor::BusesLayout>& getPluginLayouts(const String& id);
@@ -146,8 +163,8 @@ class Server : public Thread, public LogTag {
     void updateSandboxNetworkStats(const String& key, uint32 loaded, double bytesIn, double bytesOut, double rps,
                                    const std::vector<TimeStatistic::Histogram>& audioHists);
 
-    double getProcessingTraceTresholdMs() const { return m_processingTraceTresholdMs; }
-    void setProcessingTraceTresholdMs(double d) { m_processingTraceTresholdMs = d; }
+    double getProcessingTraceTresholdMs() const { return m_processingTraceThresholdMs; }
+    void setProcessingTraceTresholdMs(double d) { m_processingTraceThresholdMs = d; }
 
     template <typename T>
     inline T getOpt(const String& name, T def) const {
@@ -158,6 +175,9 @@ class Server : public Thread, public LogTag {
     inline void setOpt(const String& name, T val) {
         m_opts[name.toStdString()] = val;
     }
+
+    void loadDeviceConfig();
+    void saveDeviceConfig();
 
   private:
     json m_opts;
@@ -185,6 +205,16 @@ class Server : public Thread, public LogTag {
     bool m_screenLocalMode = false;
     int m_screenMouseOffsetX = 0;
     int m_screenMouseOffsetY = 0;
+
+    juce::AudioDeviceManager m_audioDeviceManager;
+    int m_minAudioInputChannels;
+    int m_maxAudioInputChannels;
+    int m_minAudioOutputChannels;
+    int m_maxAudioOutputChannels;
+    bool m_showMidiInputOptions;
+    bool m_showMidiOutputSelector;
+    bool m_showChannelsAsStereoPairs;
+    bool m_hideAdvancedOptionsWithButton;
 #ifdef JUCE_LINUX
     bool m_pluginWindowsOnTop = true;
 #else
@@ -200,7 +230,7 @@ class Server : public Thread, public LogTag {
     bool m_crashReporting = true;
     SandboxMode m_sandboxMode = SANDBOX_CHAIN, m_sandboxModeRuntime = SANDBOX_NONE;
     bool m_sandboxLogAutoclean = true;
-    double m_processingTraceTresholdMs = 0.0;
+    double m_processingTraceThresholdMs = 0.0;
 
     SafeHashMap<String, std::shared_ptr<SandboxMaster>> m_sandboxes;
 

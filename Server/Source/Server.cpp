@@ -162,7 +162,7 @@ void Server::loadConfig() {
     m_pluginWindowsOnTop = jsonGetValue(cfg, "PluginWindowsOnTop", m_pluginWindowsOnTop);
     m_scanForPlugins = jsonGetValue(cfg, "ScanForPlugins", m_scanForPlugins);
     m_crashReporting = jsonGetValue(cfg, "CrashReporting", m_crashReporting);
-    m_processingTraceTresholdMs = jsonGetValue(cfg, "ProcessingTraceTresholdMs", m_processingTraceTresholdMs);
+    m_processingTraceThresholdMs = jsonGetValue(cfg, "ProcessingTraceTresholdMs", m_processingTraceThresholdMs); //TODO: How to update the JSON string without breaking things?
     logln("crash reporting is " << (m_crashReporting ? "enabled" : "disabled"));
     m_sandboxMode = (SandboxMode)jsonGetValue(cfg, "SandboxMode", m_sandboxMode);
     logln("sandbox mode is " << (m_sandboxMode == SANDBOX_CHAIN    ? "chain isolation"
@@ -175,6 +175,30 @@ void Server::loadConfig() {
             m_pluginExclude.insert(s.get<std::string>());
         }
     }
+
+    loadDeviceConfig();
+}
+
+void Server::loadDeviceConfig() {
+#if JUCE_DEBUG
+    auto path = std::filesystem::current_path();
+    auto loadPath = path / "NativeIOSettings.xml";
+    juce::File deviceXMLFile (loadPath.string());
+    if (deviceXMLFile.existsAsFile()) {
+        auto deviceXML = juce::XmlDocument::parse(deviceXMLFile);
+        m_audioDeviceManager.initialise(std::numeric_limits<int>::max(), std::numeric_limits<int>::max(), deviceXML.get(), true);
+    }
+#endif
+}
+
+void Server::saveDeviceConfig() {
+#if JUCE_DEBUG
+    auto stateXml = m_audioDeviceManager.createStateXml();
+    auto path = std::filesystem::current_path();
+    auto savePath = path / "NativeIOSettings.xml";
+    juce::File deviceXMLFile(savePath.string());
+    stateXml->writeTo(deviceXMLFile);
+#endif
 }
 
 void Server::saveConfig() {
@@ -230,7 +254,7 @@ void Server::saveConfig() {
     j["CrashReporting"] = m_crashReporting;
     j["SandboxMode"] = m_sandboxMode;
     j["SandboxLogAutoclean"] = m_sandboxLogAutoclean;
-    j["ProcessingTraceTresholdMs"] = m_processingTraceTresholdMs;
+    j["ProcessingTraceTresholdMs"] = m_processingTraceThresholdMs; //TODO: Fix typo in JSON key
 
     File cfg(Defaults::getConfigFileName(Defaults::ConfigServer, {{"id", String(getId())}}));
     logln("saving config to " << cfg.getFullPathName());
@@ -1197,13 +1221,13 @@ void Server::runServer() {
     if (getScreenLocalMode() && Defaults::unixDomainSocketsSupported()) {
         auto socketPath = Defaults::getSocketPath(Defaults::SERVER_SOCK, {{"id", String(getId())}}, true);
         logln("creating listener " << socketPath.getFullPathName());
-        if (!m_masterSocketLocal.createListener(socketPath)) {
+        if (!m_masterSocketLocal.createListener(100, socketPath.getFullPathName())) {
             logln("failed to create local master listener");
         }
     }
 
     logln("creating listener " << (m_host.length() == 0 ? "*" : m_host) << ":" << (m_port + getId()));
-    if (m_masterSocket.createListener6(m_port + getId(), m_host)) {
+    if (m_masterSocket.createListener(m_port + getId(), m_host)) {
         logln("server started: ID=" << getId() << ", PORT=" << m_port + getId() << ", NAME=" << m_name);
         while (!threadShouldExit()) {
             StreamingSocket* clnt = nullptr;
@@ -1287,8 +1311,11 @@ void Server::runServer() {
                     auto sandbox = std::make_shared<SandboxMaster>(*this, id);
                     logln("creating sandbox " << id);
                     if (sandbox->launchWorkerProcess(
-                            File::getSpecialLocation(File::currentExecutableFile), Defaults::SANDBOX_CMD_PREFIX,
-                            {"-id", String(getId()), "-islocal", String((int)isLocal), "-clientid", id}, 3000, 30000)) {
+                            File::getSpecialLocation(File::currentExecutableFile),
+                            Defaults::SANDBOX_CMD_PREFIX,
+                            {"-id", String(getId()), "-islocal", String((int)isLocal), "-clientid", id},
+                             3000,
+                             30000)) {
                         sandbox->onPortReceived = [this, id, clnt](int sandboxPort) {
                             traceScope();
                             if (!sendHandshakeResponse(clnt, true, sandboxPort)) {

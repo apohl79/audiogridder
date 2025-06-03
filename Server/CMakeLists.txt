@@ -56,8 +56,6 @@ target_compile_definitions(AudioGridderServer PRIVATE
   JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:AudioGridderServer,JUCE_VERSION>"
   JUCE_DISPLAY_SPLASH_SCREEN=0)
 
-target_compile_features(AudioGridderServer PRIVATE cxx_std_14)
-
 juce_add_binary_data(AudioGridderServerData SOURCES
   Resources/icon.png
   Resources/icon16.png
@@ -66,8 +64,10 @@ juce_add_binary_data(AudioGridderServerData SOURCES
 target_link_libraries(AudioGridderServer PRIVATE
   AudioGridderServerData
   juce::juce_audio_basics
-  juce::juce_audio_processors
+  juce::juce_audio_devices
   juce::juce_audio_formats
+  juce::juce_audio_processors
+  juce::juce_audio_utils
   juce::juce_graphics
   juce::juce_gui_extra
   juce::juce_recommended_config_flags
@@ -90,10 +90,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
           "-framework AVFoundation"
           "-framework CoreMedia"
           "-framework OpenGL"
-          "-framework Security")
-  if(AG_MACOS_TARGET STRGREATER_EQUAL 10.8)
-    target_link_libraries(AudioGridderServer PRIVATE "-framework VideoToolbox")
-  endif()
+          "-framework Security"
+          "-framework VideoToolbox")
+
   ag_bundle_add_crashpad(AudioGridderServer)
   ag_bundle_sign(AudioGridderServer)
   if(CMAKE_BUILD_TYPE STREQUAL "Debug")

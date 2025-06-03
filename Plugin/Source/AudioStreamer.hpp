@@ -18,11 +18,11 @@ namespace e47 {
 template <typename T>
 class AudioStreamer : public Thread, public LogTagDelegate {
   public:
-    AudioStreamer(Client* clnt, StreamingSocket* sock)
+    AudioStreamer(Client* clnt, std::unique_ptr<StreamingSocket> sock)
         : Thread("AudioStreamer"),
           LogTagDelegate(clnt),
           m_client(clnt),
-          m_socket(std::unique_ptr<StreamingSocket>(sock)),
+          m_socket(std::move(sock)),
           m_queueSize((size_t)clnt->NUM_OF_BUFFERS * 8),
           m_queueHighWaterMark((size_t)clnt->NUM_OF_BUFFERS * 7),
           m_writeQ(m_queueSize),

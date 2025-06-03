@@ -47,6 +47,10 @@ static auto getCheckBoxBounds = [](int r) {
     return juce::Rectangle<int>(totalWidth - checkBoxWidth - borderLR, extraBorderTB + borderTB + r * rowHeight + 3,
                                 checkBoxWidth, checkBoxHeight);
 };
+static auto getIOCheckBoxBounds = [](int r) {
+    return juce::Rectangle<int>(totalWidth - checkBoxWidth - 2*borderLR, extraBorderTB + borderTB + r * rowHeight + 3,
+                                checkBoxWidth, checkBoxHeight);
+};
 static auto getLargeFieldBounds = [](int r) {
     return juce::Rectangle<int>(totalWidth - largeFieldWidth - borderLR, extraBorderTB + borderTB + r * rowHeight + 3,
                                 largeFieldWidth, largeFieldHeight);
@@ -83,4 +87,16 @@ struct CaptureSettings {
     int offsetX;
     int offsetY;
     float screenQuality;
+};
+
+struct IOSettings {
+    AudioDeviceManager& deviceManager;
+    int minAudioInputChannels;
+    int maxAudioInputChannels;
+    int minAudioOutputChannels;
+    int maxAudioOutputChannels;
+    bool showMidiInputOptions;
+    bool showMidiOutputSelector;
+    bool showChannelsAsStereoPairs;
+    bool hideAdvancedOptionsWithButton;
 };

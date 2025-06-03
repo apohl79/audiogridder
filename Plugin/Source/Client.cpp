@@ -306,23 +306,23 @@ void Client::setOnCloseCallback(OnCloseCallback fn) {
 }
 
 void Client::init(int channelsIn, int channelsOut, int channelsSC, double rate, int samplesPerBlock,
-                  bool doublePrecission) {
+                  bool doublePrecision) {
     traceScope();
     logln("init: channelsIn=" << channelsIn << " channelsOut=" << channelsOut << " channelsSC=" << channelsSC
                               << " rate=" << rate << " samplesPerBlock=" << samplesPerBlock
-                              << " doublePrecision=" << (int)doublePrecission);
+                              << " doublePrecision=" << (int)doublePrecision);
     LockByID lock(*this, INIT1);
     if (!m_ready || m_channelsIn != channelsIn || m_channelsOut != channelsOut || m_channelsSC != channelsSC ||
-        m_sampleRate != rate || m_samplesPerBlock != samplesPerBlock || m_doublePrecission != doublePrecission) {
+        m_sampleRate != rate || m_samplesPerBlock != samplesPerBlock || m_doublePrecision != doublePrecision) {
         m_channelsIn = channelsIn;
         m_channelsOut = channelsOut;
         m_channelsSC = channelsSC;
         m_sampleRate = rate;
         m_samplesPerBlock = samplesPerBlock;
-        m_doublePrecission = doublePrecission;
+        m_doublePrecision = doublePrecision;
         m_needsReconnect = true;
         m_ready = false;
-        logln("init: paramater change, requesting reconnect");
+        logln("init: parameter change, requesting reconnect");
     }
 }
 
@@ -330,6 +330,9 @@ void Client::init() {
     traceScope();
     auto srvInfo = getServer();
     bool useUnixDomain = srvInfo.getLocalMode() && Defaults::unixDomainSocketsSupported();
+    if (useUnixDomain) {
+        socketOptions = socketOptions.usingUnixDomain(useUnixDomain);
+    }
     int port = Defaults::SERVER_PORT + srvInfo.getID();
 
     LockByID lock(*this, INIT2);
@@ -341,7 +344,7 @@ void Client::init() {
 #endif
 
     m_error = true;
-    m_cmdOut = std::make_unique<StreamingSocket>();
+    m_cmdOut = std::make_unique<StreamingSocket>(socketOptions);
 
     if (useUnixDomain) {
         auto socketPath = Defaults::getSocketPath(Defaults::SERVER_SOCK, {{"id", String(srvInfo.getID())}});
@@ -364,7 +367,7 @@ void Client::init() {
                                 m_channelsSC,
                                 m_sampleRate,
                                 m_samplesPerBlock,
-                                m_doublePrecission,
+                                m_doublePrecision,
                                 getTagId(),
                                 0,
                                 0,
@@ -409,22 +412,20 @@ void Client::init() {
             return;
         }
 
-        m_cmdIn = std::make_unique<StreamingSocket>();
+        m_cmdIn = std::make_unique<StreamingSocket>(socketOptions);
         if (useUnixDomain ? !m_cmdIn->connect(workerSocketPath) : !m_cmdIn->connect(srvInfo.getHost(), resp.port)) {
             logln("failed to setup command receive connection");
             m_cmdIn.reset();
         }
         logln("command connection established");
 
-        StreamingSocket* audioSock = nullptr;
-        audioSock = new StreamingSocket;
+        std::unique_ptr<StreamingSocket> audioSock = std::make_unique<StreamingSocket>(socketOptions);
         if (useUnixDomain ? !audioSock->connect(workerSocketPath) : !audioSock->connect(srvInfo.getHost(), resp.port)) {
             logln("failed to setup audio connection");
-            delete audioSock;
-            audioSock = nullptr;
+            audioSock.reset();
         }
 
-        m_screenSocket = std::make_unique<StreamingSocket>();
+        m_screenSocket = std::make_unique<StreamingSocket>(socketOptions);
         if (useUnixDomain ? !m_screenSocket->connect(workerSocketPath)
                           : !m_screenSocket->connect(srvInfo.getHost(), resp.port)) {
             logln("failed to setup screen connection");
@@ -433,14 +434,14 @@ void Client::init() {
 
         if (nullptr != audioSock) {
             logln("audio connection established");
-            RealtimeOptions opts;
-            opts.workDurationMs = (uint32)round(m_samplesPerBlock / m_sampleRate * 1000) - 1;
+            auto opts = RealtimeOptions()
+                .withProcessingTimeMs((uint32)round(m_samplesPerBlock / m_sampleRate * 1000) - 1);
             std::lock_guard<std::mutex> audiolck(m_audioMtx);
-            if (m_doublePrecission) {
-                m_audioStreamerD = std::make_shared<AudioStreamer<double>>(this, audioSock);
+            if (m_doublePrecision) {
+                m_audioStreamerD = std::make_shared<AudioStreamer<double>>(this, std::move(audioSock));
                 m_audioStreamerD->startRealtimeThread(opts);
             } else {
-                m_audioStreamerF = std::make_shared<AudioStreamer<float>>(this, audioSock);
+                m_audioStreamerF = std::make_shared<AudioStreamer<float>>(this, std::move(audioSock));
                 m_audioStreamerF->startRealtimeThread(opts);
             }
         } else {

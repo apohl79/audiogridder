@@ -161,7 +161,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     int getNumActiveChannels() const;
     double getSampleRate() const { return m_sampleRate; }
     int getSamplesPerBlock() const { return m_samplesPerBlock; }
-    bool isUsingDoublePrecission() const { return m_doublePrecission; }
+    bool isUsingDoublePrecission() const { return m_doublePrecision; }
     int getLatencySamples() const { return m_latency + NUM_OF_BUFFERS * m_samplesPerBlock + m_latencyManual; }
     void setLatencySamplesManual(int s) { m_latencyManual = s; }
     int getLatencySamplesManual() { return m_latencyManual; }
@@ -178,7 +178,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
 
     bool isReady(int timeout = 1000);
     bool isReadyLockFree();
-    void init(int channelsIn, int channelsOut, int channelsSC, double rate, int samplesPerBlock, bool doublePrecission);
+    void init(int channelsIn, int channelsOut, int channelsSC, double rate, int samplesPerBlock, bool doublePrecision);
 
     void reconnect() { m_needsReconnect = true; }
     void close();
@@ -269,7 +269,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     int m_srvLoadLastUpdated = 0;
     bool m_needsReconnect = false;
     double m_sampleRate = 0;
-    bool m_doublePrecission = false;
+    bool m_doublePrecision = false;
 
     std::atomic_int m_channelsIn{0};
     std::atomic_int m_channelsOut{0};
@@ -368,6 +368,7 @@ class Client : public Thread, public LogTag, public MouseListener, public KeyLis
     std::mutex m_clientMtx;
     LockID m_clientMtxId = NOLOCK;
 
+    juce::SocketOptions socketOptions;
     std::unique_ptr<StreamingSocket> m_cmdOut;
     std::unique_ptr<StreamingSocket> m_cmdIn;
     std::unique_ptr<StreamingSocket> m_screenSocket;

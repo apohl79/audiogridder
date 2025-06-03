@@ -1793,7 +1793,7 @@ void PluginProcessor::TrayConnection::sendStatus() {
 
     json j;
     j["connected"] = isClientReady;
-    j["name"] = track.name.toStdString();
+    j["name"] = track.name->toStdString();
     j["channelsIn"] = m_processor->getMainBusNumInputChannels();
     j["channelsOut"] = m_processor->getTotalNumOutputChannels();
     j["channelsSC"] = m_processor->getBusCount(true) > 0 ? m_processor->getChannelCountOfBus(true, 1) : 0;
@@ -1802,7 +1802,7 @@ void PluginProcessor::TrayConnection::sendStatus() {
 #else
     j["instrument"] = false;
 #endif
-    j["colour"] = track.colour.getARGB();
+    j["colour"] = track.colour->getARGB();
     j["loadedPlugins"] = client.getLoadedPluginsString().toStdString();
     j["loadedPluginsOk"] = m_processor->m_loadedPluginsOk.load();
     j["perfStream"] = tsStream->getMostRecentAverage();
@@ -1875,9 +1875,9 @@ void PluginProcessor::TrayConnection::run() {
             if (!success) {
                 String path = File::getSpecialLocation(File::globalApplicationsDirectory).getFullPathName();
 #ifdef JUCE_MAC
-#ifdef DEBUG
-                path << "/Debug";
-#endif
+//#ifdef DEBUG
+//                path << "/Debug";
+//#endif
                 path << "/AudioGridderPluginTray.app/Contents/MacOS/AudioGridderPluginTray";
 #elif JUCE_WINDOWS
                 path << "/AudioGridderPluginTray/AudioGridderPluginTray.exe";
