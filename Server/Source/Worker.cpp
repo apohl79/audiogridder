@@ -98,7 +98,7 @@ void Worker::run() {
     if (nullptr != sock && sock->isConnected()) {
         m_audio->init(std::move(sock), m_cfg);
         RealtimeOptions opts;
-        opts.workDurationMs = (uint32)lround(m_cfg.samplesPerBlock / m_cfg.sampleRate * 1000) - 1;
+        opts = opts.withPeriodMs((double)lround(m_cfg.samplesPerBlock / m_cfg.sampleRate * 1000) - 1);
         m_audio->startRealtimeThread(opts);
     } else {
         logln("failed to establish audio connection");
@@ -275,7 +275,7 @@ void Worker::handleMessage(std::shared_ptr<Message<AddPlugin>> msg) {
             jresult["supportsDoublePrecision"] = proc->supportsDoublePrecisionProcessing();
             jresult["channelInstances"] = proc->getChannelInstances();
             auto ts = proc->getTailLengthSeconds();
-            if (ts == std::numeric_limits<double>::infinity()) {
+            if (std::isinf(ts)) {
                 ts = 0.0;
             }
             jresult["tailSeconds"] = ts;

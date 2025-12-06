@@ -195,7 +195,7 @@ bool ProcessorClient::connectSandbox() {
         int maxTries = 100;
         while (!m_sockCmdOut->isConnected() && maxTries-- > 0 && m_process.isRunning()) {
             if (hasUnixDomainSockets) {
-                if (!m_sockCmdOut->connect(socketPath, 100)) {
+                if (!m_sockCmdOut->connect(socketPath.getFullPathName(), m_port, 100)) {
                     sleep(100);
                 }
             } else {
@@ -209,7 +209,7 @@ bool ProcessorClient::connectSandbox() {
             m_sockCmdIn = std::make_unique<StreamingSocket>();
 
             if (hasUnixDomainSockets) {
-                if (!m_sockCmdIn->connect(socketPath)) {
+                if (!m_sockCmdIn->connect(socketPath.getFullPathName(), 0)) {
                     setAndLogError("failed to setup sandbox command-in connection");
                     success = false;
                 }
@@ -236,7 +236,7 @@ bool ProcessorClient::connectSandbox() {
         m_sockAudio = std::make_unique<StreamingSocket>();
 
         if (hasUnixDomainSockets) {
-            if (!m_sockAudio->connect(socketPath)) {
+            if (!m_sockAudio->connect(socketPath.getFullPathName(), m_port)) {
                 setAndLogError("failed to setup sandbox audio connection");
                 success = false;
             }
