@@ -11,7 +11,7 @@
 
 #include "WindowHelper.hpp"
 
-#include <juce_graphics/native/juce_mac_CoreGraphicsHelpers.h>
+#include <juce_graphics/native/juce_CoreGraphicsHelpers_mac.h>
 
 namespace e47 {
 namespace WindowHelper {

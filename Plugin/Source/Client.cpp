@@ -346,7 +346,7 @@ void Client::init() {
     if (useUnixDomain) {
         auto socketPath = Defaults::getSocketPath(Defaults::SERVER_SOCK, {{"id", String(srvInfo.getID())}});
         logln("connecting server: " << socketPath.getFullPathName());
-        if (!m_cmdOut->connect(socketPath, 1000)) {
+        if (!m_cmdOut->connect(socketPath.getFullPathName(), 1000)) {
             logln("local connection to server failed");
             useUnixDomain = false;
         }
@@ -397,7 +397,7 @@ void Client::init() {
             workerSocketPath = Defaults::getSocketPath(Defaults::WORKER_SOCK,
                                                        {{"id", String(srvInfo.getID())}, {"n", String(resp.port)}});
             logln("connecting worker: " << workerSocketPath.getFullPathName());
-            m_cmdOut->connect(workerSocketPath);
+            m_cmdOut->connect(workerSocketPath.getFullPathName(), 1000);
         } else {
             logln("connecting worker: " << srvInfo.getHost() << ":" << resp.port);
             m_cmdOut->connect(srvInfo.getHost(), resp.port);
@@ -410,7 +410,7 @@ void Client::init() {
         }
 
         m_cmdIn = std::make_unique<StreamingSocket>();
-        if (useUnixDomain ? !m_cmdIn->connect(workerSocketPath) : !m_cmdIn->connect(srvInfo.getHost(), resp.port)) {
+        if (useUnixDomain ? !m_cmdIn->connect(workerSocketPath.getFullPathName(), 1000) : !m_cmdIn->connect(srvInfo.getHost(), resp.port)) {
             logln("failed to setup command receive connection");
             m_cmdIn.reset();
         }
@@ -418,14 +418,14 @@ void Client::init() {
 
         StreamingSocket* audioSock = nullptr;
         audioSock = new StreamingSocket;
-        if (useUnixDomain ? !audioSock->connect(workerSocketPath) : !audioSock->connect(srvInfo.getHost(), resp.port)) {
+        if (useUnixDomain ? !audioSock->connect(workerSocketPath.getFullPathName(), 1000) : !audioSock->connect(srvInfo.getHost(), resp.port)) {
             logln("failed to setup audio connection");
             delete audioSock;
             audioSock = nullptr;
         }
 
         m_screenSocket = std::make_unique<StreamingSocket>();
-        if (useUnixDomain ? !m_screenSocket->connect(workerSocketPath)
+        if (useUnixDomain ? !m_screenSocket->connect(workerSocketPath.getFullPathName(), 1000)
                           : !m_screenSocket->connect(srvInfo.getHost(), resp.port)) {
             logln("failed to setup screen connection");
             m_screenSocket.reset();
@@ -434,7 +434,7 @@ void Client::init() {
         if (nullptr != audioSock) {
             logln("audio connection established");
             RealtimeOptions opts;
-            opts.workDurationMs = (uint32)round(m_samplesPerBlock / m_sampleRate * 1000) - 1;
+            opts = opts.withPeriodMs((double) (round(m_samplesPerBlock / m_sampleRate * 1000) - 1));
             std::lock_guard<std::mutex> audiolck(m_audioMtx);
             if (m_doublePrecission) {
                 m_audioStreamerD = std::make_shared<AudioStreamer<double>>(this, audioSock);

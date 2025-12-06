@@ -178,14 +178,19 @@ void PluginEditor::paint(Graphics& g) {
     FillType ft;
     auto colBG = getLookAndFeel().findColour(ResizableWindow::backgroundColourId);
     auto tp = m_processor.getTrackProperties();
-    if (!tp.colour.isTransparent()) {
-        auto gradient = ColourGradient::horizontal(colBG.interpolatedWith(tp.colour, 0.05f), 0, colBG, 100);
-        g.setGradientFill(gradient);
-        g.fillAll();
-        g.setColour(tp.colour);
-        g.fillRect(0, 0, 2, getHeight());
-    } else {
+    if (tp.colourARGB.has_value()) {
+      juce::Colour trackColour = juce::Colour(tp.colourARGB.value());
+      if (!trackColour.isTransparent()) {
+          juce::Colour colBG = findColour(juce::ResizableWindow::backgroundColourId);
+          auto gradient = ColourGradient::horizontal(colBG.interpolatedWith(trackColour, 0.05f), 0, colBG, 100);
+          g.setGradientFill(gradient);
+          g.setColour(trackColour);
+          g.fillRect(0, 0, getWidth(), (int)(getHeight() * 0.05)); // This assumption of how to draw might be incorrect
+      } else {
         g.fillAll(colBG);
+      }
+    } else {
+      g.fillAll(colBG);
     }
 }
 

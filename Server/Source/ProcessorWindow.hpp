@@ -29,7 +29,7 @@ class ProcessorWindow : public DocumentWindow, private Timer, public LogTag {
     ~ProcessorWindow() override;
 
     void closeButtonPressed() override;
-    BorderSize<int> getBorderThickness() override { return {}; }
+    BorderSize<int> getBorderThickness() const override { return {}; }
 
     void forgetEditor();
     juce::Rectangle<int> getScreenCaptureRect();

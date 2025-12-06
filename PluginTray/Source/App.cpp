@@ -24,7 +24,7 @@ void App::initialise(const String& /*commandLineParameters*/) {
         }
     }
     if (Defaults::unixDomainSocketsSupported()) {
-        if (!m_srv.beginWaitingForSocket(Defaults::getSocketPath(Defaults::PLUGIN_TRAY_SOCK, {}, true))) {
+          if (!m_srv.beginWaitingForSocket(0, Defaults::getSocketPath(Defaults::PLUGIN_TRAY_SOCK, {}, true).getFullPathName())) {
             quit();
             return;
         }

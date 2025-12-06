@@ -55,7 +55,7 @@ class PluginProcessor : public AudioProcessor, public AudioProcessorParameter::L
     void releaseResources() override;
 
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
-    Array<std::pair<short, short>> getAUChannelInfo() const override;
+    Array<std::pair<short, short>> getAUChannelInfo() const;
 
     bool canAddBus(bool /*isInput*/) const override { return true; }
     bool canRemoveBus(bool /*isInput*/) const override { return true; }

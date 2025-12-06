@@ -1793,7 +1793,7 @@ void PluginProcessor::TrayConnection::sendStatus() {
 
     json j;
     j["connected"] = isClientReady;
-    j["name"] = track.name.toStdString();
+    j["name"] = track.name->toStdString();
     j["channelsIn"] = m_processor->getMainBusNumInputChannels();
     j["channelsOut"] = m_processor->getTotalNumOutputChannels();
     j["channelsSC"] = m_processor->getBusCount(true) > 0 ? m_processor->getChannelCountOfBus(true, 1) : 0;
@@ -1802,7 +1802,7 @@ void PluginProcessor::TrayConnection::sendStatus() {
 #else
     j["instrument"] = false;
 #endif
-    j["colour"] = track.colour.getARGB();
+    j["colour"] = track.colourARGB.value_or(0);
     j["loadedPlugins"] = client.getLoadedPluginsString().toStdString();
     j["loadedPluginsOk"] = m_processor->m_loadedPluginsOk.load();
     j["perfStream"] = tsStream->getMostRecentAverage();
@@ -1868,9 +1868,9 @@ void PluginProcessor::TrayConnection::run() {
         if (!connected) {
             bool success;
             if (Defaults::unixDomainSocketsSupported()) {
-                success = connectToSocket(Defaults::getSocketPath(Defaults::PLUGIN_TRAY_SOCK), 500);
+                success = connectToSocket(Defaults::getSocketPath(Defaults::PLUGIN_TRAY_SOCK).getFullPathName(), Defaults::PLUGIN_TRAY_PORT, 500); // Assumption that port should be same as below
             } else {
-                success = connectToSocket("localhost", Defaults::PLUGIN_TRAY_PORT, 500);
+                success = connectToSocket("localhost", Defaults::PLUGIN_TRAY_PORT, 500); // 2nd arg is port -- we don't have that
             }
             if (!success) {
                 String path = File::getSpecialLocation(File::globalApplicationsDirectory).getFullPathName();
